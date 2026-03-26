@@ -6,7 +6,11 @@ final class ReviewRootView: UIView {
 
     private enum UIConstants {
         static let placeholderText = "플레이 경험, 좋았던 점, 아쉬운 점을 자유롭게 남겨보세요."
+        static let submitAreaHorizontalInset: CGFloat = 20
+        static let submitAreaVerticalInset: CGFloat = 12
     }
+
+    private var submitAreaBottomConstraint: NSLayoutConstraint?
 
     // MARK: Subviews
     let scrollView: UIScrollView = {
@@ -14,6 +18,24 @@ final class ReviewRootView: UIView {
         sv.keyboardDismissMode = .interactive
         sv.translatesAutoresizingMaskIntoConstraints = false
         return sv
+    }()
+
+    private let submitAreaView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpBackground
+        view.layer.shadowColor = UIColor.black.cgColor
+        view.layer.shadowOpacity = 0.18
+        view.layer.shadowRadius = 18
+        view.layer.shadowOffset = CGSize(width: 0, height: -6)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let submitAreaSeparatorView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpSeparator.withAlphaComponent(0.7)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
     }()
 
     // Game info row
@@ -130,8 +152,8 @@ final class ReviewRootView: UIView {
     // Submit
     let submitButton: UIButton = {
         var config = UIButton.Configuration.filled()
-        config.title = "리뷰 등록하기"
-        config.image = UIImage(systemName: "paperplane")
+        config.title = "리뷰 작성하기"
+        config.image = UIImage(systemName: "square.and.pencil")
         config.imagePadding = 8
         config.baseBackgroundColor = .gpPrimary
         config.baseForegroundColor = .white
@@ -161,8 +183,10 @@ final class ReviewRootView: UIView {
     private func setup() {
         backgroundColor = .gpBackground
         addSubview(scrollView)
-        addSubview(submitButton)
+        addSubview(submitAreaView)
         reviewTextView.addSubview(reviewPlaceholderLabel)
+        submitAreaView.addSubview(submitAreaSeparatorView)
+        submitAreaView.addSubview(submitButton)
 
         // Game info card
         let gameInfoStack = UIStackView(arrangedSubviews: [gameTitleLabel, gameDeveloperLabel])
@@ -209,11 +233,23 @@ final class ReviewRootView: UIView {
 
         scrollView.addSubview(contentStack)
 
+        submitAreaBottomConstraint = submitAreaView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor)
+
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: submitButton.topAnchor, constant: -16),
+            scrollView.bottomAnchor.constraint(equalTo: submitAreaView.topAnchor),
+
+            submitAreaView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            submitAreaView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            submitAreaView.topAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            submitAreaBottomConstraint!,
+
+            submitAreaSeparatorView.topAnchor.constraint(equalTo: submitAreaView.topAnchor),
+            submitAreaSeparatorView.leadingAnchor.constraint(equalTo: submitAreaView.leadingAnchor),
+            submitAreaSeparatorView.trailingAnchor.constraint(equalTo: submitAreaView.trailingAnchor),
+            submitAreaSeparatorView.heightAnchor.constraint(equalToConstant: 1),
 
             gameThumbnailView.widthAnchor.constraint(equalToConstant: 56),
             gameThumbnailView.heightAnchor.constraint(equalToConstant: 56),
@@ -229,10 +265,11 @@ final class ReviewRootView: UIView {
             reviewPlaceholderLabel.leadingAnchor.constraint(equalTo: reviewTextView.leadingAnchor, constant: 19),
             reviewPlaceholderLabel.trailingAnchor.constraint(equalTo: reviewTextView.trailingAnchor, constant: -19),
 
-            submitButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
-            submitButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
-            submitButton.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -16),
-            submitButton.heightAnchor.constraint(equalToConstant: 52)
+            submitButton.topAnchor.constraint(equalTo: submitAreaView.topAnchor, constant: UIConstants.submitAreaVerticalInset),
+            submitButton.leadingAnchor.constraint(equalTo: submitAreaView.leadingAnchor, constant: UIConstants.submitAreaHorizontalInset),
+            submitButton.trailingAnchor.constraint(equalTo: submitAreaView.trailingAnchor, constant: -UIConstants.submitAreaHorizontalInset),
+            submitButton.bottomAnchor.constraint(equalTo: submitAreaView.bottomAnchor, constant: -UIConstants.submitAreaVerticalInset),
+            submitButton.heightAnchor.constraint(equalToConstant: 56)
         ])
     }
 
@@ -270,11 +307,15 @@ final class ReviewRootView: UIView {
         reviewTextView.layer.shadowOffset = .zero
     }
 
+    func setSubmitAreaBottomInset(_ inset: CGFloat) {
+        submitAreaBottomConstraint?.constant = -inset
+    }
+
     private func updateSubmitButton(using state: ReviewState) {
         let isEnabled = state.submitEnabled && !state.isSubmitting
         var configuration = submitButton.configuration
-        configuration?.title = state.isSubmitting ? "등록 중..." : "리뷰 등록하기"
-        configuration?.image = state.isSubmitting ? nil : UIImage(systemName: "paperplane")
+        configuration?.title = state.isSubmitting ? "작성 중..." : "리뷰 작성하기"
+        configuration?.image = state.isSubmitting ? nil : UIImage(systemName: "square.and.pencil")
         configuration?.showsActivityIndicator = state.isSubmitting
         configuration?.baseBackgroundColor = isEnabled ? .gpPrimary : .gpSurfaceElevated
         configuration?.baseForegroundColor = isEnabled ? .white : .gpTextTertiary
