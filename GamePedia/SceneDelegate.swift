@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import GoogleSignIn
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
@@ -19,6 +20,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let coordinator = AppCoordinator(window: window)
         self.appCoordinator = coordinator
         coordinator.start()
+
+        if let url = connectionOptions.urlContexts.first?.url,
+           !GIDSignIn.sharedInstance.handle(url) {
+            coordinator.handleIncomingURL(url)
+        }
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
@@ -49,6 +55,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // to restore the scene back to its current state.
     }
 
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        guard let url = URLContexts.first?.url else { return }
+        if GIDSignIn.sharedInstance.handle(url) {
+            return
+        }
+
+        appCoordinator?.handleIncomingURL(url)
+    }
+
 
 }
-

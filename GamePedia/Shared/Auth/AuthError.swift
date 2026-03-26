@@ -4,6 +4,14 @@ enum AuthError: Error, LocalizedError, Equatable {
     case invalidCredentials
     case emailAlreadyExists
     case accountDeletionUnavailable
+    case appleLoginUnavailable
+    case googleLoginUnavailable
+    case googleLoginNotConfigured
+    case socialLoginCancelled
+    case emptyPasswordResetToken
+    case passwordResetTokenInvalid
+    case passwordResetTokenExpired
+    case passwordResetTokenUsed
     case tokenExpired
     case unauthorized
     case validationFailed(message: String)
@@ -25,6 +33,18 @@ enum AuthError: Error, LocalizedError, Equatable {
             return .emailAlreadyExists
         case "ACCOUNT_DELETION_UNAVAILABLE":
             return .accountDeletionUnavailable
+        case "APPLE_LOGIN_UNAVAILABLE", "APPLE_AUTH_NOT_CONFIGURED", "APPLE_AUTH_UNAVAILABLE":
+            return .appleLoginUnavailable
+        case "GOOGLE_AUTH_NOT_CONFIGURED":
+            return .googleLoginNotConfigured
+        case "GOOGLE_AUTH_UNAVAILABLE":
+            return .googleLoginUnavailable
+        case "PASSWORD_RESET_TOKEN_INVALID":
+            return .passwordResetTokenInvalid
+        case "PASSWORD_RESET_TOKEN_EXPIRED":
+            return .passwordResetTokenExpired
+        case "PASSWORD_RESET_TOKEN_USED":
+            return .passwordResetTokenUsed
         case "TOKEN_EXPIRED":
             return .tokenExpired
         case "UNAUTHORIZED":
@@ -46,6 +66,22 @@ enum AuthError: Error, LocalizedError, Equatable {
             return "이미 가입된 이메일입니다."
         case .accountDeletionUnavailable:
             return "현재 서버에서 회원 탈퇴를 지원하지 않습니다. 잠시 후 다시 시도해주세요."
+        case .appleLoginUnavailable:
+            return "현재 Apple 로그인을 사용할 수 없습니다. 잠시 후 다시 시도해주세요."
+        case .googleLoginUnavailable:
+            return "현재 Google 로그인을 사용할 수 없습니다. 잠시 후 다시 시도해주세요."
+        case .googleLoginNotConfigured:
+            return "Google 로그인 설정이 완료되지 않았습니다."
+        case .socialLoginCancelled:
+            return nil
+        case .emptyPasswordResetToken:
+            return "재설정 토큰을 입력해주세요."
+        case .passwordResetTokenInvalid:
+            return "재설정 링크가 올바르지 않습니다. 다시 요청해주세요."
+        case .passwordResetTokenExpired:
+            return "재설정 링크가 만료되었습니다. 새 링크를 요청해주세요."
+        case .passwordResetTokenUsed:
+            return "이미 사용한 재설정 링크입니다. 새 링크를 요청해주세요."
         case .tokenExpired:
             return "세션이 만료되었습니다. 다시 로그인해주세요."
         case .unauthorized:

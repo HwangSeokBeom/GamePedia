@@ -1,3 +1,4 @@
+import AuthenticationServices
 import UIKit
 
 final class LoginRootView: UIView {
@@ -17,7 +18,12 @@ final class LoginRootView: UIView {
     )
 
     let loginButton = UIButton(type: .system)
-    let appleButton = UIButton(type: .system)
+    let appleButton: ASAuthorizationAppleIDButton = {
+        let button = ASAuthorizationAppleIDButton(type: .signIn, style: .white)
+        button.cornerRadius = 12
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
     let googleButton = UIButton(type: .system)
     let signUpButton = UIButton(type: .system)
     let forgotPasswordButton = UIButton(type: .system)
@@ -136,9 +142,9 @@ final class LoginRootView: UIView {
         dividerRow.spacing = 12
 
         let socialStack = UIStackView(arrangedSubviews: [appleButton, googleButton])
-        socialStack.axis = .horizontal
-        socialStack.spacing = 10
-        socialStack.distribution = .fillEqually
+        socialStack.axis = .vertical
+        socialStack.spacing = 12
+        socialStack.distribution = .fill
 
         let formStack = UIStackView(arrangedSubviews: [
             emailFieldView,
@@ -173,8 +179,8 @@ final class LoginRootView: UIView {
             formStack.bottomAnchor.constraint(equalTo: formCardView.bottomAnchor, constant: -16),
 
             loginButton.heightAnchor.constraint(equalToConstant: 52),
-            appleButton.heightAnchor.constraint(equalToConstant: 44),
-            googleButton.heightAnchor.constraint(equalToConstant: 44),
+            appleButton.heightAnchor.constraint(equalToConstant: 52),
+            googleButton.heightAnchor.constraint(equalToConstant: 52),
 
             footerStack.topAnchor.constraint(equalTo: formCardView.bottomAnchor, constant: 18),
             footerStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
@@ -229,8 +235,8 @@ final class LoginRootView: UIView {
 
     private func configureControls() {
         loginButton.configuration = makePrimaryButton(title: "로그인")
-        appleButton.configuration = makeSecondaryButton(title: "Apple", systemImageName: "apple.logo")
-        googleButton.configuration = makeSecondaryButton(title: "Google", systemImageName: "globe")
+        googleButton.configuration = makeSecondaryButton(title: "Google로 계속하기", systemImageName: "globe")
+        googleButton.contentHorizontalAlignment = .center
 
         signUpButton.configuration = makeFooterButton(title: "회원가입", tintColor: .gpPrimary)
         forgotPasswordButton.configuration = makeFooterButton(title: "비밀번호 찾기", tintColor: .gpTextSecondary)
@@ -252,23 +258,24 @@ final class LoginRootView: UIView {
     }
 
     private func makeSecondaryButton(title: String, systemImageName: String) -> UIButton.Configuration {
-        var configuration = UIButton.Configuration.plain()
+        var configuration = UIButton.Configuration.filled()
         configuration.title = title
         configuration.image = UIImage(
             systemName: systemImageName,
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
         )
-        configuration.imagePadding = 8
-        configuration.baseForegroundColor = .gpTextPrimary
-        configuration.background.backgroundColor = .clear
-        configuration.background.strokeColor = .gpSeparator
+        configuration.imagePlacement = .leading
+        configuration.imagePadding = 10
+        configuration.baseForegroundColor = UIColor(hex: "#111216")
+        configuration.baseBackgroundColor = .white
+        configuration.background.strokeColor = UIColor(hex: "#D8D8DE")
         configuration.background.strokeWidth = 1
         configuration.background.cornerRadius = 12
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
         configuration.attributedTitle = AttributedString(
             title,
             attributes: AttributeContainer([
-                .font: UIFont.systemFont(ofSize: 14, weight: .medium)
+                .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
             ])
         )
         return configuration

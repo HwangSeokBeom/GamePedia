@@ -62,6 +62,15 @@ final class ProfileRootView: UIView {
         return view
     }()
 
+    let supportActionContainerView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpSurfaceElevated
+        view.layer.cornerRadius = 18
+        view.layer.cornerCurve = .continuous
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
     let logoutButton: UIButton = {
         let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
             title: "로그아웃",
@@ -85,6 +94,71 @@ final class ProfileRootView: UIView {
     }()
 
     private let accountActionDivider: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpSeparator
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    let termsOfServiceButton: UIButton = {
+        let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
+            title: "이용약관",
+            systemImageName: "doc.text",
+            tintColor: .gpTextPrimary
+        ))
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.contentHorizontalAlignment = .leading
+        return button
+    }()
+
+    let privacyPolicyButton: UIButton = {
+        let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
+            title: "개인정보처리방침",
+            systemImageName: "lock.shield",
+            tintColor: .gpTextPrimary
+        ))
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.contentHorizontalAlignment = .leading
+        return button
+    }()
+
+    let communityGuidelinesButton: UIButton = {
+        let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
+            title: "커뮤니티 가이드라인",
+            systemImageName: "person.2.wave.2",
+            tintColor: .gpTextPrimary
+        ))
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.contentHorizontalAlignment = .leading
+        return button
+    }()
+
+    let contactSupportButton: UIButton = {
+        let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
+            title: "문의하기",
+            systemImageName: "envelope",
+            tintColor: .gpPrimary
+        ))
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.contentHorizontalAlignment = .leading
+        return button
+    }()
+
+    private let supportActionDividerTop: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpSeparator
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let supportActionDividerMiddle: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpSeparator
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let supportActionDividerBottom: UIView = {
         let view = UIView()
         view.backgroundColor = .gpSeparator
         view.translatesAutoresizingMaskIntoConstraints = false
@@ -180,7 +254,15 @@ final class ProfileRootView: UIView {
         accountActionContainerView.addSubview(accountActionDivider)
         accountActionContainerView.addSubview(deleteAccountButton)
 
-        [userRow, statsContainerView, accountActionContainerView, sectionHeader, tableView].forEach {
+        supportActionContainerView.addSubview(termsOfServiceButton)
+        supportActionContainerView.addSubview(supportActionDividerTop)
+        supportActionContainerView.addSubview(privacyPolicyButton)
+        supportActionContainerView.addSubview(supportActionDividerMiddle)
+        supportActionContainerView.addSubview(communityGuidelinesButton)
+        supportActionContainerView.addSubview(supportActionDividerBottom)
+        supportActionContainerView.addSubview(contactSupportButton)
+
+        [userRow, statsContainerView, accountActionContainerView, supportActionContainerView, sectionHeader, tableView].forEach {
             addSubview($0)
         }
 
@@ -221,7 +303,47 @@ final class ProfileRootView: UIView {
             deleteAccountButton.heightAnchor.constraint(equalToConstant: 52),
             deleteAccountButton.bottomAnchor.constraint(equalTo: accountActionContainerView.bottomAnchor),
 
-            sectionHeader.topAnchor.constraint(equalTo: accountActionContainerView.bottomAnchor, constant: 24),
+            supportActionContainerView.topAnchor.constraint(equalTo: accountActionContainerView.bottomAnchor, constant: 20),
+            supportActionContainerView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            supportActionContainerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+
+            termsOfServiceButton.topAnchor.constraint(equalTo: supportActionContainerView.topAnchor),
+            termsOfServiceButton.leadingAnchor.constraint(equalTo: supportActionContainerView.leadingAnchor),
+            termsOfServiceButton.trailingAnchor.constraint(equalTo: supportActionContainerView.trailingAnchor),
+            termsOfServiceButton.heightAnchor.constraint(equalToConstant: 52),
+
+            supportActionDividerTop.topAnchor.constraint(equalTo: termsOfServiceButton.bottomAnchor),
+            supportActionDividerTop.leadingAnchor.constraint(equalTo: supportActionContainerView.leadingAnchor, constant: 16),
+            supportActionDividerTop.trailingAnchor.constraint(equalTo: supportActionContainerView.trailingAnchor, constant: -16),
+            supportActionDividerTop.heightAnchor.constraint(equalToConstant: 1),
+
+            privacyPolicyButton.topAnchor.constraint(equalTo: supportActionDividerTop.bottomAnchor),
+            privacyPolicyButton.leadingAnchor.constraint(equalTo: supportActionContainerView.leadingAnchor),
+            privacyPolicyButton.trailingAnchor.constraint(equalTo: supportActionContainerView.trailingAnchor),
+            privacyPolicyButton.heightAnchor.constraint(equalToConstant: 52),
+
+            supportActionDividerMiddle.topAnchor.constraint(equalTo: privacyPolicyButton.bottomAnchor),
+            supportActionDividerMiddle.leadingAnchor.constraint(equalTo: supportActionContainerView.leadingAnchor, constant: 16),
+            supportActionDividerMiddle.trailingAnchor.constraint(equalTo: supportActionContainerView.trailingAnchor, constant: -16),
+            supportActionDividerMiddle.heightAnchor.constraint(equalToConstant: 1),
+
+            communityGuidelinesButton.topAnchor.constraint(equalTo: supportActionDividerMiddle.bottomAnchor),
+            communityGuidelinesButton.leadingAnchor.constraint(equalTo: supportActionContainerView.leadingAnchor),
+            communityGuidelinesButton.trailingAnchor.constraint(equalTo: supportActionContainerView.trailingAnchor),
+            communityGuidelinesButton.heightAnchor.constraint(equalToConstant: 52),
+
+            supportActionDividerBottom.topAnchor.constraint(equalTo: communityGuidelinesButton.bottomAnchor),
+            supportActionDividerBottom.leadingAnchor.constraint(equalTo: supportActionContainerView.leadingAnchor, constant: 16),
+            supportActionDividerBottom.trailingAnchor.constraint(equalTo: supportActionContainerView.trailingAnchor, constant: -16),
+            supportActionDividerBottom.heightAnchor.constraint(equalToConstant: 1),
+
+            contactSupportButton.topAnchor.constraint(equalTo: supportActionDividerBottom.bottomAnchor),
+            contactSupportButton.leadingAnchor.constraint(equalTo: supportActionContainerView.leadingAnchor),
+            contactSupportButton.trailingAnchor.constraint(equalTo: supportActionContainerView.trailingAnchor),
+            contactSupportButton.heightAnchor.constraint(equalToConstant: 52),
+            contactSupportButton.bottomAnchor.constraint(equalTo: supportActionContainerView.bottomAnchor),
+
+            sectionHeader.topAnchor.constraint(equalTo: supportActionContainerView.bottomAnchor, constant: 24),
             sectionHeader.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
             sectionHeader.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
             sectionHeader.heightAnchor.constraint(equalToConstant: 44),

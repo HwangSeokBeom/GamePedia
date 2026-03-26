@@ -11,10 +11,18 @@ enum ProfileIntent {
     case didTapSeeMoreRecentPlay
     case didTapWrittenReviews
     case didTapFavoriteGames
+    case didTapTermsOfService
+    case didTapPrivacyPolicy
+    case didTapCommunityGuidelines
+    case didTapContactSupport
 }
 
 enum ProfileRoute {
     case loggedOut
     case showWrittenReviews
     case showFavoriteGames
+    case showTermsOfService
+    case showPrivacyPolicy
+    case showCommunityGuidelines
+    case contactSupport
 }

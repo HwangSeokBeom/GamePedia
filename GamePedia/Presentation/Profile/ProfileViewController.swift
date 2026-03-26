@@ -14,6 +14,10 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     var onLoggedOut: (() -> Void)?
     var onShowFavoriteGames: (() -> Void)?
     var onShowWrittenReviews: (() -> Void)?
+    var onShowTermsOfService: (() -> Void)?
+    var onShowPrivacyPolicy: (() -> Void)?
+    var onShowCommunityGuidelines: (() -> Void)?
+    var onContactSupport: (() -> Void)?
 
     // MARK: Init
     init(
@@ -52,6 +56,10 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
         rootView.sectionHeader.seeMoreButton.addTarget(
             self, action: #selector(didTapSeeMoreRecentPlay), for: .touchUpInside
         )
+        rootView.termsOfServiceButton.addTarget(self, action: #selector(didTapTermsOfService), for: .touchUpInside)
+        rootView.privacyPolicyButton.addTarget(self, action: #selector(didTapPrivacyPolicy), for: .touchUpInside)
+        rootView.communityGuidelinesButton.addTarget(self, action: #selector(didTapCommunityGuidelines), for: .touchUpInside)
+        rootView.contactSupportButton.addTarget(self, action: #selector(didTapContactSupport), for: .touchUpInside)
         let reviewTapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(didTapWrittenReviews))
         let favoriteTapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(didTapFavoriteGames))
         rootView.reviewStatView.addGestureRecognizer(reviewTapGestureRecognizer)
@@ -77,6 +85,14 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
                 self?.onShowWrittenReviews?()
             case .showFavoriteGames:
                 self?.onShowFavoriteGames?()
+            case .showTermsOfService:
+                self?.onShowTermsOfService?()
+            case .showPrivacyPolicy:
+                self?.onShowPrivacyPolicy?()
+            case .showCommunityGuidelines:
+                self?.onShowCommunityGuidelines?()
+            case .contactSupport:
+                self?.onContactSupport?()
             }
         }
     }
@@ -109,6 +125,22 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
 
     @objc private func didTapFavoriteGames() {
         viewModel.send(.didTapFavoriteGames)
+    }
+
+    @objc private func didTapTermsOfService() {
+        viewModel.send(.didTapTermsOfService)
+    }
+
+    @objc private func didTapPrivacyPolicy() {
+        viewModel.send(.didTapPrivacyPolicy)
+    }
+
+    @objc private func didTapCommunityGuidelines() {
+        viewModel.send(.didTapCommunityGuidelines)
+    }
+
+    @objc private func didTapContactSupport() {
+        viewModel.send(.didTapContactSupport)
     }
 
     @objc private func didTapLogout() {

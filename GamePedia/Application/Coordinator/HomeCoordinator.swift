@@ -16,6 +16,7 @@ final class HomeCoordinator {
     // MARK: Properties
 
     let navigationController: UINavigationController
+    var onAuthenticationRequested: ((UIViewController, RestrictedActionContext, @escaping () -> Void) -> Void)?
 
     // MARK: Init
 
@@ -46,6 +47,11 @@ final class HomeCoordinator {
 
     private func showDetail(gameId: Int) {
         let detailVC = GameDetailViewController(gameId: gameId)
+        detailVC.onAuthenticationRequired = { [weak self, weak detailVC] context, action in
+            guard let self else { return }
+            let presenter = detailVC ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
+        }
         detailVC.onWriteReview = { [weak self, weak detailVC] game, existingReview in
             self?.showReview(game: game, existingReview: existingReview, detailViewController: detailVC)
         }
@@ -119,6 +125,11 @@ final class HomeCoordinator {
                 gameTitle: game.displayTitle
             )
         )
+        reviewsViewController.onAuthenticationRequired = { [weak self, weak reviewsViewController] context, action in
+            guard let self else { return }
+            let presenter = reviewsViewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
+        }
         reviewsViewController.onComposeRequested = { [weak self, weak detailViewController, weak reviewsViewController] existingReview in
             self?.showReview(
                 game: game,

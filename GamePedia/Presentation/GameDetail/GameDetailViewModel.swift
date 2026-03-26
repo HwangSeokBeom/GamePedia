@@ -22,6 +22,7 @@ final class GameDetailViewModel {
     private let fetchGameReviewsUseCase: FetchGameReviewsUseCase
     private let fetchFavoriteStatusUseCase: FetchFavoriteStatusUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
+    private let moderationRepository: any ModerationRepository
 
     // MARK: Init
     init(
@@ -35,12 +36,14 @@ final class GameDetailViewModel {
         toggleFavoriteUseCase: ToggleFavoriteUseCase = ToggleFavoriteUseCase(
             favoriteRepository: DefaultFavoriteRepository()
         ),
+        moderationRepository: any ModerationRepository = DefaultModerationRepository(),
         translateTextUseCase: TranslateTextUseCase? = nil
     ) {
         self.apiClient = apiClient
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
         self.fetchFavoriteStatusUseCase = fetchFavoriteStatusUseCase
         self.toggleFavoriteUseCase = toggleFavoriteUseCase
+        self.moderationRepository = moderationRepository
         self.translateTextUseCase = translateTextUseCase ?? DefaultTranslateTextUseCase(
             repository: DefaultTranslationRepository(),
             languageProvider: DefaultLanguageProvider.shared
@@ -110,7 +113,15 @@ final class GameDetailViewModel {
                 sort: .latest
             )
             await MainActor.run {
-                self.apply(.setReviewFeed(reviewFeed))
+                let visibleReviews = self.visibleReviews(from: reviewFeed.reviews)
+                self.apply(
+                    .setReviewFeed(
+                        GameReviewFeed(
+                            reviews: visibleReviews,
+                            summary: self.makeReviewSummary(from: visibleReviews)
+                        )
+                    )
+                )
             }
         } catch {
             // Reviews failing silently — detail still shows
@@ -197,6 +208,30 @@ final class GameDetailViewModel {
             translatedTitle: translatedValues["title"],
             translatedSummary: translatedSummary,
             translatedStoryline: translatedStoryline
+        )
+    }
+
+    private func visibleReviews(from reviews: [Review]) -> [Review] {
+        let hiddenReviewIDs = moderationRepository.hiddenReviewIDs()
+        let blockedUserIDs = moderationRepository.blockedUserIDs()
+
+        return reviews.filter { review in
+            !hiddenReviewIDs.contains(review.id) && !blockedUserIDs.contains(review.author.id)
+        }
+    }
+
+    private func makeReviewSummary(from reviews: [Review]) -> ReviewSummary {
+        guard !reviews.isEmpty else {
+            return ReviewSummary(reviewCount: 0, averageRating: nil)
+        }
+
+        let averageRating = reviews.reduce(0.0) { partialResult, review in
+            partialResult + review.rating
+        } / Double(reviews.count)
+
+        return ReviewSummary(
+            reviewCount: reviews.count,
+            averageRating: (averageRating * 10).rounded() / 10
         )
     }
 }

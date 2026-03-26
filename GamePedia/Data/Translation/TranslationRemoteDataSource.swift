@@ -35,7 +35,7 @@ final class DefaultTranslationRemoteDataSource: TranslationRemoteDataSource {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(requestDTO)
 
-        print("[Translation] request start")
+        print("[TranslationNetwork] runtime=\(AppConfig.networkRuntimeDescription) baseURL=\(baseURL.absoluteString) requestURL=\(url.absoluteString) method=POST")
 
         do {
             let (data, response) = try await session.data(for: request)
@@ -43,14 +43,14 @@ final class DefaultTranslationRemoteDataSource: TranslationRemoteDataSource {
                 throw NetworkError.unknown(URLError(.badServerResponse))
             }
 
-            print("[Translation] response received")
+            print("[TranslationNetwork] response status=\(httpResponse.statusCode)")
 
             return TranslationRemoteResponse(
                 data: data,
                 statusCode: httpResponse.statusCode
             )
         } catch {
-            print("[Translation] request failed", error)
+            print("[TranslationNetwork] request failed \(error.localizedDescription)")
             throw error
         }
     }

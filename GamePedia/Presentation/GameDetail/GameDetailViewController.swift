@@ -13,6 +13,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
     var onWriteReview: ((GameDetail, Review?) -> Void)?
     var onShowAllReviews: ((GameDetail) -> Void)?
     var onShare: ((GameDetail) -> Void)?
+    var onAuthenticationRequired: ((RestrictedActionContext, @escaping () -> Void) -> Void)?
 
     // MARK: Init
 
@@ -136,16 +137,34 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
     // MARK: Actions
 
+    private func performAuthenticatedAction(
+        for context: RestrictedActionContext,
+        action: @escaping () -> Void
+    ) {
+        guard let onAuthenticationRequired else {
+            action()
+            return
+        }
+
+        onAuthenticationRequired(context, action)
+    }
+
     @objc private func didTapHaveIt() {
-        viewModel.send(.didTapHaveIt)
+        performAuthenticatedAction(for: .favoriteGame) { [weak self] in
+            self?.viewModel.send(.didTapHaveIt)
+        }
     }
 
     @objc private func didTapWriteReview() {
-        viewModel.send(.didTapWriteReview)
+        performAuthenticatedAction(for: .writeReview) { [weak self] in
+            self?.viewModel.send(.didTapWriteReview)
+        }
     }
 
     @objc private func didTapSeeAllReviews() {
-        viewModel.send(.didTapSeeAllReviews)
+        performAuthenticatedAction(for: .viewReviews) { [weak self] in
+            self?.viewModel.send(.didTapSeeAllReviews)
+        }
     }
 
     @objc private func didTapShare() {

@@ -12,6 +12,9 @@ final class GameReviewsViewModel {
 
     private let fetchGameReviewsUseCase: FetchGameReviewsUseCase
     private let deleteReviewUseCase: DeleteReviewUseCase
+    private let submitReportUseCase: SubmitReportUseCase
+    private let blockUserUseCase: BlockUserUseCase
+    private let moderationRepository: any ModerationRepository
     private let reviewSortOption: ReviewSortOption
 
     init(
@@ -23,12 +26,16 @@ final class GameReviewsViewModel {
         ),
         deleteReviewUseCase: DeleteReviewUseCase = DeleteReviewUseCase(
             reviewRepository: DefaultReviewRepository()
-        )
+        ),
+        moderationRepository: any ModerationRepository = DefaultModerationRepository()
     ) {
         self.state = GameReviewsState(gameId: gameId, gameTitle: gameTitle)
         self.reviewSortOption = reviewSortOption
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
         self.deleteReviewUseCase = deleteReviewUseCase
+        self.moderationRepository = moderationRepository
+        self.submitReportUseCase = SubmitReportUseCase(moderationRepository: moderationRepository)
+        self.blockUserUseCase = BlockUserUseCase(moderationRepository: moderationRepository)
     }
 
     func loadReviews() {
@@ -42,9 +49,10 @@ final class GameReviewsViewModel {
                     sort: reviewSortOption
                 )
                 await MainActor.run {
+                    let visibleReviews = self.visibleReviews(from: reviewFeed.reviews)
                     self.state.isLoading = false
-                    self.state.reviews = reviewFeed.reviews
-                    self.state.reviewSummary = reviewFeed.summary
+                    self.state.reviews = visibleReviews
+                    self.state.reviewSummary = self.makeReviewSummary(from: visibleReviews)
                 }
             } catch {
                 await MainActor.run {
@@ -68,6 +76,99 @@ final class GameReviewsViewModel {
 
     func didTapEdit(review: Review) {
         onComposeRequested?(review)
+    }
+
+    func report(review: Review, reason: ReportReason, detail: String?) {
+        guard !state.isModerationActionInProgress else { return }
+
+        state.errorMessage = nil
+        state.successMessage = nil
+        state.reportingReviewId = review.id
+
+        Task {
+            do {
+                try await submitReportUseCase.execute(
+                    request: ReportRequest(
+                        targetType: .review,
+                        targetId: review.id,
+                        reportedUserId: review.author.id,
+                        reportedUserName: review.authorName,
+                        reason: reason,
+                        detail: detail?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    )
+                )
+
+                NotificationCenter.default.post(
+                    name: .moderationDidChange,
+                    object: nil,
+                    userInfo: [
+                        ModerationChangeUserInfoKey.targetType: ReportTargetType.review.rawValue,
+                        ModerationChangeUserInfoKey.targetId: review.id,
+                        ModerationChangeUserInfoKey.action: ModerationChangeAction.reported.rawValue
+                    ]
+                )
+
+                await MainActor.run {
+                    self.state.reportingReviewId = nil
+                    self.state.reviews = self.state.reviews.filter { $0.id != review.id }
+                    self.state.reviewSummary = self.makeReviewSummary(from: self.state.reviews)
+                    self.state.successMessage = "신고가 접수되었습니다."
+                    self.onReviewsChanged?()
+                }
+            } catch {
+                await MainActor.run {
+                    let moderationError = ModerationError.from(error: error)
+                    self.state.reportingReviewId = nil
+                    self.state.errorMessage = moderationError.errorDescription ?? "신고를 접수하지 못했습니다."
+                }
+            }
+        }
+    }
+
+    func block(review: Review) {
+        guard !state.isModerationActionInProgress else { return }
+
+        state.errorMessage = nil
+        state.successMessage = nil
+        state.blockingUserId = review.author.id
+
+        Task {
+            do {
+                try await blockUserUseCase.execute(
+                    request: BlockUserRequest(
+                        userId: review.author.id,
+                        userName: review.authorName
+                    )
+                )
+
+                NotificationCenter.default.post(
+                    name: .moderationDidChange,
+                    object: nil,
+                    userInfo: [
+                        ModerationChangeUserInfoKey.blockedUserId: review.author.id,
+                        ModerationChangeUserInfoKey.action: ModerationChangeAction.blocked.rawValue
+                    ]
+                )
+
+                await MainActor.run {
+                    self.state.blockingUserId = nil
+                    self.state.reviews = self.state.reviews.filter { $0.author.id != review.author.id }
+                    self.state.reviewSummary = self.makeReviewSummary(from: self.state.reviews)
+                    self.state.successMessage = "차단한 사용자의 콘텐츠는 더 이상 표시되지 않습니다."
+                    self.onReviewsChanged?()
+                }
+            } catch {
+                await MainActor.run {
+                    let moderationError = ModerationError.from(error: error)
+                    self.state.blockingUserId = nil
+                    self.state.errorMessage = moderationError.errorDescription ?? "사용자를 차단하지 못했습니다."
+                }
+            }
+        }
+    }
+
+    func clearSuccessMessage() {
+        state.successMessage = nil
     }
 
     func delete(review: Review) {
@@ -115,5 +216,14 @@ final class GameReviewsViewModel {
             reviewCount: reviews.count,
             averageRating: roundedAverageRating
         )
+    }
+
+    private func visibleReviews(from reviews: [Review]) -> [Review] {
+        let hiddenReviewIDs = moderationRepository.hiddenReviewIDs()
+        let blockedUserIDs = moderationRepository.blockedUserIDs()
+
+        return reviews.filter { review in
+            !hiddenReviewIDs.contains(review.id) && !blockedUserIDs.contains(review.author.id)
+        }
     }
 }

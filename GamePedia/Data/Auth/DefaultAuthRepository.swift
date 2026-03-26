@@ -34,6 +34,105 @@ final class DefaultAuthRepository: AuthRepository {
         .eraseToAnyPublisher()
     }
 
+    func forgotPassword(email: String) -> AnyPublisher<String, AuthError> {
+        authRemoteDataSource.forgotPassword(
+            requestDTO: ForgotPasswordRequestDTO(email: email)
+        )
+        .map(\.message)
+        .eraseToAnyPublisher()
+    }
+
+    func resetPassword(token: String, newPassword: String) -> AnyPublisher<Void, AuthError> {
+        authRemoteDataSource.resetPassword(
+            requestDTO: ResetPasswordRequestDTO(
+                token: token,
+                newPassword: newPassword
+            )
+        )
+        .tryMap { responseDTO in
+            guard responseDTO.passwordReset else {
+                throw AuthError.invalidResponse
+            }
+            return ()
+        }
+        .mapError { $0 as? AuthError ?? AuthError.unknown(message: $0.localizedDescription) }
+        .eraseToAnyPublisher()
+    }
+
+    func loginWithApple(credential: AppleLoginCredential) -> AnyPublisher<AuthSession, AuthError> {
+        let fullNameExists = [credential.givenName, credential.familyName]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .contains { !$0.isEmpty }
+
+        print(
+            """
+            [AppleLogin] credential prepared \
+            userIdentifierExists=\(!credential.userIdentifier.isEmpty) \
+            userIdentifierLength=\(credential.userIdentifier.count) \
+            identityTokenExists=\(!credential.identityToken.isEmpty) \
+            identityTokenLength=\(credential.identityToken.count) \
+            authorizationCodeExists=\((credential.authorizationCode?.isEmpty == false)) \
+            authorizationCodeLength=\(credential.authorizationCode?.count ?? 0) \
+            emailExists=\((credential.email?.isEmpty == false)) \
+            fullNameExists=\(fullNameExists)
+            """
+        )
+
+        let requestDTO = AppleLoginRequestDTO(
+            identityToken: credential.identityToken,
+            deviceName: nil
+        )
+
+        print(
+            """
+            [AppleLogin] requestDTO prepared \
+            payloadKeys=[identityToken,deviceName] \
+            identityTokenExists=\(!requestDTO.identityToken.isEmpty) \
+            identityTokenLength=\(requestDTO.identityToken.count) \
+            deviceNameExists=\((requestDTO.deviceName?.isEmpty == false))
+            """
+        )
+
+        return authRemoteDataSource.loginWithApple(
+            requestDTO: requestDTO
+        )
+        .tryMap { [weak self] responseDTO in
+            let session = try responseDTO.toDomainSession()
+            self?.persist(session)
+            return session
+        }
+        .mapError { $0 as? AuthError ?? AuthError.unknown(message: $0.localizedDescription) }
+        .eraseToAnyPublisher()
+    }
+
+    func loginWithGoogle(credential: GoogleLoginCredential) -> AnyPublisher<AuthSession, AuthError> {
+        let requestDTO = GoogleLoginRequestDTO(
+            idToken: credential.idToken,
+            deviceName: credential.deviceName
+        )
+
+        print(
+            """
+            [GoogleLogin] requestDTO prepared \
+            payloadKeys=[idToken,deviceName] \
+            idTokenExists=\(!requestDTO.idToken.isEmpty) \
+            idTokenLength=\(requestDTO.idToken.count) \
+            deviceNameExists=\((requestDTO.deviceName?.isEmpty == false))
+            """
+        )
+
+        return authRemoteDataSource.loginWithGoogle(
+            requestDTO: requestDTO
+        )
+        .tryMap { [weak self] responseDTO in
+            let session = try responseDTO.toDomainSession()
+            self?.persist(session)
+            return session
+        }
+        .mapError { $0 as? AuthError ?? AuthError.unknown(message: $0.localizedDescription) }
+        .eraseToAnyPublisher()
+    }
+
     func signUp(
         email: String,
         password: String,

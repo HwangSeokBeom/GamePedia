@@ -33,6 +33,22 @@ final class AuthRemoteDataSource {
         performRequest(.login(requestDTO), responseType: AuthResponseDTO.self)
     }
 
+    func forgotPassword(requestDTO: ForgotPasswordRequestDTO) -> AnyPublisher<ForgotPasswordResponseDataDTO, AuthError> {
+        performRequest(.forgotPassword(requestDTO), responseType: ForgotPasswordResponseDataDTO.self)
+    }
+
+    func resetPassword(requestDTO: ResetPasswordRequestDTO) -> AnyPublisher<ResetPasswordResponseDataDTO, AuthError> {
+        performRequest(.resetPassword(requestDTO), responseType: ResetPasswordResponseDataDTO.self)
+    }
+
+    func loginWithApple(requestDTO: AppleLoginRequestDTO) -> AnyPublisher<AuthResponseDTO, AuthError> {
+        performRequest(.appleLogin(requestDTO), responseType: AuthResponseDTO.self)
+    }
+
+    func loginWithGoogle(requestDTO: GoogleLoginRequestDTO) -> AnyPublisher<AuthResponseDTO, AuthError> {
+        performRequest(.googleLogin(requestDTO), responseType: AuthResponseDTO.self)
+    }
+
     func signUp(requestDTO: SignUpRequestDTO) -> AnyPublisher<AuthResponseDTO, AuthError> {
         performRequest(.signUp(requestDTO), responseType: AuthResponseDTO.self)
     }
@@ -113,6 +129,32 @@ final class AuthRemoteDataSource {
                 throw AuthError.unauthorized
             }
             urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+
+        print("[AuthNetwork] runtime=\(AppConfig.networkRuntimeDescription) baseURL=\(baseURL.absoluteString) requestURL=\(url.absoluteString) method=\(endpoint.method.rawValue)")
+
+        if case .appleLogin(let requestDTO) = endpoint {
+            print(
+                """
+                [AppleLogin] request sending \
+                requestURL=\(url.absoluteString) \
+                identityTokenExists=\(!requestDTO.identityToken.isEmpty) \
+                identityTokenLength=\(requestDTO.identityToken.count) \
+                deviceNameExists=\((requestDTO.deviceName?.isEmpty == false))
+                """
+            )
+        }
+
+        if case .googleLogin(let requestDTO) = endpoint {
+            print(
+                """
+                [GoogleLogin] request sending \
+                requestURL=\(url.absoluteString) \
+                idTokenExists=\(!requestDTO.idToken.isEmpty) \
+                idTokenLength=\(requestDTO.idToken.count) \
+                deviceNameExists=\((requestDTO.deviceName?.isEmpty == false))
+                """
+            )
         }
 
         return urlRequest

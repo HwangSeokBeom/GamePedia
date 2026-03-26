@@ -15,57 +15,178 @@ enum AppConfig {
     // MARK: - Base URLs
     static let igdbBaseURL        = URL(string: "https://api.igdb.com/v4")!
     static let twitchTokenURL     = URL(string: "https://id.twitch.tv/oauth2/token")!
-    // Before TestFlight / App Review, replace localhost with a device-reachable backend URL.
-    static let authBaseURL        = configuredURL(
+    static let authBaseURL        = configuredDevelopmentURL(
         infoPlistKey: "AuthBaseURL",
         environmentKey: "AUTH_BASE_URL",
-        defaultValue: "http://localhost:3001"
+        defaultPort: 3001
     )
-    // On a real device, localhost points at the iPhone itself, not this Mac.
-    static let translationBaseURL = configuredURL(
+    static let translationBaseURL = configuredDevelopmentURL(
         infoPlistKey: "TranslationBaseURL",
         environmentKey: "TRANSLATION_BASE_URL",
-        defaultValue: "http://localhost:3000"
+        defaultPort: 3000
     )
+    static let googleClientID      = infoPlistString(for: "GIDClientID")
+        ?? configuredString(
+            infoPlistKey: "GoogleClientID",
+            environmentKey: "GOOGLE_CLIENT_ID"
+        )
+    static let googleReverseClientID = configuredString(
+        infoPlistKey: "GoogleReverseClientID",
+        environmentKey: "GOOGLE_REVERSED_CLIENT_ID"
+    ) ?? firstGoogleURLScheme()
+    static let termsOfServiceURL = configuredStaticURL(
+        infoPlistKey: "TermsOfServiceURL",
+        environmentKey: "TERMS_OF_SERVICE_URL",
+        defaultValue: "https://example.com/gamepedia/terms"
+    )
+    static let privacyPolicyURL = configuredStaticURL(
+        infoPlistKey: "PrivacyPolicyURL",
+        environmentKey: "PRIVACY_POLICY_URL",
+        defaultValue: "https://example.com/gamepedia/privacy"
+    )
+    static let communityGuidelinesURL = configuredStaticURL(
+        infoPlistKey: "CommunityGuidelinesURL",
+        environmentKey: "COMMUNITY_GUIDELINES_URL",
+        defaultValue: "https://example.com/gamepedia/community-guidelines"
+    )
+    static let supportEmail = configuredString(
+        infoPlistKey: "SupportEmail",
+        environmentKey: "SUPPORT_EMAIL"
+    ) ?? "support@gamepedia.app"
 
     // MARK: - IGDB Image
     // Replace t_thumb with any IGDB image size slug.
     // Available sizes: t_thumb, t_cover_small, t_cover_big, t_720p, t_1080p
     static let igdbImageSize      = "t_cover_big"
 
-    private static func configuredURL(
+    static let networkRuntimeDescription = {
+#if targetEnvironment(simulator)
+        "simulator"
+#else
+        "device"
+#endif
+    }()
+
+    private static let localDevelopmentServerHost = configuredString(
+        infoPlistKey: "LocalDevelopmentServerHost",
+        environmentKey: "LOCAL_DEVELOPMENT_SERVER_HOST"
+    ) ?? "192.168.0.41"
+
+    private static func configuredDevelopmentURL(
+        infoPlistKey: String,
+        environmentKey: String,
+        defaultPort: Int
+    ) -> URL {
+        let infoPlistValue = infoPlistString(for: infoPlistKey)
+        let environmentValue = ProcessInfo.processInfo.environment[environmentKey]
+
+        if let url = resolvedConfiguredURL(
+            value: infoPlistValue,
+            source: "Info.plist",
+            configKey: infoPlistKey
+        ) {
+            return url
+        }
+
+        if let url = resolvedConfiguredURL(
+            value: environmentValue,
+            source: "environment",
+            configKey: infoPlistKey
+        ) {
+            return url
+        }
+
+        let fallbackHost = defaultDevelopmentHost
+        let fallbackURL = URL(string: "http://\(fallbackHost):\(defaultPort)")!
+        print("[AppConfig] \(infoPlistKey)=\(fallbackURL.absoluteString) source=default runtime=\(networkRuntimeDescription)")
+        return fallbackURL
+    }
+
+    private static func configuredString(
+        infoPlistKey: String,
+        environmentKey: String
+    ) -> String? {
+        if let infoPlistValue = infoPlistString(for: infoPlistKey) {
+            return infoPlistValue
+        }
+
+        if let environmentValue = ProcessInfo.processInfo.environment[environmentKey],
+           !environmentValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return environmentValue
+        }
+
+        return nil
+    }
+
+    private static func configuredStaticURL(
         infoPlistKey: String,
         environmentKey: String,
         defaultValue: String
     ) -> URL {
-        let infoPlistValue = Bundle.main.object(forInfoDictionaryKey: infoPlistKey) as? String
-        let environmentValue = ProcessInfo.processInfo.environment[environmentKey]
-
-        if infoPlistKey == "TranslationBaseURL" {
-            print("[AppConfig] TranslationBaseURL plist=\(infoPlistValue ?? "nil")")
-            print("[AppConfig] TRANSLATION_BASE_URL env=\(environmentValue ?? "nil")")
-        }
-
-        if let value = infoPlistValue,
-           let url = URL(string: value) {
-            if infoPlistKey == "TranslationBaseURL" {
-                print("[AppConfig] translationBaseURL=\(url.absoluteString) source=Info.plist")
-            }
+        if let infoPlistValue = infoPlistString(for: infoPlistKey),
+           let url = URL(string: infoPlistValue) {
             return url
         }
 
-        if let value = environmentValue,
-           let url = URL(string: value) {
-            if infoPlistKey == "TranslationBaseURL" {
-                print("[AppConfig] translationBaseURL=\(url.absoluteString) source=environment")
-            }
+        if let environmentValue = ProcessInfo.processInfo.environment[environmentKey],
+           !environmentValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let url = URL(string: environmentValue) {
             return url
         }
 
-        let fallbackURL = URL(string: defaultValue)!
-        if infoPlistKey == "TranslationBaseURL" {
-            print("[AppConfig] translationBaseURL=\(fallbackURL.absoluteString) source=default")
+        return URL(string: defaultValue)!
+    }
+
+    private static func infoPlistString(for key: String) -> String? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
+              !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
         }
-        return fallbackURL
+        return value
+    }
+
+    private static var defaultDevelopmentHost: String {
+#if targetEnvironment(simulator)
+        return "localhost"
+#else
+        return localDevelopmentServerHost
+#endif
+    }
+
+    private static func resolvedConfiguredURL(
+        value: String?,
+        source: String,
+        configKey: String
+    ) -> URL? {
+        guard let value,
+              !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let url = URL(string: value) else {
+            return nil
+        }
+
+        if shouldIgnoreLoopbackURL(url) {
+            print("[AppConfig] \(configKey)=\(url.absoluteString) source=\(source) ignored on device because loopback URLs cannot reach the Mac-hosted server")
+            return nil
+        }
+
+        print("[AppConfig] \(configKey)=\(url.absoluteString) source=\(source) runtime=\(networkRuntimeDescription)")
+        return url
+    }
+
+    private static func shouldIgnoreLoopbackURL(_ url: URL) -> Bool {
+        guard networkRuntimeDescription == "device" else { return false }
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "localhost" || host == "127.0.0.1" || host == "::1"
+    }
+
+    private static func firstGoogleURLScheme() -> String? {
+        guard let urlTypes = Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]] else {
+            return nil
+        }
+
+        return urlTypes
+            .compactMap { $0["CFBundleURLSchemes"] as? [String] }
+            .flatMap { $0 }
+            .first { $0.hasPrefix("com.googleusercontent.apps.") }
     }
 }

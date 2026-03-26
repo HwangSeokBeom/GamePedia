@@ -4,6 +4,7 @@ final class MainTabBarController: UITabBarController {
 
     private let customTabBarView = CustomTabBarView()
     private let tabNavigationControllers: [UINavigationController]
+    var onTabSelectionRequested: ((Int) -> Bool)?
 
     // MARK: Init
 
@@ -53,9 +54,14 @@ final class MainTabBarController: UITabBarController {
 
     private func bindCustomTabBarView() {
         customTabBarView.onTabSelected = { [weak self] index in
-            self?.selectedIndex = index
-            self?.updateSelectedTab(index: index)
+            guard self?.onTabSelectionRequested?(index) ?? true else { return }
+            self?.selectTab(index: index)
         }
+    }
+
+    func selectTab(index: Int) {
+        selectedIndex = index
+        updateSelectedTab(index: index)
     }
 
     private func updateSelectedTab(index: Int) {

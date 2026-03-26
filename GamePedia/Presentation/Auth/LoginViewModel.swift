@@ -17,6 +17,10 @@ final class LoginViewModel {
         case emailChanged(String)
         case passwordChanged(String)
         case loginButtonTapped
+        case appleLoginSucceeded(AppleLoginCredential)
+        case appleLoginFailed(AuthError)
+        case googleLoginSucceeded(GoogleLoginCredential)
+        case googleLoginFailed(AuthError)
         case signUpTapped
     }
 
@@ -33,10 +37,18 @@ final class LoginViewModel {
     var onRoute: ((Route) -> Void)?
 
     private let loginUseCase: LoginUseCase
+    private let appleLoginUseCase: AppleLoginUseCase
+    private let googleLoginUseCase: GoogleLoginUseCase
     private var cancellables = Set<AnyCancellable>()
 
-    init(loginUseCase: LoginUseCase) {
+    init(
+        loginUseCase: LoginUseCase,
+        appleLoginUseCase: AppleLoginUseCase,
+        googleLoginUseCase: GoogleLoginUseCase
+    ) {
         self.loginUseCase = loginUseCase
+        self.appleLoginUseCase = appleLoginUseCase
+        self.googleLoginUseCase = googleLoginUseCase
     }
 
     func send(_ intent: Intent) {
@@ -55,6 +67,18 @@ final class LoginViewModel {
 
         case .loginButtonTapped:
             login()
+
+        case .appleLoginSucceeded(let credential):
+            loginWithApple(credential: credential)
+
+        case .appleLoginFailed(let error):
+            handleAppleLoginFailure(error)
+
+        case .googleLoginSucceeded(let credential):
+            loginWithGoogle(credential: credential)
+
+        case .googleLoginFailed(let error):
+            handleGoogleLoginFailure(error)
 
         case .signUpTapped:
             onRoute?(.showSignUp)
@@ -93,6 +117,70 @@ final class LoginViewModel {
                 }
             )
             .store(in: &cancellables)
+    }
+
+    private func loginWithApple(credential: AppleLoginCredential) {
+        guard !state.isLoading else { return }
+
+        state.isLoading = true
+        state.errorMessage = nil
+        updateLoginEnabledState()
+
+        appleLoginUseCase.execute(credential: credential)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    guard let self else { return }
+                    self.state.isLoading = false
+                    self.updateLoginEnabledState()
+
+                    if case .failure(let error) = completion,
+                       error != .socialLoginCancelled {
+                        self.state.errorMessage = error.errorDescription
+                    }
+                },
+                receiveValue: { [weak self] _ in
+                    self?.onRoute?(.authenticated)
+                }
+            )
+            .store(in: &cancellables)
+    }
+
+    private func loginWithGoogle(credential: GoogleLoginCredential) {
+        guard !state.isLoading else { return }
+
+        state.isLoading = true
+        state.errorMessage = nil
+        updateLoginEnabledState()
+
+        googleLoginUseCase.execute(credential: credential)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    guard let self else { return }
+                    self.state.isLoading = false
+                    self.updateLoginEnabledState()
+
+                    if case .failure(let error) = completion,
+                       error != .socialLoginCancelled {
+                        self.state.errorMessage = error.errorDescription
+                    }
+                },
+                receiveValue: { [weak self] _ in
+                    self?.onRoute?(.authenticated)
+                }
+            )
+            .store(in: &cancellables)
+    }
+
+    private func handleAppleLoginFailure(_ error: AuthError) {
+        guard error != .socialLoginCancelled else { return }
+        state.errorMessage = error.errorDescription
+    }
+
+    private func handleGoogleLoginFailure(_ error: AuthError) {
+        guard error != .socialLoginCancelled else { return }
+        state.errorMessage = error.errorDescription
     }
 
     private func updateLoginEnabledState() {

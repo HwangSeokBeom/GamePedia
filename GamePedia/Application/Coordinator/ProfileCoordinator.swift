@@ -1,8 +1,10 @@
+import MessageUI
+import SafariServices
 import UIKit
 
 // MARK: - ProfileCoordinator
 
-final class ProfileCoordinator {
+final class ProfileCoordinator: NSObject {
 
     // MARK: Properties
 
@@ -11,6 +13,7 @@ final class ProfileCoordinator {
     private let logoutUseCase: LogoutUseCase
     private let deleteAccountUseCase: DeleteAccountUseCase
     private let userSessionStore: any UserSessionStore
+    var onAuthenticationRequested: ((UIViewController, RestrictedActionContext, @escaping () -> Void) -> Void)?
 
     var onLoggedOut: (() -> Void)?
 
@@ -60,6 +63,18 @@ final class ProfileCoordinator {
         profileVC.onShowWrittenReviews = { [weak self] in
             self?.showLibrary(tab: .reviewed)
         }
+        profileVC.onShowTermsOfService = { [weak self] in
+            self?.showWebPage(url: AppConfig.termsOfServiceURL)
+        }
+        profileVC.onShowPrivacyPolicy = { [weak self] in
+            self?.showWebPage(url: AppConfig.privacyPolicyURL)
+        }
+        profileVC.onShowCommunityGuidelines = { [weak self] in
+            self?.showWebPage(url: AppConfig.communityGuidelinesURL)
+        }
+        profileVC.onContactSupport = { [weak self] in
+            self?.contactSupport()
+        }
         navigationController.setViewControllers([profileVC], animated: false)
     }
 
@@ -67,6 +82,11 @@ final class ProfileCoordinator {
 
     private func showDetail(gameId: Int) {
         let detailVC = GameDetailViewController(gameId: gameId)
+        detailVC.onAuthenticationRequired = { [weak self, weak detailVC] context, action in
+            guard let self else { return }
+            let presenter = detailVC ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
+        }
         detailVC.onWriteReview = { [weak self, weak detailVC] game, existingReview in
             self?.showReview(game: game, existingReview: existingReview, detailViewController: detailVC)
         }
@@ -113,6 +133,11 @@ final class ProfileCoordinator {
                 gameTitle: game.displayTitle
             )
         )
+        reviewsViewController.onAuthenticationRequired = { [weak self, weak reviewsViewController] context, action in
+            guard let self else { return }
+            let presenter = reviewsViewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
+        }
         reviewsViewController.onComposeRequested = { [weak self, weak detailViewController, weak reviewsViewController] existingReview in
             self?.showReview(
                 game: game,
@@ -136,5 +161,45 @@ final class ProfileCoordinator {
             self?.showDetail(gameId: gameId)
         }
         navigationController.pushViewController(libraryViewController, animated: true)
+    }
+
+    private func showWebPage(url: URL) {
+        let safariViewController = SFSafariViewController(url: url)
+        safariViewController.preferredControlTintColor = .gpPrimary
+        navigationController.topViewController?.present(safariViewController, animated: true)
+    }
+
+    private func contactSupport() {
+        if MFMailComposeViewController.canSendMail() {
+            let mailComposeViewController = MFMailComposeViewController()
+            mailComposeViewController.mailComposeDelegate = self
+            mailComposeViewController.setToRecipients([AppConfig.supportEmail])
+            mailComposeViewController.setSubject("GamePedia 문의하기")
+            mailComposeViewController.setMessageBody(
+                """
+                문의 내용을 입력해 주세요.
+
+                ---
+                앱 버전:
+                기기:
+                """,
+                isHTML: false
+            )
+            navigationController.topViewController?.present(mailComposeViewController, animated: true)
+            return
+        }
+
+        guard let mailURL = URL(string: "mailto:\(AppConfig.supportEmail)") else { return }
+        UIApplication.shared.open(mailURL)
+    }
+}
+
+extension ProfileCoordinator: MFMailComposeViewControllerDelegate {
+    func mailComposeController(
+        _ controller: MFMailComposeViewController,
+        didFinishWith result: MFMailComposeResult,
+        error: Error?
+    ) {
+        controller.dismiss(animated: true)
     }
 }

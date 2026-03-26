@@ -2,6 +2,10 @@ import Combine
 
 protocol AuthRepository {
     func login(email: String, password: String) -> AnyPublisher<AuthSession, AuthError>
+    func forgotPassword(email: String) -> AnyPublisher<String, AuthError>
+    func resetPassword(token: String, newPassword: String) -> AnyPublisher<Void, AuthError>
+    func loginWithApple(credential: AppleLoginCredential) -> AnyPublisher<AuthSession, AuthError>
+    func loginWithGoogle(credential: GoogleLoginCredential) -> AnyPublisher<AuthSession, AuthError>
 
     func signUp(
         email: String,

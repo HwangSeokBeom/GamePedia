@@ -6,12 +6,19 @@ struct GameReviewsState {
 
     var isLoading: Bool = false
     var deletingReviewId: String? = nil
+    var reportingReviewId: String? = nil
+    var blockingUserId: String? = nil
     var reviews: [Review] = []
     var reviewSummary: ReviewSummary? = nil
     var errorMessage: String? = nil
+    var successMessage: String? = nil
 
     var myReview: Review? {
         reviews.first(where: { $0.isMine })
+    }
+
+    var isModerationActionInProgress: Bool {
+        reportingReviewId != nil || blockingUserId != nil
     }
 
     var composeButtonTitle: String {

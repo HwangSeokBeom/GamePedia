@@ -67,6 +67,14 @@ final class ProfileViewModel {
             onRoute?(.showWrittenReviews)
         case .didTapFavoriteGames:
             onRoute?(.showFavoriteGames)
+        case .didTapTermsOfService:
+            onRoute?(.showTermsOfService)
+        case .didTapPrivacyPolicy:
+            onRoute?(.showPrivacyPolicy)
+        case .didTapCommunityGuidelines:
+            onRoute?(.showCommunityGuidelines)
+        case .didTapContactSupport:
+            onRoute?(.contactSupport)
         case .didTapSettings, .didTapGame, .didTapSeeMoreRecentPlay:
             break
         }

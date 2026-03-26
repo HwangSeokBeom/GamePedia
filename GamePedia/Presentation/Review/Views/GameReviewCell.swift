@@ -144,7 +144,7 @@ final class GameReviewCell: UITableViewCell {
         dateLabel.text = review.formattedDate
         starView.configure(rating: review.rating)
         contentLabel.text = review.content
-        moreButton.isHidden = !review.isMine
+        moreButton.isHidden = false
     }
 
     override func prepareForReuse() {

@@ -5,6 +5,25 @@ struct LoginRequestDTO: Encodable {
     let password: String
 }
 
+struct ForgotPasswordRequestDTO: Encodable {
+    let email: String
+}
+
+struct ResetPasswordRequestDTO: Encodable {
+    let token: String
+    let newPassword: String
+}
+
+struct AppleLoginRequestDTO: Encodable {
+    let identityToken: String
+    let deviceName: String?
+}
+
+struct GoogleLoginRequestDTO: Encodable {
+    let idToken: String
+    let deviceName: String?
+}
+
 struct SignUpRequestDTO: Encodable {
     let email: String
     let password: String
@@ -33,6 +52,14 @@ struct AuthResponseDataDTO: Decodable {
 struct AuthErrorPayloadDTO: Decodable {
     let code: String
     let message: String
+}
+
+struct ForgotPasswordResponseDataDTO: Decodable {
+    let message: String
+}
+
+struct ResetPasswordResponseDataDTO: Decodable {
+    let passwordReset: Bool
 }
 
 struct TokenPairDTO: Decodable {

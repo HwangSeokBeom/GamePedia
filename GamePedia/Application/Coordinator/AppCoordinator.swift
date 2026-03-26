@@ -1,6 +1,50 @@
 import UIKit
 import Combine
 
+enum SessionAccessMode {
+    case guest
+    case authenticated
+}
+
+enum RestrictedActionContext {
+    case favoriteGame
+    case writeReview
+    case viewReviews
+    case library
+    case profile
+    case moderation
+
+    var logName: String {
+        switch self {
+        case .favoriteGame:
+            return "favoriteGame"
+        case .writeReview:
+            return "writeReview"
+        case .viewReviews:
+            return "viewReviews"
+        case .library:
+            return "library"
+        case .profile:
+            return "profile"
+        case .moderation:
+            return "moderation"
+        }
+    }
+
+    var promptMessage: String {
+        switch self {
+        case .favoriteGame, .writeReview:
+            return "로그인하면 리뷰 작성과 찜 기능을 사용할 수 있어요."
+        case .viewReviews:
+            return "리뷰를 확인하려면 로그인이 필요합니다."
+        case .library, .profile:
+            return "내 라이브러리와 프로필을 사용하려면 로그인이 필요합니다."
+        case .moderation:
+            return "이 기능을 사용하려면 로그인이 필요합니다."
+        }
+    }
+}
+
 // MARK: - AppCoordinator
 //
 // Root coordinator. Owns the window and all tab coordinators.
@@ -23,6 +67,9 @@ final class AppCoordinator {
     private var searchCoordinator: SearchCoordinator?
     private var libraryCoordinator: LibraryCoordinator?
     private var profileCoordinator: ProfileCoordinator?
+    private weak var mainTabBarController: MainTabBarController?
+    private var modalAuthCoordinator: AuthCoordinator?
+    private var pendingResetPasswordToken: String?
     private var cancellables = Set<AnyCancellable>()
 
     private lazy var authRemoteDataSource = AuthRemoteDataSource(tokenStore: tokenStore)
@@ -32,7 +79,11 @@ final class AppCoordinator {
         userSessionStore: userSessionStore
     )
     private lazy var loginUseCase = LoginUseCase(authRepository: authRepository)
+    private lazy var appleLoginUseCase = AppleLoginUseCase(authRepository: authRepository)
+    private lazy var googleLoginUseCase = GoogleLoginUseCase(authRepository: authRepository)
     private lazy var signUpUseCase = SignUpUseCase(authRepository: authRepository)
+    private lazy var forgotPasswordUseCase = ForgotPasswordUseCase(authRepository: authRepository)
+    private lazy var resetPasswordUseCase = ResetPasswordUseCase(authRepository: authRepository)
     private lazy var refreshSessionUseCase = RefreshSessionUseCase(authRepository: authRepository)
     private lazy var fetchCurrentUserUseCase = FetchCurrentUserUseCase(authRepository: authRepository)
     private lazy var logoutUseCase = LogoutUseCase(authRepository: authRepository)
@@ -52,6 +103,18 @@ final class AppCoordinator {
         showSplash()
     }
 
+    func handleIncomingURL(_ url: URL) {
+        guard let resetPasswordToken = resetPasswordToken(from: url) else { return }
+        print("[PasswordReset] deepLinkReceived tokenLength=\(resetPasswordToken.count)")
+
+        if window.rootViewController is SplashViewController {
+            pendingResetPasswordToken = resetPasswordToken
+            return
+        }
+
+        presentResetPasswordFlow(token: resetPasswordToken)
+    }
+
     private func showSplash() {
         let splashViewController = SplashViewController()
         window.backgroundColor = UIColor(hex: "#0B0B0E")
@@ -64,53 +127,44 @@ final class AppCoordinator {
     }
 
     private func resolveInitialInterface() {
+        showMainInterface()
+        refreshSessionIfNeeded()
+    }
+
+    private func refreshSessionIfNeeded() {
         guard tokenStore.fetchRefreshToken() != nil else {
-            showAuthInterface()
+            print("[GuestMode] active runtime=noRefreshToken")
             return
         }
 
         refreshSessionUseCase.execute()
             .receive(on: DispatchQueue.main)
             .sink(
-                receiveCompletion: { [weak self] completion in
+                receiveCompletion: { completion in
                     if case .failure = completion {
-                        self?.showAuthInterface()
+                        print("[GuestMode] refreshFailed continuingAsGuest=true")
                     }
                 },
-                receiveValue: { [weak self] _ in
-                    self?.showMainInterface()
+                receiveValue: { _ in
+                    print("[GuestMode] sessionRestored mode=authenticated")
                 }
             )
             .store(in: &cancellables)
     }
 
-    private func showAuthInterface() {
-        homeCoordinator = nil
-        searchCoordinator = nil
-        libraryCoordinator = nil
-        profileCoordinator = nil
-
-        let authCoordinator = AuthCoordinator(
+    private func makeAuthCoordinator() -> AuthCoordinator {
+        AuthCoordinator(
             loginUseCase: loginUseCase,
-            signUpUseCase: signUpUseCase
+            appleLoginUseCase: appleLoginUseCase,
+            googleLoginUseCase: googleLoginUseCase,
+            signUpUseCase: signUpUseCase,
+            forgotPasswordUseCase: forgotPasswordUseCase,
+            resetPasswordUseCase: resetPasswordUseCase
         )
-        authCoordinator.onAuthenticated = { [weak self] in
-            self?.showMainInterface()
-        }
-        authCoordinator.start()
-        self.authCoordinator = authCoordinator
-
-        UIView.transition(
-            with: window,
-            duration: Metrics.transitionDuration,
-            options: [.transitionCrossDissolve, .allowAnimatedContent]
-        ) {
-            self.window.rootViewController = authCoordinator.navigationController
-        }
     }
 
-    private func showMainInterface() {
-        let mainTabBarController = makeMainTabBarController()
+    private func showMainInterface(selectedIndex: Int = 0) {
+        let mainTabBarController = makeMainTabBarController(selectedIndex: selectedIndex)
         UIView.transition(
             with: window,
             duration: Metrics.transitionDuration,
@@ -118,10 +172,19 @@ final class AppCoordinator {
         ) {
             self.window.rootViewController = mainTabBarController
         }
+        self.mainTabBarController = mainTabBarController
+        modalAuthCoordinator = nil
         authCoordinator = nil
+
+        if let pendingResetPasswordToken {
+            self.pendingResetPasswordToken = nil
+            DispatchQueue.main.async { [weak self] in
+                self?.presentResetPasswordFlow(token: pendingResetPasswordToken)
+            }
+        }
     }
 
-    private func makeMainTabBarController() -> MainTabBarController {
+    private func makeMainTabBarController(selectedIndex: Int) -> MainTabBarController {
         let homeCoord    = HomeCoordinator()
         let searchCoord  = SearchCoordinator()
         let libraryCoord = LibraryCoordinator()
@@ -131,8 +194,21 @@ final class AppCoordinator {
             deleteAccountUseCase: deleteAccountUseCase,
             userSessionStore: userSessionStore
         )
+        let authenticationHandler: (UIViewController, RestrictedActionContext, @escaping () -> Void) -> Void = {
+            [weak self] presenter, context, completion in
+            self?.requestAuthenticationIfNeeded(
+                from: presenter,
+                context: context,
+                onAuthenticated: completion
+            )
+        }
+        homeCoord.onAuthenticationRequested = authenticationHandler
+        searchCoord.onAuthenticationRequested = authenticationHandler
+        libraryCoord.onAuthenticationRequested = authenticationHandler
+        profileCoord.onAuthenticationRequested = authenticationHandler
         profileCoord.onLoggedOut = { [weak self] in
-            self?.showAuthInterface()
+            print("[GuestMode] logoutCompleted switchingToGuestMode=true")
+            self?.showMainInterface(selectedIndex: 0)
         }
 
         homeCoord.start()
@@ -145,11 +221,164 @@ final class AppCoordinator {
         self.libraryCoordinator = libraryCoord
         self.profileCoordinator = profileCoord
 
-        return MainTabBarController(tabNavigationControllers: [
+        let mainTabBarController = MainTabBarController(tabNavigationControllers: [
             homeCoord.navigationController,
             searchCoord.navigationController,
             libraryCoord.navigationController,
             profileCoord.navigationController
         ])
+        mainTabBarController.onTabSelectionRequested = { [weak self, weak mainTabBarController] index in
+            guard let self, let mainTabBarController else { return false }
+            return self.handleTabSelection(index: index, in: mainTabBarController)
+        }
+        mainTabBarController.selectTab(index: selectedIndex)
+        return mainTabBarController
+    }
+
+    private func handleTabSelection(index: Int, in mainTabBarController: MainTabBarController) -> Bool {
+        switch index {
+        case 2:
+            guard currentSessionAccessMode() == .guest else { return true }
+            requestAuthenticationIfNeeded(
+                from: mainTabBarController,
+                context: .library
+            ) {
+                mainTabBarController.selectTab(index: index)
+            }
+            return false
+        case 3:
+            guard currentSessionAccessMode() == .guest else { return true }
+            requestAuthenticationIfNeeded(
+                from: mainTabBarController,
+                context: .profile
+            ) {
+                mainTabBarController.selectTab(index: index)
+            }
+            return false
+        default:
+            return true
+        }
+    }
+
+    private func currentSessionAccessMode() -> SessionAccessMode {
+        let hasAccessToken = tokenStore.fetchAccessToken() != nil
+        let hasRefreshToken = tokenStore.fetchRefreshToken() != nil
+        return (hasAccessToken || hasRefreshToken) ? .authenticated : .guest
+    }
+
+    private func requestAuthenticationIfNeeded(
+        from presenter: UIViewController,
+        context: RestrictedActionContext,
+        onAuthenticated: @escaping () -> Void
+    ) {
+        guard currentSessionAccessMode() == .guest else {
+            onAuthenticated()
+            return
+        }
+
+        guard presenter.presentedViewController == nil else { return }
+
+        print("[GuestMode] restrictedActionTriggered action=\(context.logName)")
+
+        let alertController = UIAlertController(
+            title: "로그인이 필요합니다",
+            message: context.promptMessage,
+            preferredStyle: .alert
+        )
+        alertController.addAction(UIAlertAction(title: "나중에 하기", style: .cancel))
+        alertController.addAction(UIAlertAction(title: "로그인", style: .default) { [weak self, weak presenter] _ in
+            guard let self, let presenter else { return }
+            print("[GuestMode] loginRouteRequested action=\(context.logName)")
+            self.presentAuthFlow(from: presenter, onAuthenticated: onAuthenticated)
+        })
+        presenter.present(alertController, animated: true)
+    }
+
+    private func presentAuthFlow(
+        from presenter: UIViewController,
+        onAuthenticated: @escaping () -> Void
+    ) {
+        if let modalAuthCoordinator,
+           modalAuthCoordinator.navigationController.presentingViewController != nil {
+            return
+        }
+
+        if let modalAuthCoordinator,
+           modalAuthCoordinator.navigationController.presentingViewController == nil {
+            self.modalAuthCoordinator = nil
+        }
+
+        let authCoordinator = makeAuthCoordinator()
+        authCoordinator.onAuthenticated = { [weak self, weak authNavigationController = authCoordinator.navigationController] in
+            authNavigationController?.dismiss(animated: true) {
+                self?.modalAuthCoordinator = nil
+                onAuthenticated()
+            }
+        }
+        authCoordinator.start()
+
+        let navigationController = authCoordinator.navigationController
+        navigationController.modalPresentationStyle = .pageSheet
+        if let sheetPresentationController = navigationController.sheetPresentationController {
+            sheetPresentationController.detents = [.large()]
+            sheetPresentationController.prefersGrabberVisible = true
+        }
+
+        modalAuthCoordinator = authCoordinator
+        presenter.present(navigationController, animated: true)
+    }
+
+    private func presentResetPasswordFlow(token: String) {
+        guard let presenter = topPresenter(from: window.rootViewController) else { return }
+
+        if let modalAuthCoordinator,
+           modalAuthCoordinator.navigationController.presentingViewController != nil {
+            modalAuthCoordinator.showResetPassword(token: token)
+            return
+        }
+
+        if let modalAuthCoordinator,
+           modalAuthCoordinator.navigationController.presentingViewController == nil {
+            self.modalAuthCoordinator = nil
+        }
+
+        let authCoordinator = makeAuthCoordinator()
+        authCoordinator.start(resetPasswordToken: token)
+
+        let navigationController = authCoordinator.navigationController
+        navigationController.modalPresentationStyle = .pageSheet
+        if let sheetPresentationController = navigationController.sheetPresentationController {
+            sheetPresentationController.detents = [.large()]
+            sheetPresentationController.prefersGrabberVisible = true
+        }
+
+        modalAuthCoordinator = authCoordinator
+        presenter.present(navigationController, animated: true)
+    }
+
+    private func topPresenter(from rootViewController: UIViewController?) -> UIViewController? {
+        if let navigationController = rootViewController as? UINavigationController {
+            return topPresenter(from: navigationController.visibleViewController) ?? navigationController
+        }
+
+        if let tabBarController = rootViewController as? UITabBarController {
+            return topPresenter(from: tabBarController.selectedViewController) ?? tabBarController
+        }
+
+        if let presentedViewController = rootViewController?.presentedViewController {
+            return topPresenter(from: presentedViewController)
+        }
+
+        return rootViewController
+    }
+
+    private func resetPasswordToken(from url: URL) -> String? {
+        guard url.scheme?.lowercased() == "gamepedia" else { return nil }
+
+        let route = url.host?.lowercased() ?? url.path.replacingOccurrences(of: "/", with: "").lowercased()
+        guard route == "reset-password" else { return nil }
+
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        return components?.queryItems?.first(where: { $0.name == "token" })?.value
     }
 }
