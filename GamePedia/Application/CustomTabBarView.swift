@@ -35,6 +35,13 @@ final class CustomTabBarView: UIView {
         moveSelectedBackground(animated: false)
     }
 
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        applyDynamicLayerColors()
+        updateButtonStates()
+    }
+
     func updateSelectedIndex(_ index: Int) {
         guard tabItems.indices.contains(index) else { return }
         selectedIndex = index
@@ -46,8 +53,7 @@ final class CustomTabBarView: UIView {
         backgroundColor = .clear
         clipsToBounds = false
 
-        backgroundContainerView.backgroundColor = .gpSurface
-        backgroundContainerView.layer.shadowColor = UIColor.black.cgColor
+        backgroundContainerView.backgroundColor = .gpTabBarBackground
         backgroundContainerView.layer.shadowOffset = CGSize(width: 0, height: 8)
         backgroundContainerView.layer.shadowRadius = 20
         backgroundContainerView.layer.shadowOpacity = 0.35
@@ -69,6 +75,8 @@ final class CustomTabBarView: UIView {
             stackView.topAnchor.constraint(equalTo: backgroundContainerView.topAnchor, constant: 8),
             stackView.bottomAnchor.constraint(equalTo: backgroundContainerView.bottomAnchor, constant: -8)
         ])
+
+        applyDynamicLayerColors()
     }
 
     private func setupTabs() {
@@ -161,5 +169,9 @@ final class CustomTabBarView: UIView {
     @objc
     private func tabButtonTapped(_ sender: UIButton) {
         onTabSelected?(sender.tag)
+    }
+
+    private func applyDynamicLayerColors() {
+        backgroundContainerView.layer.shadowColor = UIColor.gpShadow.resolvedCGColor(with: traitCollection)
     }
 }

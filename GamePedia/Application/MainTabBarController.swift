@@ -33,11 +33,28 @@ final class MainTabBarController: UITabBarController {
     }
 
     private func setupTabBarController() {
+        view.backgroundColor = .gpBackground
         tabBar.isHidden = true
         tabBar.alpha = 0
         tabBar.backgroundImage = UIImage()
         tabBar.shadowImage = UIImage()
         tabBar.backgroundColor = .clear
+
+        let tabBarAppearance = UITabBarAppearance()
+        tabBarAppearance.configureWithOpaqueBackground()
+        tabBarAppearance.backgroundColor = .gpTabBarBackground
+        tabBarAppearance.shadowColor = .clear
+
+        let itemAppearance = UITabBarItemAppearance(style: .stacked)
+        itemAppearance.selected.iconColor = .gpAccent
+        itemAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor.gpAccent]
+        itemAppearance.normal.iconColor = .gpTextSecondary
+        itemAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.gpTextSecondary]
+        tabBarAppearance.stackedLayoutAppearance = itemAppearance
+        tabBar.standardAppearance = tabBarAppearance
+        tabBar.scrollEdgeAppearance = tabBarAppearance
+        tabBar.tintColor = .gpAccent
+        tabBar.unselectedItemTintColor = .gpTextSecondary
     }
 
     private func setupCustomTabBarView() {

@@ -22,10 +22,6 @@ final class GameDetailRootView: UIView {
 
     private let heroGradientLayer: CAGradientLayer = {
         let layer = CAGradientLayer()
-        layer.colors = [
-            UIColor.clear.cgColor,
-            UIColor(red: 0.04, green: 0.04, blue: 0.06, alpha: 1).cgColor
-        ]
         layer.locations = [0.55, 1.0]
         return layer
     }()
@@ -50,14 +46,13 @@ final class GameDetailRootView: UIView {
     let heartButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
         configuration.image = UIImage(systemName: "heart")
-        configuration.baseForegroundColor = UIColor(hex: "#FF6B6B")
+        configuration.baseForegroundColor = .gpRed
         configuration.contentInsets = .zero
 
         let button = UIButton(configuration: configuration)
         button.backgroundColor = .gpSurface
         button.layer.cornerRadius = 20
         button.layer.borderWidth = 1
-        button.layer.borderColor = UIColor.gpSeparator.cgColor
         button.clipsToBounds = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
@@ -76,7 +71,7 @@ final class GameDetailRootView: UIView {
         configuration.image = UIImage(systemName: "bookmark", withConfiguration: symbolConfiguration)
         configuration.imagePadding = 8
         configuration.baseBackgroundColor = .gpPrimary
-        configuration.baseForegroundColor = .white
+        configuration.baseForegroundColor = .gpOnPrimary
         configuration.cornerStyle = .capsule
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
             var updated = attributes
@@ -157,6 +152,12 @@ final class GameDetailRootView: UIView {
         setup()
     }
 
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        applyDynamicLayerColors()
+    }
+
     private func setup() {
         backgroundColor = .gpBackground
 
@@ -167,6 +168,7 @@ final class GameDetailRootView: UIView {
         reviewSectionHeader.titleLabel.font = .systemFont(ofSize: 18, weight: .bold)
 
         heroImageView.layer.addSublayer(heroGradientLayer)
+        applyDynamicLayerColors()
 
         let titleInfoStackView = UIStackView(arrangedSubviews: [titleLabel, developerLabel])
         titleInfoStackView.axis = .vertical
@@ -258,5 +260,13 @@ final class GameDetailRootView: UIView {
     func updateReviewTableHeight() {
         layoutIfNeeded()
         reviewTableHeightConstraint.constant = reviewTableView.contentSize.height
+    }
+
+    private func applyDynamicLayerColors() {
+        heroGradientLayer.colors = [
+            UIColor.clear.cgColor,
+            UIColor.gpHeroGradientEnd.resolvedCGColor(with: traitCollection)
+        ]
+        heartButton.layer.borderColor = UIColor.gpBorder.resolvedCGColor(with: traitCollection)
     }
 }

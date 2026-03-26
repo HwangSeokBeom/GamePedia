@@ -27,7 +27,6 @@ final class ReviewRootView: UIView {
         let view = UIView()
         view.backgroundColor = .gpBackground
         view.isUserInteractionEnabled = true
-        view.layer.shadowColor = UIColor.black.cgColor
         view.layer.shadowOpacity = 0.18
         view.layer.shadowRadius = 18
         view.layer.shadowOffset = CGSize(width: 0, height: -6)
@@ -110,10 +109,9 @@ final class ReviewRootView: UIView {
         tv.font = .systemFont(ofSize: 14)
         tv.layer.cornerRadius = 14
         tv.layer.borderWidth = 1
-        tv.layer.borderColor = UIColor.gpSeparator.cgColor
         tv.textContainerInset = UIEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
         tv.tintColor = .gpPrimary
-        tv.keyboardAppearance = .dark
+        tv.keyboardAppearance = .default
         tv.showsVerticalScrollIndicator = true
         tv.translatesAutoresizingMaskIntoConstraints = false
         return tv
@@ -154,14 +152,12 @@ final class ReviewRootView: UIView {
         config.image = UIImage(systemName: "square.and.pencil")
         config.imagePadding = 8
         config.baseBackgroundColor = .gpPrimary
-        config.baseForegroundColor = .white
+        config.baseForegroundColor = .gpOnPrimary
         config.cornerStyle = .capsule
         let button = UIButton(configuration: config)
         button.translatesAutoresizingMaskIntoConstraints = false
         button.isUserInteractionEnabled = true
         button.isExclusiveTouch = true
-        // Purple glow shadow matching wireframe
-        button.layer.shadowColor = UIColor.gpPrimary.cgColor
         button.layer.shadowOffset = CGSize(width: 0, height: 8)
         button.layer.shadowRadius = 12
         button.layer.shadowOpacity = 0.35
@@ -203,6 +199,12 @@ final class ReviewRootView: UIView {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setup()
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        applyDynamicLayerColors(isTextViewFocused: reviewTextView.isFirstResponder)
     }
 
     // MARK: Setup
@@ -289,6 +291,8 @@ final class ReviewRootView: UIView {
             submitButton.heightAnchor.constraint(equalToConstant: UIConstants.submitButtonHeight),
             deleteButton.heightAnchor.constraint(equalToConstant: UIConstants.submitButtonHeight)
         ])
+
+        applyDynamicLayerColors(isTextViewFocused: false)
     }
 
     // MARK: - State Rendering
@@ -320,11 +324,7 @@ final class ReviewRootView: UIView {
     }
 
     func setReviewTextInputFocused(_ isFocused: Bool) {
-        reviewTextView.layer.borderColor = (isFocused ? UIColor.gpPrimary : .gpSeparator).cgColor
-        reviewTextView.layer.shadowColor = isFocused ? UIColor.gpPrimary.withAlphaComponent(0.24).cgColor : UIColor.clear.cgColor
-        reviewTextView.layer.shadowOpacity = isFocused ? 1 : 0
-        reviewTextView.layer.shadowRadius = isFocused ? 10 : 0
-        reviewTextView.layer.shadowOffset = .zero
+        applyDynamicLayerColors(isTextViewFocused: isFocused)
     }
 
     func setSubmitAreaBottomInset(_ inset: CGFloat) {
@@ -342,7 +342,7 @@ final class ReviewRootView: UIView {
         configuration?.image = state.isSubmitting ? nil : UIImage(systemName: state.isEditing ? "square.and.arrow.down" : "square.and.pencil")
         configuration?.showsActivityIndicator = state.isSubmitting
         configuration?.baseBackgroundColor = state.submitEnabled ? .gpPrimary : .gpSurfaceElevated
-        configuration?.baseForegroundColor = state.submitEnabled ? .white : .gpTextTertiary
+        configuration?.baseForegroundColor = state.submitEnabled ? .gpOnPrimary : .gpTextTertiary
         submitButton.configuration = configuration
         submitButton.isEnabled = allowsTap
         submitButton.alpha = state.submitEnabled || state.isSubmitting ? 1 : 0.72
@@ -367,5 +367,17 @@ final class ReviewRootView: UIView {
         deleteButton.isHidden = !state.isEditing
         submitAreaSeparatorView.isHidden = false
         setNeedsLayout()
+    }
+
+    private func applyDynamicLayerColors(isTextViewFocused: Bool) {
+        submitAreaView.layer.shadowColor = UIColor.gpShadow.resolvedCGColor(with: traitCollection)
+        reviewTextView.layer.borderColor = (isTextViewFocused ? UIColor.gpPrimary : .gpBorder).resolvedCGColor(with: traitCollection)
+        reviewTextView.layer.shadowColor = isTextViewFocused
+            ? UIColor.gpPrimary.withAlphaComponent(0.24).resolvedCGColor(with: traitCollection)
+            : UIColor.clear.cgColor
+        reviewTextView.layer.shadowOpacity = isTextViewFocused ? 1 : 0
+        reviewTextView.layer.shadowRadius = isTextViewFocused ? 10 : 0
+        reviewTextView.layer.shadowOffset = .zero
+        submitButton.layer.shadowColor = UIColor.gpPrimary.resolvedCGColor(with: traitCollection)
     }
 }

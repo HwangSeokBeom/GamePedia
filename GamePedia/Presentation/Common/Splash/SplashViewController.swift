@@ -34,9 +34,7 @@ final class SplashViewController: UIViewController {
         view.translatesAutoresizingMaskIntoConstraints = false
         view.layer.cornerRadius = 24
         view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.gpSeparator.cgColor
         view.backgroundColor = .gpSurface
-        view.layer.shadowColor = UIColor.gpPrimary.cgColor
         view.layer.shadowOpacity = 0.18
         view.layer.shadowRadius = 28
         view.layer.shadowOffset = CGSize(width: 0, height: 12)
@@ -66,7 +64,7 @@ final class SplashViewController: UIViewController {
         let label = UILabel()
         label.text = "게임을 발견하고 기록하세요"
         label.font = .systemFont(ofSize: 14, weight: .medium)
-        label.textColor = UIColor(hex: "#6B6B70")
+        label.textColor = .gpTextSecondary
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -77,14 +75,21 @@ final class SplashViewController: UIViewController {
         setupLayout()
     }
 
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        applyDynamicLayerColors()
+    }
+
     private func setupView() {
-        view.backgroundColor = UIColor(hex: "#0B0B0E")
+        view.backgroundColor = .gpBackground
         view.addSubview(centerGroupView)
         centerGroupView.addSubview(glowView)
         centerGroupView.addSubview(logoContainerView)
         centerGroupView.addSubview(titleLabel)
         centerGroupView.addSubview(subtitleLabel)
         logoContainerView.addSubview(logoImageView)
+        applyDynamicLayerColors()
     }
 
     private func setupLayout() {
@@ -116,5 +121,11 @@ final class SplashViewController: UIViewController {
             logoImageView.widthAnchor.constraint(equalToConstant: Metrics.logoWidth),
             logoImageView.heightAnchor.constraint(equalToConstant: Metrics.logoHeight)
         ])
+    }
+
+    private func applyDynamicLayerColors() {
+        glowView.layer.shadowColor = UIColor.gpPrimary.resolvedCGColor(with: traitCollection)
+        logoContainerView.layer.borderColor = UIColor.gpBorder.resolvedCGColor(with: traitCollection)
+        logoContainerView.layer.shadowColor = UIColor.gpPrimary.resolvedCGColor(with: traitCollection)
     }
 }

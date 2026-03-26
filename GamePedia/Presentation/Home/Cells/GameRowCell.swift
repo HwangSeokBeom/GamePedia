@@ -128,7 +128,7 @@ final class GameRowCell: UICollectionViewCell {
             withConfiguration: symbolConfiguration
         )
         configuration.imagePadding = Metrics.buttonImagePadding
-        configuration.baseForegroundColor = .white
+        configuration.baseForegroundColor = .gpOnPrimary
         configuration.baseBackgroundColor = isWishlisted ? .gpPrimaryLight : .gpPrimary
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
         configuration.cornerStyle = .capsule

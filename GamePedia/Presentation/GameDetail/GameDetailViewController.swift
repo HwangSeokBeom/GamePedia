@@ -45,7 +45,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
             navigationItem.largeTitleDisplayMode = .never
             navigationItem.title = nil
             let shareImage = UIImage(systemName: "square.and.arrow.up")?
-                .withTintColor(.white, renderingMode: .alwaysOriginal)
+                .withTintColor(.gpOnPrimary, renderingMode: .alwaysOriginal)
             navigationItem.rightBarButtonItem = UIBarButtonItem(
                 image: shareImage,
                 style: .plain,

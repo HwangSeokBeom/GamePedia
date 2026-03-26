@@ -120,7 +120,7 @@ final class AppCoordinator {
 
     private func showSplash() {
         let splashViewController = SplashViewController()
-        window.backgroundColor = UIColor(hex: "#0B0B0E")
+        window.backgroundColor = .gpBackground
         window.rootViewController = splashViewController
         window.makeKeyAndVisible()
 

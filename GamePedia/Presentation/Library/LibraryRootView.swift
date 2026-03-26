@@ -80,13 +80,13 @@ final class LibraryRootView: UIView {
     private let favoriteCountStatView = LibraryStatCardView(
         value: "0",
         subtitle: "찜한 게임",
-        accentColor: UIColor(hex: "#FF6B6B")
+        accentColor: .gpRed
     )
 
     private let averageRatingStatView = LibraryStatCardView(
         value: "0.0",
         subtitle: "평균 평점",
-        accentColor: UIColor(hex: "#FFB14A")
+        accentColor: .gpOrange
     )
 
     private let highestRatingStatView = LibraryStatCardView(
@@ -146,7 +146,7 @@ final class LibraryRootView: UIView {
             button.applyStyle(
                 isSelected: offset == index,
                 selectedBackgroundColor: .gpPrimary,
-                selectedTextColor: .white,
+                selectedTextColor: .gpOnPrimary,
                 normalBackgroundColor: .clear,
                 normalTextColor: .gpTextSecondary,
                 normalBorderColor: .clear
@@ -178,7 +178,7 @@ final class LibraryRootView: UIView {
     }
 
     private func setupView() {
-        backgroundColor = UIColor(hex: "#0B0B0E")
+        backgroundColor = .gpBackground
 
         addSubview(scrollView)
         scrollView.addSubview(contentView)

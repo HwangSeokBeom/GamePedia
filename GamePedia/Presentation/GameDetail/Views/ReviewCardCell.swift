@@ -21,7 +21,7 @@ final class ReviewCardCell: UITableViewCell {
     private let avatarInitialLabel: UILabel = {
         let label = UILabel()
         label.font = .systemFont(ofSize: 12, weight: .semibold)
-        label.textColor = .black
+        label.textColor = .gpAvatarInitialText
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
         return label

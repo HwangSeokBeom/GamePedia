@@ -80,17 +80,16 @@ final class SignUpRootView: UIView {
         let label = UILabel()
         label.text = "새 계정을 만들고 게임 세계를 탐험하세요"
         label.font = .systemFont(ofSize: 13, weight: .medium)
-        label.textColor = UIColor(hex: "#6B6B70")
+        label.textColor = .gpTextSecondary
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
 
     private let formCardView: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor(hex: "#16161A")
+        view.backgroundColor = .gpCardBackground
         view.layer.cornerRadius = 20
         view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.gpSeparator.cgColor
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
@@ -132,6 +131,12 @@ final class SignUpRootView: UIView {
         configureControls()
     }
 
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        applyDynamicLayerColors()
+    }
+
     func setUsesSystemNavigationBar(_ usesSystemNavigationBar: Bool) {
         headerStackView.isHidden = usesSystemNavigationBar
         headerTopConstraint.isActive = !usesSystemNavigationBar
@@ -141,7 +146,7 @@ final class SignUpRootView: UIView {
     }
 
     private func setupView() {
-        backgroundColor = UIColor(hex: "#0B0B0E")
+        backgroundColor = .gpBackground
 
         addSubview(scrollView)
         scrollView.addSubview(contentView)
@@ -215,6 +220,8 @@ final class SignUpRootView: UIView {
             footerStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             footerStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -30)
         ])
+
+        applyDynamicLayerColors()
     }
 
     private func setupLayout() {
@@ -261,7 +268,7 @@ final class SignUpRootView: UIView {
         )
         signUpConfiguration.imagePadding = 6
         signUpConfiguration.baseBackgroundColor = .gpPrimary
-        signUpConfiguration.baseForegroundColor = .white
+        signUpConfiguration.baseForegroundColor = .gpOnPrimary
         signUpConfiguration.cornerStyle = .capsule
         signUpConfiguration.attributedTitle = AttributedString(
             "회원가입",
@@ -282,5 +289,9 @@ final class SignUpRootView: UIView {
             ])
         )
         loginButton.configuration = loginConfiguration
+    }
+
+    private func applyDynamicLayerColors() {
+        formCardView.layer.borderColor = UIColor.gpBorder.resolvedCGColor(with: traitCollection)
     }
 }

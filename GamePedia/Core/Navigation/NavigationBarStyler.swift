@@ -37,9 +37,11 @@ struct NavigationBarStyler {
             let appearance = UINavigationBarAppearance()
             appearance.configureWithTransparentBackground()
             let buttonAppearance = UIBarButtonItemAppearance(style: .plain)
-            buttonAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.white]
+            buttonAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.gpOnPrimary]
             appearance.buttonAppearance = buttonAppearance
             appearance.backButtonAppearance = buttonAppearance
+            appearance.titleTextAttributes = [.foregroundColor: UIColor.gpOnPrimary]
+            appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.gpOnPrimary]
             navigationItem.standardAppearance = appearance
             navigationItem.scrollEdgeAppearance = appearance
             navigationItem.compactAppearance = appearance
@@ -65,9 +67,10 @@ struct NavigationBarStyler {
     private static func makeOpaqueAppearance(buttonTintColor: UIColor) -> UINavigationBarAppearance {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .gpBackground
+        appearance.backgroundColor = .gpNavigationBarBackground
         appearance.shadowColor = .clear
         appearance.titleTextAttributes = [.foregroundColor: UIColor.gpTextPrimary]
+        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.gpTextPrimary]
         let buttonAppearance = UIBarButtonItemAppearance(style: .plain)
         buttonAppearance.normal.titleTextAttributes = [.foregroundColor: buttonTintColor]
         appearance.buttonAppearance = buttonAppearance

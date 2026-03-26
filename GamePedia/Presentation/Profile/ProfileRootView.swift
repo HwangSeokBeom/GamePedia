@@ -42,7 +42,7 @@ final class ProfileRootView: UIView {
     let badgeLabel: UILabel = {
         let label = UILabel()
         label.font = .systemFont(ofSize: 11, weight: .semibold)
-        label.textColor = .white
+        label.textColor = .gpOnPrimary
         return label
     }()
 
@@ -225,9 +225,9 @@ final class ProfileRootView: UIView {
         userRow.translatesAutoresizingMaskIntoConstraints = false
 
         // Stat cards — distinct accent colors per slot
-        playedStatView.setValueColor(UIColor(hex: "#4ECDC4"))
+        playedStatView.setValueColor(.gpTeal)
         reviewStatView.setValueColor(.gpPrimary)
-        wishlistStatView.setValueColor(UIColor(hex: "#FF6B6B"))
+        wishlistStatView.setValueColor(.gpRed)
 
         [playedStatView, reviewStatView, wishlistStatView].forEach {
             $0.backgroundColor = .gpSurfaceElevated

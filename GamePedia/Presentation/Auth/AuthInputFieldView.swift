@@ -23,7 +23,7 @@ final class AuthInputFieldView: UIView {
         textField.autocapitalizationType = .none
         textField.autocorrectionType = .no
         textField.spellCheckingType = .no
-        textField.keyboardAppearance = .dark
+        textField.keyboardAppearance = .default
         textField.translatesAutoresizingMaskIntoConstraints = false
         return textField
     }()
@@ -40,10 +40,9 @@ final class AuthInputFieldView: UIView {
 
     private let containerView: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor(hex: "#1B1B20")
+        view.backgroundColor = .gpInputBackground
         view.layer.cornerRadius = 12
         view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.gpSeparator.cgColor
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
@@ -57,6 +56,7 @@ final class AuthInputFieldView: UIView {
     }()
 
     private let trailingImageView: UIImageView?
+    private var validationState: ValidationState = .hidden
 
     init(
         title: String,
@@ -102,16 +102,23 @@ final class AuthInputFieldView: UIView {
     }
 
     func setValidationState(_ validationState: ValidationState) {
+        self.validationState = validationState
+        applyDynamicLayerColors()
+
         switch validationState {
         case .hidden:
             statusLabel.text = nil
             statusLabel.isHidden = true
-            containerView.layer.borderColor = UIColor.gpSeparator.cgColor
         case .error(let message):
             statusLabel.text = message
             statusLabel.isHidden = false
-            containerView.layer.borderColor = UIColor.gpRed.cgColor
         }
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        applyDynamicLayerColors()
     }
 
     private func setupLayout() {
@@ -158,6 +165,17 @@ final class AuthInputFieldView: UIView {
             NSLayoutConstraint.activate([
                 textField.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -14)
             ])
+        }
+
+        applyDynamicLayerColors()
+    }
+
+    private func applyDynamicLayerColors() {
+        switch validationState {
+        case .hidden:
+            containerView.layer.borderColor = UIColor.gpBorder.resolvedCGColor(with: traitCollection)
+        case .error:
+            containerView.layer.borderColor = UIColor.gpRed.resolvedCGColor(with: traitCollection)
         }
     }
 }

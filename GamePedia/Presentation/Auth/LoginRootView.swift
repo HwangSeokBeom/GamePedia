@@ -61,10 +61,9 @@ final class LoginRootView: UIView {
 
     private let logoCardView: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor(hex: "#16161A")
+        view.backgroundColor = .gpCardBackground
         view.layer.cornerRadius = 18
         view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.gpSeparator.cgColor
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
@@ -91,17 +90,16 @@ final class LoginRootView: UIView {
         let label = UILabel()
         label.text = "게임 취향을 기록하고 추천을 받아보세요"
         label.font = .systemFont(ofSize: 13, weight: .medium)
-        label.textColor = UIColor(hex: "#6B6B70")
+        label.textColor = .gpTextSecondary
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
 
     private let formCardView: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor(hex: "#16161A")
+        view.backgroundColor = .gpCardBackground
         view.layer.cornerRadius = 20
         view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.gpSeparator.cgColor
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
@@ -120,8 +118,14 @@ final class LoginRootView: UIView {
         configureControls()
     }
 
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        applyDynamicLayerColors()
+    }
+
     private func setupView() {
-        backgroundColor = UIColor(hex: "#0B0B0E")
+        backgroundColor = .gpBackground
 
         addSubview(scrollView)
         scrollView.addSubview(contentView)
@@ -186,6 +190,8 @@ final class LoginRootView: UIView {
             footerStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             footerStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -28)
         ])
+
+        applyDynamicLayerColors()
     }
 
     private func setupLayout() {
@@ -246,7 +252,7 @@ final class LoginRootView: UIView {
         var configuration = UIButton.Configuration.filled()
         configuration.title = title
         configuration.baseBackgroundColor = .gpPrimary
-        configuration.baseForegroundColor = .white
+        configuration.baseForegroundColor = .gpOnPrimary
         configuration.cornerStyle = .capsule
         configuration.attributedTitle = AttributedString(
             title,
@@ -266,9 +272,9 @@ final class LoginRootView: UIView {
         )
         configuration.imagePlacement = .leading
         configuration.imagePadding = 10
-        configuration.baseForegroundColor = UIColor(hex: "#111216")
-        configuration.baseBackgroundColor = .white
-        configuration.background.strokeColor = UIColor(hex: "#D8D8DE")
+        configuration.baseForegroundColor = .gpSocialButtonForeground
+        configuration.baseBackgroundColor = .gpSocialButtonBackground
+        configuration.background.strokeColor = .gpSocialButtonBorder
         configuration.background.strokeWidth = 1
         configuration.background.cornerRadius = 12
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
@@ -311,5 +317,11 @@ final class LoginRootView: UIView {
         label.font = .systemFont(ofSize: 11, weight: .medium)
         label.textColor = .gpTextTertiary
         return label
+    }
+
+    private func applyDynamicLayerColors() {
+        logoCardView.layer.borderColor = UIColor.gpBorder.resolvedCGColor(with: traitCollection)
+        formCardView.layer.borderColor = UIColor.gpBorder.resolvedCGColor(with: traitCollection)
+        glowView.layer.shadowColor = UIColor.gpPrimary.resolvedCGColor(with: traitCollection)
     }
 }

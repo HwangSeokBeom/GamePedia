@@ -57,10 +57,9 @@ final class ResetPasswordRootView: UIView {
 
     private let formCardView: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor(hex: "#16161A")
+        view.backgroundColor = .gpCardBackground
         view.layer.cornerRadius = 20
         view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.gpSeparator.cgColor
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
@@ -79,8 +78,14 @@ final class ResetPasswordRootView: UIView {
         configureControls()
     }
 
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        applyDynamicLayerColors()
+    }
+
     private func setupView() {
-        backgroundColor = UIColor(hex: "#0B0B0E")
+        backgroundColor = .gpBackground
 
         addSubview(scrollView)
         scrollView.addSubview(contentView)
@@ -111,6 +116,8 @@ final class ResetPasswordRootView: UIView {
             formStack.bottomAnchor.constraint(equalTo: formCardView.bottomAnchor, constant: -20),
             resetButton.heightAnchor.constraint(equalToConstant: 52)
         ])
+
+        applyDynamicLayerColors()
     }
 
     private func setupLayout() {
@@ -145,7 +152,7 @@ final class ResetPasswordRootView: UIView {
         var configuration = UIButton.Configuration.filled()
         configuration.title = "비밀번호 재설정"
         configuration.baseBackgroundColor = .gpPrimary
-        configuration.baseForegroundColor = .white
+        configuration.baseForegroundColor = .gpOnPrimary
         configuration.cornerStyle = .capsule
         configuration.attributedTitle = AttributedString(
             "비밀번호 재설정",
@@ -154,5 +161,9 @@ final class ResetPasswordRootView: UIView {
             ])
         )
         resetButton.configuration = configuration
+    }
+
+    private func applyDynamicLayerColors() {
+        formCardView.layer.borderColor = UIColor.gpBorder.resolvedCGColor(with: traitCollection)
     }
 }
