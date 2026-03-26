@@ -18,8 +18,10 @@ enum GameDetailReducer {
             state.reviews = reviewFeed.reviews
             state.reviewSummary = reviewFeed.summary
             state.myReview = reviewFeed.myReview
-        case .setOwned(let v):
-            state.isOwned = v
+        case .setFavorite(let v):
+            state.isFavorite = v
+        case .setFavoriteLoading(let isFavoriteLoading):
+            state.isFavoriteLoading = isFavoriteLoading
         case .setError(let msg):
             state.errorMessage = msg
             state.isLoading = false

@@ -20,6 +20,8 @@ final class GameDetailViewModel {
     private let apiClient: APIClient
     private let translateTextUseCase: TranslateTextUseCase
     private let fetchGameReviewsUseCase: FetchGameReviewsUseCase
+    private let fetchFavoriteStatusUseCase: FetchFavoriteStatusUseCase
+    private let toggleFavoriteUseCase: ToggleFavoriteUseCase
 
     // MARK: Init
     init(
@@ -27,10 +29,18 @@ final class GameDetailViewModel {
         fetchGameReviewsUseCase: FetchGameReviewsUseCase = FetchGameReviewsUseCase(
             reviewRepository: DefaultReviewRepository()
         ),
+        fetchFavoriteStatusUseCase: FetchFavoriteStatusUseCase = FetchFavoriteStatusUseCase(
+            favoriteRepository: DefaultFavoriteRepository()
+        ),
+        toggleFavoriteUseCase: ToggleFavoriteUseCase = ToggleFavoriteUseCase(
+            favoriteRepository: DefaultFavoriteRepository()
+        ),
         translateTextUseCase: TranslateTextUseCase? = nil
     ) {
         self.apiClient = apiClient
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
+        self.fetchFavoriteStatusUseCase = fetchFavoriteStatusUseCase
+        self.toggleFavoriteUseCase = toggleFavoriteUseCase
         self.translateTextUseCase = translateTextUseCase ?? DefaultTranslateTextUseCase(
             repository: DefaultTranslationRepository(),
             languageProvider: DefaultLanguageProvider.shared
@@ -44,7 +54,7 @@ final class GameDetailViewModel {
         case .viewDidLoad(let id):
             loadDetail(gameId: id)
         case .didTapHaveIt:
-            apply(.setOwned(!state.isOwned))
+            toggleFavorite()
         case .didTapWriteReview:
             guard let game = state.game else { return }
             onWriteReview?(game, state.myReview)
@@ -70,6 +80,7 @@ final class GameDetailViewModel {
             await withTaskGroup(of: Void.self) { group in
                 group.addTask { await self.fetchGame(id: gameId) }
                 group.addTask { await self.fetchReviews(gameId: gameId) }
+                group.addTask { await self.fetchFavoriteStatus(gameId: gameId) }
             }
         }
     }
@@ -103,6 +114,54 @@ final class GameDetailViewModel {
             }
         } catch {
             // Reviews failing silently — detail still shows
+        }
+    }
+
+    private func fetchFavoriteStatus(gameId: Int) async {
+        do {
+            let favoriteStatus = try await fetchFavoriteStatusUseCase.execute(gameId: String(gameId))
+            await MainActor.run {
+                self.apply(.setFavorite(favoriteStatus.isFavorite))
+            }
+        } catch {
+            // Favorite status should not block detail rendering.
+        }
+    }
+
+    private func toggleFavorite() {
+        guard let game = state.game, !state.isFavoriteLoading else { return }
+
+        apply(.setFavoriteLoading(true))
+
+        Task {
+            do {
+                let result = try await toggleFavoriteUseCase.execute(
+                    gameId: String(game.id),
+                    isCurrentlyFavorite: state.isFavorite
+                )
+
+                await MainActor.run {
+                    self.apply(.setFavorite(result.isFavorite))
+                    self.apply(.setFavoriteLoading(false))
+                    NotificationCenter.default.post(
+                        name: .favoriteDidChange,
+                        object: nil,
+                        userInfo: [
+                            FavoriteChangeUserInfoKey.gameId: result.gameId,
+                            FavoriteChangeUserInfoKey.isFavorite: result.isFavorite,
+                            FavoriteChangeUserInfoKey.action: result.isFavorite
+                                ? FavoriteChangeAction.added.rawValue
+                                : FavoriteChangeAction.removed.rawValue
+                        ]
+                    )
+                }
+            } catch {
+                let favoriteError = FavoriteError.from(error: error)
+                await MainActor.run {
+                    self.apply(.setFavoriteLoading(false))
+                    self.apply(.setError(favoriteError.errorDescription ?? "찜 상태를 변경하지 못했습니다."))
+                }
+            }
         }
     }
 

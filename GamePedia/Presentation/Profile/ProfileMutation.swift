@@ -9,6 +9,7 @@ enum ProfileMutation {
     case setAuthenticatedUser(AuthUser)
     case setRecentGames([RecentGame])
     case setWrittenReviewCount(Int)
+    case setWishlistCount(Int)
     case setError(String)
     case clearError
     case setTranslatedRecentGameTitles([Int: String])

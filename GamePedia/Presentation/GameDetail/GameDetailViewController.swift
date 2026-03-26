@@ -7,6 +7,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
     private let viewModel: GameDetailViewModel
     let gameId: Int
     private var previewReviews: [Review] = []
+    private var lastPresentedErrorMessage: String?
 
     // Set by the owning Coordinator before push.
     var onWriteReview: ((GameDetail, Review?) -> Void)?
@@ -99,21 +100,31 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
         let bookmarkSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         var haveItButtonConfiguration = rootView.haveItButton.configuration
-        haveItButtonConfiguration?.title = state.isOwned ? "보유 중" : "찜하기"
+        haveItButtonConfiguration?.title = state.isFavorite ? "찜됨" : "찜하기"
         haveItButtonConfiguration?.image = UIImage(
-            systemName: state.isOwned ? "bookmark.fill" : "bookmark",
+            systemName: state.isFavorite ? "bookmark.fill" : "bookmark",
             withConfiguration: bookmarkSymbolConfiguration
         )
-        haveItButtonConfiguration?.baseBackgroundColor = state.isOwned ? .gpSurfaceElevated : .gpPrimary
+        haveItButtonConfiguration?.baseBackgroundColor = state.isFavorite ? .gpSurfaceElevated : .gpPrimary
         rootView.haveItButton.configuration = haveItButtonConfiguration
+        rootView.haveItButton.isEnabled = !state.isFavoriteLoading
 
         var heartButtonConfiguration = rootView.heartButton.configuration
-        heartButtonConfiguration?.image = UIImage(systemName: state.isOwned ? "heart.fill" : "heart")
+        heartButtonConfiguration?.image = UIImage(systemName: state.isFavorite ? "heart.fill" : "heart")
         rootView.heartButton.configuration = heartButtonConfiguration
+        rootView.heartButton.isEnabled = !state.isFavoriteLoading
 
         var writeReviewButtonConfiguration = rootView.writeReviewButton.configuration
         writeReviewButtonConfiguration?.title = state.writeReviewButtonTitle
         rootView.writeReviewButton.configuration = writeReviewButtonConfiguration
+
+        if let errorMessage = state.errorMessage,
+           errorMessage != lastPresentedErrorMessage {
+            lastPresentedErrorMessage = errorMessage
+            let alert = UIAlertController(title: "오류", message: errorMessage, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "확인", style: .default))
+            present(alert, animated: true)
+        }
     }
 
     // MARK: Public

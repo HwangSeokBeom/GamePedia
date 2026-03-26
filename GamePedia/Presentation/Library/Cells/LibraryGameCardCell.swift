@@ -3,16 +3,19 @@ import UIKit
 struct LibraryGameCardItem: Hashable {
     let id: Int
     let title: String
-    let playHours: Int
-    let ratingValue: Double
+    let metadataText: String
+    let ratingValue: Double?
+    let coverImageURL: URL?
     let symbolName: String
     let startColorHex: String
     let endColorHex: String
+    let isFavorite: Bool
 }
 
 final class LibraryGameCardCell: UICollectionViewCell {
 
     static let reuseId = "LibraryGameCardCell"
+    var onFavoriteButtonTapped: (() -> Void)?
 
     private let artworkView = LibraryArtworkView()
 
@@ -57,13 +60,13 @@ final class LibraryGameCardCell: UICollectionViewCell {
         let button = UIButton(type: .system)
         var configuration = UIButton.Configuration.plain()
         configuration.image = UIImage(
-            systemName: "heart",
+            systemName: "heart.fill",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .regular)
         )
         configuration.baseForegroundColor = .gpRed
         configuration.contentInsets = .zero
         button.configuration = configuration
-        button.isUserInteractionEnabled = false
+        button.isUserInteractionEnabled = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -81,6 +84,7 @@ final class LibraryGameCardCell: UICollectionViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         artworkView.prepareForReuse()
+        onFavoriteButtonTapped = nil
     }
 
     func configure(with item: LibraryGameCardItem) {
@@ -88,11 +92,26 @@ final class LibraryGameCardCell: UICollectionViewCell {
             title: item.title,
             symbolName: item.symbolName,
             startColorHex: item.startColorHex,
-            endColorHex: item.endColorHex
+            endColorHex: item.endColorHex,
+            imageURL: item.coverImageURL
         )
         titleLabel.text = item.title
-        ratingLabel.text = String(format: "%.1f", item.ratingValue)
-        playtimeLabel.text = "\(item.playHours)시간"
+        if let ratingValue = item.ratingValue {
+            ratingLabel.text = String(format: "%.1f", ratingValue)
+            ratingLabel.isHidden = false
+            starImageView.isHidden = false
+        } else {
+            ratingLabel.isHidden = true
+            starImageView.isHidden = true
+        }
+        playtimeLabel.text = item.metadataText
+
+        var configuration = favoriteButton.configuration
+        configuration?.image = UIImage(
+            systemName: item.isFavorite ? "heart.fill" : "heart",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+        )
+        favoriteButton.configuration = configuration
     }
 
     private func setup() {
@@ -107,6 +126,7 @@ final class LibraryGameCardCell: UICollectionViewCell {
         contentView.addSubview(ratingLabel)
         contentView.addSubview(favoriteButton)
         contentView.addSubview(playtimeLabel)
+        favoriteButton.addTarget(self, action: #selector(didTapFavoriteButton), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
             artworkView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
@@ -137,11 +157,23 @@ final class LibraryGameCardCell: UICollectionViewCell {
             playtimeLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10)
         ])
     }
+
+    @objc
+    private func didTapFavoriteButton() {
+        onFavoriteButtonTapped?()
+    }
 }
 
 private final class LibraryArtworkView: UIView {
 
     private let gradientLayer = CAGradientLayer()
+    private let imageView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
 
     private let monogramLabel: UILabel = {
         let label = UILabel()
@@ -174,7 +206,7 @@ private final class LibraryArtworkView: UIView {
         gradientLayer.frame = bounds
     }
 
-    func configure(title: String, symbolName: String, startColorHex: String, endColorHex: String) {
+    func configure(title: String, symbolName: String, startColorHex: String, endColorHex: String, imageURL: URL?) {
         gradientLayer.colors = [
             UIColor(hex: startColorHex).cgColor,
             UIColor(hex: endColorHex).cgColor
@@ -184,11 +216,20 @@ private final class LibraryArtworkView: UIView {
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 42, weight: .medium)
         )
         monogramLabel.text = String(title.prefix(1))
+        imageView.loadImage(url: imageURL)
+        imageView.isHidden = imageURL == nil
+        symbolImageView.isHidden = imageURL != nil
+        monogramLabel.isHidden = imageURL != nil
     }
 
     func prepareForReuse() {
+        imageView.cancelLoad()
+        imageView.image = nil
         symbolImageView.image = nil
         monogramLabel.text = nil
+        imageView.isHidden = true
+        symbolImageView.isHidden = false
+        monogramLabel.isHidden = false
     }
 
     private func setup() {
@@ -200,10 +241,16 @@ private final class LibraryArtworkView: UIView {
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)
         layer.insertSublayer(gradientLayer, at: 0)
 
+        addSubview(imageView)
         addSubview(symbolImageView)
         addSubview(monogramLabel)
 
         NSLayoutConstraint.activate([
+            imageView.topAnchor.constraint(equalTo: topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            imageView.bottomAnchor.constraint(equalTo: bottomAnchor),
+
             symbolImageView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
             symbolImageView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
             symbolImageView.widthAnchor.constraint(equalToConstant: 50),

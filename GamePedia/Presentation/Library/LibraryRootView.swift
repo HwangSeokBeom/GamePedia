@@ -77,6 +77,24 @@ final class LibraryRootView: UIView {
         return stackView
     }()
 
+    private let favoriteCountStatView = LibraryStatCardView(
+        value: "0",
+        subtitle: "찜한 게임",
+        accentColor: UIColor(hex: "#FF6B6B")
+    )
+
+    private let averageRatingStatView = LibraryStatCardView(
+        value: "0.0",
+        subtitle: "평균 평점",
+        accentColor: UIColor(hex: "#FFB14A")
+    )
+
+    private let highestRatingStatView = LibraryStatCardView(
+        value: "0.0",
+        subtitle: "최고 평점",
+        accentColor: .gpPrimaryLight
+    )
+
     private let filterStackView: UIStackView = {
         let stackView = UIStackView()
         stackView.axis = .horizontal
@@ -84,6 +102,25 @@ final class LibraryRootView: UIView {
         stackView.alignment = .fill
         stackView.translatesAutoresizingMaskIntoConstraints = false
         return stackView
+    }()
+
+    private let loadingIndicatorView: UIActivityIndicatorView = {
+        let indicatorView = UIActivityIndicatorView(style: .large)
+        indicatorView.color = .gpPrimary
+        indicatorView.hidesWhenStopped = true
+        indicatorView.translatesAutoresizingMaskIntoConstraints = false
+        return indicatorView
+    }()
+
+    private let emptyStateLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.textColor = .gpTextSecondary
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.isHidden = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
     }()
 
     private var collectionHeightConstraint: NSLayoutConstraint!
@@ -151,7 +188,9 @@ final class LibraryRootView: UIView {
         tabsContainerView.addSubview(tabStackView)
         contentView.addSubview(statsStackView)
         contentView.addSubview(filterStackView)
+        contentView.addSubview(emptyStateLabel)
         contentView.addSubview(collectionView)
+        contentView.addSubview(loadingIndicatorView)
 
         ["플레이중", "찜한 게임", "리뷰 작성함"].enumerated().forEach { index, title in
             let button = LibraryPillButton(title: title)
@@ -161,13 +200,11 @@ final class LibraryRootView: UIView {
             tabStackView.addArrangedSubview(button)
         }
 
-        [
-            LibraryStatCardView(value: "1,284h", subtitle: "총 플레이", accentColor: UIColor(hex: "#57F7B0")),
-            LibraryStatCardView(value: "4.3", subtitle: "평균 평점", accentColor: UIColor(hex: "#FFB14A")),
-            LibraryStatCardView(value: "142", subtitle: "게임 수", accentColor: .gpPrimaryLight)
-        ].forEach { statsStackView.addArrangedSubview($0) }
+        [favoriteCountStatView, averageRatingStatView, highestRatingStatView].forEach {
+            statsStackView.addArrangedSubview($0)
+        }
 
-        ["최근 플레이", "평점순", "플레이 시간순"].enumerated().forEach { index, title in
+        ["최신순", "오래된순"].enumerated().forEach { index, title in
             let button = LibraryPillButton(title: title)
             button.tag = index
             button.addTarget(self, action: #selector(didTapFilter(_:)), for: .touchUpInside)
@@ -200,11 +237,18 @@ final class LibraryRootView: UIView {
             filterStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             filterStackView.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -16),
 
+            emptyStateLabel.topAnchor.constraint(equalTo: filterStackView.bottomAnchor, constant: 40),
+            emptyStateLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            emptyStateLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+
             collectionView.topAnchor.constraint(equalTo: filterStackView.bottomAnchor, constant: 14),
             collectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             collectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             collectionView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24),
-            collectionHeightConstraint
+            collectionHeightConstraint,
+
+            loadingIndicatorView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            loadingIndicatorView.topAnchor.constraint(equalTo: filterStackView.bottomAnchor, constant: 40)
         ])
     }
 
@@ -224,8 +268,32 @@ final class LibraryRootView: UIView {
     }
 
     private func configureSelections() {
-        setSelectedTab(index: 0)
+        setSelectedTab(index: 1)
         setSelectedFilter(index: 0)
+    }
+
+    func render(_ state: LibraryState) {
+        setSelectedTab(index: state.selectedTab.rawValue)
+        setSelectedFilter(index: state.selectedSort == .latest ? 0 : 1)
+
+        favoriteCountStatView.configure(value: "\(state.favoriteCount)", subtitle: "찜한 게임")
+        averageRatingStatView.configure(value: state.averageRatingText, subtitle: "평균 평점")
+        highestRatingStatView.configure(value: state.highestRatingText, subtitle: "최고 평점")
+
+        statsStackView.isHidden = !state.showsFavoriteContent
+        filterStackView.isHidden = !state.showsFavoriteContent
+
+        emptyStateLabel.text = state.emptyMessage
+        emptyStateLabel.isHidden = !state.showsEmptyState
+        collectionView.isHidden = state.isLoading || state.showsEmptyState
+
+        if state.isLoading {
+            loadingIndicatorView.startAnimating()
+        } else {
+            loadingIndicatorView.stopAnimating()
+        }
+
+        collectionHeightConstraint.constant = state.showsEmptyState ? 0 : collectionView.collectionViewLayout.collectionViewContentSize.height
     }
 
     @objc
@@ -329,6 +397,11 @@ private final class LibraryStatCardView: UIView {
             stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
             stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
+    }
+
+    func configure(value: String, subtitle: String) {
+        valueLabel.text = value
+        subtitleLabel.text = subtitle
     }
 
     @available(*, unavailable)

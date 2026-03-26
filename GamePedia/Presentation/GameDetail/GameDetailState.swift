@@ -8,7 +8,8 @@ struct GameDetailState {
     var reviews: [Review] = []
     var reviewSummary: ReviewSummary? = nil
     var myReview: Review? = nil
-    var isOwned: Bool = false
+    var isFavorite: Bool = false
+    var isFavoriteLoading: Bool = false
     var errorMessage: String? = nil
     var translatedTitle: String? = nil
     var translatedSummary: String? = nil

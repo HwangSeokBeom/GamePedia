@@ -20,6 +20,8 @@ enum ProfileReducer {
             state.translatedRecentGameTitles = [:]
         case .setWrittenReviewCount(let count):
             state.writtenReviewCount = count
+        case .setWishlistCount(let count):
+            state.wishlistCountValue = count
         case .setError(let msg):
             state.errorMessage = msg
             state.isLoading = false

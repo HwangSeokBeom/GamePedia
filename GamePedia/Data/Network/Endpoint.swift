@@ -177,6 +177,15 @@ extension Endpoint {
             limit 1;
             """)
     }
+
+    static func games(ids: [Int]) -> Endpoint {
+        let joinedIDs = ids.map(String.init).joined(separator: ",")
+        return .igdb("/games", query: """
+            fields name, summary, cover.url, genres.name, platforms.name, rating, rating_count, first_release_date;
+            where id = (\(joinedIDs));
+            limit \(ids.count);
+            """)
+    }
 }
 
 // MARK: - Review Endpoints
@@ -202,6 +211,27 @@ extension Endpoint {
     static func myReviews(sort: String? = nil) -> Endpoint {
         let queryItems = sort.map { [URLQueryItem(name: "sort", value: $0)] } ?? []
         return .get("/users/me/reviews", query: queryItems, userAuth: true)
+    }
+}
+
+// MARK: - Favorite Endpoints
+
+extension Endpoint {
+    static func addFavorite(body: AddFavoriteRequestDTO) -> Endpoint {
+        .post("/favorites", body: body, userAuth: true)
+    }
+
+    static func removeFavorite(gameId: String) -> Endpoint {
+        .delete("/favorites/\(gameId)", userAuth: true)
+    }
+
+    static func myFavorites(sort: String? = nil) -> Endpoint {
+        let queryItems = sort.map { [URLQueryItem(name: "sort", value: $0)] } ?? []
+        return .get("/users/me/favorites", query: queryItems, userAuth: true)
+    }
+
+    static func favoriteStatus(gameId: String) -> Endpoint {
+        .get("/games/\(gameId)/favorite-status", userAuth: true)
     }
 }
 

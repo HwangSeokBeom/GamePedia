@@ -16,6 +16,7 @@ final class ProfileViewModel {
     // MARK: Dependencies
     private let fetchCurrentUserUseCase: FetchCurrentUserUseCase
     private let fetchMyReviewsUseCase: FetchMyReviewsUseCase
+    private let fetchMyFavoritesUseCase: FetchMyFavoritesUseCase
     private let logoutUseCase: LogoutUseCase
     private let deleteAccountUseCase: DeleteAccountUseCase
     private let userSessionStore: any UserSessionStore
@@ -29,6 +30,9 @@ final class ProfileViewModel {
         fetchMyReviewsUseCase: FetchMyReviewsUseCase = FetchMyReviewsUseCase(
             reviewRepository: DefaultReviewRepository()
         ),
+        fetchMyFavoritesUseCase: FetchMyFavoritesUseCase = FetchMyFavoritesUseCase(
+            favoriteRepository: DefaultFavoriteRepository()
+        ),
         logoutUseCase: LogoutUseCase,
         deleteAccountUseCase: DeleteAccountUseCase,
         userSessionStore: any UserSessionStore,
@@ -37,6 +41,7 @@ final class ProfileViewModel {
     ) {
         self.fetchCurrentUserUseCase = fetchCurrentUserUseCase
         self.fetchMyReviewsUseCase = fetchMyReviewsUseCase
+        self.fetchMyFavoritesUseCase = fetchMyFavoritesUseCase
         self.logoutUseCase = logoutUseCase
         self.deleteAccountUseCase = deleteAccountUseCase
         self.userSessionStore = userSessionStore
@@ -85,6 +90,10 @@ final class ProfileViewModel {
 
         Task {
             await fetchWrittenReviewCount()
+        }
+
+        Task {
+            await fetchWishlistCount()
         }
     }
 
@@ -151,6 +160,16 @@ final class ProfileViewModel {
                 }
             }
             .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .favoriteDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.userSessionStore.fetchUser() != nil else { return }
+                Task {
+                    await self.fetchWishlistCount()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     private func logout() {
@@ -202,6 +221,22 @@ final class ProfileViewModel {
             return true
         default:
             return false
+        }
+    }
+
+    private func fetchWishlistCount() async {
+        do {
+            let favorites = try await fetchMyFavoritesUseCase.execute(sort: .latest)
+            await MainActor.run {
+                self.apply(.setWishlistCount(favorites.count))
+            }
+        } catch {
+            let favoriteError = FavoriteError.from(error: error)
+            if case .unauthorized = favoriteError {
+                await MainActor.run {
+                    _ = self.handleProtectedSessionFailure(.unauthorized)
+                }
+            }
         }
     }
 

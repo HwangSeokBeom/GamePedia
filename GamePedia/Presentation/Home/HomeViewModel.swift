@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 // MARK: - HomeViewModel
@@ -20,12 +21,17 @@ final class HomeViewModel {
     // MARK: Dependencies
     private let loadHomeFeedUseCase: LoadHomeFeedUseCase
     private let userActivityRepository: any UserActivityRepository
+    private let fetchMyFavoritesUseCase: FetchMyFavoritesUseCase
     private let translateTextUseCase: TranslateTextUseCase
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: Init
     init(
         loadHomeFeedUseCase: LoadHomeFeedUseCase? = nil,
         userActivityRepository: (any UserActivityRepository)? = nil,
+        fetchMyFavoritesUseCase: FetchMyFavoritesUseCase = FetchMyFavoritesUseCase(
+            favoriteRepository: DefaultFavoriteRepository()
+        ),
         translateTextUseCase: TranslateTextUseCase? = nil
     ) {
         let resolvedActivityRepository = userActivityRepository ?? LocalUserActivityRepository.shared
@@ -33,10 +39,12 @@ final class HomeViewModel {
         self.loadHomeFeedUseCase = loadHomeFeedUseCase ?? LoadHomeFeedUseCase.live(
             userActivityRepository: resolvedActivityRepository
         )
+        self.fetchMyFavoritesUseCase = fetchMyFavoritesUseCase
         self.translateTextUseCase = translateTextUseCase ?? DefaultTranslateTextUseCase(
             repository: DefaultTranslationRepository(),
             languageProvider: DefaultLanguageProvider.shared
         )
+        observeFavoriteChanges()
     }
 
     // MARK: - Intent Processing
@@ -68,12 +76,13 @@ final class HomeViewModel {
         Task {
             do {
                 async let feedTask = loadHomeFeedUseCase.execute()
-                async let activityTask = userActivityRepository.loadActivity()
-                let (feed, activity) = try await (feedTask, activityTask)
+                async let favoritesTask = fetchMyFavoritesUseCase.execute(sort: .latest)
+                let feed = try await feedTask
+                let favoriteItems = (try? await favoritesTask) ?? []
                 let translatedFeed = await translateHomeFeed(feed)
                 await MainActor.run {
                     self.apply(.setHomeFeed(translatedFeed))
-                    self.apply(.setWishlistedGameIDs(Set(activity.likedItemIDs)))
+                    self.apply(.setWishlistedGameIDs(Set(favoriteItems.map(\.gameId))))
                     self.apply(.setLoading(false))
                 }
             } catch {
@@ -82,6 +91,27 @@ final class HomeViewModel {
                 }
             }
         }
+    }
+
+    private func observeFavoriteChanges() {
+        NotificationCenter.default.publisher(for: .favoriteDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let gameId = notification.userInfo?[FavoriteChangeUserInfoKey.gameId] as? Int,
+                      let isFavorite = notification.userInfo?[FavoriteChangeUserInfoKey.isFavorite] as? Bool else {
+                    return
+                }
+
+                var updatedIDs = self.state.wishlistedGameIDs
+                if isFavorite {
+                    updatedIDs.insert(gameId)
+                } else {
+                    updatedIDs.remove(gameId)
+                }
+                self.apply(.setWishlistedGameIDs(updatedIDs))
+            }
+            .store(in: &cancellables)
     }
 
     private func routeToSectionList(_ section: HomeSection) {

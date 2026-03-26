@@ -1,60 +1,19 @@
-//
-//  LibraryViewController.swift
-//  GamePedia
-//
-//  Created by Hwangseokbeom on 3/23/26.
-//
-
 import UIKit
 
-final class LibraryViewController: BaseViewController<LibraryRootView, Void> {
+final class LibraryViewController: BaseViewController<LibraryRootView, LibraryState> {
 
     private enum Section {
         case main
     }
 
+    private let viewModel: LibraryViewModel
     private var dataSource: UICollectionViewDiffableDataSource<Section, LibraryGameCardItem>!
+    private var lastPresentedErrorMessage: String?
 
-    private let items: [LibraryGameCardItem] = [
-        LibraryGameCardItem(
-            id: 1,
-            title: "엘든 링",
-            playHours: 120,
-            ratingValue: 4.9,
-            symbolName: "flame",
-            startColorHex: "#A96E20",
-            endColorHex: "#1C1B27"
-        ),
-        LibraryGameCardItem(
-            id: 2,
-            title: "젤다의 전설",
-            playHours: 85,
-            ratingValue: 4.8,
-            symbolName: "leaf",
-            startColorHex: "#66D4FF",
-            endColorHex: "#3B6B5C"
-        ),
-        LibraryGameCardItem(
-            id: 3,
-            title: "갓 오브 워",
-            playHours: 32,
-            ratingValue: 4.9,
-            symbolName: "shield.lefthalf.filled",
-            startColorHex: "#50545F",
-            endColorHex: "#1B1B21"
-        ),
-        LibraryGameCardItem(
-            id: 4,
-            title: "사이버펑크",
-            playHours: 65,
-            ratingValue: 4.5,
-            symbolName: "building.2.crop.circle",
-            startColorHex: "#8C46F9",
-            endColorHex: "#0C2C4E"
-        )
-    ]
+    var onGameSelected: ((Int) -> Void)?
 
     override init(rootView: LibraryRootView = LibraryRootView()) {
+        self.viewModel = LibraryViewModel()
         super.init(rootView: rootView)
         NavigationBarStyler.apply(.opaque, to: navigationItem, buttonTintColor: .gpPrimary)
         configureNavigationItem()
@@ -65,7 +24,8 @@ final class LibraryViewController: BaseViewController<LibraryRootView, Void> {
         rootView.setUsesNavigationTitle(true)
         setupCollectionView()
         setupBindings()
-        applySnapshot()
+        bindViewModel()
+        viewModel.send(.viewDidLoad)
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -77,23 +37,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, Void> {
         UIView.performWithoutAnimation {
             navigationItem.title = "내 라이브러리"
             navigationItem.largeTitleDisplayMode = .never
-            navigationItem.rightBarButtonItem = makeSortFilterBarButtonItem()
         }
-    }
-
-    private func makeSortFilterBarButtonItem() -> UIBarButtonItem {
-        let image = UIImage(
-            systemName: "slider.horizontal.3",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
-        )
-        let item = UIBarButtonItem(
-            image: image,
-            style: .plain,
-            target: self,
-            action: #selector(didTapSortFilter)
-        )
-        item.tintColor = .gpTextSecondary
-        return item
     }
 
     private func setupCollectionView() {
@@ -101,33 +45,71 @@ final class LibraryViewController: BaseViewController<LibraryRootView, Void> {
 
         dataSource = UICollectionViewDiffableDataSource<Section, LibraryGameCardItem>(
             collectionView: rootView.collectionView
-        ) { collectionView, indexPath, item in
+        ) { [weak self] collectionView, indexPath, item in
+            guard let self else { return UICollectionViewCell() }
             let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: LibraryGameCardCell.reuseId,
                 for: indexPath
             ) as! LibraryGameCardCell
             cell.configure(with: item)
+            cell.onFavoriteButtonTapped = { [weak self] in
+                self?.presentRemoveFavoriteAlert(gameId: item.id, title: item.title)
+            }
             return cell
         }
     }
 
     private func setupBindings() {
-        rootView.onTabSelected = { _ in }
-        rootView.onFilterSelected = { _ in }
+        rootView.onTabSelected = { [weak self] index in
+            self?.viewModel.send(.didSelectTab(index))
+        }
+        rootView.onFilterSelected = { [weak self] index in
+            self?.viewModel.send(.didSelectSort(index))
+        }
     }
 
-    private func applySnapshot() {
+    private func bindViewModel() {
+        viewModel.onStateChanged = { [weak self] state in
+            DispatchQueue.main.async {
+                self?.render(state)
+            }
+        }
+    }
+
+    override func render(_ state: LibraryState) {
+        rootView.render(state)
+        applySnapshot(items: state.items)
+
+        if let errorMessage = state.errorMessage,
+           errorMessage != lastPresentedErrorMessage {
+            lastPresentedErrorMessage = errorMessage
+            let alert = UIAlertController(title: "오류", message: errorMessage, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "확인", style: .default))
+            present(alert, animated: true)
+        }
+    }
+
+    private func applySnapshot(items: [LibraryGameCardItem]) {
         var snapshot = NSDiffableDataSourceSnapshot<Section, LibraryGameCardItem>()
         snapshot.appendSections([.main])
         snapshot.appendItems(items, toSection: .main)
         dataSource.apply(snapshot, animatingDifferences: false) { [weak self] in
             self?.rootView.updateCollectionHeight()
+            self?.rootView.render(self?.viewModel.state ?? LibraryState())
         }
     }
 
-    @objc
-    private func didTapSortFilter() {
-        // No sort action was previously wired for the in-content button.
+    private func presentRemoveFavoriteAlert(gameId: Int, title: String) {
+        let alert = UIAlertController(
+            title: "찜을 해제할까요?",
+            message: "\"\(title)\"을 찜한 게임 목록에서 제거합니다.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alert.addAction(UIAlertAction(title: "삭제", style: .destructive) { [weak self] _ in
+            self?.viewModel.send(.didConfirmRemoveFavorite(gameId: gameId))
+        })
+        present(alert, animated: true)
     }
 }
 
@@ -139,5 +121,10 @@ extension LibraryViewController: UICollectionViewDelegateFlowLayout {
     ) -> CGSize {
         let width = floor((collectionView.bounds.width - 12) / 2)
         return CGSize(width: width, height: width * 1.54)
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
+        onGameSelected?(item.id)
     }
 }
