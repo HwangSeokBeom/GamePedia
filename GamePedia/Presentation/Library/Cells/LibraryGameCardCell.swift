@@ -10,6 +10,7 @@ struct LibraryGameCardItem: Hashable {
     let startColorHex: String
     let endColorHex: String
     let isFavorite: Bool
+    let showsFavoriteButton: Bool
 }
 
 final class LibraryGameCardCell: UICollectionViewCell {
@@ -112,6 +113,7 @@ final class LibraryGameCardCell: UICollectionViewCell {
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .regular)
         )
         favoriteButton.configuration = configuration
+        favoriteButton.isHidden = !item.showsFavoriteButton
     }
 
     private func setup() {

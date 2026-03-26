@@ -274,14 +274,14 @@ final class LibraryRootView: UIView {
 
     func render(_ state: LibraryState) {
         setSelectedTab(index: state.selectedTab.rawValue)
-        setSelectedFilter(index: state.selectedSort == .latest ? 0 : 1)
+        setSelectedFilter(index: state.selectedSort.rawValue)
 
-        favoriteCountStatView.configure(value: "\(state.favoriteCount)", subtitle: "찜한 게임")
+        favoriteCountStatView.configure(value: "\(state.itemCount)", subtitle: state.countSubtitle)
         averageRatingStatView.configure(value: state.averageRatingText, subtitle: "평균 평점")
         highestRatingStatView.configure(value: state.highestRatingText, subtitle: "최고 평점")
 
-        statsStackView.isHidden = !state.showsFavoriteContent
-        filterStackView.isHidden = !state.showsFavoriteContent
+        statsStackView.isHidden = !state.showsManagedContent
+        filterStackView.isHidden = !state.showsManagedContent
 
         emptyStateLabel.text = state.emptyMessage
         emptyStateLabel.isHidden = !state.showsEmptyState

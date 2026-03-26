@@ -12,23 +12,36 @@ enum LibraryTab: Int {
         case .favorites:
             return "찜한 게임이 아직 없어요."
         case .reviewed:
-            return "작성한 리뷰 라이브러리는 아직 준비 중이에요."
+            return "작성한 리뷰가 없어요."
         }
+    }
+}
+
+enum LibrarySortOption: Int {
+    case latest = 0
+    case oldest = 1
+
+    var favoriteSort: FavoriteSortOption {
+        self == .oldest ? .oldest : .latest
+    }
+
+    var reviewSort: ReviewSortOption {
+        self == .oldest ? .oldest : .latest
     }
 }
 
 struct LibraryState {
     var selectedTab: LibraryTab = .favorites
-    var selectedSort: FavoriteSortOption = .latest
+    var selectedSort: LibrarySortOption = .latest
     var items: [LibraryGameCardItem] = []
     var isLoading: Bool = false
     var errorMessage: String? = nil
-    var favoriteCount: Int = 0
+    var itemCount: Int = 0
     var averageRatingText: String = "0.0"
     var highestRatingText: String = "0.0"
 
-    var showsFavoriteContent: Bool {
-        selectedTab == .favorites
+    var showsManagedContent: Bool {
+        selectedTab != .playing
     }
 
     var showsEmptyState: Bool {
@@ -37,5 +50,16 @@ struct LibraryState {
 
     var emptyMessage: String {
         selectedTab.emptyMessage
+    }
+
+    var countSubtitle: String {
+        switch selectedTab {
+        case .favorites:
+            return "찜한 게임"
+        case .reviewed:
+            return "작성한 리뷰"
+        case .playing:
+            return "항목"
+        }
     }
 }
