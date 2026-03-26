@@ -60,6 +60,7 @@ actor AuthService {
         guard httpResponse.statusCode == 200 else {
             throw NetworkError.serverError(
                 statusCode: httpResponse.statusCode,
+                code: nil,
                 message: "Twitch token request failed"
             )
         }

@@ -15,6 +15,7 @@ final class ProfileViewModel {
 
     // MARK: Dependencies
     private let fetchCurrentUserUseCase: FetchCurrentUserUseCase
+    private let fetchMyReviewsUseCase: FetchMyReviewsUseCase
     private let logoutUseCase: LogoutUseCase
     private let deleteAccountUseCase: DeleteAccountUseCase
     private let userSessionStore: any UserSessionStore
@@ -25,6 +26,9 @@ final class ProfileViewModel {
     // MARK: Init
     init(
         fetchCurrentUserUseCase: FetchCurrentUserUseCase,
+        fetchMyReviewsUseCase: FetchMyReviewsUseCase = FetchMyReviewsUseCase(
+            reviewRepository: DefaultReviewRepository()
+        ),
         logoutUseCase: LogoutUseCase,
         deleteAccountUseCase: DeleteAccountUseCase,
         userSessionStore: any UserSessionStore,
@@ -32,6 +36,7 @@ final class ProfileViewModel {
         translateTextUseCase: TranslateTextUseCase? = nil
     ) {
         self.fetchCurrentUserUseCase = fetchCurrentUserUseCase
+        self.fetchMyReviewsUseCase = fetchMyReviewsUseCase
         self.logoutUseCase = logoutUseCase
         self.deleteAccountUseCase = deleteAccountUseCase
         self.userSessionStore = userSessionStore
@@ -40,6 +45,7 @@ final class ProfileViewModel {
             repository: DefaultTranslationRepository(),
             languageProvider: DefaultLanguageProvider.shared
         )
+        observeReviewChanges()
     }
 
     // MARK: - Intent Processing
@@ -75,6 +81,10 @@ final class ProfileViewModel {
 
         Task {
             await fetchRecentGames()
+        }
+
+        Task {
+            await fetchWrittenReviewCount()
         }
     }
 
@@ -113,6 +123,34 @@ final class ProfileViewModel {
         } catch {
             // Recent games failing silently — basic auth profile still shows
         }
+    }
+
+    private func fetchWrittenReviewCount() async {
+        do {
+            let reviews = try await fetchMyReviewsUseCase.execute(sort: .latest)
+            await MainActor.run {
+                self.apply(.setWrittenReviewCount(reviews.count))
+            }
+        } catch {
+            let reviewError = ReviewError.from(error: error)
+            if case .unauthorized = reviewError {
+                await MainActor.run {
+                    _ = self.handleProtectedSessionFailure(.unauthorized)
+                }
+            }
+        }
+    }
+
+    private func observeReviewChanges() {
+        NotificationCenter.default.publisher(for: .reviewDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.userSessionStore.fetchUser() != nil else { return }
+                Task {
+                    await self.fetchWrittenReviewCount()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     private func logout() {

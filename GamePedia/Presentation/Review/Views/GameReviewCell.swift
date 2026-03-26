@@ -1,23 +1,21 @@
 import UIKit
 
-// MARK: - ReviewCardCell
+final class GameReviewCell: UITableViewCell {
 
-final class ReviewCardCell: UITableViewCell {
+    static let reuseIdentifier = "GameReviewCell"
 
-    static let reuseId = "ReviewCardCell"
+    var onMoreButtonTapped: (() -> Void)?
 
-    // MARK: Subviews
     private let avatarView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFill
-        iv.clipsToBounds = true
-        iv.layer.cornerRadius = 14
-        iv.backgroundColor = .gpSurfaceElevated
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.layer.cornerRadius = 16
+        imageView.backgroundColor = .gpSurface
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
     }()
 
-    // Initial letter shown when no avatar image is loaded
     private let avatarInitialLabel: UILabel = {
         let label = UILabel()
         label.font = .systemFont(ofSize: 12, weight: .semibold)
@@ -29,32 +27,40 @@ final class ReviewCardCell: UITableViewCell {
 
     private let authorLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.font = .systemFont(ofSize: 14, weight: .semibold)
         label.textColor = .gpTextPrimary
         return label
     }()
 
-    private let starView: StarRatingView = {
-        let v = StarRatingView()
-        return v
-    }()
-
     private let dateLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 11)
+        label.font = .systemFont(ofSize: 11, weight: .medium)
         label.textColor = .gpTextTertiary
         return label
     }()
 
-    private let bodyLabel: UILabel = {
+    private let starView = StarRatingView()
+
+    private let contentLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 13)
+        label.font = .systemFont(ofSize: 14)
         label.textColor = .gpTextSecondary
-        label.numberOfLines = 3
+        label.numberOfLines = 0
         return label
     }()
 
-    // MARK: Init
+    private let moreButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.image = UIImage(
+            systemName: "ellipsis",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        )
+        configuration.baseForegroundColor = .gpTextTertiary
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setup()
@@ -72,56 +78,57 @@ final class ReviewCardCell: UITableViewCell {
 
         let cardView = UIView()
         cardView.backgroundColor = .gpSurfaceElevated
-        cardView.layer.cornerRadius = 14
-        cardView.clipsToBounds = true
+        cardView.layer.cornerRadius = 16
         cardView.translatesAutoresizingMaskIntoConstraints = false
 
-        // Avatar with initial label overlay
         avatarView.addSubview(avatarInitialLabel)
 
         let authorInfoStack = UIStackView(arrangedSubviews: [authorLabel, dateLabel])
         authorInfoStack.axis = .vertical
         authorInfoStack.spacing = 2
 
-        // Left: avatar + author info
         let userStack = UIStackView(arrangedSubviews: [avatarView, authorInfoStack])
         userStack.axis = .horizontal
-        userStack.spacing = 8
         userStack.alignment = .center
+        userStack.spacing = 10
 
-        let header = UIStackView(arrangedSubviews: [userStack, UIView(), starView])
-        header.axis = .horizontal
-        header.alignment = .center
+        let topRow = UIStackView(arrangedSubviews: [userStack, UIView(), starView, moreButton])
+        topRow.axis = .horizontal
+        topRow.alignment = .center
+        topRow.spacing = 8
 
-        let main = UIStackView(arrangedSubviews: [header, bodyLabel])
-        main.axis = .vertical
-        main.spacing = 8
-        main.translatesAutoresizingMaskIntoConstraints = false
+        let contentStack = UIStackView(arrangedSubviews: [topRow, contentLabel])
+        contentStack.axis = .vertical
+        contentStack.spacing = 12
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(cardView)
-        cardView.addSubview(main)
+        cardView.addSubview(contentStack)
+
+        moreButton.addTarget(self, action: #selector(didTapMoreButton), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
-            avatarView.widthAnchor.constraint(equalToConstant: 28),
-            avatarView.heightAnchor.constraint(equalToConstant: 28),
+            avatarView.widthAnchor.constraint(equalToConstant: 32),
+            avatarView.heightAnchor.constraint(equalToConstant: 32),
 
             avatarInitialLabel.centerXAnchor.constraint(equalTo: avatarView.centerXAnchor),
             avatarInitialLabel.centerYAnchor.constraint(equalTo: avatarView.centerYAnchor),
 
-            // Card fills cell width; 12pt gap below acts as inter-card spacing
+            moreButton.widthAnchor.constraint(equalToConstant: 28),
+            moreButton.heightAnchor.constraint(equalToConstant: 28),
+
             cardView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
             cardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             cardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
 
-            main.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 14),
-            main.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -14),
-            main.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 14),
-            main.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -14)
+            contentStack.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 16),
+            contentStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 16),
+            contentStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
+            contentStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -16)
         ])
     }
 
-    // MARK: Configure
     func configure(with review: Review) {
         let avatarColors: [UIColor] = [
             UIColor(hex: "#6C63FF"), UIColor(hex: "#4ECDC4"),
@@ -134,9 +141,10 @@ final class ReviewCardCell: UITableViewCell {
         avatarView.loadImage(url: review.authorAvatarURL)
 
         authorLabel.text = review.authorName
-        starView.configure(rating: review.rating)
         dateLabel.text = review.formattedDate
-        bodyLabel.text = review.body
+        starView.configure(rating: review.rating)
+        contentLabel.text = review.content
+        moreButton.isHidden = !review.isMine
     }
 
     override func prepareForReuse() {
@@ -144,5 +152,10 @@ final class ReviewCardCell: UITableViewCell {
         avatarView.cancelLoad()
         avatarView.image = nil
         avatarInitialLabel.text = nil
+        onMoreButtonTapped = nil
+    }
+
+    @objc private func didTapMoreButton() {
+        onMoreButtonTapped?()
     }
 }

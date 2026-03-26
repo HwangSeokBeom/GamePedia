@@ -66,6 +66,7 @@ final class InteractiveStarRatingView: UIView {
         let newRating = Float(tappedIndex) + (isLeadingHalf ? 0.5 : 1.0)
         guard rating != newRating else { return }
         rating = newRating
+        print("[ReviewSubmit] starTapped newRating=\(rating)")
         updateStarAppearance()
         feedbackGenerator.impactOccurred()
         onRatingChanged?(rating)

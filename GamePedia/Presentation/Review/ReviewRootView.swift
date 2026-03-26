@@ -8,9 +8,12 @@ final class ReviewRootView: UIView {
         static let placeholderText = "플레이 경험, 좋았던 점, 아쉬운 점을 자유롭게 남겨보세요."
         static let submitAreaHorizontalInset: CGFloat = 20
         static let submitAreaVerticalInset: CGFloat = 12
+        static let submitButtonHeight: CGFloat = 56
+        static let submitButtonSpacing: CGFloat = 12
     }
 
     private var submitAreaBottomConstraint: NSLayoutConstraint?
+    private var lastLoggedSubmitEnabledState: Bool?
 
     // MARK: Subviews
     let scrollView: UIScrollView = {
@@ -23,6 +26,7 @@ final class ReviewRootView: UIView {
     private let submitAreaView: UIView = {
         let view = UIView()
         view.backgroundColor = .gpBackground
+        view.isUserInteractionEnabled = true
         view.layer.shadowColor = UIColor.black.cgColor
         view.layer.shadowOpacity = 0.18
         view.layer.shadowRadius = 18
@@ -134,19 +138,13 @@ final class ReviewRootView: UIView {
         return label
     }()
 
-    // Spoiler toggle
-    let spoilerLabel: UILabel = {
+    private let validationMessageLabel: UILabel = {
         let label = UILabel()
-        label.text = "스포일러 포함"
-        label.font = .systemFont(ofSize: 14, weight: .medium)
-        label.textColor = .gpTextPrimary
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .systemOrange
+        label.numberOfLines = 0
+        label.isHidden = true
         return label
-    }()
-
-    let spoilerSwitch: UISwitch = {
-        let s = UISwitch()
-        s.onTintColor = UIColor(hex: "#4ECDC4")
-        return s
     }()
 
     // Submit
@@ -160,12 +158,40 @@ final class ReviewRootView: UIView {
         config.cornerStyle = .capsule
         let button = UIButton(configuration: config)
         button.translatesAutoresizingMaskIntoConstraints = false
+        button.isUserInteractionEnabled = true
+        button.isExclusiveTouch = true
         // Purple glow shadow matching wireframe
         button.layer.shadowColor = UIColor.gpPrimary.cgColor
         button.layer.shadowOffset = CGSize(width: 0, height: 8)
         button.layer.shadowRadius = 12
         button.layer.shadowOpacity = 0.35
         return button
+    }()
+
+    let deleteButton: UIButton = {
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = "삭제"
+        configuration.baseBackgroundColor = .gpSurfaceElevated
+        configuration.baseForegroundColor = .systemRed
+        configuration.cornerStyle = .capsule
+        configuration.background.strokeColor = UIColor.systemRed.withAlphaComponent(0.35)
+        configuration.background.strokeWidth = 1
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.isUserInteractionEnabled = true
+        button.isExclusiveTouch = true
+        button.isHidden = true
+        return button
+    }()
+
+    private lazy var ctaStackView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [deleteButton, submitButton])
+        stackView.axis = .horizontal
+        stackView.spacing = UIConstants.submitButtonSpacing
+        stackView.alignment = .fill
+        stackView.distribution = .fillEqually
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
     }()
 
     // MARK: Init
@@ -184,9 +210,10 @@ final class ReviewRootView: UIView {
         backgroundColor = .gpBackground
         addSubview(scrollView)
         addSubview(submitAreaView)
+        bringSubviewToFront(submitAreaView)
         reviewTextView.addSubview(reviewPlaceholderLabel)
         submitAreaView.addSubview(submitAreaSeparatorView)
-        submitAreaView.addSubview(submitButton)
+        submitAreaView.addSubview(ctaStackView)
 
         // Game info card
         let gameInfoStack = UIStackView(arrangedSubviews: [gameTitleLabel, gameDeveloperLabel])
@@ -209,21 +236,10 @@ final class ReviewRootView: UIView {
         ratingSection.spacing = 12
         ratingSection.alignment = .center
 
-        // Spoiler card row
-        let spoilerRow = UIStackView(arrangedSubviews: [spoilerLabel, UIView(), spoilerSwitch])
-        spoilerRow.axis = .horizontal
-        spoilerRow.alignment = .center
-        spoilerRow.backgroundColor = .gpSurfaceElevated
-        spoilerRow.layer.cornerRadius = 12
-        spoilerRow.clipsToBounds = true
-        spoilerRow.isLayoutMarginsRelativeArrangement = true
-        spoilerRow.layoutMargins = UIEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
-
         // Content stack — no divider between game card and rating
         let contentStack = UIStackView(arrangedSubviews: [
             gameRow, ratingSection,
-            reviewTitleLabel, reviewTextView, charCountLabel,
-            spoilerRow
+            reviewTitleLabel, reviewTextView, charCountLabel, validationMessageLabel
         ])
         contentStack.axis = .vertical
         contentStack.spacing = 24
@@ -265,11 +281,13 @@ final class ReviewRootView: UIView {
             reviewPlaceholderLabel.leadingAnchor.constraint(equalTo: reviewTextView.leadingAnchor, constant: 19),
             reviewPlaceholderLabel.trailingAnchor.constraint(equalTo: reviewTextView.trailingAnchor, constant: -19),
 
-            submitButton.topAnchor.constraint(equalTo: submitAreaView.topAnchor, constant: UIConstants.submitAreaVerticalInset),
-            submitButton.leadingAnchor.constraint(equalTo: submitAreaView.leadingAnchor, constant: UIConstants.submitAreaHorizontalInset),
-            submitButton.trailingAnchor.constraint(equalTo: submitAreaView.trailingAnchor, constant: -UIConstants.submitAreaHorizontalInset),
-            submitButton.bottomAnchor.constraint(equalTo: submitAreaView.bottomAnchor, constant: -UIConstants.submitAreaVerticalInset),
-            submitButton.heightAnchor.constraint(equalToConstant: 56)
+            ctaStackView.topAnchor.constraint(equalTo: submitAreaView.topAnchor, constant: UIConstants.submitAreaVerticalInset),
+            ctaStackView.leadingAnchor.constraint(equalTo: submitAreaView.leadingAnchor, constant: UIConstants.submitAreaHorizontalInset),
+            ctaStackView.trailingAnchor.constraint(equalTo: submitAreaView.trailingAnchor, constant: -UIConstants.submitAreaHorizontalInset),
+            ctaStackView.bottomAnchor.constraint(equalTo: submitAreaView.bottomAnchor, constant: -UIConstants.submitAreaVerticalInset),
+
+            submitButton.heightAnchor.constraint(equalToConstant: UIConstants.submitButtonHeight),
+            deleteButton.heightAnchor.constraint(equalToConstant: UIConstants.submitButtonHeight)
         ])
     }
 
@@ -291,12 +309,14 @@ final class ReviewRootView: UIView {
         reviewPlaceholderLabel.isHidden = !state.reviewText.isEmpty
         charCountLabel.text = state.formattedCharCount
         charCountLabel.textColor = state.charCount >= state.maxChars ? .systemOrange : .gpTextTertiary
-        spoilerSwitch.isOn = state.isSpoiler
-        spoilerSwitch.isEnabled = !state.isSubmitting
-        reviewTextView.isEditable = !state.isSubmitting
-        starRatingView.isUserInteractionEnabled = !state.isSubmitting
+        validationMessageLabel.text = state.validationMessage
+        validationMessageLabel.isHidden = state.validationMessage == nil || state.isProcessing
+        reviewTextView.isEditable = !state.isProcessing
+        starRatingView.isUserInteractionEnabled = !state.isProcessing
 
+        updateCTALayout(using: state)
         updateSubmitButton(using: state)
+        updateDeleteButton(using: state)
     }
 
     func setReviewTextInputFocused(_ isFocused: Bool) {
@@ -312,16 +332,40 @@ final class ReviewRootView: UIView {
     }
 
     private func updateSubmitButton(using state: ReviewState) {
-        let isEnabled = state.submitEnabled && !state.isSubmitting
+        let allowsTap = !state.isProcessing
+        if lastLoggedSubmitEnabledState != allowsTap {
+            print("[ReviewSubmit] submitButtonStateChanged allowsTap=\(allowsTap) submitEnabled=\(state.submitEnabled) isProcessing=\(state.isProcessing) rating=\(state.rating) trimmedCount=\(state.trimmedReviewText.count) validationMessage=\(state.validationMessage ?? "nil")")
+            lastLoggedSubmitEnabledState = allowsTap
+        }
         var configuration = submitButton.configuration
-        configuration?.title = state.isSubmitting ? "작성 중..." : "리뷰 작성하기"
-        configuration?.image = state.isSubmitting ? nil : UIImage(systemName: "square.and.pencil")
+        configuration?.title = state.isSubmitting ? state.submitLoadingTitle : state.submitButtonTitle
+        configuration?.image = state.isSubmitting ? nil : UIImage(systemName: state.isEditing ? "square.and.arrow.down" : "square.and.pencil")
         configuration?.showsActivityIndicator = state.isSubmitting
-        configuration?.baseBackgroundColor = isEnabled ? .gpPrimary : .gpSurfaceElevated
-        configuration?.baseForegroundColor = isEnabled ? .white : .gpTextTertiary
+        configuration?.baseBackgroundColor = state.submitEnabled ? .gpPrimary : .gpSurfaceElevated
+        configuration?.baseForegroundColor = state.submitEnabled ? .white : .gpTextTertiary
         submitButton.configuration = configuration
-        submitButton.isEnabled = isEnabled
-        submitButton.alpha = isEnabled || state.isSubmitting ? 1 : 0.72
-        submitButton.layer.shadowOpacity = isEnabled ? 0.35 : 0
+        submitButton.isEnabled = allowsTap
+        submitButton.alpha = state.submitEnabled || state.isSubmitting ? 1 : 0.72
+        submitButton.layer.shadowOpacity = state.submitEnabled ? 0.35 : 0
+    }
+
+    private func updateDeleteButton(using state: ReviewState) {
+        var configuration = deleteButton.configuration
+        configuration?.title = state.deleteButtonTitle
+        configuration?.image = nil
+        configuration?.showsActivityIndicator = state.isDeleting
+        configuration?.baseBackgroundColor = .gpSurfaceElevated
+        configuration?.baseForegroundColor = .systemRed
+        configuration?.background.strokeColor = UIColor.systemRed.withAlphaComponent(state.isProcessing ? 0.18 : 0.35)
+        configuration?.background.strokeWidth = 1
+        deleteButton.configuration = configuration
+        deleteButton.isEnabled = state.isEditing && !state.isProcessing
+        deleteButton.alpha = state.isEditing ? (state.isProcessing ? 0.65 : 1) : 0
+    }
+
+    private func updateCTALayout(using state: ReviewState) {
+        deleteButton.isHidden = !state.isEditing
+        submitAreaSeparatorView.isHidden = false
+        setNeedsLayout()
     }
 }

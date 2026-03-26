@@ -14,8 +14,10 @@ enum GameDetailReducer {
             state.translatedTitle = nil
             state.translatedSummary = nil
             state.translatedStoryline = nil
-        case .setReviews(let reviews):
-            state.reviews = reviews
+        case .setReviewFeed(let reviewFeed):
+            state.reviews = reviewFeed.reviews
+            state.reviewSummary = reviewFeed.summary
+            state.myReview = reviewFeed.myReview
         case .setOwned(let v):
             state.isOwned = v
         case .setError(let msg):

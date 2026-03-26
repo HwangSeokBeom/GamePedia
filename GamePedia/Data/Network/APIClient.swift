@@ -53,14 +53,30 @@ final class APIClient {
     /// IGDB auth headers are automatically injected.
     func request<T: Decodable>(_ endpoint: Endpoint, as type: T.Type) async throws -> T {
         let urlRequest = try await buildRequest(from: endpoint)
+        if endpoint.path.contains("/reviews") {
+            let bodyString = urlRequest.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            print("[ReviewSubmit] APIClient.request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(urlRequest.allHTTPHeaderFields ?? [:]) body=\(bodyString)")
+        }
         let (data, response) = try await session.data(for: urlRequest)
+        if endpoint.path.contains("/reviews"), let httpResponse = response as? HTTPURLResponse {
+            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            print("[ReviewSubmit] APIClient.response status=\(httpResponse.statusCode) body=\(responseBody)")
+        }
         try validate(response: response, data: data)
         return try decode(data, as: type)
     }
 
     func requestVoid(_ endpoint: Endpoint) async throws {
         let urlRequest = try await buildRequest(from: endpoint)
+        if endpoint.path.contains("/reviews") {
+            let bodyString = urlRequest.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            print("[ReviewSubmit] APIClient.requestVoid url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(urlRequest.allHTTPHeaderFields ?? [:]) body=\(bodyString)")
+        }
         let (data, response) = try await session.data(for: urlRequest)
+        if endpoint.path.contains("/reviews"), let httpResponse = response as? HTTPURLResponse {
+            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            print("[ReviewSubmit] APIClient.responseVoid status=\(httpResponse.statusCode) body=\(responseBody)")
+        }
         try validate(response: response, data: data)
     }
 
@@ -137,9 +153,11 @@ final class APIClient {
         default:
             let envelope = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data)
             let plainMessage = try? JSONDecoder().decode(APIErrorResponse.self, from: data).message
+            let code = envelope?.error?.code
             let message = envelope?.error?.message ?? envelope?.message ?? plainMessage
             throw NetworkError.serverError(
                 statusCode: httpResponse.statusCode,
+                code: code,
                 message: message
             )
         }

@@ -125,6 +125,15 @@ final class GameDetailRootView: UIView {
 
     let reviewSectionHeader = SectionHeaderView()
 
+    private let reviewSummaryLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 13, weight: .medium)
+        label.textColor = .gpTextSecondary
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
     let reviewTableView: UITableView = {
         let tableView = UITableView()
         tableView.backgroundColor = .clear
@@ -182,6 +191,7 @@ final class GameDetailRootView: UIView {
             descriptionTitleLabel,
             descriptionLabel,
             reviewSectionHeader,
+            reviewSummaryLabel,
             reviewTableView
         ])
         contentStackView.axis = .vertical
@@ -192,6 +202,7 @@ final class GameDetailRootView: UIView {
 
         contentStackView.setCustomSpacing(10, after: descriptionTitleLabel)
         contentStackView.setCustomSpacing(12, after: reviewSectionHeader)
+        contentStackView.setCustomSpacing(12, after: reviewSummaryLabel)
 
         addSubview(scrollView)
         scrollView.addSubview(heroImageView)
@@ -238,6 +249,8 @@ final class GameDetailRootView: UIView {
         developerLabel.text = game.developerLine
         statsView.configure(game: game)
         descriptionLabel.text = state.summary
+        reviewSummaryLabel.text = state.reviewSummaryText
+        reviewSectionHeader.seeMoreButton.isHidden = !state.shouldShowReviewSeeMore
         print("[UI] rendered resolvedTitle:", state.title)
         print("[UI] rendered resolvedSummary:", state.summary)
     }

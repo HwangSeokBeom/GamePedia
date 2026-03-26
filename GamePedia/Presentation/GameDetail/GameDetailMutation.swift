@@ -5,7 +5,7 @@ import Foundation
 enum GameDetailMutation {
     case setLoading(Bool)
     case setGame(GameDetail)
-    case setReviews([Review])
+    case setReviewFeed(GameReviewFeed)
     case setOwned(Bool)
     case setError(String)
     case setTranslatedFields(title: String?, summary: String?, storyline: String?)

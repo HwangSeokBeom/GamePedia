@@ -8,6 +8,7 @@ struct ProfileState {
     var isDeletingAccount: Bool = false
     var authenticatedUser: AuthUser? = nil
     var recentGames: [RecentGame] = []
+    var writtenReviewCount: Int = 0
     var errorMessage: String? = nil
     var translatedRecentGameTitles: [Int: String] = [:]
 
@@ -35,7 +36,6 @@ struct ProfileState {
     }
 
     var playedGameCount: Int { recentGames.count }
-    var writtenReviewCount: Int { 0 }
     var wishlistCount: Int { 0 }
 
     func resolvedTitle(for game: RecentGame) -> String {

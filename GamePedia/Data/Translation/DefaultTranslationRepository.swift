@@ -45,7 +45,7 @@ final class DefaultTranslationRepository: TranslationRepository {
             dto = try decoder.decode(TranslationDTO.self, from: response.data)
         } catch {
             if (500...599).contains(response.statusCode) {
-                throw NetworkError.serverError(statusCode: response.statusCode, message: nil)
+                throw NetworkError.serverError(statusCode: response.statusCode, code: nil, message: nil)
             }
             throw NetworkError.decodingFailed(error)
         }
@@ -53,7 +53,11 @@ final class DefaultTranslationRepository: TranslationRepository {
         let normalizedTranslation = dto.translatedText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedTranslation.isEmpty else {
             if (500...599).contains(response.statusCode) {
-                throw NetworkError.serverError(statusCode: response.statusCode, message: dto.reason)
+                throw NetworkError.serverError(
+                    statusCode: response.statusCode,
+                    code: nil,
+                    message: dto.reason
+                )
             }
 
             let error = NSError(

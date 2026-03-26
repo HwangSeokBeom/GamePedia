@@ -7,6 +7,12 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
     // MARK: Properties
     private let viewModel: ReviewViewModel
     private let defaultSubmitAreaInset: CGFloat = 0
+    private lazy var backgroundTapGestureRecognizer: UITapGestureRecognizer = {
+        let gestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        gestureRecognizer.cancelsTouchesInView = false
+        gestureRecognizer.delegate = self
+        return gestureRecognizer
+    }()
 
     // Called after successful submission, so GameDetail can reload
     var onReviewSubmitted: (() -> Void)?
@@ -37,23 +43,23 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
 
     private func configureNavigationItem() {
         UIView.performWithoutAnimation {
-            navigationItem.title = "리뷰 작성"
+            navigationItem.title = viewModel.state.navigationTitle
             navigationItem.largeTitleDisplayMode = .never
         }
+        navigationItem.rightBarButtonItems = nil
     }
 
     private func setupActions() {
         rootView.reviewTextView.delegate = self
-        rootView.spoilerSwitch.addTarget(self, action: #selector(spoilerSwitchToggled), for: .valueChanged)
         rootView.submitButton.addTarget(self, action: #selector(didTapSubmit), for: .touchUpInside)
+        rootView.submitButton.addTarget(self, action: #selector(didTapSubmitTouchDown), for: .touchDown)
+        rootView.submitButton.addTarget(self, action: #selector(didTapSubmit), for: .primaryActionTriggered)
+        rootView.deleteButton.addTarget(self, action: #selector(didTapDelete), for: .touchUpInside)
         rootView.starRatingView.onRatingChanged = { [weak self] rating in
             self?.viewModel.send(.ratingChanged(rating))
         }
 
-        // Dismiss keyboard on tap
-        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
-        tap.cancelsTouchesInView = false
-        view.addGestureRecognizer(tap)
+        rootView.scrollView.addGestureRecognizer(backgroundTapGestureRecognizer)
     }
 
     private func setupKeyboardObservers() {
@@ -78,13 +84,20 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
             DispatchQueue.main.async { self?.render(state) }
         }
 
+        print("[ReviewSubmit] bindViewModel initialState submitEnabled=\(viewModel.state.submitEnabled) rating=\(viewModel.state.rating) trimmedCount=\(viewModel.state.trimmedReviewText.count)")
         render(viewModel.state)
     }
 
     override func render(_ state: ReviewState) {
+        navigationItem.title = state.navigationTitle
         rootView.render(state)
 
         if state.didSubmitSuccessfully {
+            onReviewSubmitted?()
+            navigationController?.popViewController(animated: true)
+        }
+
+        if state.didDeleteSuccessfully {
             onReviewSubmitted?()
             navigationController?.popViewController(animated: true)
         }
@@ -96,12 +109,28 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
 
     // MARK: Actions
 
-    @objc private func spoilerSwitchToggled(_ sender: UISwitch) {
-        viewModel.send(.spoilerToggled(sender.isOn))
+    @objc private func didTapSubmitTouchDown() {
+        print("[ReviewSubmit] buttonTouchDown isEnabled=\(rootView.submitButton.isEnabled) isUserInteractionEnabled=\(rootView.submitButton.isUserInteractionEnabled)")
+    }
+
+    @objc private func didTapDelete() {
+        let alert = UIAlertController(
+            title: "리뷰를 삭제할까요?",
+            message: "삭제한 리뷰는 복구할 수 없습니다.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alert.addAction(UIAlertAction(title: "삭제", style: .destructive) { [weak self] _ in
+            print("[ReviewDelete] ViewController forwarded delete action")
+            self?.viewModel.send(.didTapDelete)
+        })
+        present(alert, animated: true)
     }
 
     @objc private func didTapSubmit() {
+        print("[ReviewSubmit] buttonTapped isEnabled=\(rootView.submitButton.isEnabled) isUserInteractionEnabled=\(rootView.submitButton.isUserInteractionEnabled) submitEnabled=\(viewModel.state.submitEnabled) rating=\(viewModel.state.rating) trimmedCount=\(viewModel.state.trimmedReviewText.count)")
         view.endEditing(true)
+        print("[ReviewSubmit] ViewController forwarded submit action")
         viewModel.send(.didTapSubmit)
     }
 
@@ -147,6 +176,20 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
         let alert = UIAlertController(title: "오류", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
+    }
+}
+
+extension ReviewViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if touch.view is UIControl {
+            return false
+        }
+
+        if let touchedView = touch.view, touchedView.isDescendant(of: rootView.submitButton) {
+            return false
+        }
+
+        return true
     }
 }
 

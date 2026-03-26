@@ -6,10 +6,11 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
     private let viewModel: GameDetailViewModel
     let gameId: Int
-    private var reviews: [Review] = []
+    private var previewReviews: [Review] = []
 
     // Set by the owning Coordinator before push.
-    var onWriteReview: ((GameDetail) -> Void)?
+    var onWriteReview: ((GameDetail, Review?) -> Void)?
+    var onShowAllReviews: ((GameDetail) -> Void)?
     var onShare: ((GameDetail) -> Void)?
 
     // MARK: Init
@@ -72,8 +73,12 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         }
 
         // Forward ViewModel navigation events to the Coordinator via public callbacks.
-        viewModel.onWriteReview = { [weak self] game in
-            self?.onWriteReview?(game)
+        viewModel.onWriteReview = { [weak self] game, existingReview in
+            self?.onWriteReview?(game, existingReview)
+        }
+
+        viewModel.onShowAllReviews = { [weak self] game in
+            self?.onShowAllReviews?(game)
         }
 
         viewModel.onShare = { [weak self] game in
@@ -86,8 +91,8 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
     override func render(_ state: GameDetailState) {
         rootView.render(state)
 
-        if reviews.count != state.reviews.count {
-            reviews = state.reviews
+        if previewReviews != state.previewReviews {
+            previewReviews = state.previewReviews
             rootView.reviewTableView.reloadData()
             rootView.updateReviewTableHeight()
         }
@@ -105,6 +110,10 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         var heartButtonConfiguration = rootView.heartButton.configuration
         heartButtonConfiguration?.image = UIImage(systemName: state.isOwned ? "heart.fill" : "heart")
         rootView.heartButton.configuration = heartButtonConfiguration
+
+        var writeReviewButtonConfiguration = rootView.writeReviewButton.configuration
+        writeReviewButtonConfiguration?.title = state.writeReviewButtonTitle
+        rootView.writeReviewButton.configuration = writeReviewButtonConfiguration
     }
 
     // MARK: Public
@@ -137,7 +146,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
 extension GameDetailViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        reviews.count
+        previewReviews.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -145,7 +154,7 @@ extension GameDetailViewController: UITableViewDataSource, UITableViewDelegate {
             withIdentifier: ReviewCardCell.reuseId,
             for: indexPath
         ) as! ReviewCardCell
-        cell.configure(with: reviews[indexPath.row])
+        cell.configure(with: previewReviews[indexPath.row])
         return cell
     }
 

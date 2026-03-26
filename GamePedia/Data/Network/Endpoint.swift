@@ -29,7 +29,7 @@ struct Endpoint {
     let requiresUserAuth: Bool
 
     enum HTTPMethod: String {
-        case GET, POST, PUT, DELETE
+        case GET, POST, PUT, PATCH, DELETE
     }
 }
 
@@ -88,6 +88,21 @@ extension Endpoint {
             method: .DELETE,
             queryItems: query,
             body: .none,
+            requiresUserAuth: userAuth
+        )
+    }
+
+    static func patch<T: Encodable>(
+        _ path: String,
+        body: T,
+        userAuth: Bool = true
+    ) -> Endpoint {
+        Endpoint(
+            path: path,
+            service: .backend,
+            method: .PATCH,
+            queryItems: [],
+            body: .json(body),
             requiresUserAuth: userAuth
         )
     }
@@ -167,15 +182,26 @@ extension Endpoint {
 // MARK: - Review Endpoints
 
 extension Endpoint {
-    static func gameReviews(gameId: Int, page: Int = 1, limit: Int = 10) -> Endpoint {
-        .get("/games/\(gameId)/reviews", query: [
-            URLQueryItem(name: "page", value: "\(page)"),
-            URLQueryItem(name: "limit", value: "\(limit)")
-        ], userAuth: false)
+    static func createReview(body: CreateReviewRequestDTO) -> Endpoint {
+        .post("/reviews", body: body, userAuth: true)
     }
 
-    static func postReview(gameId: Int, body: PostReviewRequestDTO) -> Endpoint {
-        .post("/games/\(gameId)/reviews", body: body, userAuth: true)
+    static func gameReviews(gameId: String, sort: String? = nil) -> Endpoint {
+        let queryItems = sort.map { [URLQueryItem(name: "sort", value: $0)] } ?? []
+        return .get("/games/\(gameId)/reviews", query: queryItems, userAuth: true)
+    }
+
+    static func updateReview(reviewId: String, body: UpdateReviewRequestDTO) -> Endpoint {
+        .patch("/reviews/\(reviewId)", body: body, userAuth: true)
+    }
+
+    static func deleteReview(reviewId: String) -> Endpoint {
+        .delete("/reviews/\(reviewId)", userAuth: true)
+    }
+
+    static func myReviews(sort: String? = nil) -> Endpoint {
+        let queryItems = sort.map { [URLQueryItem(name: "sort", value: $0)] } ?? []
+        return .get("/users/me/reviews", query: queryItems, userAuth: true)
     }
 }
 

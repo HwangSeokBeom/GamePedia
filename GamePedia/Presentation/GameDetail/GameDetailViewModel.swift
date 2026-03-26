@@ -12,19 +12,25 @@ final class GameDetailViewModel {
     var onStateChanged: ((GameDetailState) -> Void)?
 
     // MARK: Navigation Events — handled by ViewController
-    var onWriteReview: ((GameDetail) -> Void)?
+    var onWriteReview: ((GameDetail, Review?) -> Void)?
+    var onShowAllReviews: ((GameDetail) -> Void)?
     var onShare: ((GameDetail) -> Void)?
 
     // MARK: Dependencies
     private let apiClient: APIClient
     private let translateTextUseCase: TranslateTextUseCase
+    private let fetchGameReviewsUseCase: FetchGameReviewsUseCase
 
     // MARK: Init
     init(
         apiClient: APIClient = .shared,
+        fetchGameReviewsUseCase: FetchGameReviewsUseCase = FetchGameReviewsUseCase(
+            reviewRepository: DefaultReviewRepository()
+        ),
         translateTextUseCase: TranslateTextUseCase? = nil
     ) {
         self.apiClient = apiClient
+        self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
         self.translateTextUseCase = translateTextUseCase ?? DefaultTranslateTextUseCase(
             repository: DefaultTranslationRepository(),
             languageProvider: DefaultLanguageProvider.shared
@@ -41,12 +47,13 @@ final class GameDetailViewModel {
             apply(.setOwned(!state.isOwned))
         case .didTapWriteReview:
             guard let game = state.game else { return }
-            onWriteReview?(game)
+            onWriteReview?(game, state.myReview)
         case .didTapShare:
             guard let game = state.game else { return }
             onShare?(game)
         case .didTapSeeAllReviews:
-            break
+            guard let game = state.game else { return }
+            onShowAllReviews?(game)
         }
     }
 
@@ -87,13 +94,12 @@ final class GameDetailViewModel {
 
     private func fetchReviews(gameId: Int) async {
         do {
-            let response = try await apiClient.request(
-                .gameReviews(gameId: gameId, limit: 5),
-                as: ReviewListResponseDTO.self
+            let reviewFeed = try await fetchGameReviewsUseCase.execute(
+                gameId: String(gameId),
+                sort: .latest
             )
-            let reviews = response.reviews.map { ReviewMapper.toEntity($0) }
             await MainActor.run {
-                self.apply(.setReviews(reviews))
+                self.apply(.setReviewFeed(reviewFeed))
             }
         } catch {
             // Reviews failing silently — detail still shows
