@@ -63,6 +63,10 @@ final class ProfileViewModel {
             logout()
         case .didTapDeleteAccount:
             deleteAccount()
+        case .didTapWrittenReviews:
+            onRoute?(.showWrittenReviews)
+        case .didTapFavoriteGames:
+            onRoute?(.showFavoriteGames)
         case .didTapSettings, .didTapGame, .didTapSeeMoreRecentPlay:
             break
         }

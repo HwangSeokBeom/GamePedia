@@ -12,8 +12,11 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
 
     var onGameSelected: ((Int) -> Void)?
 
-    override init(rootView: LibraryRootView = LibraryRootView()) {
-        self.viewModel = LibraryViewModel()
+    init(
+        rootView: LibraryRootView = LibraryRootView(),
+        viewModel: LibraryViewModel = LibraryViewModel()
+    ) {
+        self.viewModel = viewModel
         super.init(rootView: rootView)
         NavigationBarStyler.apply(.opaque, to: navigationItem, buttonTintColor: .gpPrimary)
         configureNavigationItem()

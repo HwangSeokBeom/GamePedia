@@ -9,7 +9,7 @@ enum LibraryIntent {
 }
 
 final class LibraryViewModel {
-    private(set) var state: LibraryState = LibraryState() {
+    private(set) var state: LibraryState {
         didSet { onStateChanged?(state) }
     }
 
@@ -33,10 +33,12 @@ final class LibraryViewModel {
             ),
             gameRepository: DefaultGameRepository()
         ),
+        initialTab: LibraryTab = .favorites,
         removeFavoriteUseCase: RemoveFavoriteUseCase = RemoveFavoriteUseCase(
             favoriteRepository: DefaultFavoriteRepository()
         )
     ) {
+        self.state = LibraryState(selectedTab: initialTab)
         self.fetchFavoriteGamesUseCase = fetchFavoriteGamesUseCase
         self.fetchMyReviewedGamesUseCase = fetchMyReviewedGamesUseCase
         self.removeFavoriteUseCase = removeFavoriteUseCase

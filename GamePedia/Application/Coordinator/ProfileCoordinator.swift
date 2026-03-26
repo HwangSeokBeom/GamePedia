@@ -54,6 +54,12 @@ final class ProfileCoordinator {
         profileVC.onLoggedOut = { [weak self] in
             self?.onLoggedOut?()
         }
+        profileVC.onShowFavoriteGames = { [weak self] in
+            self?.showLibrary(tab: .favorites)
+        }
+        profileVC.onShowWrittenReviews = { [weak self] in
+            self?.showLibrary(tab: .reviewed)
+        }
         navigationController.setViewControllers([profileVC], animated: false)
     }
 
@@ -119,5 +125,16 @@ final class ProfileCoordinator {
             detailViewController?.reload()
         }
         navigationController.pushViewController(reviewsViewController, animated: true)
+    }
+
+    private func showLibrary(tab: LibraryTab) {
+        let libraryViewController = LibraryViewController(
+            rootView: LibraryRootView(),
+            viewModel: LibraryViewModel(initialTab: tab)
+        )
+        libraryViewController.onGameSelected = { [weak self] gameId in
+            self?.showDetail(gameId: gameId)
+        }
+        navigationController.pushViewController(libraryViewController, animated: true)
     }
 }

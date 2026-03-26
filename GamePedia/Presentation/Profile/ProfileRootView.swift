@@ -159,6 +159,7 @@ final class ProfileRootView: UIView {
             $0.backgroundColor = .gpSurfaceElevated
             $0.layer.cornerRadius = 16
             $0.clipsToBounds = true
+            $0.isUserInteractionEnabled = true
         }
 
         let statsStack = UIStackView(arrangedSubviews: [playedStatView, reviewStatView, wishlistStatView])

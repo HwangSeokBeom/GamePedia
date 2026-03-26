@@ -12,6 +12,8 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     // Set by ProfileCoordinator.
     var onGameSelected: ((Int) -> Void)?
     var onLoggedOut: (() -> Void)?
+    var onShowFavoriteGames: (() -> Void)?
+    var onShowWrittenReviews: (() -> Void)?
 
     // MARK: Init
     init(
@@ -50,6 +52,14 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
         rootView.sectionHeader.seeMoreButton.addTarget(
             self, action: #selector(didTapSeeMoreRecentPlay), for: .touchUpInside
         )
+        let reviewTapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(didTapWrittenReviews))
+        let favoriteTapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(didTapFavoriteGames))
+        rootView.reviewStatView.addGestureRecognizer(reviewTapGestureRecognizer)
+        rootView.wishlistStatView.addGestureRecognizer(favoriteTapGestureRecognizer)
+        rootView.reviewStatView.accessibilityTraits.insert(.button)
+        rootView.wishlistStatView.accessibilityTraits.insert(.button)
+        rootView.reviewStatView.accessibilityLabel = "작성한 리뷰"
+        rootView.wishlistStatView.accessibilityLabel = "찜한 게임"
     }
 
     // MARK: ViewModel Binding
@@ -63,6 +73,10 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
             switch route {
             case .loggedOut:
                 self?.onLoggedOut?()
+            case .showWrittenReviews:
+                self?.onShowWrittenReviews?()
+            case .showFavoriteGames:
+                self?.onShowFavoriteGames?()
             }
         }
     }
@@ -87,6 +101,14 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     @objc private func didTapSeeMoreRecentPlay() {
         viewModel.send(.didTapSeeMoreRecentPlay)
         // TODO: navigate to full recent play list
+    }
+
+    @objc private func didTapWrittenReviews() {
+        viewModel.send(.didTapWrittenReviews)
+    }
+
+    @objc private func didTapFavoriteGames() {
+        viewModel.send(.didTapFavoriteGames)
     }
 
     @objc private func didTapLogout() {

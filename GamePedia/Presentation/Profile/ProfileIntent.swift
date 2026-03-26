@@ -9,8 +9,12 @@ enum ProfileIntent {
     case didTapDeleteAccount
     case didTapGame(id: Int)
     case didTapSeeMoreRecentPlay
+    case didTapWrittenReviews
+    case didTapFavoriteGames
 }
 
 enum ProfileRoute {
     case loggedOut
+    case showWrittenReviews
+    case showFavoriteGames
 }
