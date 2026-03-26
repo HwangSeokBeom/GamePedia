@@ -59,6 +59,8 @@ final class ProfileViewModel {
         switch intent {
         case .viewDidLoad:
             loadProfileData()
+        case .didTapEditProfile:
+            onRoute?(.showEditProfile)
         case .didTapLogout:
             logout()
         case .didTapDeleteAccount:
@@ -180,6 +182,14 @@ final class ProfileViewModel {
                 Task {
                     await self.fetchWishlistCount()
                 }
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .currentUserProfileDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, let user = self.userSessionStore.fetchUser() else { return }
+                self.apply(.setAuthenticatedUser(user))
             }
             .store(in: &cancellables)
     }

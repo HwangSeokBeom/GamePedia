@@ -10,6 +10,9 @@ final class ProfileCoordinator: NSObject {
 
     let navigationController: UINavigationController
     private let fetchCurrentUserUseCase: FetchCurrentUserUseCase
+    private let updateCurrentUserProfileUseCase: UpdateCurrentUserProfileUseCase
+    private let uploadCurrentUserProfileImageUseCase: UploadCurrentUserProfileImageUseCase
+    private let removeCurrentUserProfileImageUseCase: RemoveCurrentUserProfileImageUseCase
     private let logoutUseCase: LogoutUseCase
     private let deleteAccountUseCase: DeleteAccountUseCase
     private let userSessionStore: any UserSessionStore
@@ -21,11 +24,17 @@ final class ProfileCoordinator: NSObject {
 
     init(
         fetchCurrentUserUseCase: FetchCurrentUserUseCase,
+        updateCurrentUserProfileUseCase: UpdateCurrentUserProfileUseCase,
+        uploadCurrentUserProfileImageUseCase: UploadCurrentUserProfileImageUseCase,
+        removeCurrentUserProfileImageUseCase: RemoveCurrentUserProfileImageUseCase,
         logoutUseCase: LogoutUseCase,
         deleteAccountUseCase: DeleteAccountUseCase,
         userSessionStore: any UserSessionStore
     ) {
         self.fetchCurrentUserUseCase = fetchCurrentUserUseCase
+        self.updateCurrentUserProfileUseCase = updateCurrentUserProfileUseCase
+        self.uploadCurrentUserProfileImageUseCase = uploadCurrentUserProfileImageUseCase
+        self.removeCurrentUserProfileImageUseCase = removeCurrentUserProfileImageUseCase
         self.logoutUseCase = logoutUseCase
         self.deleteAccountUseCase = deleteAccountUseCase
         self.userSessionStore = userSessionStore
@@ -56,6 +65,9 @@ final class ProfileCoordinator: NSObject {
         }
         profileVC.onLoggedOut = { [weak self] in
             self?.onLoggedOut?()
+        }
+        profileVC.onShowEditProfile = { [weak self] in
+            self?.showEditProfile()
         }
         profileVC.onShowFavoriteGames = { [weak self] in
             self?.showLibrary(tab: .favorites)
@@ -161,6 +173,25 @@ final class ProfileCoordinator: NSObject {
             self?.showDetail(gameId: gameId)
         }
         navigationController.pushViewController(libraryViewController, animated: true)
+    }
+
+    private func showEditProfile() {
+        guard let authenticatedUser = userSessionStore.fetchUser() else { return }
+
+        let profileEditViewModel = ProfileEditViewModel(
+            authenticatedUser: authenticatedUser,
+            updateCurrentUserProfileUseCase: updateCurrentUserProfileUseCase,
+            uploadCurrentUserProfileImageUseCase: uploadCurrentUserProfileImageUseCase,
+            removeCurrentUserProfileImageUseCase: removeCurrentUserProfileImageUseCase
+        )
+        let profileEditViewController = ProfileEditViewController(
+            rootView: ProfileEditRootView(),
+            viewModel: profileEditViewModel
+        )
+        profileEditViewController.onCompleted = { [weak self] in
+            self?.navigationController.popViewController(animated: true)
+        }
+        navigationController.pushViewController(profileEditViewController, animated: true)
     }
 
     private func showWebPage(url: URL) {

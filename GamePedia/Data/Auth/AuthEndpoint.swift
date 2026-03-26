@@ -5,6 +5,7 @@ enum AuthEndpoint {
     enum HTTPMethod: String {
         case get = "GET"
         case post = "POST"
+        case patch = "PATCH"
         case delete = "DELETE"
     }
 
@@ -17,6 +18,9 @@ enum AuthEndpoint {
     case refresh(RefreshRequestDTO)
     case logout(LogoutRequestDTO?)
     case currentUser
+    case updateCurrentUserProfile(UpdateCurrentUserProfileRequestDTO)
+    case uploadCurrentUserProfileImage(ProfileImageUploadRequestDTO)
+    case removeCurrentUserProfileImage
     case deleteAccount
 
     var path: String {
@@ -39,6 +43,12 @@ enum AuthEndpoint {
             return "auth/logout"
         case .currentUser:
             return "auth/me"
+        case .updateCurrentUserProfile:
+            return "auth/me"
+        case .uploadCurrentUserProfileImage:
+            return "auth/me/profile-image"
+        case .removeCurrentUserProfileImage:
+            return "auth/me/profile-image"
         case .deleteAccount:
             return "auth/me"
         }
@@ -48,7 +58,9 @@ enum AuthEndpoint {
         switch self {
         case .currentUser:
             return .get
-        case .deleteAccount:
+        case .updateCurrentUserProfile, .uploadCurrentUserProfileImage:
+            return .patch
+        case .removeCurrentUserProfileImage, .deleteAccount:
             return .delete
         case .signUp, .login, .forgotPassword, .resetPassword, .appleLogin, .googleLogin, .refresh, .logout:
             return .post
@@ -57,10 +69,21 @@ enum AuthEndpoint {
 
     var requiresAuthorization: Bool {
         switch self {
-        case .currentUser, .logout, .deleteAccount:
+        case .currentUser, .updateCurrentUserProfile, .uploadCurrentUserProfileImage, .removeCurrentUserProfileImage, .logout, .deleteAccount:
             return true
         case .signUp, .login, .forgotPassword, .resetPassword, .appleLogin, .googleLogin, .refresh:
             return false
+        }
+    }
+
+    var contentType: String? {
+        switch self {
+        case .signUp, .login, .forgotPassword, .resetPassword, .appleLogin, .googleLogin, .refresh, .logout, .updateCurrentUserProfile:
+            return "application/json"
+        case .uploadCurrentUserProfileImage(let requestDTO):
+            return requestDTO.contentType
+        case .currentUser, .removeCurrentUserProfileImage, .deleteAccount:
+            return nil
         }
     }
 
@@ -83,7 +106,11 @@ enum AuthEndpoint {
         case .logout(let requestDTO):
             guard let requestDTO else { return nil }
             return try encoder.encode(requestDTO)
-        case .currentUser, .deleteAccount:
+        case .updateCurrentUserProfile(let requestDTO):
+            return try encoder.encode(requestDTO)
+        case .uploadCurrentUserProfileImage(let requestDTO):
+            return requestDTO.multipartBodyData()
+        case .currentUser, .removeCurrentUserProfileImage, .deleteAccount:
             return nil
         }
     }

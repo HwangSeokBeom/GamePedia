@@ -29,12 +29,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		8D0000012F70000100D5F380 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Debug.xcconfig; sourceTree = SOURCE_ROOT; };
-		8D0000022F70000100D5F380 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = SOURCE_ROOT; };
-		8D0000032F70000100D5F380 /* Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Secrets.example.xcconfig; sourceTree = SOURCE_ROOT; };
 		8B9A88492F6EDC9A00D5F380 /* GamePedia.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GamePedia.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B9A885F2F6EDC9B00D5F380 /* GamePediaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GamePediaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B9A88692F6EDC9B00D5F380 /* GamePediaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GamePediaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8D0000012F70000100D5F380 /* Config/Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		8D0000022F70000100D5F380 /* Config/Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = SOURCE_ROOT; };
+		8D0000032F70000100D5F380 /* Config/Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Secrets.example.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -95,16 +95,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		8D0000042F70000100D5F380 /* Config */ = {
-			isa = PBXGroup;
-			children = (
-				8D0000012F70000100D5F380 /* Debug.xcconfig */,
-				8D0000022F70000100D5F380 /* Release.xcconfig */,
-				8D0000032F70000100D5F380 /* Secrets.example.xcconfig */,
-			);
-			path = Config;
-			sourceTree = SOURCE_ROOT;
-		};
 		8B9A88402F6EDC9A00D5F380 = {
 			isa = PBXGroup;
 			children = (
@@ -125,6 +115,16 @@
 			);
 			name = Products;
 			sourceTree = "<group>";
+		};
+		8D0000042F70000100D5F380 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				8D0000012F70000100D5F380 /* Config/Debug.xcconfig */,
+				8D0000022F70000100D5F380 /* Config/Release.xcconfig */,
+				8D0000032F70000100D5F380 /* Config/Secrets.example.xcconfig */,
+			);
+			path = Config;
+			sourceTree = SOURCE_ROOT;
 		};
 /* End PBXGroup section */
 
@@ -311,7 +311,7 @@
 /* Begin XCBuildConfiguration section */
 		8B9A88732F6EDC9B00D5F380 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8D0000012F70000100D5F380 /* Debug.xcconfig */;
+			baseConfigurationReference = 8D0000012F70000100D5F380 /* Config/Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -349,7 +349,7 @@
 		};
 		8B9A88742F6EDC9B00D5F380 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8D0000022F70000100D5F380 /* Release.xcconfig */;
+			baseConfigurationReference = 8D0000022F70000100D5F380 /* Config/Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

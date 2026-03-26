@@ -173,7 +173,46 @@ final class DefaultAuthRepository: AuthRepository {
     func fetchCurrentUser() -> AnyPublisher<AuthUser, AuthError> {
         authRemoteDataSource.fetchCurrentUser()
             .handleEvents(receiveOutput: { [weak self] user in
-                self?.userSessionStore.saveUser(user)
+                self?.saveCurrentUser(user)
+            })
+            .eraseToAnyPublisher()
+    }
+
+    func updateCurrentUserProfile(nickname: String) -> AnyPublisher<AuthUser, AuthError> {
+        print("[ProfileEdit] updateProfile nicknameLength=\(nickname.count)")
+        return authRemoteDataSource.updateCurrentUserProfile(
+            requestDTO: UpdateCurrentUserProfileRequestDTO(nickname: nickname)
+        )
+        .handleEvents(receiveOutput: { [weak self] user in
+            self?.saveCurrentUser(user)
+        })
+        .eraseToAnyPublisher()
+    }
+
+    func uploadCurrentUserProfileImage(
+        data: Data,
+        fileName: String,
+        mimeType: String
+    ) -> AnyPublisher<AuthUser, AuthError> {
+        print("[ProfileEdit] uploadProfileImage bytes=\(data.count) mimeType=\(mimeType)")
+        return authRemoteDataSource.uploadCurrentUserProfileImage(
+            requestDTO: ProfileImageUploadRequestDTO(
+                imageData: data,
+                fileName: fileName,
+                mimeType: mimeType
+            )
+        )
+        .handleEvents(receiveOutput: { [weak self] user in
+            self?.saveCurrentUser(user)
+        })
+        .eraseToAnyPublisher()
+    }
+
+    func removeCurrentUserProfileImage() -> AnyPublisher<AuthUser, AuthError> {
+        print("[ProfileEdit] removeProfileImage")
+        return authRemoteDataSource.removeCurrentUserProfileImage()
+            .handleEvents(receiveOutput: { [weak self] user in
+                self?.saveCurrentUser(user)
             })
             .eraseToAnyPublisher()
     }
@@ -209,8 +248,12 @@ final class DefaultAuthRepository: AuthRepository {
     private func persist(_ session: AuthSession) {
         tokenStore.saveAccessToken(session.accessToken)
         tokenStore.saveRefreshToken(session.refreshToken)
-        userSessionStore.saveUser(session.user)
+        saveCurrentUser(session.user)
         apiClient.userAuthToken = session.accessToken
+    }
+
+    private func saveCurrentUser(_ user: AuthUser) {
+        userSessionStore.saveUser(user)
     }
 
     private func clearStoredSession() {

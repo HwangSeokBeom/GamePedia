@@ -30,6 +30,36 @@ struct SignUpRequestDTO: Encodable {
     let nickname: String
 }
 
+struct UpdateCurrentUserProfileRequestDTO: Encodable {
+    let nickname: String
+}
+
+struct ProfileImageUploadRequestDTO {
+    let imageData: Data
+    let fileName: String
+    let mimeType: String
+
+    private let boundary = "Boundary-\(UUID().uuidString)"
+
+    var contentType: String {
+        "multipart/form-data; boundary=\(boundary)"
+    }
+
+    func multipartBodyData(fieldName: String = "image") -> Data {
+        var data = Data()
+        let lineBreak = "\r\n"
+
+        data.append("--\(boundary)\(lineBreak)")
+        data.append("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\(lineBreak)")
+        data.append("Content-Type: \(mimeType)\(lineBreak)\(lineBreak)")
+        data.append(imageData)
+        data.append(lineBreak)
+        data.append("--\(boundary)--\(lineBreak)")
+
+        return data
+    }
+}
+
 struct RefreshRequestDTO: Encodable {
     let refreshToken: String
 }
@@ -109,5 +139,13 @@ extension AuthResponseDTO {
         }
 
         return data.user.toDomain()
+    }
+}
+
+private extension Data {
+    mutating func append(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
+        }
     }
 }

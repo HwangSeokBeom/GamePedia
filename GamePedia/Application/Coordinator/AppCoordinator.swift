@@ -86,6 +86,9 @@ final class AppCoordinator {
     private lazy var resetPasswordUseCase = ResetPasswordUseCase(authRepository: authRepository)
     private lazy var refreshSessionUseCase = RefreshSessionUseCase(authRepository: authRepository)
     private lazy var fetchCurrentUserUseCase = FetchCurrentUserUseCase(authRepository: authRepository)
+    private lazy var updateCurrentUserProfileUseCase = UpdateCurrentUserProfileUseCase(authRepository: authRepository)
+    private lazy var uploadCurrentUserProfileImageUseCase = UploadCurrentUserProfileImageUseCase(authRepository: authRepository)
+    private lazy var removeCurrentUserProfileImageUseCase = RemoveCurrentUserProfileImageUseCase(authRepository: authRepository)
     private lazy var logoutUseCase = LogoutUseCase(authRepository: authRepository)
     private lazy var deleteAccountUseCase = DeleteAccountUseCase(authRepository: authRepository)
 
@@ -190,6 +193,9 @@ final class AppCoordinator {
         let libraryCoord = LibraryCoordinator()
         let profileCoord = ProfileCoordinator(
             fetchCurrentUserUseCase: fetchCurrentUserUseCase,
+            updateCurrentUserProfileUseCase: updateCurrentUserProfileUseCase,
+            uploadCurrentUserProfileImageUseCase: uploadCurrentUserProfileImageUseCase,
+            removeCurrentUserProfileImageUseCase: removeCurrentUserProfileImageUseCase,
             logoutUseCase: logoutUseCase,
             deleteAccountUseCase: deleteAccountUseCase,
             userSessionStore: userSessionStore

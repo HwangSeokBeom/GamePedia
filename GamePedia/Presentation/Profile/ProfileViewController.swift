@@ -12,6 +12,7 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     // Set by ProfileCoordinator.
     var onGameSelected: ((Int) -> Void)?
     var onLoggedOut: (() -> Void)?
+    var onShowEditProfile: (() -> Void)?
     var onShowFavoriteGames: (() -> Void)?
     var onShowWrittenReviews: (() -> Void)?
     var onShowTermsOfService: (() -> Void)?
@@ -44,7 +45,12 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
         UIView.performWithoutAnimation {
             navigationItem.title = "프로필"
             navigationItem.largeTitleDisplayMode = .never
-            navigationItem.rightBarButtonItem = nil
+            navigationItem.rightBarButtonItem = UIBarButtonItem(
+                title: "편집",
+                style: .plain,
+                target: self,
+                action: #selector(didTapEditProfile)
+            )
         }
     }
 
@@ -81,6 +87,8 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
             switch route {
             case .loggedOut:
                 self?.onLoggedOut?()
+            case .showEditProfile:
+                self?.onShowEditProfile?()
             case .showWrittenReviews:
                 self?.onShowWrittenReviews?()
             case .showFavoriteGames:
@@ -117,6 +125,10 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     @objc private func didTapSeeMoreRecentPlay() {
         viewModel.send(.didTapSeeMoreRecentPlay)
         // TODO: navigate to full recent play list
+    }
+
+    @objc private func didTapEditProfile() {
+        viewModel.send(.didTapEditProfile)
     }
 
     @objc private func didTapWrittenReviews() {

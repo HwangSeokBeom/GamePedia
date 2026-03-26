@@ -67,6 +67,27 @@ final class AuthRemoteDataSource {
             .eraseToAnyPublisher()
     }
 
+    func updateCurrentUserProfile(requestDTO: UpdateCurrentUserProfileRequestDTO) -> AnyPublisher<AuthUser, AuthError> {
+        performRequest(.updateCurrentUserProfile(requestDTO), responseType: AuthResponseDTO.self)
+            .tryMap { try $0.toDomainUser() }
+            .mapError { $0 as? AuthError ?? AuthError.unknown(message: $0.localizedDescription) }
+            .eraseToAnyPublisher()
+    }
+
+    func uploadCurrentUserProfileImage(requestDTO: ProfileImageUploadRequestDTO) -> AnyPublisher<AuthUser, AuthError> {
+        performRequest(.uploadCurrentUserProfileImage(requestDTO), responseType: AuthResponseDTO.self)
+            .tryMap { try $0.toDomainUser() }
+            .mapError { $0 as? AuthError ?? AuthError.unknown(message: $0.localizedDescription) }
+            .eraseToAnyPublisher()
+    }
+
+    func removeCurrentUserProfileImage() -> AnyPublisher<AuthUser, AuthError> {
+        performRequest(.removeCurrentUserProfileImage, responseType: AuthResponseDTO.self)
+            .tryMap { try $0.toDomainUser() }
+            .mapError { $0 as? AuthError ?? AuthError.unknown(message: $0.localizedDescription) }
+            .eraseToAnyPublisher()
+    }
+
     func logout(refreshToken: String?) -> AnyPublisher<Void, AuthError> {
         performVoidRequest(.logout(refreshToken.map { LogoutRequestDTO(refreshToken: $0) }))
     }
@@ -121,7 +142,9 @@ final class AuthRemoteDataSource {
 
         if let httpBody = try endpoint.httpBody(using: jsonEncoder) {
             urlRequest.httpBody = httpBody
-            urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let contentType = endpoint.contentType {
+                urlRequest.setValue(contentType, forHTTPHeaderField: "Content-Type")
+            }
         }
 
         if endpoint.requiresAuthorization {
@@ -153,6 +176,27 @@ final class AuthRemoteDataSource {
                 idTokenExists=\(!requestDTO.idToken.isEmpty) \
                 idTokenLength=\(requestDTO.idToken.count) \
                 deviceNameExists=\((requestDTO.deviceName?.isEmpty == false))
+                """
+            )
+        }
+
+        if case .updateCurrentUserProfile(let requestDTO) = endpoint {
+            print(
+                """
+                [ProfileEdit] request sending \
+                requestURL=\(url.absoluteString) \
+                nicknameLength=\(requestDTO.nickname.count)
+                """
+            )
+        }
+
+        if case .uploadCurrentUserProfileImage(let requestDTO) = endpoint {
+            print(
+                """
+                [ProfileEdit] image upload sending \
+                requestURL=\(url.absoluteString) \
+                imageBytes=\(requestDTO.imageData.count) \
+                mimeType=\(requestDTO.mimeType)
                 """
             )
         }

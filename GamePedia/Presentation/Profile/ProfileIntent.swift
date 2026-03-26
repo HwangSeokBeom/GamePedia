@@ -4,6 +4,7 @@ import Foundation
 
 enum ProfileIntent {
     case viewDidLoad
+    case didTapEditProfile
     case didTapSettings
     case didTapLogout
     case didTapDeleteAccount
@@ -19,6 +20,7 @@ enum ProfileIntent {
 
 enum ProfileRoute {
     case loggedOut
+    case showEditProfile
     case showWrittenReviews
     case showFavoriteGames
     case showTermsOfService
