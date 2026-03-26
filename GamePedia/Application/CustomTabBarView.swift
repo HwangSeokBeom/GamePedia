@@ -1,19 +1,19 @@
-//
-//  Untitled.swift
-//  GamePedia
-//
-//  Created by Hwangseokbeom on 3/23/26.
-//
-
 import UIKit
 
 final class CustomTabBarView: UIView {
 
     var onTabSelected: ((Int) -> Void)?
 
-    private let blurContainerView = UIView()
+    private let backgroundContainerView = UIView()
     private let selectedBackgroundView = UIView()
     private let stackView = UIStackView()
+
+    private let tabItems: [(title: String, image: String, selectedImage: String)] = [
+        ("홈", "house", "house.fill"),
+        ("검색", "magnifyingglass", "magnifyingglass"),
+        ("라이브러리", "books.vertical", "books.vertical.fill"),
+        ("프로필", "person", "person.fill")
+    ]
 
     private var tabButtons: [UIButton] = []
     private var selectedIndex: Int = 0
@@ -30,12 +30,13 @@ final class CustomTabBarView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        blurContainerView.frame = bounds
-        blurContainerView.layer.cornerRadius = bounds.height / 2
+        backgroundContainerView.frame = bounds
+        backgroundContainerView.layer.cornerRadius = bounds.height / 2
         moveSelectedBackground(animated: false)
     }
 
     func updateSelectedIndex(_ index: Int) {
+        guard tabItems.indices.contains(index) else { return }
         selectedIndex = index
         updateButtonStates()
         moveSelectedBackground(animated: true)
@@ -45,62 +46,45 @@ final class CustomTabBarView: UIView {
         backgroundColor = .clear
         clipsToBounds = false
 
-        blurContainerView.backgroundColor = .gpSurface
-        blurContainerView.layer.cornerRadius = 36
-        blurContainerView.layer.shadowColor = UIColor.black.cgColor
-        blurContainerView.layer.shadowOffset = CGSize(width: 0, height: 8)
-        blurContainerView.layer.shadowRadius = 20
-        blurContainerView.layer.shadowOpacity = 0.35
-        blurContainerView.clipsToBounds = false
-        addSubview(blurContainerView)
+        backgroundContainerView.backgroundColor = .gpSurface
+        backgroundContainerView.layer.shadowColor = UIColor.black.cgColor
+        backgroundContainerView.layer.shadowOffset = CGSize(width: 0, height: 8)
+        backgroundContainerView.layer.shadowRadius = 20
+        backgroundContainerView.layer.shadowOpacity = 0.35
+        backgroundContainerView.clipsToBounds = false
+        addSubview(backgroundContainerView)
 
         selectedBackgroundView.backgroundColor = UIColor.gpPrimary.withAlphaComponent(0.18)
-        selectedBackgroundView.layer.cornerRadius = 28
-        blurContainerView.addSubview(selectedBackgroundView)
+        backgroundContainerView.addSubview(selectedBackgroundView)
 
         stackView.axis = .horizontal
         stackView.alignment = .fill
         stackView.distribution = .fillEqually
-        blurContainerView.addSubview(stackView)
+        backgroundContainerView.addSubview(stackView)
         stackView.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            stackView.leadingAnchor.constraint(equalTo: blurContainerView.leadingAnchor, constant: 8),
-            stackView.trailingAnchor.constraint(equalTo: blurContainerView.trailingAnchor, constant: -8),
-            stackView.topAnchor.constraint(equalTo: blurContainerView.topAnchor, constant: 8),
-            stackView.bottomAnchor.constraint(equalTo: blurContainerView.bottomAnchor, constant: -8)
+            stackView.leadingAnchor.constraint(equalTo: backgroundContainerView.leadingAnchor, constant: 8),
+            stackView.trailingAnchor.constraint(equalTo: backgroundContainerView.trailingAnchor, constant: -8),
+            stackView.topAnchor.constraint(equalTo: backgroundContainerView.topAnchor, constant: 8),
+            stackView.bottomAnchor.constraint(equalTo: backgroundContainerView.bottomAnchor, constant: -8)
         ])
     }
 
     private func setupTabs() {
-        let items: [(title: String, image: String, selectedImage: String)] = [
-            ("홈", "house", "house.fill"),
-            ("검색", "magnifyingglass", "magnifyingglass"),
-            ("라이브러리", "books.vertical", "books.vertical.fill"),
-            ("프로필", "person", "person.fill")
-        ]
-
-        items.enumerated().forEach { index, item in
+        tabItems.enumerated().forEach { index, _ in
             let button = UIButton(type: .system)
             button.tag = index
-            button.tintColor = .gpTextTertiary
-            button.setTitle(item.title, for: .normal)
-            button.setTitle(item.title, for: .selected)
-            button.setImage(UIImage(systemName: item.image), for: .normal)
-            button.setImage(UIImage(systemName: item.selectedImage), for: .selected)
-            button.titleLabel?.font = UIFont.systemFont(ofSize: 11, weight: .medium)
-            button.setTitleColor(.gpTextTertiary, for: .normal)
-            button.setTitleColor(.gpPrimary, for: .selected)
-            button.contentHorizontalAlignment = .center
-            button.adjustsImageWhenHighlighted = false
             button.addTarget(self, action: #selector(tabButtonTapped(_:)), for: .touchUpInside)
-
-            button.configuration = nil
-            button.semanticContentAttribute = .forceTopToBottom
-            button.imageView?.contentMode = .scaleAspectFit
-            button.titleLabel?.textAlignment = .center
+            button.configuration = makeButtonConfiguration(for: index, isSelected: index == selectedIndex)
+            button.configurationUpdateHandler = { [weak self] button in
+                guard let self else { return }
+                let isSelected = button.tag == self.selectedIndex
+                button.configuration = self.makeButtonConfiguration(for: button.tag, isSelected: isSelected)
+            }
 
             let containerView = UIView()
+            containerView.backgroundColor = .clear
             containerView.addSubview(button)
             button.translatesAutoresizingMaskIntoConstraints = false
 
@@ -118,34 +102,59 @@ final class CustomTabBarView: UIView {
         updateButtonStates()
     }
 
+    private func makeButtonConfiguration(for index: Int, isSelected: Bool) -> UIButton.Configuration {
+        let tabItem = tabItems[index]
+
+        var configuration = UIButton.Configuration.plain()
+        configuration.title = tabItem.title
+        configuration.image = UIImage(systemName: isSelected ? tabItem.selectedImage : tabItem.image)
+        configuration.imagePlacement = .top
+        configuration.imagePadding = 4
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0)
+        configuration.baseForegroundColor = isSelected ? .gpPrimary : .gpTextTertiary
+        configuration.titleAlignment = .center
+
+        let titleFont = UIFont.systemFont(ofSize: 11, weight: .medium)
+        let attributes = AttributeContainer([
+            .font: titleFont
+        ])
+        configuration.attributedTitle = AttributedString(tabItem.title, attributes: attributes)
+
+        return configuration
+    }
+
     private func updateButtonStates() {
-        tabButtons.enumerated().forEach { index, button in
-            let isSelected = index == selectedIndex
-            button.isSelected = isSelected
-            button.tintColor = isSelected ? .gpPrimary : .gpTextTertiary
+        tabButtons.forEach { button in
+            button.setNeedsUpdateConfiguration()
         }
     }
 
     private func moveSelectedBackground(animated: Bool) {
         guard !tabButtons.isEmpty else { return }
 
-        let itemWidth = (blurContainerView.bounds.width - 16) / CGFloat(tabButtons.count)
-        let backgroundWidth = itemWidth
-        let backgroundHeight = blurContainerView.bounds.height - 16
+        let horizontalInset: CGFloat = 8
+        let verticalInset: CGFloat = 8
+        let itemWidth = (backgroundContainerView.bounds.width - (horizontalInset * 2)) / CGFloat(tabButtons.count)
+        let backgroundHeight = backgroundContainerView.bounds.height - (verticalInset * 2)
 
         let targetFrame = CGRect(
-            x: 8 + (CGFloat(selectedIndex) * itemWidth),
-            y: 8,
-            width: backgroundWidth,
+            x: horizontalInset + (CGFloat(selectedIndex) * itemWidth),
+            y: verticalInset,
+            width: itemWidth,
             height: backgroundHeight
         )
 
+        let applyFrame = {
+            self.selectedBackgroundView.frame = targetFrame
+            self.selectedBackgroundView.layer.cornerRadius = targetFrame.height / 2
+        }
+
         if animated {
-            UIView.animate(withDuration: 0.25) {
-                self.selectedBackgroundView.frame = targetFrame
+            UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseInOut]) {
+                applyFrame()
             }
         } else {
-            selectedBackgroundView.frame = targetFrame
+            applyFrame()
         }
     }
 
