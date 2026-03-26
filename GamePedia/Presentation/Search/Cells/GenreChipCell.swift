@@ -53,7 +53,7 @@ final class GenreChipCell: UICollectionViewCell {
         if isSelected {
             backgroundColor = .gpPrimary
             layer.borderColor = UIColor.gpPrimary.cgColor
-            label.textColor = .white
+            label.textColor = .gpOnPrimary
             label.font = .systemFont(ofSize: 13, weight: .semibold)
         } else {
             backgroundColor = .gpSurface

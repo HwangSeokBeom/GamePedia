@@ -8,5 +8,4 @@ enum SearchMutation {
     case setResults([Game])
     case setSearching(Bool)
     case clearResults
-    case setTranslatedFields(titles: [Int: String], summaries: [Int: String])
 }

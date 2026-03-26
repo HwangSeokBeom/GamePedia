@@ -68,7 +68,7 @@ final class GameRowCell: UICollectionViewCell {
 
     // MARK: Setup
     private func setup() {
-        contentView.backgroundColor = .gpSurfaceElevated
+        contentView.backgroundColor = .gpCardBackground
         contentView.layer.cornerRadius = 14
         contentView.clipsToBounds = true
 

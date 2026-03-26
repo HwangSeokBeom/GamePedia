@@ -1,6 +1,10 @@
 import Foundation
 
 // MARK: - SearchViewModel
+//
+// The backend /games/search endpoint now handles translation-aware search.
+// Korean (or other non-English) queries are translated server-side before
+// hitting IGDB, so the client sends the raw user query as-is.
 
 final class SearchViewModel {
 
@@ -13,22 +17,14 @@ final class SearchViewModel {
 
     // MARK: Dependencies
     private let apiClient: APIClient
-    private let translateTextUseCase: TranslateTextUseCase
 
     // MARK: Debounce
     private var searchTask: Task<Void, Never>? = nil
     private let debounceMilliseconds: UInt64 = 400
 
     // MARK: Init
-    init(
-        apiClient: APIClient = .shared,
-        translateTextUseCase: TranslateTextUseCase? = nil
-    ) {
+    init(apiClient: APIClient = .shared) {
         self.apiClient = apiClient
-        self.translateTextUseCase = translateTextUseCase ?? DefaultTranslateTextUseCase(
-            repository: DefaultTranslationRepository(),
-            languageProvider: DefaultLanguageProvider.shared
-        )
     }
 
     // MARK: - Intent Processing
@@ -77,6 +73,8 @@ final class SearchViewModel {
     private func performSearch(query: String, genre: String) async {
         await MainActor.run { apply(.setSearching(true)) }
 
+        print("[GameSearch] originalQuery=\"\(query)\"")
+
         do {
             let endpoint = Endpoint.searchGames(query: query, genre: genre == "전체" ? nil : genre)
             let response = try await apiClient.request(
@@ -84,59 +82,13 @@ final class SearchViewModel {
                 as: GameResponseEnvelopeDTO<GameListResponseDataDTO>.self
             )
             let games = response.data.games.map { GameMapper.toEntity($0) }
-            print("[GameSearch] query=\(query) resultCount=\(games.count)")
-            let translatedGames = await translateGames(games, context: "Search")
+            print("[GameSearch] decodeSuccess resultCount=\(games.count)")
             await MainActor.run {
-                self.apply(.setResults(translatedGames))
+                self.apply(.setResults(games))
             }
         } catch {
-            print("[GameSearch] failed query=\(query) error=\(error.localizedDescription)")
+            print("[GameSearch] decodeFailed query=\"\(query)\" error=\(error.localizedDescription)")
             await MainActor.run { self.apply(.setResults([])) }
-        }
-    }
-
-    private func translateGames(_ games: [Game], context: String) async -> [Game] {
-        guard !games.isEmpty else { return games }
-
-        let titleItems = games.compactMap { game -> TranslationRequestItem? in
-            guard game.translatedTitle == nil else { return nil }
-            return TranslationRequestItem(
-                identifier: String(game.id),
-                field: "title",
-                text: game.title
-            )
-        }
-
-        let summaryItems = games.compactMap { game -> TranslationRequestItem? in
-            guard game.translatedSummary == nil, let summary = game.summary else { return nil }
-            return TranslationRequestItem(
-                identifier: String(game.id),
-                field: "summary",
-                text: summary
-            )
-        }
-
-        async let translatedTitles = translateTextUseCase.execute(
-            items: titleItems,
-            context: "\(context).title",
-            sourceLanguage: "en"
-        )
-        async let translatedSummaries = translateTextUseCase.execute(
-            items: summaryItems,
-            context: "\(context).summary",
-            sourceLanguage: "en"
-        )
-
-        let titleResults = await translatedTitles
-        let summaryResults = await translatedSummaries
-        let titleMap = Dictionary(uniqueKeysWithValues: titleResults.map { ($0.identifier, $0.translatedText) })
-        let summaryMap = Dictionary(uniqueKeysWithValues: summaryResults.map { ($0.identifier, $0.translatedText) })
-
-        return games.map { game in
-            game.replacingTranslated(
-                translatedTitle: titleMap[String(game.id)],
-                translatedSummary: summaryMap[String(game.id)]
-            )
         }
     }
 }

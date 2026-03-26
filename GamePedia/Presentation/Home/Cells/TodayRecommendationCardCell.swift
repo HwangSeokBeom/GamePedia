@@ -70,7 +70,7 @@ final class TodayRecommendationCardCell: UICollectionViewCell {
     }
 
     private func setup() {
-        contentView.backgroundColor = .gpSurfaceElevated
+        contentView.backgroundColor = .gpCardBackground
         contentView.layer.cornerRadius = 20
         contentView.clipsToBounds = true
 

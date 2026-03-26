@@ -208,7 +208,7 @@ final class ProfileEditRootView: UIView {
         photoActionButton.configuration = photoActionConfiguration
 
         var removeConfiguration = UIButton.Configuration.plain()
-        removeConfiguration.baseForegroundColor = .systemRed
+        removeConfiguration.baseForegroundColor = .gpCoral
         removeConfiguration.title = "사진 제거"
         removeConfiguration.attributedTitle = AttributedString(
             "사진 제거",

@@ -10,7 +10,7 @@ final class SearchResultCell: UITableViewCell {
     // MARK: Subviews
     private let cardView: UIView = {
         let view = UIView()
-        view.backgroundColor = .gpSurfaceElevated
+        view.backgroundColor = .gpCardBackground
         view.layer.cornerRadius = 16
         view.clipsToBounds = true
         view.translatesAutoresizingMaskIntoConstraints = false

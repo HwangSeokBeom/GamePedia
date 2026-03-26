@@ -17,7 +17,9 @@ struct GameDetailResponseDataDTO: Decodable {
 struct GameDTO: Decodable {
     let id: Int
     let name: String?
+    let originalName: String?
     let summary: String?
+    let originalSummary: String?
     let coverUrl: String?
     let genres: [String]?
     let platforms: [String]?

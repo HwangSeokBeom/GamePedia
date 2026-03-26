@@ -71,7 +71,7 @@ final class ReviewCardCell: UITableViewCell {
         selectionStyle = .none
 
         let cardView = UIView()
-        cardView.backgroundColor = .gpSurfaceElevated
+        cardView.backgroundColor = .gpCardBackground
         cardView.layer.cornerRadius = 14
         cardView.clipsToBounds = true
         cardView.translatesAutoresizingMaskIntoConstraints = false

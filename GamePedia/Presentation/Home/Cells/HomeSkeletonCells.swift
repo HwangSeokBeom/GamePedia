@@ -22,7 +22,7 @@ final class TodayRecommendationSkeletonCell: UICollectionViewCell {
     }
 
     private func setup() {
-        contentView.backgroundColor = .gpSurfaceElevated
+        contentView.backgroundColor = .gpCardBackground
         contentView.layer.cornerRadius = 20
         contentView.layer.cornerCurve = .continuous
         contentView.clipsToBounds = true
@@ -140,7 +140,7 @@ final class GameRowSkeletonCell: UICollectionViewCell {
     }
 
     private func setup() {
-        contentView.backgroundColor = .gpSurfaceElevated
+        contentView.backgroundColor = .gpCardBackground
         contentView.layer.cornerRadius = 14
         contentView.layer.cornerCurve = .continuous
         contentView.clipsToBounds = true

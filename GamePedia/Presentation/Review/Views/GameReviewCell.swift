@@ -77,7 +77,7 @@ final class GameReviewCell: UITableViewCell {
         selectionStyle = .none
 
         let cardView = UIView()
-        cardView.backgroundColor = .gpSurfaceElevated
+        cardView.backgroundColor = .gpCardBackground
         cardView.layer.cornerRadius = 16
         cardView.translatesAutoresizingMaskIntoConstraints = false
 

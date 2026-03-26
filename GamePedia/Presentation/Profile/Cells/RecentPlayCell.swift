@@ -11,7 +11,7 @@ final class RecentPlayCell: UITableViewCell {
     // MARK: Subviews
     private let cardView: UIView = {
         let v = UIView()
-        v.backgroundColor = .gpSurfaceElevated
+        v.backgroundColor = .gpCardBackground
         v.layer.cornerRadius = 14
         v.clipsToBounds = true
         v.translatesAutoresizingMaskIntoConstraints = false

@@ -55,7 +55,7 @@ final class ProfileRootView: UIView {
 
     let accountActionContainerView: UIView = {
         let view = UIView()
-        view.backgroundColor = .gpSurfaceElevated
+        view.backgroundColor = .gpCardBackground
         view.layer.cornerRadius = 18
         view.layer.cornerCurve = .continuous
         view.translatesAutoresizingMaskIntoConstraints = false
@@ -64,7 +64,7 @@ final class ProfileRootView: UIView {
 
     let supportActionContainerView: UIView = {
         let view = UIView()
-        view.backgroundColor = .gpSurfaceElevated
+        view.backgroundColor = .gpCardBackground
         view.layer.cornerRadius = 18
         view.layer.cornerCurve = .continuous
         view.translatesAutoresizingMaskIntoConstraints = false
@@ -86,7 +86,7 @@ final class ProfileRootView: UIView {
         let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
             title: "회원 탈퇴",
             systemImageName: "person.crop.circle.badge.minus",
-            tintColor: .systemRed
+            tintColor: .gpCoral
         ))
         button.translatesAutoresizingMaskIntoConstraints = false
         button.contentHorizontalAlignment = .leading
@@ -217,7 +217,7 @@ final class ProfileRootView: UIView {
         userRow.axis = .horizontal
         userRow.spacing = 16
         userRow.alignment = .center
-        userRow.backgroundColor = .gpSurfaceElevated
+        userRow.backgroundColor = .gpCardBackground
         userRow.layer.cornerRadius = 20
         userRow.clipsToBounds = true
         userRow.isLayoutMarginsRelativeArrangement = true
@@ -230,7 +230,7 @@ final class ProfileRootView: UIView {
         wishlistStatView.setValueColor(.gpRed)
 
         [playedStatView, reviewStatView, wishlistStatView].forEach {
-            $0.backgroundColor = .gpSurfaceElevated
+            $0.backgroundColor = .gpCardBackground
             $0.layer.cornerRadius = 16
             $0.clipsToBounds = true
             $0.isUserInteractionEnabled = true

@@ -175,7 +175,7 @@ final class FeaturedBannerCell: UICollectionViewCell {
 
     private func setup() {
         backgroundColor = .clear
-        contentView.backgroundColor = .gpSurfaceElevated
+        contentView.backgroundColor = .gpCardBackground
         contentView.layer.cornerRadius = Metrics.cornerRadius
         contentView.layer.cornerCurve = .continuous
         contentView.clipsToBounds = true

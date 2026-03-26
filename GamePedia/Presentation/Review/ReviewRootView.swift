@@ -168,9 +168,9 @@ final class ReviewRootView: UIView {
         var configuration = UIButton.Configuration.filled()
         configuration.title = "삭제"
         configuration.baseBackgroundColor = .gpSurfaceElevated
-        configuration.baseForegroundColor = .systemRed
+        configuration.baseForegroundColor = .gpCoral
         configuration.cornerStyle = .capsule
-        configuration.background.strokeColor = UIColor.systemRed.withAlphaComponent(0.35)
+        configuration.background.strokeColor = UIColor.gpCoral.withAlphaComponent(0.35)
         configuration.background.strokeWidth = 1
         let button = UIButton(configuration: configuration)
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -226,7 +226,7 @@ final class ReviewRootView: UIView {
         gameRow.axis = .horizontal
         gameRow.spacing = 14
         gameRow.alignment = .center
-        gameRow.backgroundColor = .gpSurfaceElevated
+        gameRow.backgroundColor = .gpCardBackground
         gameRow.layer.cornerRadius = 14
         gameRow.clipsToBounds = true
         gameRow.isLayoutMarginsRelativeArrangement = true
@@ -355,8 +355,8 @@ final class ReviewRootView: UIView {
         configuration?.image = nil
         configuration?.showsActivityIndicator = state.isDeleting
         configuration?.baseBackgroundColor = .gpSurfaceElevated
-        configuration?.baseForegroundColor = .systemRed
-        configuration?.background.strokeColor = UIColor.systemRed.withAlphaComponent(state.isProcessing ? 0.18 : 0.35)
+        configuration?.baseForegroundColor = .gpCoral
+        configuration?.background.strokeColor = UIColor.gpCoral.withAlphaComponent(state.isProcessing ? 0.18 : 0.35)
         configuration?.background.strokeWidth = 1
         deleteButton.configuration = configuration
         deleteButton.isEnabled = state.isEditing && !state.isProcessing

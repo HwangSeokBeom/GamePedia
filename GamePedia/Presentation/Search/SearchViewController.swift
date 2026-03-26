@@ -192,11 +192,7 @@ extension SearchViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: SearchResultCell.reuseId, for: indexPath) as! SearchResultCell
         let game = results[indexPath.row]
-        let resolvedTitle = viewModel.state.resolvedTitle(for: game)
-        let resolvedSummary = viewModel.state.resolvedSummary(for: game)
-        print("[UI] rendered resolvedTitle:", resolvedTitle)
-        print("[UI] rendered resolvedSummary:", resolvedSummary ?? "")
-        cell.configure(with: game, resolvedTitle: resolvedTitle, resolvedSummary: resolvedSummary)
+        cell.configure(with: game, resolvedTitle: game.resolvedTitle, resolvedSummary: game.resolvedSummary)
         return cell
     }
 

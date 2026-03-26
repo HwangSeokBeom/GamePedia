@@ -33,7 +33,7 @@ final class HomeHighlightCarouselView: UIView {
     private let pageControl: UIPageControl = {
         let pageControl = UIPageControl()
         pageControl.currentPageIndicatorTintColor = .gpPrimary
-        pageControl.pageIndicatorTintColor = UIColor.white.withAlphaComponent(0.18)
+        pageControl.pageIndicatorTintColor = .gpTextMuted
         pageControl.hidesForSinglePage = true
         pageControl.isUserInteractionEnabled = false
         pageControl.translatesAutoresizingMaskIntoConstraints = false

@@ -12,12 +12,22 @@ enum GameMapper {
         )
         let ratingOnFiveScale = ratingOnFiveScale(from: resolvedRating)
 
+        // When the backend returns originalName, name is the localized display value
+        // and originalName is the English original.
+        let hasServerTranslation = dto.originalName != nil
+        let title = (hasServerTranslation ? dto.originalName : dto.name) ?? "이름 없는 게임"
+        let translatedTitle: String? = hasServerTranslation ? dto.name : nil
+
+        let hasServerSummary = dto.originalSummary != nil
+        let summary = sanitized(hasServerSummary ? dto.originalSummary : dto.summary)
+        let translatedSummary: String? = hasServerSummary ? sanitized(dto.summary) : nil
+
         return Game(
             id: dto.id,
-            title: dto.name ?? "이름 없는 게임",
-            translatedTitle: nil,
-            summary: sanitized(dto.summary),
-            translatedSummary: nil,
+            title: title,
+            translatedTitle: translatedTitle,
+            summary: summary,
+            translatedSummary: translatedSummary,
             genre: dto.genres?.first ?? "기타",
             category: dto.genres?.first ?? "기타",
             developer: "—",

@@ -4,7 +4,7 @@ final class HomeHighlightSkeletonView: UIView {
 
     private let cardView: UIView = {
         let view = UIView()
-        view.backgroundColor = .gpSurfaceElevated
+        view.backgroundColor = .gpCardBackground
         view.layer.cornerRadius = 22
         view.layer.cornerCurve = .continuous
         view.translatesAutoresizingMaskIntoConstraints = false

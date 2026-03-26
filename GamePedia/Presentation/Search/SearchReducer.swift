@@ -15,25 +15,12 @@ enum SearchReducer {
             state.resultCount = games.count
             state.showEmptyResult = !state.query.isEmpty && games.isEmpty
             state.isSearching = false
-            state.translatedTitles = [:]
-            state.translatedSummaries = [:]
         case .setSearching(let isSearching):
             state.isSearching = isSearching
         case .clearResults:
             state.results = []
             state.resultCount = 0
             state.showEmptyResult = false
-            state.translatedTitles = [:]
-            state.translatedSummaries = [:]
-        case .setTranslatedFields(let titles, let summaries):
-            state.translatedTitles.merge(titles) { _, new in new }
-            state.translatedSummaries.merge(summaries) { _, new in new }
-            if !titles.isEmpty {
-                print("[Translation] reducer applied translatedTitle")
-            }
-            if !summaries.isEmpty {
-                print("[Translation] reducer applied translatedSummary")
-            }
         }
         return state
     }

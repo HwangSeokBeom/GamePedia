@@ -118,7 +118,7 @@ final class LibraryGameCardCell: UICollectionViewCell {
 
     private func setup() {
         backgroundColor = .clear
-        contentView.backgroundColor = .gpSurface
+        contentView.backgroundColor = .gpCardBackground
         contentView.layer.cornerRadius = 16
         contentView.layer.masksToBounds = true
 
