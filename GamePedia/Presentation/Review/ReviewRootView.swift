@@ -4,6 +4,10 @@ import UIKit
 
 final class ReviewRootView: UIView {
 
+    private enum UIConstants {
+        static let placeholderText = "플레이 경험, 좋았던 점, 아쉬운 점을 자유롭게 남겨보세요."
+    }
+
     // MARK: Subviews
     let scrollView: UIScrollView = {
         let sv = UIScrollView()
@@ -35,6 +39,7 @@ final class ReviewRootView: UIView {
         let label = UILabel()
         label.font = .systemFont(ofSize: 12)
         label.textColor = .gpTextSecondary
+        label.numberOfLines = 2
         return label
     }()
 
@@ -55,10 +60,11 @@ final class ReviewRootView: UIView {
 
     let ratingDisplayLabel: UILabel = {
         let label = UILabel()
-        label.text = "0.0 / 5.0"
+        label.text = "별점을 선택해주세요"
         label.font = .systemFont(ofSize: 14, weight: .medium)
-        label.textColor = .gpTextSecondary
+        label.textColor = .gpTextTertiary
         label.textAlignment = .center
+        label.numberOfLines = 2
         return label
     }()
 
@@ -80,8 +86,21 @@ final class ReviewRootView: UIView {
         tv.layer.borderWidth = 1
         tv.layer.borderColor = UIColor.gpSeparator.cgColor
         tv.textContainerInset = UIEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
+        tv.tintColor = .gpPrimary
+        tv.keyboardAppearance = .dark
+        tv.showsVerticalScrollIndicator = true
         tv.translatesAutoresizingMaskIntoConstraints = false
         return tv
+    }()
+
+    private let reviewPlaceholderLabel: UILabel = {
+        let label = UILabel()
+        label.text = UIConstants.placeholderText
+        label.font = .systemFont(ofSize: 14)
+        label.textColor = .gpTextTertiary
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
     }()
 
     let charCountLabel: UILabel = {
@@ -143,6 +162,7 @@ final class ReviewRootView: UIView {
         backgroundColor = .gpBackground
         addSubview(scrollView)
         addSubview(submitButton)
+        reviewTextView.addSubview(reviewPlaceholderLabel)
 
         // Game info card
         let gameInfoStack = UIStackView(arrangedSubviews: [gameTitleLabel, gameDeveloperLabel])
@@ -205,6 +225,10 @@ final class ReviewRootView: UIView {
 
             reviewTextView.heightAnchor.constraint(equalToConstant: 140),
 
+            reviewPlaceholderLabel.topAnchor.constraint(equalTo: reviewTextView.topAnchor, constant: 14),
+            reviewPlaceholderLabel.leadingAnchor.constraint(equalTo: reviewTextView.leadingAnchor, constant: 19),
+            reviewPlaceholderLabel.trailingAnchor.constraint(equalTo: reviewTextView.trailingAnchor, constant: -19),
+
             submitButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
             submitButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
             submitButton.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -16),
@@ -217,20 +241,46 @@ final class ReviewRootView: UIView {
     func render(_ state: ReviewState) {
         gameTitleLabel.text = state.gameName
         gameDeveloperLabel.text = state.gameSubtitle
+        gameDeveloperLabel.isHidden = state.gameSubtitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         gameThumbnailView.loadImage(url: URL(string: state.gameThumbnailURL))
 
         starRatingView.setRating(state.rating)
-        ratingDisplayLabel.text = state.formattedRating
-        charCountLabel.text = state.formattedCharCount
-        spoilerSwitch.isOn = state.isSpoiler
+        ratingDisplayLabel.text = state.hasSelectedRating ? state.formattedRating : "별점을 선택해주세요"
+        ratingDisplayLabel.textColor = state.hasSelectedRating ? .gpPrimary : .gpTextTertiary
 
-        submitButton.isEnabled = state.submitEnabled
-        submitButton.alpha = state.submitEnabled ? 1 : 0.5
-
-        if state.isSubmitting {
-            submitButton.configuration?.showsActivityIndicator = true
-        } else {
-            submitButton.configuration?.showsActivityIndicator = false
+        if reviewTextView.text != state.reviewText {
+            reviewTextView.text = state.reviewText
         }
+        reviewPlaceholderLabel.isHidden = !state.reviewText.isEmpty
+        charCountLabel.text = state.formattedCharCount
+        charCountLabel.textColor = state.charCount >= state.maxChars ? .systemOrange : .gpTextTertiary
+        spoilerSwitch.isOn = state.isSpoiler
+        spoilerSwitch.isEnabled = !state.isSubmitting
+        reviewTextView.isEditable = !state.isSubmitting
+        starRatingView.isUserInteractionEnabled = !state.isSubmitting
+
+        updateSubmitButton(using: state)
+    }
+
+    func setReviewTextInputFocused(_ isFocused: Bool) {
+        reviewTextView.layer.borderColor = (isFocused ? UIColor.gpPrimary : .gpSeparator).cgColor
+        reviewTextView.layer.shadowColor = isFocused ? UIColor.gpPrimary.withAlphaComponent(0.24).cgColor : UIColor.clear.cgColor
+        reviewTextView.layer.shadowOpacity = isFocused ? 1 : 0
+        reviewTextView.layer.shadowRadius = isFocused ? 10 : 0
+        reviewTextView.layer.shadowOffset = .zero
+    }
+
+    private func updateSubmitButton(using state: ReviewState) {
+        let isEnabled = state.submitEnabled && !state.isSubmitting
+        var configuration = submitButton.configuration
+        configuration?.title = state.isSubmitting ? "등록 중..." : "리뷰 등록하기"
+        configuration?.image = state.isSubmitting ? nil : UIImage(systemName: "paperplane")
+        configuration?.showsActivityIndicator = state.isSubmitting
+        configuration?.baseBackgroundColor = isEnabled ? .gpPrimary : .gpSurfaceElevated
+        configuration?.baseForegroundColor = isEnabled ? .white : .gpTextTertiary
+        submitButton.configuration = configuration
+        submitButton.isEnabled = isEnabled
+        submitButton.alpha = isEnabled || state.isSubmitting ? 1 : 0.72
+        submitButton.layer.shadowOpacity = isEnabled ? 0.35 : 0
     }
 }

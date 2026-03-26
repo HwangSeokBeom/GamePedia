@@ -1,7 +1,6 @@
 import UIKit
 
 // MARK: - InteractiveStarRatingView
-// Supports half-star taps: tap left half → 0.5 steps
 
 final class InteractiveStarRatingView: UIView {
 
@@ -12,6 +11,7 @@ final class InteractiveStarRatingView: UIView {
     private(set) var rating: Float = 0
     private let starCount = 5
     private var starButtons: [UIButton] = []
+    private let feedbackGenerator = UIImpactFeedbackGenerator(style: .light)
 
     // MARK: Init
     override init(frame: CGRect) {
@@ -28,24 +28,29 @@ final class InteractiveStarRatingView: UIView {
     private func setup() {
         let stack = UIStackView()
         stack.axis = .horizontal
-        stack.spacing = 10
+        stack.spacing = 8
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stack.centerXAnchor.constraint(equalTo: centerXAnchor)
+            stack.centerXAnchor.constraint(equalTo: centerXAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor)
         ])
 
-        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 30, weight: .semibold)
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
         for index in 0..<starCount {
             let button = UIButton()
             button.setImage(UIImage(systemName: "star", withConfiguration: symbolConfig), for: .normal)
-            button.tintColor = .gpStar
-            button.widthAnchor.constraint(equalToConstant: 40).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 40).isActive = true
+            button.tintColor = .gpTextTertiary
+            button.widthAnchor.constraint(equalToConstant: 44).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 44).isActive = true
             button.tag = index
-            button.addTarget(self, action: #selector(starTapped(_:)), for: .touchUpInside)
+            button.accessibilityLabel = "\(index + 1)번째 별"
+            button.accessibilityHint = "왼쪽은 0.5점, 오른쪽은 1점 단위로 선택"
+            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(starTapped(_:)))
+            button.addGestureRecognizer(tapGesture)
             starButtons.append(button)
             stack.addArrangedSubview(button)
         }
@@ -53,11 +58,16 @@ final class InteractiveStarRatingView: UIView {
 
     // MARK: - Actions
 
-    @objc private func starTapped(_ sender: UIButton) {
-        let tappedIndex = sender.tag
-        let newRating = Float(tappedIndex + 1)
+    @objc private func starTapped(_ recognizer: UITapGestureRecognizer) {
+        guard let button = recognizer.view as? UIButton else { return }
+        let tapLocation = recognizer.location(in: button)
+        let tappedIndex = button.tag
+        let isLeadingHalf = tapLocation.x < button.bounds.midX
+        let newRating = Float(tappedIndex) + (isLeadingHalf ? 0.5 : 1.0)
+        guard rating != newRating else { return }
         rating = newRating
         updateStarAppearance()
+        feedbackGenerator.impactOccurred()
         onRatingChanged?(rating)
     }
 
@@ -71,7 +81,7 @@ final class InteractiveStarRatingView: UIView {
     // MARK: - Private
 
     private func updateStarAppearance() {
-        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 30, weight: .semibold)
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
         for (index, button) in starButtons.enumerated() {
             let threshold = Float(index + 1)
             let name: String
@@ -83,6 +93,8 @@ final class InteractiveStarRatingView: UIView {
                 name = "star"
             }
             button.setImage(UIImage(systemName: name, withConfiguration: symbolConfig), for: .normal)
+            button.tintColor = name == "star" ? .gpTextTertiary : .gpStar
+            button.accessibilityValue = String(format: "%.1f점 선택됨", rating)
         }
     }
 }

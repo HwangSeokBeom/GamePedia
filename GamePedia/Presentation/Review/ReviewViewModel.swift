@@ -55,13 +55,13 @@ final class ReviewViewModel {
     }
 
     private func submitReview() {
-        guard state.submitEnabled else { return }
+        guard state.submitEnabled, !state.isSubmitting else { return }
         apply(.setSubmitting(true))
 
         let request = PostReviewRequestDTO(
             gameId: state.gameId,
             rating: Double(state.rating),
-            body: state.reviewText,
+            body: state.trimmedReviewText,
             isSpoiler: state.isSpoiler
         )
 

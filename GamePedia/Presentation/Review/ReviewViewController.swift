@@ -55,6 +55,8 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
         viewModel.onStateChanged = { [weak self] state in
             DispatchQueue.main.async { self?.render(state) }
         }
+
+        render(viewModel.state)
     }
 
     override func render(_ state: ReviewState) {
@@ -96,7 +98,31 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
 // MARK: - UITextViewDelegate
 
 extension ReviewViewController: UITextViewDelegate {
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        rootView.setReviewTextInputFocused(true)
+    }
+
     func textViewDidChange(_ textView: UITextView) {
         viewModel.send(.textChanged(textView.text))
+    }
+
+    func textViewDidEndEditing(_ textView: UITextView) {
+        rootView.setReviewTextInputFocused(false)
+    }
+
+    func textView(
+        _ textView: UITextView,
+        shouldChangeTextIn range: NSRange,
+        replacementText text: String
+    ) -> Bool {
+        guard let textRange = Range(range, in: textView.text) else { return true }
+        let updatedText = textView.text.replacingCharacters(in: textRange, with: text)
+        let cappedText = String(updatedText.prefix(viewModel.state.maxChars))
+
+        guard updatedText.count > viewModel.state.maxChars else { return true }
+
+        textView.text = cappedText
+        viewModel.send(.textChanged(cappedText))
+        return false
     }
 }

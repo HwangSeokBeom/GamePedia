@@ -47,4 +47,16 @@ struct ReviewState {
     var formattedCharCount: String {
         "\(charCount) / \(maxChars)자"
     }
+
+    var trimmedReviewText: String {
+        reviewText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var hasSelectedRating: Bool {
+        rating > 0
+    }
+
+    var hasValidReviewText: Bool {
+        !trimmedReviewText.isEmpty
+    }
 }
