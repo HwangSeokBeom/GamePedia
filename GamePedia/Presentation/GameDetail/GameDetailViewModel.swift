@@ -90,18 +90,18 @@ final class GameDetailViewModel {
 
     private func fetchGame(id: Int) async {
         do {
-            // IGDB returns an array even for single-item queries
-            let dtos = try await apiClient.request(.gameDetail(id: id), as: [IGDBGameDetailDTO].self)
-            guard let dto = dtos.first else {
-                await MainActor.run { self.apply(.setError("게임 정보를 찾을 수 없습니다.")) }
-                return
-            }
-            let entity = IGDBGameMapper.toDetailEntity(dto)
+            let response = try await apiClient.request(
+                .gameDetail(id: id),
+                as: GameResponseEnvelopeDTO<GameDetailResponseDataDTO>.self
+            )
+            let entity = GameMapper.toDetailEntity(response.data.game)
             let translatedEntity = await translateGame(entity)
+            print("[GameDetail] success id=\(id) title=\(entity.title)")
             await MainActor.run {
                 self.apply(.setGame(translatedEntity))
             }
         } catch {
+            print("[GameDetail] failed id=\(id) error=\(error.localizedDescription)")
             await MainActor.run { self.apply(.setError(error.localizedDescription)) }
         }
     }

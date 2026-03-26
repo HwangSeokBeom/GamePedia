@@ -1,0 +1,14 @@
+#include? "Secrets.xcconfig"
+
+URL_SCHEME_SEPARATOR = /
+AUTH_BASE_URL = https:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)example.com/gamepedia-auth
+TRANSLATION_BASE_URL = https:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)example.com/gamepedia-translation
+LOCAL_DEVELOPMENT_SERVER_HOST =
+
+GOOGLE_CLIENT_ID =
+GOOGLE_REVERSED_CLIENT_ID =
+
+TERMS_OF_SERVICE_URL = https:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)example.com/gamepedia/terms
+PRIVACY_POLICY_URL = https:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)example.com/gamepedia/privacy
+COMMUNITY_GUIDELINES_URL = https:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)example.com/gamepedia/community-guidelines
+SUPPORT_EMAIL = support@gamepedia.app

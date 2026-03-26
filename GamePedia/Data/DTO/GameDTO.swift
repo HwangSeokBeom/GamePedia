@@ -1,49 +1,50 @@
 import Foundation
 
-// MARK: - GameListResponseDTO
-
-struct GameListResponseDTO: Decodable {
-    let games: [GameDTO]
-    let total: Int
-    let page: Int
+struct GameResponseEnvelopeDTO<DataDTO: Decodable>: Decodable {
+    let success: Bool
+    let data: DataDTO
 }
 
-// MARK: - GameDTO
+struct GameListResponseDataDTO: Decodable {
+    let games: [GameDTO]
+    let query: String?
+}
+
+struct GameDetailResponseDataDTO: Decodable {
+    let game: GameDetailDTO
+}
 
 struct GameDTO: Decodable {
     let id: Int
-    let title: String
-    /// 한국어 제목 (optional — TODO: confirm API provides this field)
-    let titleKo: String?
-    let translatedTitle: String?
-    let genre: String
-    let developer: String
-    let platform: String
-    let releaseYear: Int
-    let coverImageUrl: String
-    let rating: Double
-    let reviewCount: Int
+    let name: String?
+    let summary: String?
+    let coverUrl: String?
+    let genres: [String]?
+    let platforms: [String]?
+    let rating: Double?
+    let aggregatedRating: Double?
+    let totalRating: Double?
+    let releaseDate: Int?
 }
-
-// MARK: - GameDetailDTO
 
 struct GameDetailDTO: Decodable {
     let id: Int
-    let title: String
-    let titleKo: String?
-    let translatedTitle: String?
-    let genre: String
-    let developer: String
-    let releaseYear: Int
-    let coverImageUrl: String
-    let heroImageUrl: String
-    let rating: Double
-    let reviewCount: Int
-    /// Average playtime in hours (e.g. 60 → displayed as "60+ 시간")
-    let avgPlaytimeHours: Int
-    let description: String
-    /// Korean description — TODO: confirm API provides this field
-    let descriptionKo: String?
-    let translatedSummary: String?
-    let translatedStoryline: String?
+    let name: String?
+    let summary: String?
+    let storyline: String?
+    let coverUrl: String?
+    let artworkUrls: [String]?
+    let screenshotUrls: [String]?
+    let genres: [String]?
+    let platforms: [String]?
+    let developers: [String]?
+    let publishers: [String]?
+    let rating: Double?
+    let aggregatedRating: Double?
+    let totalRating: Double?
+    let releaseDate: Int?
+    let status: Int?
+    let category: Int?
+    let videoIds: [String]?
+    let similarGames: [GameDTO]?
 }

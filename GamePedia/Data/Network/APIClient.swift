@@ -18,12 +18,9 @@ private struct APIErrorEnvelope: Decodable {
 
 // MARK: - APIClient
 //
-// Requests are routed by Endpoint.Service.
-// - IGDB uses Twitch auth headers
-// - backend uses the app backend base URL
-//
-// For backend endpoints, requiresUserAuth controls whether a user-level JWT
-// is attached. User JWT is separate from the Twitch token.
+// All game/auth/review/favorite/translation requests are routed through
+// GamePediaCoreServer or other app backend endpoints. The iOS client no longer
+// talks to IGDB directly or performs Twitch token exchange on-device.
 
 final class APIClient {
 
@@ -32,7 +29,6 @@ final class APIClient {
 
     // MARK: Properties
     private let session: URLSession
-    private let authService: AuthService
 
     // MARK: User auth token (separate from Twitch token)
     // TODO: Set this after user login, e.g. from Keychain
@@ -44,26 +40,43 @@ final class APIClient {
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
         self.session = URLSession(configuration: config)
-        self.authService = .shared
     }
 
     // MARK: - Public Interface
 
     /// Executes an endpoint and decodes the JSON response into type T.
-    /// IGDB auth headers are automatically injected.
     func request<T: Decodable>(_ endpoint: Endpoint, as type: T.Type) async throws -> T {
         let urlRequest = try await buildRequest(from: endpoint)
+        let isGameRequest = endpoint.path.hasPrefix("/games")
+        if isGameRequest {
+            print("[GameAPI] request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil")")
+        }
         if endpoint.path.contains("/reviews") {
             let bodyString = urlRequest.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
             print("[ReviewSubmit] APIClient.request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(urlRequest.allHTTPHeaderFields ?? [:]) body=\(bodyString)")
         }
         let (data, response) = try await session.data(for: urlRequest)
+        if isGameRequest, let httpResponse = response as? HTTPURLResponse {
+            print("[GameAPI] response status=\(httpResponse.statusCode) url=\(urlRequest.url?.absoluteString ?? "nil")")
+        }
         if endpoint.path.contains("/reviews"), let httpResponse = response as? HTTPURLResponse {
             let responseBody = String(data: data, encoding: .utf8) ?? ""
             print("[ReviewSubmit] APIClient.response status=\(httpResponse.statusCode) body=\(responseBody)")
         }
         try validate(response: response, data: data)
-        return try decode(data, as: type)
+        do {
+            let decoded: T = try decode(data, as: type)
+            if isGameRequest {
+                print("[GameAPI] decodeSuccess type=\(String(describing: type))")
+            }
+            return decoded
+        } catch {
+            if isGameRequest {
+                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                print("[GameAPI] decodeFailure type=\(String(describing: type)) error=\(error.localizedDescription) body=\(responseBody)")
+            }
+            throw error
+        }
     }
 
     func requestVoid(_ endpoint: Endpoint) async throws {
@@ -83,15 +96,8 @@ final class APIClient {
     // MARK: - Private: Request Builder
 
     private func buildRequest(from endpoint: Endpoint) async throws -> URLRequest {
-        let baseURL: URL
-        switch endpoint.service {
-        case .igdb:
-            baseURL = AppConfig.igdbBaseURL
-        case .backend:
-            baseURL = AppConfig.authBaseURL
-        }
         var components = URLComponents(
-            url: baseURL.appendingPathComponent(endpoint.path),
+            url: AppConfig.authBaseURL.appendingPathComponent(endpoint.path),
             resolvingAgainstBaseURL: true
         )
 
@@ -106,21 +112,10 @@ final class APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = endpoint.method.rawValue
 
-        if endpoint.service == .igdb {
-            let twitchToken = try await authService.validToken()
-            request.setValue(AppConfig.twitchClientID, forHTTPHeaderField: "Client-ID")
-            request.setValue("Bearer \(twitchToken)", forHTTPHeaderField: "Authorization")
-        }
-
         // Body encoding — drives Content-Type
         switch endpoint.body {
         case .none:
             break
-
-        case .igdbQuery(let queryString):
-            // IGDB uses text/plain for Apicalypse queries
-            request.setValue("text/plain", forHTTPHeaderField: "Content-Type")
-            request.httpBody = queryString.data(using: .utf8)
 
         case .json(let encodable):
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

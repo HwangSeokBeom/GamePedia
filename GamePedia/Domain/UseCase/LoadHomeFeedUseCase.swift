@@ -17,31 +17,30 @@ final class LoadHomeFeedUseCase {
     }
 
     func execute() async throws -> HomeFeed {
-        async let featuredGame = gameRepository.fetchFeaturedGame()
+        async let highlightGames = gameRepository.fetchHighlights(limit: 5)
         async let popularGames = gameRepository.fetchPopularGames(limit: 10)
         async let trendingGames = gameRepository.fetchTrendingGames(limit: 10)
-        async let latestGames = gameRepository.fetchLatestGames(limit: 10)
 
-        let featured = try await featuredGame
+        let highlightsSource = try await highlightGames
         let popular = try await popularGames
         let trending = try await trendingGames
-        let latest = try await latestGames
 
-        let candidatePool = ([featured].compactMap { $0 } + [popular, trending, latest].flatMap { $0 })
+        let candidatePool = (highlightsSource + [popular, trending].flatMap { $0 })
             .uniquedByID()
 
+        let highlightIDs = Set(highlightsSource.map(\.id))
         let recommendationPool = candidatePool
-            .filter { $0.id != featured?.id }
+            .filter { !highlightIDs.contains($0.id) }
 
         let highlights = homeHighlightSelector.selectHighlights(
-            from: candidatePool,
+            from: highlightsSource,
             minimumCount: 3,
             maximumCount: 5
         )
 
         let todayRecommendations = await todayRecommendationsUseCase.execute(
-            candidates: recommendationPool,
-            fallbackPool: recommendationPool,
+            candidates: recommendationPool.isEmpty ? candidatePool : recommendationPool,
+            fallbackPool: candidatePool,
             limit: 5
         )
 

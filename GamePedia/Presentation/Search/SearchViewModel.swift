@@ -78,15 +78,19 @@ final class SearchViewModel {
         await MainActor.run { apply(.setSearching(true)) }
 
         do {
-            // IGDB returns a flat array — no wrapper object
             let endpoint = Endpoint.searchGames(query: query, genre: genre == "전체" ? nil : genre)
-            let dtos = try await apiClient.request(endpoint, as: [IGDBGameDTO].self)
-            let games = dtos.map { IGDBGameMapper.toEntity($0) }
+            let response = try await apiClient.request(
+                endpoint,
+                as: GameResponseEnvelopeDTO<GameListResponseDataDTO>.self
+            )
+            let games = response.data.games.map { GameMapper.toEntity($0) }
+            print("[GameSearch] query=\(query) resultCount=\(games.count)")
             let translatedGames = await translateGames(games, context: "Search")
             await MainActor.run {
                 self.apply(.setResults(translatedGames))
             }
         } catch {
+            print("[GameSearch] failed query=\(query) error=\(error.localizedDescription)")
             await MainActor.run { self.apply(.setResults([])) }
         }
     }

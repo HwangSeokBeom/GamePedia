@@ -8,32 +8,76 @@ final class DefaultGameRepository: GameRepository {
         self.apiClient = apiClient
     }
 
+    func fetchHighlights(limit: Int) async throws -> [Game] {
+        try await fetchGames(
+            endpoint: .highlightGames(limit: limit),
+            logLabel: "highlights",
+            isTrending: false
+        )
+    }
+
     func fetchFeaturedGame() async throws -> Game? {
-        let dtos = try await apiClient.request(.featuredGame, as: [IGDBGameDTO].self)
-        return dtos.first.map(IGDBGameMapper.toEntity)
+        try await fetchHighlights(limit: 1).first
     }
 
     func fetchPopularGames(limit: Int) async throws -> [Game] {
-        try await fetchGames(endpoint: .popularGames(limit: limit))
+        try await fetchGames(
+            endpoint: .popularGames(limit: limit),
+            logLabel: "popular",
+            isTrending: false
+        )
     }
 
     func fetchTrendingGames(limit: Int) async throws -> [Game] {
-        try await fetchGames(endpoint: .recommendedGames(limit: limit))
+        try await fetchGames(
+            endpoint: .recommendedGames(limit: limit),
+            logLabel: "recommended",
+            isTrending: true
+        )
     }
 
     func fetchLatestGames(limit: Int) async throws -> [Game] {
-        try await fetchGames(endpoint: .latestGames(limit: limit))
+        try await fetchTrendingGames(limit: limit)
     }
 
     func fetchGames(ids: [Int]) async throws -> [Game] {
         guard !ids.isEmpty else { return [] }
-        let games = try await fetchGames(endpoint: .games(ids: ids))
+
+        let games = try await withThrowingTaskGroup(of: Game.self) { group in
+            for id in ids {
+                group.addTask { [apiClient] in
+                    let response = try await apiClient.request(
+                        .gameDetail(id: id),
+                        as: GameResponseEnvelopeDTO<GameDetailResponseDataDTO>.self
+                    )
+                    return GameMapper.toEntity(response.data.game)
+                }
+            }
+
+            var collectedGames: [Game] = []
+            for try await game in group {
+                collectedGames.append(game)
+            }
+            return collectedGames
+        }
+
         let gamesByID = Dictionary(uniqueKeysWithValues: games.map { ($0.id, $0) })
-        return ids.compactMap { gamesByID[$0] }
+        let orderedGames = ids.compactMap { gamesByID[$0] }
+        print("[GameRepository] details count=\(orderedGames.count)")
+        return orderedGames
     }
 
-    private func fetchGames(endpoint: Endpoint) async throws -> [Game] {
-        let dtos = try await apiClient.request(endpoint, as: [IGDBGameDTO].self)
-        return dtos.map(IGDBGameMapper.toEntity)
+    private func fetchGames(
+        endpoint: Endpoint,
+        logLabel: String,
+        isTrending: Bool
+    ) async throws -> [Game] {
+        let response = try await apiClient.request(
+            endpoint,
+            as: GameResponseEnvelopeDTO<GameListResponseDataDTO>.self
+        )
+        let games = response.data.games.map { GameMapper.toEntity($0, isTrending: isTrending) }
+        print("[GameRepository] \(logLabel) count=\(games.count)")
+        return games
     }
 }

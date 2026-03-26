@@ -4,8 +4,8 @@ import Foundation
 // MARK: - HomeViewModel
 //
 // Data flow:
-//   HomeIntent → HomeViewModel → APIClient → AuthService → IGDB
-//   IGDB response → [IGDBGameDTO] → IGDBGameMapper → [Game] → HomeMutation → HomeReducer → HomeState → UI
+//   HomeIntent → HomeViewModel → LoadHomeFeedUseCase → GamePediaCoreServer
+//   backend response → DTO → GameMapper → [Game] → HomeMutation → HomeReducer → HomeState → UI
 
 final class HomeViewModel {
 

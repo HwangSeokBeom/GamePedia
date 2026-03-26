@@ -3,6 +3,7 @@ import Foundation
 // MARK: - NetworkError
 
 enum NetworkError: Error, LocalizedError {
+    case configurationMissing(String)
     case invalidURL
     case noData
     case decodingFailed(Error)
@@ -12,6 +13,8 @@ enum NetworkError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .configurationMissing(let message):
+            return message
         case .invalidURL:
             return "잘못된 URL입니다."
         case .noData:

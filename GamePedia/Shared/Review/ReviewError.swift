@@ -21,6 +21,8 @@ enum ReviewError: Error, LocalizedError, Equatable {
 
         if let networkError = error as? NetworkError {
             switch networkError {
+            case .configurationMissing(let message):
+                return .server(code: "CONFIGURATION_MISSING", message: message)
             case .unauthorized:
                 return .unauthorized
             case .serverError(_, let code, let message):

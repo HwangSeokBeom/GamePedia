@@ -1,21 +1,14 @@
 import Foundation
 
 // MARK: - AppConfig
-// Single source of truth for all credentials and base URLs.
-// TODO: Before shipping — move twitchClientSecret out of source code.
-//       Options: xcconfig + .gitignore, or fetch from a secure remote config.
+// Single source of truth for runtime configuration.
+// Server-side secrets must never be embedded in the iOS client.
 
 enum AppConfig {
 
-    // MARK: - Twitch / IGDB Credentials
-    // TODO: Replace with your actual credentials before shipping
-    static let twitchClientID     = "w3o7azrujjtery8dh9re2v9jp815pb"
-    static let twitchClientSecret = "f45lcjhqkql3xtxak2cw832fyyw4qj"
+    // MARK: - Public Configuration
 
-    // MARK: - Base URLs
-    static let igdbBaseURL        = URL(string: "https://api.igdb.com/v4")!
-    static let twitchTokenURL     = URL(string: "https://id.twitch.tv/oauth2/token")!
-    static let authBaseURL        = configuredDevelopmentURL(
+    static let authBaseURL = configuredDevelopmentURL(
         infoPlistKey: "AuthBaseURL",
         environmentKey: "AUTH_BASE_URL",
         defaultPort: 3001
@@ -25,7 +18,7 @@ enum AppConfig {
         environmentKey: "TRANSLATION_BASE_URL",
         defaultPort: 3000
     )
-    static let googleClientID      = infoPlistString(for: "GIDClientID")
+    static let googleClientID = infoPlistString(for: "GIDClientID")
         ?? configuredString(
             infoPlistKey: "GoogleClientID",
             environmentKey: "GOOGLE_CLIENT_ID"
@@ -54,10 +47,9 @@ enum AppConfig {
         environmentKey: "SUPPORT_EMAIL"
     ) ?? "support@gamepedia.app"
 
-    // MARK: - IGDB Image
-    // Replace t_thumb with any IGDB image size slug.
-    // Available sizes: t_thumb, t_cover_small, t_cover_big, t_720p, t_1080p
-    static let igdbImageSize      = "t_cover_big"
+    // MARK: - Presentation
+
+    static let igdbImageSize = "t_cover_big"
 
     static let networkRuntimeDescription = {
 #if targetEnvironment(simulator)
@@ -70,7 +62,9 @@ enum AppConfig {
     private static let localDevelopmentServerHost = configuredString(
         infoPlistKey: "LocalDevelopmentServerHost",
         environmentKey: "LOCAL_DEVELOPMENT_SERVER_HOST"
-    ) ?? "192.168.0.41"
+    ) ?? "localhost"
+
+    // MARK: - Private
 
     private static func configuredDevelopmentURL(
         infoPlistKey: String,
@@ -110,8 +104,7 @@ enum AppConfig {
             return infoPlistValue
         }
 
-        if let environmentValue = ProcessInfo.processInfo.environment[environmentKey],
-           !environmentValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if let environmentValue = sanitizedString(ProcessInfo.processInfo.environment[environmentKey]) {
             return environmentValue
         }
 
@@ -128,8 +121,7 @@ enum AppConfig {
             return url
         }
 
-        if let environmentValue = ProcessInfo.processInfo.environment[environmentKey],
-           !environmentValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+        if let environmentValue = sanitizedString(ProcessInfo.processInfo.environment[environmentKey]),
            let url = URL(string: environmentValue) {
             return url
         }
@@ -138,11 +130,7 @@ enum AppConfig {
     }
 
     private static func infoPlistString(for key: String) -> String? {
-        guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
-              !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return nil
-        }
-        return value
+        sanitizedString(Bundle.main.object(forInfoDictionaryKey: key) as? String)
     }
 
     private static var defaultDevelopmentHost: String {
@@ -158,8 +146,7 @@ enum AppConfig {
         source: String,
         configKey: String
     ) -> URL? {
-        guard let value,
-              !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+        guard let value = sanitizedString(value),
               let url = URL(string: value) else {
             return nil
         }
@@ -188,5 +175,15 @@ enum AppConfig {
             .compactMap { $0["CFBundleURLSchemes"] as? [String] }
             .flatMap { $0 }
             .first { $0.hasPrefix("com.googleusercontent.apps.") }
+    }
+
+    private static func sanitizedString(_ value: String?) -> String? {
+        guard let value else { return nil }
+
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedValue.isEmpty else { return nil }
+        guard !trimmedValue.hasPrefix("$(") else { return nil }
+        guard !trimmedValue.hasPrefix("YOUR_") else { return nil }
+        return trimmedValue
     }
 }
