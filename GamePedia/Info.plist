@@ -28,14 +28,10 @@
 	<string>Dark</string>
 	<key>APIEnvironment</key>
 	<string>$(API_ENVIRONMENT)</string>
-	<key>TranslationBaseURL</key>
-	<string>$(TRANSLATION_BASE_URL)</string>
 	<key>GIDClientID</key>
 	<string>$(GOOGLE_CLIENT_ID)</string>
 	<key>GoogleReverseClientID</key>
 	<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
-	<key>LocalDevelopmentServerHost</key>
-	<string>$(LOCAL_DEVELOPMENT_SERVER_HOST)</string>
 	<key>TermsOfServiceURL</key>
 	<string>$(TERMS_OF_SERVICE_URL)</string>
 	<key>PrivacyPolicyURL</key>

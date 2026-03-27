@@ -8,18 +8,19 @@ enum AppConfig {
 
     // MARK: - Public Configuration
 
-    static let apiEnvironment = APIEnvironment.current
+    static let apiEnvironment = AppEnvironmentResolver.current
     static let authBaseURL: URL = {
-        let environment = APIEnvironment.current
-        let baseURL = environment.baseURL
+        let environment = AppEnvironmentResolver.current
+        let baseURL = environment.apiBaseURL
         print("[AppConfig] APIEnvironment=\(environment.rawValue) authBaseURL=\(baseURL.absoluteString)")
         return baseURL
     }()
-    static let translationBaseURL = configuredDevelopmentURL(
-        infoPlistKey: "TranslationBaseURL",
-        environmentKey: "TRANSLATION_BASE_URL",
-        defaultPort: 3000
-    )
+    static let translationBaseURL: URL = {
+        let environment = AppEnvironmentResolver.current
+        let baseURL = environment.translationBaseURL
+        print("[AppConfig] APIEnvironment=\(environment.rawValue) translationBaseURL=\(baseURL.absoluteString)")
+        return baseURL
+    }()
     static let googleClientID = infoPlistString(for: "GIDClientID")
         ?? configuredString(
             infoPlistKey: "GoogleClientID",
@@ -61,42 +62,7 @@ enum AppConfig {
 #endif
     }()
 
-    private static let localDevelopmentServerHost = configuredString(
-        infoPlistKey: "LocalDevelopmentServerHost",
-        environmentKey: "LOCAL_DEVELOPMENT_SERVER_HOST"
-    ) ?? "localhost"
-
     // MARK: - Private
-
-    private static func configuredDevelopmentURL(
-        infoPlistKey: String,
-        environmentKey: String,
-        defaultPort: Int
-    ) -> URL {
-        let infoPlistValue = infoPlistString(for: infoPlistKey)
-        let environmentValue = ProcessInfo.processInfo.environment[environmentKey]
-
-        if let url = resolvedConfiguredURL(
-            value: infoPlistValue,
-            source: "Info.plist",
-            configKey: infoPlistKey
-        ) {
-            return url
-        }
-
-        if let url = resolvedConfiguredURL(
-            value: environmentValue,
-            source: "environment",
-            configKey: infoPlistKey
-        ) {
-            return url
-        }
-
-        let fallbackHost = defaultDevelopmentHost
-        let fallbackURL = URL(string: "http://\(fallbackHost):\(defaultPort)")!
-        print("[AppConfig] \(infoPlistKey)=\(fallbackURL.absoluteString) source=default runtime=\(networkRuntimeDescription)")
-        return fallbackURL
-    }
 
     private static func configuredString(
         infoPlistKey: String,
@@ -133,39 +99,6 @@ enum AppConfig {
 
     private static func infoPlistString(for key: String) -> String? {
         sanitizedString(Bundle.main.object(forInfoDictionaryKey: key) as? String)
-    }
-
-    private static var defaultDevelopmentHost: String {
-#if targetEnvironment(simulator)
-        return "localhost"
-#else
-        return localDevelopmentServerHost
-#endif
-    }
-
-    private static func resolvedConfiguredURL(
-        value: String?,
-        source: String,
-        configKey: String
-    ) -> URL? {
-        guard let value = sanitizedString(value),
-              let url = URL(string: value) else {
-            return nil
-        }
-
-        if shouldIgnoreLoopbackURL(url) {
-            print("[AppConfig] \(configKey)=\(url.absoluteString) source=\(source) ignored on device because loopback URLs cannot reach the Mac-hosted server")
-            return nil
-        }
-
-        print("[AppConfig] \(configKey)=\(url.absoluteString) source=\(source) runtime=\(networkRuntimeDescription)")
-        return url
-    }
-
-    private static func shouldIgnoreLoopbackURL(_ url: URL) -> Bool {
-        guard networkRuntimeDescription == "device" else { return false }
-        guard let host = url.host?.lowercased() else { return false }
-        return host == "localhost" || host == "127.0.0.1" || host == "::1"
     }
 
     private static func firstGoogleURLScheme() -> String? {

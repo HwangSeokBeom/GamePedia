@@ -5,7 +5,7 @@ enum APIEnvironment: String, CaseIterable {
     case staging
     case production
 
-    var baseURL: URL {
+    var apiBaseURL: URL {
         switch self {
         case .dev:
             return URL(string: "http://localhost:3001")!
@@ -16,9 +16,26 @@ enum APIEnvironment: String, CaseIterable {
         }
     }
 
+    var translationBaseURL: URL {
+        switch self {
+        case .dev:
+            return URL(string: "http://localhost:3000")!
+        case .staging:
+            return URL(string: "https://staging-gamepedia-translate.duckdns.org")!
+        case .production:
+            return URL(string: "https://gamepedia-translate.duckdns.org")!
+        }
+    }
+}
+
+enum AppEnvironmentResolver {
     static var current: APIEnvironment {
         if let override = configuredOverride {
             return override
+        }
+
+        if isTestFlight {
+            return .staging
         }
 
 #if DEBUG
@@ -38,6 +55,10 @@ enum APIEnvironment: String, CaseIterable {
         }
 
         return nil
+    }
+
+    private static var isTestFlight: Bool {
+        Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
     }
 
     private static func resolve(rawValue: String?) -> APIEnvironment? {

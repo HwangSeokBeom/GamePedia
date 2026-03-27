@@ -35,7 +35,7 @@ final class DefaultTranslationRemoteDataSource: TranslationRemoteDataSource {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(requestDTO)
 
-        print("[TranslationNetwork] runtime=\(AppConfig.networkRuntimeDescription) baseURL=\(baseURL.absoluteString) requestURL=\(url.absoluteString) method=POST")
+        print("[TranslationNetwork] environment=\(AppConfig.apiEnvironment.rawValue) runtime=\(AppConfig.networkRuntimeDescription) baseURL=\(baseURL.absoluteString) requestURL=\(url.absoluteString) method=POST")
 
         do {
             let (data, response) = try await session.data(for: request)
