@@ -2,7 +2,6 @@ import UIKit
 
 final class MainTabBarController: UITabBarController {
 
-    private let customTabBarView = CustomTabBarView()
     private let tabNavigationControllers: [UINavigationController]
     var onTabSelectionRequested: ((Int) -> Bool)?
 
@@ -22,28 +21,31 @@ final class MainTabBarController: UITabBarController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupTabBarController()
-        setupCustomTabBarView()
-        bindCustomTabBarView()
-        updateSelectedTab(index: selectedIndex)
     }
 
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        layoutHiddenSystemTabBar()
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+        applyTabBarAppearance()
     }
 
     private func setupTabBarController() {
         view.backgroundColor = .gpBackground
-        tabBar.isHidden = true
-        tabBar.alpha = 0
-        tabBar.backgroundImage = UIImage()
-        tabBar.shadowImage = UIImage()
-        tabBar.backgroundColor = .clear
+        delegate = self
+        tabBar.isHidden = false
+        tabBar.alpha = 1
+        tabBar.isTranslucent = true
+        tabBar.backgroundImage = nil
+        tabBar.shadowImage = nil
+        applyTabBarAppearance()
+    }
 
+    private func applyTabBarAppearance() {
         let tabBarAppearance = UITabBarAppearance()
-        tabBarAppearance.configureWithOpaqueBackground()
+        tabBarAppearance.configureWithTransparentBackground()
+        tabBarAppearance.backgroundEffect = makeTabBarBlurEffect()
         tabBarAppearance.backgroundColor = .gpTabBarBackground
-        tabBarAppearance.shadowColor = .clear
+        tabBarAppearance.shadowColor = .gpTabBarSeparator
 
         let itemAppearance = UITabBarItemAppearance(style: .stacked)
         itemAppearance.selected.iconColor = .gpAccent
@@ -51,45 +53,36 @@ final class MainTabBarController: UITabBarController {
         itemAppearance.normal.iconColor = .gpTextSecondary
         itemAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.gpTextSecondary]
         tabBarAppearance.stackedLayoutAppearance = itemAppearance
+        tabBarAppearance.inlineLayoutAppearance = itemAppearance
+        tabBarAppearance.compactInlineLayoutAppearance = itemAppearance
         tabBar.standardAppearance = tabBarAppearance
         tabBar.scrollEdgeAppearance = tabBarAppearance
         tabBar.tintColor = .gpAccent
         tabBar.unselectedItemTintColor = .gpTextSecondary
     }
 
-    private func setupCustomTabBarView() {
-        view.addSubview(customTabBarView)
-        customTabBarView.translatesAutoresizingMaskIntoConstraints = false
-
-        NSLayoutConstraint.activate([
-            customTabBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            customTabBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            customTabBarView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16),
-            customTabBarView.heightAnchor.constraint(equalToConstant: 72)
-        ])
+    func selectTab(index: Int) {
+        guard tabNavigationControllers.indices.contains(index) else { return }
+        selectedIndex = index
     }
 
-    private func bindCustomTabBarView() {
-        customTabBarView.onTabSelected = { [weak self] index in
-            guard self?.onTabSelectionRequested?(index) ?? true else { return }
-            self?.selectTab(index: index)
+    private func makeTabBarBlurEffect() -> UIBlurEffect {
+        switch traitCollection.userInterfaceStyle {
+        case .dark:
+            return UIBlurEffect(style: .systemChromeMaterialDark)
+        default:
+            return UIBlurEffect(style: .systemChromeMaterialLight)
         }
     }
+}
 
-    func selectTab(index: Int) {
-        selectedIndex = index
-        updateSelectedTab(index: index)
+extension MainTabBarController: UITabBarControllerDelegate {
+    func tabBarController(_ tabBarController: UITabBarController, shouldSelect viewController: UIViewController) -> Bool {
+        guard let viewControllers,
+              let index = viewControllers.firstIndex(of: viewController) else {
+            return true
+        }
+
+        return onTabSelectionRequested?(index) ?? true
     }
-
-    private func updateSelectedTab(index: Int) {
-        customTabBarView.updateSelectedIndex(index)
-    }
-
-    private func layoutHiddenSystemTabBar() {
-        var frame = tabBar.frame
-        frame.size.height = 0
-        frame.origin.y = view.bounds.height + 100
-        tabBar.frame = frame
-    }
-
 }

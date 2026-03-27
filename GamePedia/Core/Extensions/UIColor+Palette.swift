@@ -12,7 +12,14 @@ extension UIColor {
     static let gpCardBackground = dynamic(light: "#FFFFFF", dark: "#16161A")
     static let gpInputBackground = dynamic(light: "#FFFFFF", dark: "#16161A")
     static let gpNavigationBarBackground = gpBackground
-    static let gpTabBarBackground = dynamic(light: "#F8F8FA", dark: "#0B0B0E")
+    static let gpTabBarBackground = UIColor { trait in
+        switch trait.userInterfaceStyle {
+        case .dark:
+            return UIColor(hex: "#0B0B0E").withAlphaComponent(0.80)
+        default:
+            return UIColor(hex: "#F8F9FD").withAlphaComponent(0.82)
+        }
+    }
 
     // MARK: Primary
     static let gpPrimary = dynamic(light: "#5856D6", dark: "#6366F1")
@@ -40,6 +47,14 @@ extension UIColor {
     // MARK: Separators / Utility
     static let gpSeparator = dynamic(light: "#E5E5EA", dark: "#2A2A2E")
     static let gpBorder = gpSeparator
+    static let gpTabBarSeparator = UIColor { trait in
+        switch trait.userInterfaceStyle {
+        case .dark:
+            return UIColor.white.withAlphaComponent(18.0 / 255.0)
+        default:
+            return UIColor.black.withAlphaComponent(0.08)
+        }
+    }
     static let gpShadow = UIColor { trait in
         switch trait.userInterfaceStyle {
         case .dark:
