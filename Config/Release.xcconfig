@@ -1,7 +1,7 @@
 #include? "Secrets.xcconfig"
 
 URL_SCHEME_SEPARATOR = /
-AUTH_BASE_URL = https:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)example.com/gamepedia-auth
+AUTH_BASE_URL = https:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)gamepedia-api.duckdns.org
 TRANSLATION_BASE_URL = https:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)example.com/gamepedia-translation
 LOCAL_DEVELOPMENT_SERVER_HOST =
 
