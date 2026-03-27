@@ -4,6 +4,7 @@ final class MainTabBarController: UITabBarController {
 
     private let tabNavigationControllers: [UINavigationController]
     var onTabSelectionRequested: ((Int) -> Bool)?
+    var onDebugEnvironmentMenuRequested: (() -> Void)?
 
     // MARK: Init
 
@@ -32,6 +33,7 @@ final class MainTabBarController: UITabBarController {
         tabBar.backgroundImage = nil
         tabBar.shadowImage = nil
         applyTabBarAppearance()
+        configureDebugMenuGestureIfNeeded()
     }
 
     private func applyTabBarAppearance() {
@@ -62,6 +64,24 @@ final class MainTabBarController: UITabBarController {
 
     private func makeTabBarBlurEffect() -> UIBlurEffect {
         UIBlurEffect(style: .systemChromeMaterialDark)
+    }
+
+    private func configureDebugMenuGestureIfNeeded() {
+#if DEBUG
+        let longPressGestureRecognizer = UILongPressGestureRecognizer(
+            target: self,
+            action: #selector(handleTabBarLongPress(_:))
+        )
+        tabBar.addGestureRecognizer(longPressGestureRecognizer)
+#endif
+    }
+
+    @objc
+    private func handleTabBarLongPress(_ gestureRecognizer: UILongPressGestureRecognizer) {
+#if DEBUG
+        guard gestureRecognizer.state == .began else { return }
+        onDebugEnvironmentMenuRequested?()
+#endif
     }
 }
 
