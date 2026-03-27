@@ -12,7 +12,7 @@ final class GameHorizontalCell: UICollectionViewCell {
     // MARK: Subviews
     private let thumbnailView: UIImageView = {
         let iv = UIImageView()
-        iv.contentMode = .scaleAspectFill
+        iv.contentMode = .scaleAspectFit
         iv.clipsToBounds = true
         iv.layer.cornerRadius = 12
         iv.backgroundColor = .gpSurfaceElevated
