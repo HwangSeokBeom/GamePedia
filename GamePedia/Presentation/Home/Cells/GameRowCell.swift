@@ -7,6 +7,7 @@ final class GameRowCell: UICollectionViewCell {
 
     static let reuseId = "GameRowCell"
     static let height: CGFloat = 88
+
     private enum Metrics {
         static let buttonWidth: CGFloat = 84
         static let buttonHeight: CGFloat = 32
@@ -16,14 +17,15 @@ final class GameRowCell: UICollectionViewCell {
     }
 
     // MARK: Subviews
+
     private let thumbnailView: UIImageView = {
-        let iv = UIImageView()
-        iv.contentMode = .scaleAspectFill
-        iv.clipsToBounds = true
-        iv.layer.cornerRadius = 10
-        iv.backgroundColor = .gpSurface
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        return iv
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.layer.cornerRadius = 10
+        imageView.backgroundColor = .gpSurface
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
     }()
 
     private let titleLabel: UILabel = {
@@ -55,9 +57,14 @@ final class GameRowCell: UICollectionViewCell {
         return button
     }()
 
+    private var wishlistButtonWidthConstraint: NSLayoutConstraint?
+    private var infoStackTrailingToWishlistConstraint: NSLayoutConstraint?
+    private var infoStackTrailingToContentConstraint: NSLayoutConstraint?
+
     var onFavoriteButtonTapped: (() -> Void)?
 
     // MARK: Init
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setup()
@@ -69,6 +76,7 @@ final class GameRowCell: UICollectionViewCell {
     }
 
     // MARK: Setup
+
     private func setup() {
         contentView.backgroundColor = .gpCardBackground
         contentView.layer.cornerRadius = 14
@@ -112,6 +120,7 @@ final class GameRowCell: UICollectionViewCell {
     }
 
     // MARK: Configure
+
     func configure(
         with game: Game,
         resolvedTitle: String,
@@ -130,10 +139,13 @@ final class GameRowCell: UICollectionViewCell {
         thumbnailView.cancelLoad()
         thumbnailView.image = nil
         wishlistButton.configuration = makeWishlistConfiguration(isWishlisted: false)
+        applyWishlistButtonVisibility(true)
         wishlistButton.layer.removeAllAnimations()
         wishlistButton.transform = .identity
         onFavoriteButtonTapped = nil
     }
+
+    // MARK: Actions
 
     @objc
     private func didTapWishlistButton() {
@@ -165,8 +177,12 @@ final class GameRowCell: UICollectionViewCell {
         )
     }
 
+    // MARK: Private Helpers
+
     private func releaseText(for game: Game) -> String {
-        if game.releaseYear > 0 { return "\(game.releaseYear)" }
+        if game.releaseYear > 0 {
+            return "\(game.releaseYear)"
+        }
         return "출시 예정"
     }
 
@@ -176,6 +192,7 @@ final class GameRowCell: UICollectionViewCell {
             pointSize: Metrics.buttonIconPointSize,
             weight: .semibold
         )
+
         configuration.title = isWishlisted ? "찜됨" : "찜하기"
         configuration.image = UIImage(
             systemName: isWishlisted ? "bookmark.fill" : "bookmark",
@@ -191,6 +208,7 @@ final class GameRowCell: UICollectionViewCell {
             outgoing.font = UIFont.systemFont(ofSize: Metrics.buttonTitleFontSize, weight: .semibold)
             return outgoing
         }
+
         return configuration
     }
 
