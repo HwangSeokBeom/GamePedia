@@ -12,14 +12,7 @@ extension UIColor {
     static let gpCardBackground = dynamic(light: "#FFFFFF", dark: "#16161A")
     static let gpInputBackground = dynamic(light: "#FFFFFF", dark: "#16161A")
     static let gpNavigationBarBackground = gpBackground
-    static let gpTabBarBackground = UIColor { trait in
-        switch trait.userInterfaceStyle {
-        case .dark:
-            return UIColor(hex: "#0B0B0E").withAlphaComponent(0.80)
-        default:
-            return UIColor(hex: "#F8F9FD").withAlphaComponent(0.82)
-        }
-    }
+    static let gpTabBarBackground = UIColor(hex: "#0B0B0E").withAlphaComponent(0.80)
 
     // MARK: Primary
     static let gpPrimary = dynamic(light: "#5856D6", dark: "#6366F1")
@@ -47,22 +40,8 @@ extension UIColor {
     // MARK: Separators / Utility
     static let gpSeparator = dynamic(light: "#E5E5EA", dark: "#2A2A2E")
     static let gpBorder = gpSeparator
-    static let gpTabBarSeparator = UIColor { trait in
-        switch trait.userInterfaceStyle {
-        case .dark:
-            return UIColor.white.withAlphaComponent(18.0 / 255.0)
-        default:
-            return UIColor.black.withAlphaComponent(0.08)
-        }
-    }
-    static let gpShadow = UIColor { trait in
-        switch trait.userInterfaceStyle {
-        case .dark:
-            return UIColor.black.withAlphaComponent(0.34)
-        default:
-            return UIColor.black.withAlphaComponent(0.12)
-        }
-    }
+    static let gpTabBarSeparator = UIColor.white.withAlphaComponent(18.0 / 255.0)
+    static let gpShadow = UIColor.black.withAlphaComponent(0.34)
     static let gpHeroGradientEnd = dynamic(light: "#F8F8FA", dark: "#0B0B0E")
     static let gpSocialButtonBackground = dynamic(light: "#FFFFFF", dark: "#16161A")
     static let gpSocialButtonForeground = dynamic(light: "#1A1A1E", dark: "#FAFAF9")
@@ -70,14 +49,8 @@ extension UIColor {
     static let gpAvatarInitialText = UIColor.white
 
     static func dynamic(light: String, dark: String) -> UIColor {
-        UIColor { trait in
-            switch trait.userInterfaceStyle {
-            case .dark:
-                return UIColor(hex: dark)
-            default:
-                return UIColor(hex: light)
-            }
-        }
+        _ = light
+        return UIColor(hex: dark)
     }
 
     func resolvedCGColor(with traitCollection: UITraitCollection) -> CGColor {

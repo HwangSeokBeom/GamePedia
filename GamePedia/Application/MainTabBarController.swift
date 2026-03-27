@@ -23,12 +23,6 @@ final class MainTabBarController: UITabBarController {
         setupTabBarController()
     }
 
-    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        super.traitCollectionDidChange(previousTraitCollection)
-        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
-        applyTabBarAppearance()
-    }
-
     private func setupTabBarController() {
         view.backgroundColor = .gpBackground
         delegate = self
@@ -67,12 +61,7 @@ final class MainTabBarController: UITabBarController {
     }
 
     private func makeTabBarBlurEffect() -> UIBlurEffect {
-        switch traitCollection.userInterfaceStyle {
-        case .dark:
-            return UIBlurEffect(style: .systemChromeMaterialDark)
-        default:
-            return UIBlurEffect(style: .systemChromeMaterialLight)
-        }
+        UIBlurEffect(style: .systemChromeMaterialDark)
     }
 }
 
