@@ -134,7 +134,7 @@ final class LibraryGameCardCell: UICollectionViewCell {
             artworkView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
             artworkView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
             artworkView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
-            artworkView.heightAnchor.constraint(equalTo: artworkView.widthAnchor, multiplier: 0.88),
+            artworkView.heightAnchor.constraint(equalTo: artworkView.widthAnchor),
 
             titleLabel.topAnchor.constraint(equalTo: artworkView.bottomAnchor, constant: 10),
             titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
@@ -171,7 +171,7 @@ private final class LibraryArtworkView: UIView {
     private let gradientLayer = CAGradientLayer()
     private let imageView: UIImageView = {
         let imageView = UIImageView()
-        imageView.contentMode = .scaleAspectFill
+        imageView.contentMode = .scaleAspectFit
         imageView.clipsToBounds = true
         imageView.translatesAutoresizingMaskIntoConstraints = false
         return imageView

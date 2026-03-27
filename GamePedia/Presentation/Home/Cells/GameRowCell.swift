@@ -113,12 +113,39 @@ final class GameRowCell: UICollectionViewCell {
         thumbnailView.cancelLoad()
         thumbnailView.image = nil
         wishlistButton.configuration = makeWishlistConfiguration(isWishlisted: false)
+        wishlistButton.layer.removeAllAnimations()
+        wishlistButton.transform = .identity
         onFavoriteButtonTapped = nil
     }
 
     @objc
     private func didTapWishlistButton() {
+        animateWishlistButton()
         onFavoriteButtonTapped?()
+    }
+
+    private func animateWishlistButton() {
+        wishlistButton.layer.removeAllAnimations()
+        wishlistButton.transform = .identity
+
+        UIView.animate(
+            withDuration: 0.18,
+            delay: 0,
+            options: [.curveEaseOut, .beginFromCurrentState, .allowUserInteraction],
+            animations: {
+                self.wishlistButton.transform = CGAffineTransform(scaleX: 1.05, y: 1.05)
+            },
+            completion: { _ in
+                UIView.animate(
+                    withDuration: 0.12,
+                    delay: 0,
+                    options: [.curveEaseOut, .beginFromCurrentState, .allowUserInteraction],
+                    animations: {
+                        self.wishlistButton.transform = .identity
+                    }
+                )
+            }
+        )
     }
 
     private func releaseText(for game: Game) -> String {
