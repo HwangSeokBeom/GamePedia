@@ -26,8 +26,8 @@
 	<string>LaunchScreen</string>
 	<key>UIUserInterfaceStyle</key>
 	<string>Dark</string>
-	<key>AuthBaseURL</key>
-	<string>$(AUTH_BASE_URL)</string>
+	<key>APIEnvironment</key>
+	<string>$(API_ENVIRONMENT)</string>
 	<key>TranslationBaseURL</key>
 	<string>$(TRANSLATION_BASE_URL)</string>
 	<key>GIDClientID</key>

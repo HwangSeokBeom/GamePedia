@@ -8,11 +8,13 @@ enum AppConfig {
 
     // MARK: - Public Configuration
 
-    static let authBaseURL = configuredDevelopmentURL(
-        infoPlistKey: "AuthBaseURL",
-        environmentKey: "AUTH_BASE_URL",
-        defaultPort: 3001
-    )
+    static let apiEnvironment = APIEnvironment.current
+    static let authBaseURL: URL = {
+        let environment = APIEnvironment.current
+        let baseURL = environment.baseURL
+        print("[AppConfig] APIEnvironment=\(environment.rawValue) authBaseURL=\(baseURL.absoluteString)")
+        return baseURL
+    }()
     static let translationBaseURL = configuredDevelopmentURL(
         infoPlistKey: "TranslationBaseURL",
         environmentKey: "TRANSLATION_BASE_URL",

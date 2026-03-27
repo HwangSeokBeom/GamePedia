@@ -25,9 +25,10 @@ private struct APIErrorEnvelope: Decodable {
 final class APIClient {
 
     // MARK: Singleton
-    static let shared = APIClient()
+    static let shared = APIClient(baseURL: AppConfig.authBaseURL)
 
     // MARK: Properties
+    private let baseURL: URL
     private let session: URLSession
 
     // MARK: User auth token (separate from Twitch token)
@@ -35,11 +36,19 @@ final class APIClient {
     var userAuthToken: String? = nil
 
     // MARK: Init
-    private init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
-        self.session = URLSession(configuration: config)
+    init(
+        baseURL: URL = AppConfig.authBaseURL,
+        session: URLSession? = nil
+    ) {
+        self.baseURL = baseURL
+        if let session {
+            self.session = session
+        } else {
+            let configuration = URLSessionConfiguration.default
+            configuration.timeoutIntervalForRequest = 30
+            configuration.timeoutIntervalForResource = 60
+            self.session = URLSession(configuration: configuration)
+        }
     }
 
     // MARK: - Public Interface
@@ -97,7 +106,7 @@ final class APIClient {
 
     private func buildRequest(from endpoint: Endpoint) async throws -> URLRequest {
         var components = URLComponents(
-            url: AppConfig.authBaseURL.appendingPathComponent(endpoint.path),
+            url: baseURL.appendingPathComponent(endpoint.path),
             resolvingAgainstBaseURL: true
         )
 
