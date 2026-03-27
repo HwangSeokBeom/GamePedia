@@ -33,22 +33,22 @@ enum AppConfig {
     static let termsOfServiceURL = configuredStaticURL(
         infoPlistKey: "TermsOfServiceURL",
         environmentKey: "TERMS_OF_SERVICE_URL",
-        defaultValue: "https://example.com/gamepedia/terms"
+        defaultValue: "https://hwangseokbeom.github.io/gamepedia-legal/terms.html"
     )
     static let privacyPolicyURL = configuredStaticURL(
         infoPlistKey: "PrivacyPolicyURL",
         environmentKey: "PRIVACY_POLICY_URL",
-        defaultValue: "https://example.com/gamepedia/privacy"
+        defaultValue: "https://hwangseokbeom.github.io/gamepedia-legal/privacy.html"
     )
     static let communityGuidelinesURL = configuredStaticURL(
         infoPlistKey: "CommunityGuidelinesURL",
         environmentKey: "COMMUNITY_GUIDELINES_URL",
-        defaultValue: "https://example.com/gamepedia/community-guidelines"
+        defaultValue: "https://hwangseokbeom.github.io/gamepedia-legal/community.html"
     )
     static let supportEmail = configuredString(
         infoPlistKey: "SupportEmail",
         environmentKey: "SUPPORT_EMAIL"
-    ) ?? "support@gamepedia.app"
+    ) ?? "tjrqja0714@gmail.com"
 
     // MARK: - Presentation
 
