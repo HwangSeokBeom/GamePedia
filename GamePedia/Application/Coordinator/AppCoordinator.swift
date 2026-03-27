@@ -237,6 +237,12 @@ final class AppCoordinator {
             guard let self, let mainTabBarController else { return false }
             return self.handleTabSelection(index: index, in: mainTabBarController)
         }
+#if DEBUG
+        mainTabBarController.onDebugEnvironmentMenuRequested = { [weak self, weak mainTabBarController] in
+            guard let self, let mainTabBarController else { return }
+            self.presentDebugEnvironmentMenu(from: mainTabBarController)
+        }
+#endif
         mainTabBarController.selectTab(index: selectedIndex)
         return mainTabBarController
     }
@@ -387,4 +393,29 @@ final class AppCoordinator {
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         return components?.queryItems?.first(where: { $0.name == "token" })?.value
     }
+
+#if DEBUG
+    private func presentDebugEnvironmentMenu(from presenter: UIViewController) {
+        EnvironmentDebugMenuPresenter.present(
+            from: presenter,
+            currentEnvironment: AppConfig.apiEnvironment,
+            selectedOverride: DebugEnvironmentSelectionStore.selectedEnvironment
+        ) { [weak presenter] selectedEnvironment in
+            DebugEnvironmentSelectionStore.selectedEnvironment = selectedEnvironment
+            let resolvedEnvironment = selectedEnvironment ?? AppEnvironmentResolver.current
+            let alertController = UIAlertController(
+                title: "환경이 저장되었습니다",
+                message: """
+                다음 실행부터 \(resolvedEnvironment.rawValue) 환경이 적용됩니다.
+
+                API: \(resolvedEnvironment.apiBaseURL.absoluteString)
+                Translation: \(resolvedEnvironment.translationBaseURL.absoluteString)
+                """,
+                preferredStyle: .alert
+            )
+            alertController.addAction(UIAlertAction(title: "확인", style: .default))
+            presenter?.present(alertController, animated: true)
+        }
+    }
+#endif
 }

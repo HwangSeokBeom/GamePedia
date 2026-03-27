@@ -9,6 +9,18 @@ enum AppConfig {
     // MARK: - Public Configuration
 
     static let apiEnvironment = AppEnvironmentResolver.current
+    static let oauthConfig = OAuthConfig(
+        environment: apiEnvironment,
+        googleClientID: configuredString(
+            infoPlistKey: "GIDClientID",
+            environmentKey: "GOOGLE_CLIENT_ID"
+        ),
+        googleReverseClientID: configuredString(
+            infoPlistKey: "GoogleReverseClientID",
+            environmentKey: "GOOGLE_REVERSED_CLIENT_ID"
+        ) ?? firstGoogleURLScheme()
+    )
+    static let featureFlags = FeatureFlags.defaults(for: apiEnvironment)
     static let authBaseURL: URL = {
         let environment = AppEnvironmentResolver.current
         let baseURL = environment.apiBaseURL
@@ -21,15 +33,8 @@ enum AppConfig {
         print("[AppConfig] APIEnvironment=\(environment.rawValue) translationBaseURL=\(baseURL.absoluteString)")
         return baseURL
     }()
-    static let googleClientID = infoPlistString(for: "GIDClientID")
-        ?? configuredString(
-            infoPlistKey: "GoogleClientID",
-            environmentKey: "GOOGLE_CLIENT_ID"
-        )
-    static let googleReverseClientID = configuredString(
-        infoPlistKey: "GoogleReverseClientID",
-        environmentKey: "GOOGLE_REVERSED_CLIENT_ID"
-    ) ?? firstGoogleURLScheme()
+    static let googleClientID = oauthConfig.googleClientID
+    static let googleReverseClientID = oauthConfig.googleReverseClientID
     static let termsOfServiceURL = configuredStaticURL(
         infoPlistKey: "TermsOfServiceURL",
         environmentKey: "TERMS_OF_SERVICE_URL",
