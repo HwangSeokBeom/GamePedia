@@ -1,4 +1,3 @@
-import MessageUI
 import SafariServices
 import UIKit
 
@@ -201,36 +200,18 @@ final class ProfileCoordinator: NSObject {
     }
 
     private func contactSupport() {
-        if MFMailComposeViewController.canSendMail() {
-            let mailComposeViewController = MFMailComposeViewController()
-            mailComposeViewController.mailComposeDelegate = self
-            mailComposeViewController.setToRecipients([AppConfig.supportEmail])
-            mailComposeViewController.setSubject("GamePedia 문의하기")
-            mailComposeViewController.setMessageBody(
-                """
-                문의 내용을 입력해 주세요.
-
-                ---
-                앱 버전:
-                기기:
-                """,
-                isHTML: false
+        guard let mailURL = URL(string: "mailto:\(AppConfig.supportEmail)") else { return }
+        guard UIApplication.shared.canOpenURL(mailURL) else {
+            let alertController = UIAlertController(
+                title: "메일을 열 수 없어요",
+                message: "Mail 앱을 사용할 수 있는 환경에서 다시 시도해 주세요.",
+                preferredStyle: .alert
             )
-            navigationController.topViewController?.present(mailComposeViewController, animated: true)
+            alertController.addAction(UIAlertAction(title: "확인", style: .default))
+            navigationController.topViewController?.present(alertController, animated: true)
             return
         }
 
-        guard let mailURL = URL(string: "mailto:\(AppConfig.supportEmail)") else { return }
         UIApplication.shared.open(mailURL)
-    }
-}
-
-extension ProfileCoordinator: MFMailComposeViewControllerDelegate {
-    func mailComposeController(
-        _ controller: MFMailComposeViewController,
-        didFinishWith result: MFMailComposeResult,
-        error: Error?
-    ) {
-        controller.dismiss(animated: true)
     }
 }
