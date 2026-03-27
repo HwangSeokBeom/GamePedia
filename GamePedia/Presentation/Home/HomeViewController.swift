@@ -143,6 +143,9 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
                 resolvedTitle: resolvedTitle,
                 isWishlisted: viewModel.state.wishlistedGameIDs.contains(game.id)
             )
+            cell.onFavoriteButtonTapped = { [weak self] in
+                self?.viewModel.send(.didTapFavorite(gameId: game.id))
+            }
             return cell
 
         case .todayRecommendationSkeleton:

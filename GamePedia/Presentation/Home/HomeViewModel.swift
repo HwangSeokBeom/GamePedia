@@ -22,6 +22,7 @@ final class HomeViewModel {
     private let loadHomeFeedUseCase: LoadHomeFeedUseCase
     private let userActivityRepository: any UserActivityRepository
     private let fetchMyFavoritesUseCase: FetchMyFavoritesUseCase
+    private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let translateTextUseCase: TranslateTextUseCase
     private var cancellables = Set<AnyCancellable>()
 
@@ -32,6 +33,9 @@ final class HomeViewModel {
         fetchMyFavoritesUseCase: FetchMyFavoritesUseCase = FetchMyFavoritesUseCase(
             favoriteRepository: DefaultFavoriteRepository()
         ),
+        toggleFavoriteUseCase: ToggleFavoriteUseCase = ToggleFavoriteUseCase(
+            favoriteRepository: DefaultFavoriteRepository()
+        ),
         translateTextUseCase: TranslateTextUseCase? = nil
     ) {
         let resolvedActivityRepository = userActivityRepository ?? LocalUserActivityRepository.shared
@@ -40,6 +44,7 @@ final class HomeViewModel {
             userActivityRepository: resolvedActivityRepository
         )
         self.fetchMyFavoritesUseCase = fetchMyFavoritesUseCase
+        self.toggleFavoriteUseCase = toggleFavoriteUseCase
         self.translateTextUseCase = translateTextUseCase ?? DefaultTranslateTextUseCase(
             repository: DefaultTranslationRepository(),
             languageProvider: DefaultLanguageProvider.shared
@@ -57,6 +62,8 @@ final class HomeViewModel {
             Task {
                 await userActivityRepository.recordViewed(game: game)
             }
+        case .didTapFavorite(let gameId):
+            toggleFavorite(gameId: gameId)
         case .didTapSeeMore(let section):
             routeToSectionList(section)
         case .didTapNotification:
@@ -133,6 +140,38 @@ final class HomeViewModel {
                 wishlistedGameIDs: state.wishlistedGameIDs
             )
         )
+    }
+
+    private func toggleFavorite(gameId: Int) {
+        let isCurrentlyFavorite = state.wishlistedGameIDs.contains(gameId)
+
+        Task {
+            do {
+                let result = try await toggleFavoriteUseCase.execute(
+                    gameId: String(gameId),
+                    isCurrentlyFavorite: isCurrentlyFavorite
+                )
+
+                await MainActor.run {
+                    NotificationCenter.default.post(
+                        name: .favoriteDidChange,
+                        object: nil,
+                        userInfo: [
+                            FavoriteChangeUserInfoKey.gameId: result.gameId,
+                            FavoriteChangeUserInfoKey.isFavorite: result.isFavorite,
+                            FavoriteChangeUserInfoKey.action: result.isFavorite
+                                ? FavoriteChangeAction.added.rawValue
+                                : FavoriteChangeAction.removed.rawValue
+                        ]
+                    )
+                }
+            } catch {
+                let favoriteError = FavoriteError.from(error: error)
+                await MainActor.run {
+                    self.apply(.setError(favoriteError.errorDescription ?? "찜 상태를 변경하지 못했습니다."))
+                }
+            }
+        }
     }
 
     private func translateHomeFeed(_ feed: HomeFeed) async -> HomeFeed {

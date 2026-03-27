@@ -18,6 +18,7 @@ final class LibraryViewModel {
     private let fetchFavoriteGamesUseCase: FetchFavoriteGamesUseCase
     private let fetchMyReviewedGamesUseCase: FetchMyReviewedGamesUseCase
     private let removeFavoriteUseCase: RemoveFavoriteUseCase
+    private let translateTextUseCase: TranslateTextUseCase
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -36,12 +37,17 @@ final class LibraryViewModel {
         initialTab: LibraryTab = .favorites,
         removeFavoriteUseCase: RemoveFavoriteUseCase = RemoveFavoriteUseCase(
             favoriteRepository: DefaultFavoriteRepository()
+        ),
+        translateTextUseCase: TranslateTextUseCase = DefaultTranslateTextUseCase(
+            repository: DefaultTranslationRepository(),
+            languageProvider: DefaultLanguageProvider.shared
         )
     ) {
         self.state = LibraryState(selectedTab: initialTab)
         self.fetchFavoriteGamesUseCase = fetchFavoriteGamesUseCase
         self.fetchMyReviewedGamesUseCase = fetchMyReviewedGamesUseCase
         self.removeFavoriteUseCase = removeFavoriteUseCase
+        self.translateTextUseCase = translateTextUseCase
         observeFavoriteChanges()
     }
 
@@ -89,11 +95,14 @@ final class LibraryViewModel {
         Task {
             do {
                 let entries = try await fetchFavoriteGamesUseCase.execute(sort: state.selectedSort.favoriteSort)
-                let items = entries.map(Self.makeLibraryItem(from:))
+                print("[LibraryTranslation] favorites translation start count=\(entries.count)")
+                let translatedEntries = await translateFavoriteEntries(entries)
+                let items = translatedEntries.map(Self.makeLibraryItem(from:))
                 let favoriteCount = entries.count
-                let ratings = entries.map(\.game.rating).filter { $0 > 0 }
+                let ratings = translatedEntries.map(\.game.rating).filter { $0 > 0 }
                 let averageRating = ratings.isEmpty ? 0 : ratings.reduce(0, +) / Double(ratings.count)
                 let highestRating = ratings.max() ?? 0
+                print("[LibraryTranslation] favorites translation complete itemCount=\(items.count)")
 
                 await MainActor.run {
                     self.state.items = items
@@ -194,11 +203,14 @@ final class LibraryViewModel {
         Task {
             do {
                 let reviewedGames = try await fetchMyReviewedGamesUseCase.execute(sort: state.selectedSort.reviewSort)
-                let items = reviewedGames.map(Self.makeLibraryItem(from:))
+                print("[LibraryTranslation] reviewed translation start count=\(reviewedGames.count)")
+                let translatedReviewedGames = await translateReviewedGames(reviewedGames)
+                let items = translatedReviewedGames.map(Self.makeLibraryItem(from:))
                 let reviewCount = reviewedGames.count
-                let ratings = reviewedGames.map(\.rating).filter { $0 > 0 }
+                let ratings = translatedReviewedGames.map(\.rating).filter { $0 > 0 }
                 let averageRating = ratings.isEmpty ? 0 : ratings.reduce(0, +) / Double(ratings.count)
                 let highestRating = ratings.max() ?? 0
+                print("[LibraryTranslation] reviewed translation complete itemCount=\(items.count)")
 
                 await MainActor.run {
                     self.state.items = items
@@ -234,5 +246,62 @@ final class LibraryViewModel {
             isFavorite: false,
             showsFavoriteButton: false
         )
+    }
+
+    private func translateFavoriteEntries(_ entries: [FavoriteGameEntry]) async -> [FavoriteGameEntry] {
+        let translatedGames = await translateGames(entries.map(\.game), context: "Library.favorites")
+        let translatedGamesByID = Dictionary(uniqueKeysWithValues: translatedGames.map { ($0.id, $0) })
+
+        return entries.map { entry in
+            FavoriteGameEntry(
+                favorite: entry.favorite,
+                game: translatedGamesByID[entry.game.id] ?? entry.game
+            )
+        }
+    }
+
+    private func translateReviewedGames(_ reviewedGames: [ReviewedGame]) async -> [ReviewedGame] {
+        let translatedGames = await translateGames(reviewedGames.map(\.game), context: "Library.reviewed")
+        let translatedGamesByID = Dictionary(uniqueKeysWithValues: translatedGames.map { ($0.id, $0) })
+
+        return reviewedGames.map { reviewedGame in
+            ReviewedGame(
+                reviewId: reviewedGame.reviewId,
+                gameId: reviewedGame.gameId,
+                rating: reviewedGame.rating,
+                content: reviewedGame.content,
+                createdAt: reviewedGame.createdAt,
+                game: translatedGamesByID[reviewedGame.game.id] ?? reviewedGame.game
+            )
+        }
+    }
+
+    private func translateGames(_ games: [Game], context: String) async -> [Game] {
+        guard !games.isEmpty else { return games }
+
+        let titleItems = games.compactMap { game -> TranslationRequestItem? in
+            guard game.translatedTitle == nil else { return nil }
+            return TranslationRequestItem(
+                identifier: String(game.id),
+                field: "title",
+                text: game.title
+            )
+        }
+
+        guard !titleItems.isEmpty else { return games }
+
+        let translatedTitles = Dictionary(
+            uniqueKeysWithValues: await translateTextUseCase.execute(
+                items: titleItems,
+                context: "\(context).title",
+                sourceLanguage: "en"
+            ).map { ($0.identifier, $0.translatedText) }
+        )
+
+        return games.map { game in
+            game.replacingTranslated(
+                translatedTitle: translatedTitles[String(game.id)]
+            )
+        }
     }
 }
