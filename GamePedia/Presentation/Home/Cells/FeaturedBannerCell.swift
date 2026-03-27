@@ -16,11 +16,21 @@ final class FeaturedBannerCell: UICollectionViewCell {
 
     private var representedGameID: Int?
 
-    private let heroImageView: UIImageView = {
+    private let heroBackdropImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
+        imageView.alpha = 0.34
         imageView.backgroundColor = .gpSurfaceElevated
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let heroImageView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFit
+        imageView.clipsToBounds = true
+        imageView.backgroundColor = .clear
         imageView.translatesAutoresizingMaskIntoConstraints = false
         return imageView
     }()
@@ -137,6 +147,7 @@ final class FeaturedBannerCell: UICollectionViewCell {
         representedGameID = nil
         heroImageView.cancelLoad()
         heroImageView.image = nil
+        heroBackdropImageView.image = nil
         fallbackLabel.text = "이미지를 불러오는 중이에요"
         fallbackOverlayView.isHidden = false
     }
@@ -164,9 +175,11 @@ final class FeaturedBannerCell: UICollectionViewCell {
         ) { [weak self] result in
             guard let self, self.representedGameID == representedGameID else { return }
             switch result {
-            case .success:
+            case .success(let value):
+                self.heroBackdropImageView.image = value.image
                 self.fallbackOverlayView.isHidden = true
             case .failure:
+                self.heroBackdropImageView.image = nil
                 self.fallbackLabel.text = "대표 이미지를 불러올 수 없어요"
                 self.fallbackOverlayView.isHidden = false
             }
@@ -180,6 +193,7 @@ final class FeaturedBannerCell: UICollectionViewCell {
         contentView.layer.cornerCurve = .continuous
         contentView.clipsToBounds = true
 
+        contentView.addSubview(heroBackdropImageView)
         contentView.addSubview(heroImageView)
         contentView.addSubview(fallbackOverlayView)
         contentView.addSubview(textStack)
@@ -190,6 +204,11 @@ final class FeaturedBannerCell: UICollectionViewCell {
         badgeView.addSubview(badgeLabel)
 
         NSLayoutConstraint.activate([
+            heroBackdropImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            heroBackdropImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            heroBackdropImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            heroBackdropImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+
             heroImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             heroImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             heroImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),

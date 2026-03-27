@@ -14,6 +14,7 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
     private let viewModel: HomeViewModel
     private var dataSource: UICollectionViewDiffableDataSource<HomeRootView.Section, HomeCollectionItem>!
     private var isShowingSkeletonSnapshot = false
+    private var lastRenderedWishlistedGameIDs = Set<Int>()
 
     // Set by HomeCoordinator — called when the user taps a game cell.
     var onGameSelected: ((Int) -> Void)?
@@ -143,6 +144,9 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
                 resolvedTitle: resolvedTitle,
                 isWishlisted: viewModel.state.wishlistedGameIDs.contains(game.id)
             )
+            cell.onFavoriteButtonTapped = { [weak self] in
+                self?.viewModel.send(.didTapFavorite(gameId: game.id))
+            }
             return cell
 
         case .todayRecommendationSkeleton:
@@ -251,6 +255,9 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
     private func applySnapshot(state: HomeState) {
         var snapshot = NSDiffableDataSourceSnapshot<HomeRootView.Section, HomeCollectionItem>()
         snapshot.appendSections(HomeRootView.Section.allCases)
+        let isFavoriteStateOnlyUpdate = !state.showsSkeleton
+            && dataSource.snapshot().numberOfItems > 0
+            && lastRenderedWishlistedGameIDs != state.wishlistedGameIDs
 
         if state.showsSkeleton {
             snapshot.appendItems(
@@ -272,16 +279,41 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
             )
             snapshot.appendItems(state.popularGames.map { .popular($0) }, toSection: .popular)
             snapshot.appendItems(state.trendingGames.map { .trending($0) }, toSection: .trending)
+            reconfigureTrendingItemsIfNeeded(state: state, snapshot: &snapshot)
         }
 
         let shouldAnimateDifferences = !state.showsSkeleton
             && !isShowingSkeletonSnapshot
             && dataSource.snapshot().numberOfItems > 0
 
-        dataSource.apply(snapshot, animatingDifferences: shouldAnimateDifferences) { [weak self] in
+        dataSource.apply(snapshot, animatingDifferences: shouldAnimateDifferences && !isFavoriteStateOnlyUpdate) { [weak self] in
             self?.refreshVisibleSectionHeaders(showsSkeleton: state.showsSkeleton)
         }
         isShowingSkeletonSnapshot = state.showsSkeleton
+        lastRenderedWishlistedGameIDs = state.wishlistedGameIDs
+    }
+
+    private func reconfigureTrendingItemsIfNeeded(
+        state: HomeState,
+        snapshot: inout NSDiffableDataSourceSnapshot<HomeRootView.Section, HomeCollectionItem>
+    ) {
+        guard dataSource.snapshot().numberOfItems > 0,
+              lastRenderedWishlistedGameIDs != state.wishlistedGameIDs else {
+            return
+        }
+
+        let changedGameIDs = lastRenderedWishlistedGameIDs.symmetricDifference(state.wishlistedGameIDs)
+        let itemsToRefresh = state.trendingGames
+            .filter { changedGameIDs.contains($0.id) }
+            .map { HomeCollectionItem.trending($0) }
+
+        guard !itemsToRefresh.isEmpty else { return }
+
+        if #available(iOS 15.0, *) {
+            snapshot.reconfigureItems(itemsToRefresh)
+        } else {
+            snapshot.reloadItems(itemsToRefresh)
+        }
     }
 
     private func refreshVisibleSectionHeaders(showsSkeleton: Bool) {

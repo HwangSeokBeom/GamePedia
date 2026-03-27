@@ -49,11 +49,13 @@ final class GameRowCell: UICollectionViewCell {
         button.layer.cornerRadius = Metrics.buttonHeight / 2
         button.clipsToBounds = true
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.isUserInteractionEnabled = false
+        button.isUserInteractionEnabled = true
         button.setContentHuggingPriority(.required, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
         return button
     }()
+
+    var onFavoriteButtonTapped: (() -> Void)?
 
     // MARK: Init
     override init(frame: CGRect) {
@@ -78,6 +80,8 @@ final class GameRowCell: UICollectionViewCell {
         infoStack.translatesAutoresizingMaskIntoConstraints = false
 
         [thumbnailView, infoStack, wishlistButton].forEach { contentView.addSubview($0) }
+
+        wishlistButton.addTarget(self, action: #selector(didTapWishlistButton), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
             thumbnailView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
@@ -109,6 +113,39 @@ final class GameRowCell: UICollectionViewCell {
         thumbnailView.cancelLoad()
         thumbnailView.image = nil
         wishlistButton.configuration = makeWishlistConfiguration(isWishlisted: false)
+        wishlistButton.layer.removeAllAnimations()
+        wishlistButton.transform = .identity
+        onFavoriteButtonTapped = nil
+    }
+
+    @objc
+    private func didTapWishlistButton() {
+        animateWishlistButton()
+        onFavoriteButtonTapped?()
+    }
+
+    private func animateWishlistButton() {
+        wishlistButton.layer.removeAllAnimations()
+        wishlistButton.transform = .identity
+
+        UIView.animate(
+            withDuration: 0.18,
+            delay: 0,
+            options: [.curveEaseOut, .beginFromCurrentState, .allowUserInteraction],
+            animations: {
+                self.wishlistButton.transform = CGAffineTransform(scaleX: 1.05, y: 1.05)
+            },
+            completion: { _ in
+                UIView.animate(
+                    withDuration: 0.12,
+                    delay: 0,
+                    options: [.curveEaseOut, .beginFromCurrentState, .allowUserInteraction],
+                    animations: {
+                        self.wishlistButton.transform = .identity
+                    }
+                )
+            }
+        )
     }
 
     private func releaseText(for game: Game) -> String {

@@ -5,6 +5,7 @@ import Foundation
 enum HomeIntent {
     case viewDidLoad
     case didTapGame(Game)
+    case didTapFavorite(gameId: Int)
     case didTapSeeMore(section: HomeSection)
     case didTapNotification
 }
