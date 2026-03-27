@@ -34,6 +34,12 @@ enum AppEnvironmentResolver {
             return override
         }
 
+#if DEBUG
+        if let selectedEnvironment = DebugEnvironmentSelectionStore.selectedEnvironment {
+            return selectedEnvironment
+        }
+#endif
+
         if isTestFlight {
             return .staging
         }
@@ -73,3 +79,24 @@ enum AppEnvironmentResolver {
         return APIEnvironment(rawValue: normalizedValue)
     }
 }
+
+#if DEBUG
+enum DebugEnvironmentSelectionStore {
+    private static let userDefaultsKey = "debugSelectedAPIEnvironment"
+    private static let defaults = UserDefaults.standard
+
+    static var selectedEnvironment: APIEnvironment? {
+        get {
+            guard let rawValue = defaults.string(forKey: userDefaultsKey) else { return nil }
+            return APIEnvironment(rawValue: rawValue)
+        }
+        set {
+            if let newValue {
+                defaults.set(newValue.rawValue, forKey: userDefaultsKey)
+            } else {
+                defaults.removeObject(forKey: userDefaultsKey)
+            }
+        }
+    }
+}
+#endif

@@ -141,7 +141,8 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
             cell.configure(
                 with: game,
                 resolvedTitle: resolvedTitle,
-                isWishlisted: viewModel.state.wishlistedGameIDs.contains(game.id)
+                isWishlisted: viewModel.state.wishlistedGameIDs.contains(game.id),
+                showLikeButton: false
             )
             return cell
 

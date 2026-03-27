@@ -55,6 +55,10 @@ final class GameRowCell: UICollectionViewCell {
         return button
     }()
 
+    private var wishlistButtonWidthConstraint: NSLayoutConstraint?
+    private var infoStackTrailingToWishlistConstraint: NSLayoutConstraint?
+    private var infoStackTrailingToContentConstraint: NSLayoutConstraint?
+
     // MARK: Init
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -87,21 +91,38 @@ final class GameRowCell: UICollectionViewCell {
 
             wishlistButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
             wishlistButton.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            wishlistButton.widthAnchor.constraint(equalToConstant: Metrics.buttonWidth),
             wishlistButton.heightAnchor.constraint(equalToConstant: Metrics.buttonHeight),
 
             infoStack.leadingAnchor.constraint(equalTo: thumbnailView.trailingAnchor, constant: 12),
-            infoStack.trailingAnchor.constraint(equalTo: wishlistButton.leadingAnchor, constant: -12),
             infoStack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor)
+        ])
+
+        let wishlistButtonWidthConstraint = wishlistButton.widthAnchor.constraint(equalToConstant: Metrics.buttonWidth)
+        let infoStackTrailingToWishlistConstraint = infoStack.trailingAnchor.constraint(equalTo: wishlistButton.leadingAnchor, constant: -12)
+        let infoStackTrailingToContentConstraint = infoStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12)
+
+        self.wishlistButtonWidthConstraint = wishlistButtonWidthConstraint
+        self.infoStackTrailingToWishlistConstraint = infoStackTrailingToWishlistConstraint
+        self.infoStackTrailingToContentConstraint = infoStackTrailingToContentConstraint
+
+        NSLayoutConstraint.activate([
+            wishlistButtonWidthConstraint,
+            infoStackTrailingToWishlistConstraint
         ])
     }
 
     // MARK: Configure
-    func configure(with game: Game, resolvedTitle: String, isWishlisted: Bool = false) {
+    func configure(
+        with game: Game,
+        resolvedTitle: String,
+        isWishlisted: Bool = false,
+        showLikeButton: Bool = true
+    ) {
         thumbnailView.loadImage(url: game.coverImageURL)
         titleLabel.text = resolvedTitle
         descLabel.text = "\(game.genre) · \(releaseText(for: game)) · ★ \(game.formattedRating)"
         wishlistButton.configuration = makeWishlistConfiguration(isWishlisted: isWishlisted)
+        applyWishlistButtonVisibility(showLikeButton)
     }
 
     override func prepareForReuse() {
@@ -109,6 +130,7 @@ final class GameRowCell: UICollectionViewCell {
         thumbnailView.cancelLoad()
         thumbnailView.image = nil
         wishlistButton.configuration = makeWishlistConfiguration(isWishlisted: false)
+        applyWishlistButtonVisibility(true)
     }
 
     private func releaseText(for game: Game) -> String {
@@ -138,5 +160,12 @@ final class GameRowCell: UICollectionViewCell {
             return outgoing
         }
         return configuration
+    }
+
+    private func applyWishlistButtonVisibility(_ isVisible: Bool) {
+        wishlistButton.isHidden = !isVisible
+        wishlistButtonWidthConstraint?.constant = isVisible ? Metrics.buttonWidth : 0
+        infoStackTrailingToWishlistConstraint?.isActive = isVisible
+        infoStackTrailingToContentConstraint?.isActive = !isVisible
     }
 }
