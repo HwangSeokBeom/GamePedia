@@ -187,3 +187,20 @@ extension Endpoint {
         ], userAuth: true)
     }
 }
+
+// MARK: - Library Endpoints
+
+extension Endpoint {
+    static func myLibrary(sort: String? = nil) -> Endpoint {
+        let queryItems = sort.map { [URLQueryItem(name: "sort", value: $0)] } ?? []
+        return .get("/users/me/library", query: queryItems, userAuth: true)
+    }
+
+    static var mySteamLinkStatus: Endpoint {
+        .get("/users/me/steam", userAuth: true)
+    }
+
+    static func updateLibraryStatus(body: UpdateLibraryStatusRequestDTO) -> Endpoint {
+        .post("/users/me/library/status", body: body, userAuth: true)
+    }
+}
