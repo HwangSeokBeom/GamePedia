@@ -41,7 +41,6 @@ struct SteamLinkStatus: Hashable {
     let steamID: String?
     let displayName: String?
     let profileURL: URL?
-    let connectURL: URL?
 
     var isLinked: Bool {
         connectionState == .linked
@@ -51,8 +50,7 @@ struct SteamLinkStatus: Hashable {
         connectionState: .notLinked,
         steamID: nil,
         displayName: nil,
-        profileURL: nil,
-        connectURL: nil
+        profileURL: nil
     )
 }
 
@@ -141,6 +139,10 @@ enum LibraryError: Error, LocalizedError, Equatable {
             case .unknown:
                 return .network
             }
+        }
+
+        if error is URLError {
+            return .network
         }
 
         return .unknown(message: error.localizedDescription)

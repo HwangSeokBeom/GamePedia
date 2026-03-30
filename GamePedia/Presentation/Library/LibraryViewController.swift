@@ -9,7 +9,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     private let refreshControl = UIRefreshControl()
 
     var onGameSelected: ((Int) -> Void)?
-    var onSteamLinkRequested: ((URL?) -> Void)?
+    var onSteamLinkRequested: ((URL) -> Void)?
 
     init(
         rootView: LibraryRootView = LibraryRootView(),
@@ -48,6 +48,8 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
             let alert = UIAlertController(title: "오류", message: errorMessage, preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "확인", style: .default))
             present(alert, animated: true)
+        } else if state.errorMessage == nil {
+            lastPresentedErrorMessage = nil
         }
     }
 

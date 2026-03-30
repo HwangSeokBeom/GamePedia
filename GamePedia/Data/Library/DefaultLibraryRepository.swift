@@ -24,6 +24,15 @@ final class DefaultLibraryRepository: LibraryRepository {
         }
     }
 
+    func startSteamLink() async throws -> URL {
+        do {
+            let data = try await libraryRemoteDataSource.startSteamLink()
+            return try LibraryMapper.toSteamLinkURL(data)
+        } catch {
+            throw LibraryError.from(error: error)
+        }
+    }
+
     func updateGameStatus(identifier: LibraryGameIdentifier, status: UserGameStatus) async throws -> LibraryGameStatusMutationResult {
         do {
             let data = try await libraryRemoteDataSource.updateGameStatus(

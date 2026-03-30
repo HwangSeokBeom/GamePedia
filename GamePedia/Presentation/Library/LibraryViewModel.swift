@@ -17,12 +17,12 @@ final class LibraryViewModel {
     private let fetchLibraryOverviewUseCase: FetchLibraryOverviewUseCase
     private let fetchFavoriteGamesUseCase: FetchFavoriteGamesUseCase
     private let fetchMyReviewedGamesUseCase: FetchMyReviewedGamesUseCase
+    private let startSteamLinkUseCase: StartSteamLinkUseCase
     private let updateLibraryGameStatusUseCase: UpdateLibraryGameStatusUseCase
     private let removeFavoriteUseCase: RemoveFavoriteUseCase
     private let translateTextUseCase: TranslateTextUseCase
     private var cancellables = Set<AnyCancellable>()
     private var loadTask: Task<Void, Never>?
-    private var currentSteamLinkStatus: SteamLinkStatus = .notLinked
 
     init(
         fetchLibraryOverviewUseCase: FetchLibraryOverviewUseCase = FetchLibraryOverviewUseCase(
@@ -40,6 +40,9 @@ final class LibraryViewModel {
             ),
             gameRepository: DefaultGameRepository()
         ),
+        startSteamLinkUseCase: StartSteamLinkUseCase = StartSteamLinkUseCase(
+            libraryRepository: DefaultLibraryRepository()
+        ),
         updateLibraryGameStatusUseCase: UpdateLibraryGameStatusUseCase = UpdateLibraryGameStatusUseCase(
             libraryRepository: DefaultLibraryRepository()
         ),
@@ -56,6 +59,7 @@ final class LibraryViewModel {
         self.fetchLibraryOverviewUseCase = fetchLibraryOverviewUseCase
         self.fetchFavoriteGamesUseCase = fetchFavoriteGamesUseCase
         self.fetchMyReviewedGamesUseCase = fetchMyReviewedGamesUseCase
+        self.startSteamLinkUseCase = startSteamLinkUseCase
         self.updateLibraryGameStatusUseCase = updateLibraryGameStatusUseCase
         self.removeFavoriteUseCase = removeFavoriteUseCase
         self.translateTextUseCase = translateTextUseCase
@@ -78,7 +82,7 @@ final class LibraryViewModel {
             loadLibrary(trigger: .refresh)
 
         case .didTapSteamLink:
-            onRoute?(.showSteamLink(currentSteamLinkStatus.connectURL))
+            startSteamLink()
 
         case .didTapRecentlyPlayedGame(let identifier):
             routeToGameDetailIfPossible(identifier)
@@ -163,10 +167,6 @@ final class LibraryViewModel {
                 reviewedResult: translatedReviewed
             )
 
-            if case .success(let overview) = translatedOverview {
-                self.currentSteamLinkStatus = overview.steamLinkStatus
-            }
-
             await MainActor.run {
                 self.apply(.setSections(sections))
                 self.apply(.setLoading(false))
@@ -183,6 +183,26 @@ final class LibraryViewModel {
     private func routeToGameDetailIfPossible(_ identifier: LibraryGameIdentifier) {
         guard let gameID = identifier.detailGameID else { return }
         onRoute?(.showGameDetail(gameID))
+    }
+
+    private func startSteamLink() {
+        apply(.clearError)
+        print("[LibrarySteamLink] action=didTapSteamLink")
+
+        Task {
+            do {
+                let authURL = try await startSteamLinkUseCase.execute()
+                await MainActor.run {
+                    self.apply(.clearError)
+                    self.onRoute?(.showSteamLink(authURL))
+                }
+            } catch {
+                let errorMessage = resolveSteamLinkErrorMessage(error)
+                await MainActor.run {
+                    self.apply(.setError(errorMessage))
+                }
+            }
+        }
     }
 
     private func addToPlaying(_ identifier: LibraryGameIdentifier) {
@@ -718,6 +738,28 @@ final class LibraryViewModel {
             return .success(try await operation())
         } catch {
             return .failure(error)
+        }
+    }
+
+    private func resolveSteamLinkErrorMessage(_ error: Error) -> String {
+        let libraryError = LibraryError.from(error: error)
+
+        switch libraryError {
+        case .server(let code, let message):
+            let normalizedMessage = message.lowercased()
+            if code == "CONFIGURATION_MISSING"
+                || normalizedMessage.contains("not configured")
+                || normalizedMessage.contains("configuration")
+                || message.contains("설정") {
+                return "현재 Steam 연동이 서버에 아직 설정되어 있지 않아요."
+            }
+            return "Steam 연동을 시작할 수 없어요. 잠시 후 다시 시도해주세요."
+        case .network:
+            return "Steam 서버와 통신하지 못했어요. 잠시 후 다시 시도해주세요."
+        case .invalidResponse:
+            return "Steam 연동을 시작할 수 없어요. 잠시 후 다시 시도해주세요."
+        default:
+            return libraryError.errorDescription ?? "Steam 연동을 시작할 수 없어요. 잠시 후 다시 시도해주세요."
         }
     }
 }

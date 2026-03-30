@@ -21,18 +21,17 @@ enum AppConfig {
         ) ?? firstGoogleURLScheme()
     )
     static let featureFlags = FeatureFlags.defaults(for: apiEnvironment)
-    static let authBaseURL: URL = {
-        let environment = AppEnvironmentResolver.current
-        let baseURL = environment.apiBaseURL
-        print("[AppConfig] APIEnvironment=\(environment.rawValue) authBaseURL=\(baseURL.absoluteString)")
-        return baseURL
-    }()
-    static let translationBaseURL: URL = {
-        let environment = AppEnvironmentResolver.current
-        let baseURL = environment.translationBaseURL
-        print("[AppConfig] APIEnvironment=\(environment.rawValue) translationBaseURL=\(baseURL.absoluteString)")
-        return baseURL
-    }()
+    static let coreBaseURL: URL = configuredURL(
+        infoPlistKey: "CoreBaseURL",
+        environmentKey: "CORE_BASE_URL",
+        fallback: apiEnvironment.apiBaseURL
+    )
+    static let authBaseURL: URL = coreBaseURL
+    static let translationBaseURL: URL = configuredURL(
+        infoPlistKey: "TranslationBaseURL",
+        environmentKey: "TRANSLATION_BASE_URL",
+        fallback: apiEnvironment.translationBaseURL
+    )
     static let googleClientID = oauthConfig.googleClientID
     static let googleReverseClientID = oauthConfig.googleReverseClientID
     static let termsOfServiceURL = configuredStaticURL(
@@ -67,6 +66,13 @@ enum AppConfig {
 #endif
     }()
 
+    static func logRuntimeConfiguration() {
+        print("[AppConfig] runtime=\(networkRuntimeDescription)")
+        print("[AppConfig] APIEnvironment=\(apiEnvironment.rawValue)")
+        print("[AppConfig] CoreBaseURL=\(coreBaseURL.absoluteString)")
+        print("[AppConfig] TranslationBaseURL=\(translationBaseURL.absoluteString)")
+    }
+
     // MARK: - Private
 
     private static func configuredString(
@@ -100,6 +106,24 @@ enum AppConfig {
         }
 
         return URL(string: defaultValue)!
+    }
+
+    private static func configuredURL(
+        infoPlistKey: String,
+        environmentKey: String,
+        fallback: URL
+    ) -> URL {
+        if let infoPlistValue = infoPlistString(for: infoPlistKey),
+           let url = URL(string: infoPlistValue) {
+            return url
+        }
+
+        if let environmentValue = sanitizedString(ProcessInfo.processInfo.environment[environmentKey]),
+           let url = URL(string: environmentValue) {
+            return url
+        }
+
+        return fallback
     }
 
     private static func infoPlistString(for key: String) -> String? {

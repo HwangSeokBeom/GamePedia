@@ -10,7 +10,6 @@ struct SteamLinkStatusDTO: Decodable {
     let steamId: String?
     let displayName: String?
     let profileUrl: String?
-    let connectUrl: String?
 }
 
 struct LibraryOverviewResponseDataDTO: Decodable {
@@ -66,4 +65,12 @@ struct LibraryStatusMutationResponseDataDTO: Decodable {
     let sourceId: String
     let gameId: Int?
     let status: String
+}
+
+struct SteamLinkStartResponseDataDTO: Decodable {
+    let steamLink: SteamLinkAuthDTO
+}
+
+struct SteamLinkAuthDTO: Decodable {
+    let authUrl: String?
 }

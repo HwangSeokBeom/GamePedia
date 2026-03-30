@@ -2,7 +2,7 @@ import Foundation
 
 enum LibraryRoute {
     case showGameDetail(Int)
-    case showSteamLink(URL?)
+    case showSteamLink(URL)
     case showRecentlyPlayed
     case showReviewed
 }

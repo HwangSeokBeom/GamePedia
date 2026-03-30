@@ -9,8 +9,7 @@ enum LibraryMapper {
             connectionState: dto.isLinked ? .linked : .notLinked,
             steamID: sanitized(dto.steamId),
             displayName: sanitized(dto.displayName),
-            profileURL: makeURL(from: dto.profileUrl),
-            connectURL: makeURL(from: dto.connectUrl)
+            profileURL: makeURL(from: dto.profileUrl)
         )
     }
 
@@ -60,6 +59,14 @@ enum LibraryMapper {
             ),
             status: status
         )
+    }
+
+    static func toSteamLinkURL(_ dto: SteamLinkStartResponseDataDTO) throws -> URL {
+        guard let authURL = makeURL(from: dto.steamLink.authUrl) else {
+            throw LibraryError.invalidResponse
+        }
+
+        return authURL
     }
 
     private static func resolvedSourceID(from dto: LibraryGameItemDTO, source: GameSource) -> String? {

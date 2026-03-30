@@ -8,7 +8,7 @@ enum APIEnvironment: String, CaseIterable {
     var apiBaseURL: URL {
         switch self {
         case .dev:
-            return URL(string: "http://localhost:3001")!
+            return URL(string: "http://127.0.0.1:3001")!
         case .staging:
             return URL(string: "https://staging-gamepedia-api.duckdns.org")!
         case .production:
@@ -19,7 +19,7 @@ enum APIEnvironment: String, CaseIterable {
     var translationBaseURL: URL {
         switch self {
         case .dev:
-            return URL(string: "http://localhost:3000")!
+            return URL(string: "http://127.0.0.1:3000")!
         case .staging:
             return URL(string: "https://staging-gamepedia-translate.duckdns.org")!
         case .production:

@@ -219,19 +219,8 @@ final class ProfileCoordinator: NSObject {
         UIApplication.shared.open(mailURL)
     }
 
-    private func showSteamLink(url: URL?, presenter: UIViewController?) {
+    private func showSteamLink(url: URL, presenter: UIViewController?) {
         guard let presenter else { return }
-
-        guard let url else {
-            let alertController = UIAlertController(
-                title: "Steam 연동",
-                message: "Steam 연동 주소를 아직 불러오지 못했어요. 잠시 후 다시 시도해주세요.",
-                preferredStyle: .alert
-            )
-            alertController.addAction(UIAlertAction(title: "확인", style: .default))
-            presenter.present(alertController, animated: true)
-            return
-        }
 
         let safariViewController = SFSafariViewController(url: url)
         safariViewController.preferredControlTintColor = .gpPrimary

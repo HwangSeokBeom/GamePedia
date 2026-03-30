@@ -3,6 +3,7 @@ import Foundation
 protocol LibraryRemoteDataSource {
     func fetchLibraryOverview(sort: UserGameCollectionSortOption?) async throws -> LibraryOverviewResponseDataDTO
     func fetchSteamLinkStatus() async throws -> SteamLinkStatusDTO
+    func startSteamLink() async throws -> SteamLinkStartResponseDataDTO
     func updateGameStatus(requestDTO: UpdateLibraryStatusRequestDTO) async throws -> LibraryStatusMutationResponseDataDTO
 }
 
@@ -26,6 +27,16 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
             .mySteamLinkStatus,
             as: LibraryResponseEnvelopeDTO<SteamLinkStatusDTO>.self
         )
+        return response.data
+    }
+
+    func startSteamLink() async throws -> SteamLinkStartResponseDataDTO {
+        print("[LibrarySteamLink] request endpoint=POST /users/me/library/steam/link")
+        let response = try await apiClient.request(
+            .startSteamLink,
+            as: LibraryResponseEnvelopeDTO<SteamLinkStartResponseDataDTO>.self
+        )
+        print("[LibrarySteamLink] response authUrl=\(response.data.steamLink.authUrl ?? "nil")")
         return response.data
     }
 

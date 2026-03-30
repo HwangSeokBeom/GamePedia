@@ -54,6 +54,19 @@ extension Endpoint {
         )
     }
 
+    static func post(
+        _ path: String,
+        userAuth: Bool = true
+    ) -> Endpoint {
+        Endpoint(
+            path: path,
+            method: .POST,
+            queryItems: [],
+            body: .none,
+            requiresUserAuth: userAuth
+        )
+    }
+
     static func delete(
         _ path: String,
         query: [URLQueryItem] = [],
@@ -198,6 +211,10 @@ extension Endpoint {
 
     static var mySteamLinkStatus: Endpoint {
         .get("/users/me/steam", userAuth: true)
+    }
+
+    static var startSteamLink: Endpoint {
+        .post("/users/me/library/steam/link", userAuth: true)
     }
 
     static func updateLibraryStatus(body: UpdateLibraryStatusRequestDTO) -> Endpoint {
