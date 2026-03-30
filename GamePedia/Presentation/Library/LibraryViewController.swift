@@ -23,6 +23,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        print("[Library] viewDidLoad")
         setupCollectionView()
         setupBindings()
         bindViewModel()
@@ -31,6 +32,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        print("[Library] viewWillAppear")
         navigationController?.setNavigationBarHidden(false, animated: false)
     }
 
@@ -115,8 +117,13 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
                 ) as! LibraryInfoCell
                 cell.configure(with: viewState)
                 cell.onButtonTapped = { [weak self] in
-                    guard viewState.buttonTitle != nil else { return }
-                    self?.viewModel.send(.didTapSteamLink)
+                    guard let action = viewState.action else { return }
+                    switch action {
+                    case .connectSteam:
+                        self?.viewModel.send(.connectSteamButtonTapped)
+                    case .retrySteamSync:
+                        self?.viewModel.send(.retrySteamSyncTapped)
+                    }
                 }
                 return cell
             }
@@ -226,6 +233,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
 
     @objc
     private func didPullToRefresh() {
+        print("[Library] pullToRefresh")
         viewModel.send(.pullToRefresh)
     }
 

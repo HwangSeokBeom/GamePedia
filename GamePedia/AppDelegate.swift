@@ -37,7 +37,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey: Any] = [:]
     ) -> Bool {
-        GIDSignIn.sharedInstance.handle(url)
+        if GIDSignIn.sharedInstance.handle(url) {
+            return true
+        }
+
+        for connectedScene in UIApplication.shared.connectedScenes {
+            guard let sceneDelegate = connectedScene.delegate as? SceneDelegate else { continue }
+            if sceneDelegate.handleIncomingURL(url) {
+                return true
+            }
+        }
+
+        return false
     }
 
 

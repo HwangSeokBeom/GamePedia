@@ -13,16 +13,22 @@ struct SteamLinkStatusDTO: Decodable {
 }
 
 struct LibraryOverviewResponseDataDTO: Decodable {
+    let steamConnected: Bool?
+    let steamSyncAvailable: Bool?
+    let steamSyncErrorCode: String?
     let steamLinkStatus: SteamLinkStatusDTO?
     let recentlyPlayed: [LibraryGameItemDTO]?
     let playing: [LibraryGameItemDTO]?
+    let liked: [LibraryGameItemDTO]?
     let wishlist: [LibraryGameItemDTO]?
+    let reviews: [LibraryReviewedGameItemDTO]?
     let reviewed: [LibraryReviewedGameItemDTO]?
 }
 
 struct LibraryGameItemDTO: Decodable {
     let source: String?
     let sourceId: String?
+    let externalGameId: String?
     let gameId: Int?
     let title: String?
     let name: String?
@@ -55,16 +61,38 @@ struct LibraryReviewedGameItemDTO: Decodable {
 }
 
 struct UpdateLibraryStatusRequestDTO: Encodable {
-    let source: String
-    let sourceId: String
+    let gameSource: String
+    let externalGameId: String
+    let title: String
+    let coverUrl: String?
     let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case gameSource = "source"
+        case externalGameId
+        case title
+        case coverUrl
+        case status
+    }
+}
+
+struct LibraryStatusMutationResponseEnvelopeDataDTO: Decodable {
+    let libraryEntry: LibraryStatusMutationResponseDataDTO
 }
 
 struct LibraryStatusMutationResponseDataDTO: Decodable {
     let source: String?
-    let sourceId: String
+    let gameSource: String?
+    let externalGameId: String?
     let gameId: Int?
+    let title: String?
+    let gameName: String?
+    let coverUrl: String?
     let status: String
+    let startedAt: String?
+    let completedAt: String?
+    let lastPlayedAt: String?
+    let playtimeMinutes: Int?
 }
 
 struct SteamLinkStartResponseDataDTO: Decodable {

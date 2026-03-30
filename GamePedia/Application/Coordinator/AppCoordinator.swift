@@ -70,7 +70,9 @@ final class AppCoordinator {
     private weak var mainTabBarController: MainTabBarController?
     private var modalAuthCoordinator: AuthCoordinator?
     private var pendingResetPasswordToken: String?
+    private var pendingSteamLinkCallbackURL: URL?
     private var cancellables = Set<AnyCancellable>()
+    private let steamLinkFlowController = SteamLinkFlowController()
 
     private lazy var authRemoteDataSource = AuthRemoteDataSource(tokenStore: tokenStore)
     private lazy var authRepository: any AuthRepository = DefaultAuthRepository(
@@ -106,16 +108,27 @@ final class AppCoordinator {
         showSplash()
     }
 
-    func handleIncomingURL(_ url: URL) {
-        guard let resetPasswordToken = resetPasswordToken(from: url) else { return }
+    @discardableResult
+    func handleIncomingURL(_ url: URL) -> Bool {
+        if SteamLinkCallbackParser.isSteamCallbackURL(url) {
+            if window.rootViewController is SplashViewController {
+                pendingSteamLinkCallbackURL = url
+            } else {
+                _ = steamLinkFlowController.handleIncomingURL(url)
+            }
+            return true
+        }
+
+        guard let resetPasswordToken = resetPasswordToken(from: url) else { return false }
         print("[PasswordReset] deepLinkReceived tokenLength=\(resetPasswordToken.count)")
 
         if window.rootViewController is SplashViewController {
             pendingResetPasswordToken = resetPasswordToken
-            return
+            return true
         }
 
         presentResetPasswordFlow(token: resetPasswordToken)
+        return true
     }
 
     private func showSplash() {
@@ -185,12 +198,20 @@ final class AppCoordinator {
                 self?.presentResetPasswordFlow(token: pendingResetPasswordToken)
             }
         }
+
+        if let pendingSteamLinkCallbackURL {
+            self.pendingSteamLinkCallbackURL = nil
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                _ = self.steamLinkFlowController.handleIncomingURL(pendingSteamLinkCallbackURL)
+            }
+        }
     }
 
     private func makeMainTabBarController(selectedIndex: Int) -> MainTabBarController {
         let homeCoord    = HomeCoordinator()
         let searchCoord  = SearchCoordinator()
-        let libraryCoord = LibraryCoordinator()
+        let libraryCoord = LibraryCoordinator(steamLinkFlowController: steamLinkFlowController)
         let profileCoord = ProfileCoordinator(
             fetchCurrentUserUseCase: fetchCurrentUserUseCase,
             updateCurrentUserProfileUseCase: updateCurrentUserProfileUseCase,
@@ -198,7 +219,8 @@ final class AppCoordinator {
             removeCurrentUserProfileImageUseCase: removeCurrentUserProfileImageUseCase,
             logoutUseCase: logoutUseCase,
             deleteAccountUseCase: deleteAccountUseCase,
-            userSessionStore: userSessionStore
+            userSessionStore: userSessionStore,
+            steamLinkFlowController: steamLinkFlowController
         )
         let authenticationHandler: (UIViewController, RestrictedActionContext, @escaping () -> Void) -> Void = {
             [weak self] presenter, context, completion in

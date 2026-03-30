@@ -30,6 +30,15 @@ final class LibraryInfoCell: UICollectionViewCell {
         return label
     }()
 
+    private let detailLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 13, weight: .medium)
+        label.textColor = .gpTextTertiary
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
     private let actionButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
         configuration.baseBackgroundColor = .gpPrimary
@@ -60,6 +69,8 @@ final class LibraryInfoCell: UICollectionViewCell {
         super.prepareForReuse()
         titleLabel.text = nil
         messageLabel.text = nil
+        detailLabel.text = nil
+        detailLabel.isHidden = true
         actionButton.isHidden = true
         onButtonTapped = nil
     }
@@ -68,6 +79,8 @@ final class LibraryInfoCell: UICollectionViewCell {
         titleLabel.text = viewState.title
         titleLabel.isHidden = viewState.title == nil
         messageLabel.text = viewState.message
+        detailLabel.text = viewState.detailText
+        detailLabel.isHidden = viewState.detailText == nil
 
         var buttonConfiguration = actionButton.configuration
         buttonConfiguration?.title = viewState.buttonTitle
@@ -94,7 +107,7 @@ final class LibraryInfoCell: UICollectionViewCell {
         contentView.layer.cornerRadius = 16
         contentView.layer.masksToBounds = true
 
-        let textStack = UIStackView(arrangedSubviews: [titleLabel, messageLabel])
+        let textStack = UIStackView(arrangedSubviews: [titleLabel, messageLabel, detailLabel])
         textStack.axis = .vertical
         textStack.spacing = 6
         textStack.translatesAutoresizingMaskIntoConstraints = false

@@ -4,6 +4,8 @@ enum LibraryIntent {
     case viewDidLoad
     case pullToRefresh
     case didSelectSort(Int)
+    case connectSteamButtonTapped
+    case retrySteamSyncTapped
     case didTapSteamLink
     case didTapRecentlyPlayedGame(LibraryGameIdentifier)
     case didTapAddToPlaying(gameID: LibraryGameIdentifier, source: GameSource)

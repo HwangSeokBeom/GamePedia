@@ -57,6 +57,7 @@ final class APIClient {
     func request<T: Decodable>(_ endpoint: Endpoint, as type: T.Type) async throws -> T {
         let urlRequest = try await buildRequest(from: endpoint)
         let isGameRequest = endpoint.path.hasPrefix("/games")
+        let isLibraryStatusRequest = endpoint.path == "/users/me/library/status"
         if isGameRequest {
             print("[GameAPI] request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil")")
         }
@@ -67,6 +68,10 @@ final class APIClient {
         let (data, response) = try await session.data(for: urlRequest)
         if isGameRequest, let httpResponse = response as? HTTPURLResponse {
             print("[GameAPI] response status=\(httpResponse.statusCode) url=\(urlRequest.url?.absoluteString ?? "nil")")
+        }
+        if isLibraryStatusRequest, let httpResponse = response as? HTTPURLResponse {
+            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            print("[Library] rawResponse endpoint=/users/me/library/status status=\(httpResponse.statusCode) body=\(responseBody)")
         }
         if endpoint.path.contains("/reviews"), let httpResponse = response as? HTTPURLResponse {
             let responseBody = String(data: data, encoding: .utf8) ?? ""
@@ -83,6 +88,10 @@ final class APIClient {
             if isGameRequest {
                 let responseBody = String(data: data, encoding: .utf8) ?? ""
                 print("[GameAPI] decodeFailure type=\(String(describing: type)) error=\(error.localizedDescription) body=\(responseBody)")
+            }
+            if isLibraryStatusRequest {
+                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                print("[Library] decodeFailure endpoint=/users/me/library/status type=\(String(describing: type)) error=\(error) body=\(responseBody)")
             }
             throw error
         }

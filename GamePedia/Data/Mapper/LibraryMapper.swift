@@ -18,6 +18,13 @@ enum LibraryMapper {
         let canonicalGameID = dto.gameId
         let resolvedSourceID = resolvedSourceID(from: dto, source: source)
         guard let resolvedSourceID else {
+            print(
+                "[Library] invalidGameIdentifier " +
+                "source=\(dto.source ?? "nil") " +
+                "sourceId=\(dto.sourceId ?? "nil") " +
+                "gameId=\(dto.gameId.map(String.init) ?? "nil") " +
+                "title=\(dto.title ?? dto.name ?? "nil")"
+            )
             throw LibraryError.invalidGameIdentifier
         }
 
@@ -51,10 +58,14 @@ enum LibraryMapper {
             throw LibraryError.invalidStatus
         }
 
+        guard let sourceID = sanitized(dto.externalGameId) ?? dto.gameId.map(String.init) else {
+            throw LibraryError.invalidGameIdentifier
+        }
+
         return LibraryGameStatusMutationResult(
             identifier: LibraryGameIdentifier(
-                source: resolvedSource(from: dto.source),
-                sourceID: dto.sourceId,
+                source: resolvedSource(from: dto.source ?? dto.gameSource),
+                sourceID: sourceID,
                 canonicalGameID: dto.gameId
             ),
             status: status
@@ -72,6 +83,10 @@ enum LibraryMapper {
     private static func resolvedSourceID(from dto: LibraryGameItemDTO, source: GameSource) -> String? {
         if let sourceId = sanitized(dto.sourceId) {
             return sourceId
+        }
+
+        if let externalGameId = sanitized(dto.externalGameId) {
+            return externalGameId
         }
 
         if let gameId = dto.gameId {

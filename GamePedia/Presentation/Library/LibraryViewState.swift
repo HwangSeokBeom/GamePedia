@@ -67,6 +67,7 @@ struct LibraryRecentGameCardViewState: Hashable {
     let coverImageURL: URL?
     let badgeText: String
     let actionTitle: String?
+    let isActionEnabled: Bool
 }
 
 struct LibraryGameRowViewState: Hashable {
@@ -88,11 +89,18 @@ struct LibraryMessageViewState: Hashable {
     let style: LibraryMessageStyle
     let title: String?
     let message: String
+    let detailText: String?
     let buttonTitle: String?
+    let action: LibraryMessageAction?
 }
 
 enum LibraryMessageStyle: Hashable {
     case banner
     case empty
     case error
+}
+
+enum LibraryMessageAction: Hashable {
+    case connectSteam
+    case retrySteamSync
 }

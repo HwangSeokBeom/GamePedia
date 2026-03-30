@@ -15,11 +15,24 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
     }
 
     func fetchLibraryOverview(sort: UserGameCollectionSortOption?) async throws -> LibraryOverviewResponseDataDTO {
+        print("[Library] request endpoint=GET /users/me/library sort=\(sort?.rawValue ?? "nil")")
         let response = try await apiClient.request(
             .myLibrary(sort: sort?.rawValue),
             as: LibraryResponseEnvelopeDTO<LibraryOverviewResponseDataDTO>.self
         )
-        return response.data
+        let data = response.data
+        let likedCount = data.liked?.count ?? data.wishlist?.count ?? 0
+        let reviewsCount = data.reviews?.count ?? data.reviewed?.count ?? 0
+        print(
+            "[Library] response endpoint=GET /users/me/library " +
+            "steamConnected=\(data.steamConnected.map(String.init) ?? "nil") " +
+            "steamSyncAvailable=\(data.steamSyncAvailable.map(String.init) ?? "nil") " +
+            "recentlyPlayedCount=\(data.recentlyPlayed?.count ?? 0) " +
+            "playingCount=\(data.playing?.count ?? 0) " +
+            "likedCount=\(likedCount) " +
+            "reviewsCount=\(reviewsCount)"
+        )
+        return data
     }
 
     func fetchSteamLinkStatus() async throws -> SteamLinkStatusDTO {
@@ -31,20 +44,32 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
     }
 
     func startSteamLink() async throws -> SteamLinkStartResponseDataDTO {
-        print("[LibrarySteamLink] request endpoint=POST /users/me/library/steam/link")
+        print("[SteamLink] request endpoint=POST /users/me/library/steam/link")
         let response = try await apiClient.request(
             .startSteamLink,
             as: LibraryResponseEnvelopeDTO<SteamLinkStartResponseDataDTO>.self
         )
-        print("[LibrarySteamLink] response authUrl=\(response.data.steamLink.authUrl ?? "nil")")
+        print("[SteamLink] response authUrl=\(response.data.steamLink.authUrl ?? "nil")")
         return response.data
     }
 
     func updateGameStatus(requestDTO: UpdateLibraryStatusRequestDTO) async throws -> LibraryStatusMutationResponseDataDTO {
+        print(
+            "[Library] request endpoint=POST /users/me/library/status " +
+            "externalGameId=\(requestDTO.externalGameId) " +
+            "title=\(requestDTO.title) " +
+            "gameSource=\(requestDTO.gameSource.uppercased()) " +
+            "status=\(requestDTO.status)"
+        )
         let response = try await apiClient.request(
             .updateLibraryStatus(body: requestDTO),
-            as: LibraryResponseEnvelopeDTO<LibraryStatusMutationResponseDataDTO>.self
+            as: LibraryResponseEnvelopeDTO<LibraryStatusMutationResponseEnvelopeDataDTO>.self
         )
-        return response.data
+        print(
+            "[Library] response endpoint=POST /users/me/library/status " +
+            "externalGameId=\(response.data.libraryEntry.externalGameId ?? "nil") " +
+            "status=\(response.data.libraryEntry.status)"
+        )
+        return response.data.libraryEntry
     }
 }

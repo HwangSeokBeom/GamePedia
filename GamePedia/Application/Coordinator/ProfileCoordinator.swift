@@ -15,6 +15,7 @@ final class ProfileCoordinator: NSObject {
     private let logoutUseCase: LogoutUseCase
     private let deleteAccountUseCase: DeleteAccountUseCase
     private let userSessionStore: any UserSessionStore
+    private let steamLinkFlowController: any SteamLinkFlowControlling
     var onAuthenticationRequested: ((UIViewController, RestrictedActionContext, @escaping () -> Void) -> Void)?
 
     var onLoggedOut: (() -> Void)?
@@ -28,7 +29,8 @@ final class ProfileCoordinator: NSObject {
         removeCurrentUserProfileImageUseCase: RemoveCurrentUserProfileImageUseCase,
         logoutUseCase: LogoutUseCase,
         deleteAccountUseCase: DeleteAccountUseCase,
-        userSessionStore: any UserSessionStore
+        userSessionStore: any UserSessionStore,
+        steamLinkFlowController: any SteamLinkFlowControlling
     ) {
         self.fetchCurrentUserUseCase = fetchCurrentUserUseCase
         self.updateCurrentUserProfileUseCase = updateCurrentUserProfileUseCase
@@ -37,6 +39,7 @@ final class ProfileCoordinator: NSObject {
         self.logoutUseCase = logoutUseCase
         self.deleteAccountUseCase = deleteAccountUseCase
         self.userSessionStore = userSessionStore
+        self.steamLinkFlowController = steamLinkFlowController
         navigationController = UINavigationController()
         navigationController.tabBarItem = UITabBarItem(
             title: "프로필",
@@ -221,9 +224,6 @@ final class ProfileCoordinator: NSObject {
 
     private func showSteamLink(url: URL, presenter: UIViewController?) {
         guard let presenter else { return }
-
-        let safariViewController = SFSafariViewController(url: url)
-        safariViewController.preferredControlTintColor = .gpPrimary
-        presenter.present(safariViewController, animated: true)
+        steamLinkFlowController.start(url: url, presenter: presenter)
     }
 }

@@ -10,16 +10,37 @@ final class DefaultLibraryRepository: LibraryRepository {
     func fetchLibraryOverview(sort: UserGameCollectionSortOption?) async throws -> LibraryOverview {
         do {
             let data = try await libraryRemoteDataSource.fetchLibraryOverview(sort: sort)
-            let steamLinkStatus = try await resolveSteamLinkStatus(from: data.steamLinkStatus)
+            print(
+                "[Library] mapping overview " +
+                "steamConnected=\(data.steamConnected.map(String.init) ?? "nil") " +
+                "steamSyncAvailable=\(data.steamSyncAvailable.map(String.init) ?? "nil") " +
+                "recentlyPlayedCount=\(data.recentlyPlayed?.count ?? 0) " +
+                "playingCount=\(data.playing?.count ?? 0)"
+            )
+            let steamLinkStatus = try await resolveSteamLinkStatus(
+                from: data.steamLinkStatus,
+                isConnected: data.steamConnected
+            )
             let recentlyPlayed = try (data.recentlyPlayed ?? []).map(LibraryMapper.toGameSummary)
             let playing = try (data.playing ?? []).map(LibraryMapper.toGameSummary)
 
-            return LibraryOverview(
+            let overview = LibraryOverview(
                 steamLinkStatus: steamLinkStatus,
+                isSteamSyncAvailable: data.steamSyncAvailable ?? true,
+                steamSyncErrorCode: sanitized(data.steamSyncErrorCode),
                 recentlyPlayed: recentlyPlayed,
                 playing: playing
             )
+            print(
+                "[Library] mapped overview " +
+                "recentlyPlayedCount=\(overview.recentlyPlayed.count) " +
+                "playingCount=\(overview.playing.count) " +
+                "isSteamConnected=\(overview.steamLinkStatus.isLinked) " +
+                "isSteamSyncAvailable=\(overview.isSteamSyncAvailable)"
+            )
+            return overview
         } catch {
+            print("[Library] mapping overview failed error=\(error.localizedDescription)")
             throw LibraryError.from(error: error)
         }
     }
@@ -33,13 +54,15 @@ final class DefaultLibraryRepository: LibraryRepository {
         }
     }
 
-    func updateGameStatus(identifier: LibraryGameIdentifier, status: UserGameStatus) async throws -> LibraryGameStatusMutationResult {
+    func updateGameStatus(request: LibraryGameStatusUpdateRequest) async throws -> LibraryGameStatusMutationResult {
         do {
             let data = try await libraryRemoteDataSource.updateGameStatus(
                 requestDTO: UpdateLibraryStatusRequestDTO(
-                    source: identifier.source.rawValue,
-                    sourceId: identifier.sourceID,
-                    status: status.rawValue
+                    gameSource: request.gameSource.rawValue,
+                    externalGameId: request.externalGameId,
+                    title: request.title,
+                    coverUrl: request.coverImageURL?.absoluteString,
+                    status: request.status.rawValue
                 )
             )
             return try LibraryMapper.toStatusMutationResult(data)
@@ -48,9 +71,18 @@ final class DefaultLibraryRepository: LibraryRepository {
         }
     }
 
-    private func resolveSteamLinkStatus(from dto: SteamLinkStatusDTO?) async throws -> SteamLinkStatus {
+    private func resolveSteamLinkStatus(from dto: SteamLinkStatusDTO?, isConnected: Bool?) async throws -> SteamLinkStatus {
         if let dto {
             return LibraryMapper.toSteamLinkStatus(dto)
+        }
+
+        if let isConnected {
+            return SteamLinkStatus(
+                connectionState: isConnected ? .linked : .notLinked,
+                steamID: nil,
+                displayName: nil,
+                profileURL: nil
+            )
         }
 
         do {
@@ -69,5 +101,11 @@ final class DefaultLibraryRepository: LibraryRepository {
         } catch {
             throw error
         }
+    }
+
+    private func sanitized(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedValue.isEmpty ? nil : trimmedValue
     }
 }

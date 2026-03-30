@@ -92,8 +92,25 @@ struct LibraryGameSummary: Hashable {
 
 struct LibraryOverview: Hashable {
     let steamLinkStatus: SteamLinkStatus
+    let isSteamSyncAvailable: Bool
+    let steamSyncErrorCode: String?
     let recentlyPlayed: [LibraryGameSummary]
     let playing: [LibraryGameSummary]
+}
+
+struct LibraryGameStatusUpdateRequest: Hashable {
+    let identifier: LibraryGameIdentifier
+    let title: String
+    let coverImageURL: URL?
+    let status: UserGameStatus
+
+    var externalGameId: String {
+        identifier.sourceID
+    }
+
+    var gameSource: GameSource {
+        identifier.source
+    }
 }
 
 struct LibraryGameStatusMutationResult: Hashable {
@@ -128,6 +145,8 @@ enum LibraryError: Error, LocalizedError, Equatable {
                 case "UNAUTHORIZED":
                     return .unauthorized
                 case "INVALID_GAME_ID", "INVALID_SOURCE_ID":
+                    return .invalidGameIdentifier
+                case "INVALID_EXTERNAL_GAME_ID", "INVALID_GAME_TITLE":
                     return .invalidGameIdentifier
                 case "INVALID_STATUS":
                     return .invalidStatus

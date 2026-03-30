@@ -3,7 +3,7 @@ import Foundation
 struct UpdateLibraryGameStatusUseCase {
     let libraryRepository: any LibraryRepository
 
-    func execute(identifier: LibraryGameIdentifier, status: UserGameStatus) async throws -> LibraryGameStatusMutationResult {
-        try await libraryRepository.updateGameStatus(identifier: identifier, status: status)
+    func execute(request: LibraryGameStatusUpdateRequest) async throws -> LibraryGameStatusMutationResult {
+        try await libraryRepository.updateGameStatus(request: request)
     }
 }

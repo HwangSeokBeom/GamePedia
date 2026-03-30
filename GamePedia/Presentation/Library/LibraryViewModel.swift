@@ -5,6 +5,15 @@ final class LibraryViewModel {
     private enum LoadTrigger {
         case initial
         case refresh
+
+        var logName: String {
+            switch self {
+            case .initial:
+                return "initial"
+            case .refresh:
+                return "refresh"
+            }
+        }
     }
 
     private(set) var state: LibraryState {
@@ -23,6 +32,9 @@ final class LibraryViewModel {
     private let translateTextUseCase: TranslateTextUseCase
     private var cancellables = Set<AnyCancellable>()
     private var loadTask: Task<Void, Never>?
+    private var fetchSequence = 0
+    private var isRefreshingSteamLinkStatus = false
+    private var needsSteamLinkStatusRefresh = false
 
     init(
         fetchLibraryOverviewUseCase: FetchLibraryOverviewUseCase = FetchLibraryOverviewUseCase(
@@ -69,7 +81,10 @@ final class LibraryViewModel {
     func send(_ intent: LibraryIntent) {
         switch intent {
         case .viewDidLoad:
-            guard state.sections.isEmpty else { return }
+            guard state.sections.isEmpty else {
+                print("[Library] viewDidLoad ignored reason=sectionsAlreadyLoaded")
+                return
+            }
             loadLibrary(trigger: .initial)
 
         case .pullToRefresh:
@@ -79,6 +94,12 @@ final class LibraryViewModel {
             let selectedSort: LibrarySortOption = index == 1 ? .oldest : .latest
             guard selectedSort != state.selectedSort else { return }
             apply(.setSort(selectedSort))
+            loadLibrary(trigger: .refresh)
+
+        case .connectSteamButtonTapped:
+            startSteamLink()
+
+        case .retrySteamSyncTapped:
             loadLibrary(trigger: .refresh)
 
         case .didTapSteamLink:
@@ -118,7 +139,10 @@ final class LibraryViewModel {
     }
 
     private func loadLibrary(trigger: LoadTrigger) {
-        guard !state.isLoading && !state.isRefreshing else { return }
+        guard !state.isLoading && !state.isRefreshing else {
+            print("[Library] fetchSkipped trigger=\(trigger.logName) reason=requestInFlight")
+            return
+        }
 
         loadTask?.cancel()
         apply(.clearError)
@@ -131,6 +155,14 @@ final class LibraryViewModel {
         }
 
         let selectedSort = state.selectedSort
+        fetchSequence += 1
+        let fetchID = fetchSequence
+        print("[Library] fetchStarted id=\(fetchID) trigger=\(trigger.logName) sort=\(selectedSort)")
+        let previousSteamState = (
+            isConnected: state.isSteamConnected,
+            isSyncAvailable: state.isSteamSyncAvailable,
+            errorCode: state.steamSyncErrorCode
+        )
         loadTask = Task { [weak self] in
             guard let self else { return }
 
@@ -156,6 +188,13 @@ final class LibraryViewModel {
 
             if Task.isCancelled { return }
 
+            self.logResponseSummary(
+                id: fetchID,
+                overviewResult: translatedOverview,
+                wishlistResult: translatedWishlist,
+                reviewedResult: translatedReviewed
+            )
+
             let sections = self.makeSections(
                 overviewResult: translatedOverview,
                 wishlistResult: translatedWishlist,
@@ -166,15 +205,55 @@ final class LibraryViewModel {
                 wishlistResult: translatedWishlist,
                 reviewedResult: translatedReviewed
             )
+            let steamState = self.resolveSteamState(
+                from: translatedOverview,
+                fallback: previousSteamState
+            )
+            let libraryItems = self.resolveLibraryItems(
+                overviewResult: translatedOverview,
+                wishlistResult: translatedWishlist,
+                reviewedResult: translatedReviewed
+            )
+            self.logMappedState(
+                id: fetchID,
+                libraryItems: libraryItems,
+                steamState: steamState
+            )
 
             await MainActor.run {
+                self.apply(
+                    .setSteamState(
+                        isConnected: steamState.isConnected,
+                        isSyncAvailable: steamState.isSyncAvailable,
+                        errorCode: steamState.errorCode
+                    )
+                )
+                self.apply(
+                    .setLibraryItems(
+                        recentlyPlayed: libraryItems.recentlyPlayed,
+                        playingGames: libraryItems.playingGames,
+                        likedGames: libraryItems.likedGames,
+                        reviews: libraryItems.reviews
+                    )
+                )
                 self.apply(.setSections(sections))
+                self.apply(.clearAddingToPlaying)
                 self.apply(.setLoading(false))
                 self.apply(.setRefreshing(false))
                 if let errorMessage {
                     self.apply(.setError(errorMessage))
                 } else {
                     self.apply(.clearError)
+                }
+
+                if self.isRefreshingSteamLinkStatus {
+                    print("[SteamLink] statusRefreshCompleted")
+                    self.isRefreshingSteamLinkStatus = false
+                }
+
+                if self.needsSteamLinkStatusRefresh {
+                    self.needsSteamLinkStatusRefresh = false
+                    self.refreshSteamLinkStatus()
                 }
             }
         }
@@ -187,7 +266,7 @@ final class LibraryViewModel {
 
     private func startSteamLink() {
         apply(.clearError)
-        print("[LibrarySteamLink] action=didTapSteamLink")
+        print("[SteamLink] action=didTapSteamLink")
 
         Task {
             do {
@@ -206,17 +285,50 @@ final class LibraryViewModel {
     }
 
     private func addToPlaying(_ identifier: LibraryGameIdentifier) {
-        guard !state.isLoading else { return }
+        guard !state.addingToPlayingIdentifiers.contains(identifier) else {
+            print("[Library] addToPlaying skipped reason=requestInFlight identifier=\(identifier.uniqueKey)")
+            return
+        }
+
+        guard let summary = state.recentlyPlayed.first(where: { $0.identifier == identifier }) else {
+            print("[Library] addToPlaying invalidItem reason=missingSummary identifier=\(identifier.uniqueKey)")
+            apply(.clearError)
+            apply(.setError("게임 정보를 확인하지 못해 플레이 중 상태로 추가할 수 없어요."))
+            return
+        }
+
+        guard let request = makeAddToPlayingRequest(from: summary) else {
+            print(
+                "[Library] addToPlaying invalidItem " +
+                "identifier=\(summary.identifier.uniqueKey) " +
+                "externalGameId=\(summary.identifier.sourceID) " +
+                "title=\(summary.title)"
+            )
+            apply(.clearError)
+            apply(.setError("게임 정보를 확인하지 못해 플레이 중 상태로 추가할 수 없어요."))
+            return
+        }
+
+        apply(.clearError)
+        apply(.setAddingToPlaying(identifier, isUpdating: true))
+        print(
+            "[Library] addToPlaying prepared " +
+            "externalGameId=\(request.externalGameId) " +
+            "title=\(request.title) " +
+            "gameSource=\(request.gameSource.rawValue.uppercased()) " +
+            "status=\(request.status.rawValue)"
+        )
 
         Task {
             do {
-                _ = try await updateLibraryGameStatusUseCase.execute(identifier: identifier, status: .playing)
+                _ = try await updateLibraryGameStatusUseCase.execute(request: request)
                 await MainActor.run {
                     self.loadLibrary(trigger: .refresh)
                 }
             } catch {
                 let libraryError = LibraryError.from(error: error)
                 await MainActor.run {
+                    self.apply(.setAddingToPlaying(identifier, isUpdating: false))
                     self.apply(.setError(libraryError.errorDescription ?? "플레이 중 상태를 저장하지 못했습니다."))
                 }
             }
@@ -256,6 +368,7 @@ final class LibraryViewModel {
         NotificationCenter.default.publisher(for: .favoriteDidChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
+                print("[Library] refreshTriggered source=favoriteDidChange")
                 self?.loadLibrary(trigger: .refresh)
             }
             .store(in: &cancellables)
@@ -263,7 +376,20 @@ final class LibraryViewModel {
         NotificationCenter.default.publisher(for: .reviewDidChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
+                print("[Library] refreshTriggered source=reviewDidChange")
                 self?.loadLibrary(trigger: .refresh)
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .steamLinkDidComplete)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let result = notification.userInfo?[SteamLinkChangeUserInfoKey.result] as? SteamLinkCallbackResult else {
+                    return
+                }
+                print("[Library] refreshTriggered source=steamLinkDidComplete")
+                self.handleSteamLinkCallbackResult(result)
             }
             .store(in: &cancellables)
     }
@@ -284,6 +410,8 @@ final class LibraryViewModel {
             return .success(
                 LibraryOverview(
                     steamLinkStatus: overview.steamLinkStatus,
+                    isSteamSyncAvailable: overview.isSteamSyncAvailable,
+                    steamSyncErrorCode: overview.steamSyncErrorCode,
                     recentlyPlayed: translatedRecentlyPlayed,
                     playing: translatedPlaying
                 )
@@ -348,11 +476,34 @@ final class LibraryViewModel {
                     items: [
                         .message(
                             LibraryMessageViewState(
-                                id: "recentlyPlayed.banner",
+                                id: "recentlyPlayed.connect",
                                 style: .banner,
-                                title: nil,
-                                message: "Steam 계정을 연결하면 최근 플레이한 게임을 자동으로 불러올 수 있어요.",
-                                buttonTitle: "Steam 연동하기"
+                                title: "Steam 계정을 연결하세요",
+                                message: "Steam 계정을 연결하면 최근 플레이한 게임을 불러올 수 있어요.",
+                                detailText: nil,
+                                buttonTitle: "Steam 계정 연동하기",
+                                action: .connectSteam
+                            )
+                        )
+                    ],
+                    showsSeeAll: false
+                )
+            }
+
+            if !overview.isSteamSyncAvailable {
+                return LibrarySectionViewState(
+                    kind: .recentlyPlayed,
+                    layoutStyle: .message,
+                    items: [
+                        .message(
+                            LibraryMessageViewState(
+                                id: "recentlyPlayed.unavailable",
+                                style: .error,
+                                title: "Steam 정보를 불러올 수 없어요",
+                                message: "현재 Steam 데이터를 동기화할 수 없는 상태예요. 잠시 후 다시 시도해주세요.",
+                                detailText: overview.steamSyncErrorCode.map { "오류 코드: \($0)" },
+                                buttonTitle: "다시 시도",
+                                action: .retrySteamSync
                             )
                         )
                     ],
@@ -371,7 +522,9 @@ final class LibraryViewModel {
                                 style: .empty,
                                 title: nil,
                                 message: "최근 플레이한 Steam 게임이 아직 없어요.",
-                                buttonTitle: nil
+                                detailText: nil,
+                                buttonTitle: nil,
+                                action: nil
                             )
                         )
                     ],
@@ -380,7 +533,8 @@ final class LibraryViewModel {
             }
 
             let items = overview.recentlyPlayed.map { summary in
-                LibraryCollectionItem.recentCard(
+                let isAddingToPlaying = state.addingToPlayingIdentifiers.contains(summary.identifier)
+                return LibraryCollectionItem.recentCard(
                     LibraryRecentGameCardViewState(
                         identifier: summary.identifier,
                         title: summary.displayTitle,
@@ -388,7 +542,10 @@ final class LibraryViewModel {
                         ratingText: summary.rating.map { String(format: "%.1f", $0) },
                         coverImageURL: summary.coverImageURL,
                         badgeText: "Steam",
-                        actionTitle: playingIdentifiers.contains(summary.identifier) ? nil : "플레이 중으로 추가"
+                        actionTitle: playingIdentifiers.contains(summary.identifier)
+                            ? nil
+                            : (isAddingToPlaying ? "추가 중..." : "플레이 중으로 추가"),
+                        isActionEnabled: !isAddingToPlaying
                     )
                 )
             }
@@ -411,7 +568,9 @@ final class LibraryViewModel {
                             style: .error,
                             title: nil,
                             message: "최근 플레이 정보를 불러오지 못했어요.",
-                            buttonTitle: nil
+                            detailText: nil,
+                            buttonTitle: nil,
+                            action: nil
                         )
                     )
                 ],
@@ -434,7 +593,9 @@ final class LibraryViewModel {
                                 style: .empty,
                                 title: nil,
                                 message: "플레이 중인 게임이 아직 없어요.",
-                                buttonTitle: nil
+                                detailText: nil,
+                                buttonTitle: nil,
+                                action: nil
                             )
                         )
                     ],
@@ -474,7 +635,9 @@ final class LibraryViewModel {
                             style: .error,
                             title: nil,
                             message: "플레이 중 목록을 불러오지 못했어요.",
-                            buttonTitle: nil
+                            detailText: nil,
+                            buttonTitle: nil,
+                            action: nil
                         )
                     )
                 ],
@@ -497,7 +660,9 @@ final class LibraryViewModel {
                                 style: .empty,
                                 title: nil,
                                 message: "찜한 게임이 아직 없어요.",
-                                buttonTitle: nil
+                                detailText: nil,
+                                buttonTitle: nil,
+                                action: nil
                             )
                         )
                     ],
@@ -541,7 +706,9 @@ final class LibraryViewModel {
                             style: .error,
                             title: nil,
                             message: "찜한 게임을 불러오지 못했어요.",
-                            buttonTitle: nil
+                            detailText: nil,
+                            buttonTitle: nil,
+                            action: nil
                         )
                     )
                 ],
@@ -564,7 +731,9 @@ final class LibraryViewModel {
                                 style: .empty,
                                 title: nil,
                                 message: "작성한 리뷰가 아직 없어요.",
-                                buttonTitle: nil
+                                detailText: nil,
+                                buttonTitle: nil,
+                                action: nil
                             )
                         )
                     ],
@@ -608,7 +777,9 @@ final class LibraryViewModel {
                             style: .error,
                             title: nil,
                             message: "작성한 리뷰를 불러오지 못했어요.",
-                            buttonTitle: nil
+                            detailText: nil,
+                            buttonTitle: nil,
+                            action: nil
                         )
                     )
                 ],
@@ -739,6 +910,169 @@ final class LibraryViewModel {
         } catch {
             return .failure(error)
         }
+    }
+
+    private func logResponseSummary(
+        id: Int,
+        overviewResult: Result<LibraryOverview, Error>,
+        wishlistResult: Result<[FavoriteGameEntry], Error>,
+        reviewedResult: Result<[ReviewedGame], Error>
+    ) {
+        let overviewSummary: String
+        switch overviewResult {
+        case .success(let overview):
+            overviewSummary =
+                "recentlyPlayedCount=\(overview.recentlyPlayed.count) " +
+                "playingCount=\(overview.playing.count) " +
+                "isSteamConnected=\(overview.steamLinkStatus.isLinked) " +
+                "isSteamSyncAvailable=\(overview.isSteamSyncAvailable)"
+        case .failure(let error):
+            overviewSummary = "overviewError=\(LibraryError.from(error: error).errorDescription ?? error.localizedDescription)"
+        }
+
+        let wishlistSummary: String
+        switch wishlistResult {
+        case .success(let wishlist):
+            wishlistSummary = "likedCount=\(wishlist.count)"
+        case .failure(let error):
+            wishlistSummary = "likedError=\(FavoriteError.from(error: error).errorDescription ?? error.localizedDescription)"
+        }
+
+        let reviewedSummary: String
+        switch reviewedResult {
+        case .success(let reviewedGames):
+            reviewedSummary = "reviewsCount=\(reviewedGames.count)"
+        case .failure(let error):
+            reviewedSummary = "reviewsError=\(ReviewError.from(error: error).errorDescription ?? error.localizedDescription)"
+        }
+
+        print("[Library] responseArrived id=\(id) \(overviewSummary) \(wishlistSummary) \(reviewedSummary)")
+    }
+
+    private func logMappedState(
+        id: Int,
+        libraryItems: (
+            recentlyPlayed: [LibraryGameSummary],
+            playingGames: [LibraryGameSummary],
+            likedGames: [Game],
+            reviews: [ReviewedGame]
+        ),
+        steamState: (isConnected: Bool, isSyncAvailable: Bool, errorCode: String?)
+    ) {
+        print(
+            "[Library] mappedState id=\(id) " +
+            "recentlyPlayedCount=\(libraryItems.recentlyPlayed.count) " +
+            "playingGamesCount=\(libraryItems.playingGames.count) " +
+            "likedGamesCount=\(libraryItems.likedGames.count) " +
+            "reviewsCount=\(libraryItems.reviews.count) " +
+            "isSteamConnected=\(steamState.isConnected) " +
+            "isSteamSyncAvailable=\(steamState.isSyncAvailable)"
+        )
+    }
+
+    private func handleSteamLinkCallbackResult(_ result: SteamLinkCallbackResult) {
+        switch result.status {
+        case .success:
+            apply(.clearError)
+            refreshSteamLinkStatus()
+        case .failed, .cancelled:
+            apply(
+                .setError(
+                    result.userFacingMessage
+                    ?? "Steam 연동을 완료하지 못했어요. 잠시 후 다시 시도해주세요."
+                )
+            )
+        }
+    }
+
+    private func refreshSteamLinkStatus() {
+        if state.isLoading || state.isRefreshing {
+            needsSteamLinkStatusRefresh = true
+            return
+        }
+
+        isRefreshingSteamLinkStatus = true
+        print("[SteamLink] statusRefreshStarted")
+        loadLibrary(trigger: .refresh)
+    }
+
+    private func resolveSteamState(
+        from result: Result<LibraryOverview, Error>,
+        fallback: (isConnected: Bool, isSyncAvailable: Bool, errorCode: String?)
+    ) -> (isConnected: Bool, isSyncAvailable: Bool, errorCode: String?) {
+        guard case .success(let overview) = result else { return fallback }
+        return (
+            isConnected: overview.steamLinkStatus.isLinked,
+            isSyncAvailable: overview.isSteamSyncAvailable,
+            errorCode: overview.steamSyncErrorCode
+        )
+    }
+
+    private func resolveLibraryItems(
+        overviewResult: Result<LibraryOverview, Error>,
+        wishlistResult: Result<[FavoriteGameEntry], Error>,
+        reviewedResult: Result<[ReviewedGame], Error>
+    ) -> (
+        recentlyPlayed: [LibraryGameSummary],
+        playingGames: [LibraryGameSummary],
+        likedGames: [Game],
+        reviews: [ReviewedGame]
+    ) {
+        let recentlyPlayed: [LibraryGameSummary]
+        let playingGames: [LibraryGameSummary]
+        if case .success(let overview) = overviewResult {
+            recentlyPlayed = overview.recentlyPlayed
+            playingGames = overview.playing
+        } else {
+            recentlyPlayed = []
+            playingGames = []
+        }
+
+        let likedGames: [Game]
+        if case .success(let wishlist) = wishlistResult {
+            likedGames = wishlist.map(\.game)
+        } else {
+            likedGames = []
+        }
+
+        let reviews: [ReviewedGame]
+        if case .success(let reviewedGames) = reviewedResult {
+            reviews = reviewedGames
+        } else {
+            reviews = []
+        }
+
+        return (
+            recentlyPlayed: recentlyPlayed,
+            playingGames: playingGames,
+            likedGames: likedGames,
+            reviews: reviews
+        )
+    }
+
+    private func makeAddToPlayingRequest(from summary: LibraryGameSummary) -> LibraryGameStatusUpdateRequest? {
+        guard let externalGameId = sanitized(summary.identifier.sourceID),
+              let title = sanitized(summary.title),
+              title != "이름 없는 게임" else {
+            return nil
+        }
+
+        if summary.identifier.source == .steam, Int(externalGameId) == nil {
+            return nil
+        }
+
+        return LibraryGameStatusUpdateRequest(
+            identifier: summary.identifier,
+            title: title,
+            coverImageURL: summary.coverImageURL,
+            status: .playing
+        )
+    }
+
+    private func sanitized(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedValue.isEmpty ? nil : trimmedValue
     }
 
     private func resolveSteamLinkErrorMessage(_ error: Error) -> String {

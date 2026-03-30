@@ -78,6 +78,8 @@ final class LibraryGameCardCell: UICollectionViewCell {
         metadataLabel.text = nil
         ratingLabel.text = nil
         actionButton.isHidden = true
+        actionButton.isEnabled = true
+        actionButton.alpha = 1
         onActionButtonTapped = nil
     }
 
@@ -97,6 +99,8 @@ final class LibraryGameCardCell: UICollectionViewCell {
         configuration?.title = viewState.actionTitle
         actionButton.configuration = configuration
         actionButton.isHidden = viewState.actionTitle == nil
+        actionButton.isEnabled = viewState.isActionEnabled
+        actionButton.alpha = viewState.isActionEnabled ? 1 : 0.6
     }
 
     private func setup() {

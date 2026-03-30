@@ -11,6 +11,23 @@ enum LibraryReducer {
             state.isRefreshing = isRefreshing
         case .setSort(let sort):
             state.selectedSort = sort
+        case .setSteamState(let isConnected, let isSyncAvailable, let errorCode):
+            state.isSteamConnected = isConnected
+            state.isSteamSyncAvailable = isSyncAvailable
+            state.steamSyncErrorCode = errorCode
+        case .setLibraryItems(let recentlyPlayed, let playingGames, let likedGames, let reviews):
+            state.recentlyPlayed = recentlyPlayed
+            state.playingGames = playingGames
+            state.likedGames = likedGames
+            state.reviews = reviews
+        case .setAddingToPlaying(let identifier, let isUpdating):
+            if isUpdating {
+                state.addingToPlayingIdentifiers.insert(identifier)
+            } else {
+                state.addingToPlayingIdentifiers.remove(identifier)
+            }
+        case .clearAddingToPlaying:
+            state.addingToPlayingIdentifiers.removeAll()
         case .setSections(let sections):
             state.sections = sections
             state.errorMessage = nil

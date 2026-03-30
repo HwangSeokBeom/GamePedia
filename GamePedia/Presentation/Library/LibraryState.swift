@@ -36,6 +36,14 @@ enum LibrarySortOption: Int {
 
 struct LibraryState {
     var selectedSort: LibrarySortOption = .latest
+    var isSteamConnected: Bool = true
+    var isSteamSyncAvailable: Bool = true
+    var steamSyncErrorCode: String? = nil
+    var recentlyPlayed: [LibraryGameSummary] = []
+    var playingGames: [LibraryGameSummary] = []
+    var likedGames: [Game] = []
+    var reviews: [ReviewedGame] = []
+    var addingToPlayingIdentifiers: Set<LibraryGameIdentifier> = []
     var sections: [LibrarySectionViewState] = []
     var isLoading: Bool = false
     var isRefreshing: Bool = false

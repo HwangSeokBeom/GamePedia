@@ -1,4 +1,3 @@
-import SafariServices
 import UIKit
 
 // MARK: - LibraryCoordinator
@@ -9,10 +8,12 @@ final class LibraryCoordinator {
 
     let navigationController: UINavigationController
     var onAuthenticationRequested: ((UIViewController, RestrictedActionContext, @escaping () -> Void) -> Void)?
+    private let steamLinkFlowController: any SteamLinkFlowControlling
 
     // MARK: Init
 
-    init() {
+    init(steamLinkFlowController: any SteamLinkFlowControlling) {
+        self.steamLinkFlowController = steamLinkFlowController
         navigationController = UINavigationController()
         navigationController.tabBarItem = UITabBarItem(
             title: "라이브러리",
@@ -110,9 +111,6 @@ final class LibraryCoordinator {
 
     private func showSteamLink(url: URL, presenter: UIViewController?) {
         guard let presenter else { return }
-
-        let safariViewController = SFSafariViewController(url: url)
-        safariViewController.preferredControlTintColor = .gpPrimary
-        presenter.present(safariViewController, animated: true)
+        steamLinkFlowController.start(url: url, presenter: presenter)
     }
 }
