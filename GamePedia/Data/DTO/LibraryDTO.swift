@@ -19,6 +19,8 @@ struct LibraryOverviewResponseDataDTO: Decodable {
     let steamLinkStatus: SteamLinkStatusDTO?
     let recentlyPlayed: [LibraryGameItemDTO]?
     let playing: [LibraryGameItemDTO]?
+    let owned: [LibraryGameItemDTO]?
+    let backlog: [LibraryGameItemDTO]?
     let liked: [LibraryGameItemDTO]?
     let wishlist: [LibraryGameItemDTO]?
     let reviews: [LibraryReviewedGameItemDTO]?
@@ -93,6 +95,15 @@ struct LibraryStatusMutationResponseDataDTO: Decodable {
     let completedAt: String?
     let lastPlayedAt: String?
     let playtimeMinutes: Int?
+}
+
+struct SyncOwnedSteamLibraryResponseDataDTO: Decodable {
+    let syncedCount: Int
+    let insertedCount: Int
+    let updatedCount: Int
+    let syncWarningCode: String?
+    let igdbEnrichmentApplied: Bool?
+    let igdbEnrichmentSkippedReason: String?
 }
 
 struct SteamLinkStartResponseDataDTO: Decodable {

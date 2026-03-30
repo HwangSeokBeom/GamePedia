@@ -4,6 +4,7 @@ protocol LibraryRemoteDataSource {
     func fetchLibraryOverview(sort: UserGameCollectionSortOption?) async throws -> LibraryOverviewResponseDataDTO
     func fetchSteamLinkStatus() async throws -> SteamLinkStatusDTO
     func startSteamLink() async throws -> SteamLinkStartResponseDataDTO
+    func syncOwnedSteamLibrary() async throws -> SyncOwnedSteamLibraryResponseDataDTO
     func updateGameStatus(requestDTO: UpdateLibraryStatusRequestDTO) async throws -> LibraryStatusMutationResponseDataDTO
 }
 
@@ -50,6 +51,24 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
             as: LibraryResponseEnvelopeDTO<SteamLinkStartResponseDataDTO>.self
         )
         print("[SteamLink] response authUrl=\(response.data.steamLink.authUrl ?? "nil")")
+        return response.data
+    }
+
+    func syncOwnedSteamLibrary() async throws -> SyncOwnedSteamLibraryResponseDataDTO {
+        print("[Library] request endpoint=POST /users/me/library/steam/sync-owned")
+        let response = try await apiClient.request(
+            .syncOwnedSteamLibrary,
+            as: LibraryResponseEnvelopeDTO<SyncOwnedSteamLibraryResponseDataDTO>.self
+        )
+        print(
+            "[Library] response endpoint=POST /users/me/library/steam/sync-owned " +
+            "syncedCount=\(response.data.syncedCount) " +
+            "insertedCount=\(response.data.insertedCount) " +
+            "updatedCount=\(response.data.updatedCount) " +
+            "syncWarningCode=\(response.data.syncWarningCode ?? "nil") " +
+            "igdbEnrichmentApplied=\(response.data.igdbEnrichmentApplied.map(String.init) ?? "nil") " +
+            "igdbEnrichmentSkippedReason=\(response.data.igdbEnrichmentSkippedReason ?? "nil")"
+        )
         return response.data
     }
 

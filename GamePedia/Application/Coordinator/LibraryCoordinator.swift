@@ -1,3 +1,4 @@
+import SafariServices
 import UIKit
 
 // MARK: - LibraryCoordinator
@@ -34,6 +35,19 @@ final class LibraryCoordinator {
             let presenter = libraryVC ?? self?.navigationController.topViewController ?? self?.navigationController
             self?.showSteamLink(url: url, presenter: presenter)
         }
+        libraryVC.onSteamPrivacyGuideRequested = { [weak self, weak libraryVC] url in
+            let presenter = libraryVC ?? self?.navigationController.topViewController ?? self?.navigationController
+            self?.showSteamPrivacyGuidance(
+                url: url,
+                presenter: presenter,
+                retryHandler: { [weak libraryVC] in
+                    libraryVC?.retrySteamPrivacyGuidance()
+                }
+            )
+        }
+        libraryVC.onSectionListRequested = { [weak self] route in
+            self?.showSectionList(route)
+        }
         navigationController.setViewControllers([libraryVC], animated: false)
     }
 
@@ -57,6 +71,14 @@ final class LibraryCoordinator {
             topVC.present(activityVC, animated: true)
         }
         navigationController.pushViewController(detailVC, animated: true)
+    }
+
+    private func showSectionList(_ route: LibrarySectionListRoute) {
+        let listViewController = LibrarySectionListViewController(route: route)
+        listViewController.onGameSelected = { [weak self] gameID in
+            self?.showDetail(gameId: gameID)
+        }
+        navigationController.pushViewController(listViewController, animated: true)
     }
 
     private func showReview(
@@ -112,5 +134,51 @@ final class LibraryCoordinator {
     private func showSteamLink(url: URL, presenter: UIViewController?) {
         guard let presenter else { return }
         steamLinkFlowController.start(url: url, presenter: presenter)
+    }
+
+    private func showSteamPrivacyGuidance(
+        url: URL,
+        presenter: UIViewController?,
+        retryHandler: @escaping () -> Void
+    ) {
+        guard let presenter else { return }
+
+        let guidanceViewController = SteamPrivacyGuidanceViewController()
+        let navigationController = UINavigationController(rootViewController: guidanceViewController)
+        navigationController.modalPresentationStyle = .pageSheet
+        NavigationBarStyler.configureGlobalAppearance(on: navigationController.navigationBar)
+
+        if let sheetPresentationController = navigationController.sheetPresentationController {
+            sheetPresentationController.detents = [.medium(), .large()]
+            sheetPresentationController.prefersGrabberVisible = true
+        }
+
+        guidanceViewController.onShowInstructions = { [weak self, weak navigationController] in
+            guard let navigationController else { return }
+            self?.showSteamPrivacyInstructions(url: url, navigationController: navigationController)
+        }
+        guidanceViewController.onRetry = { [weak navigationController] in
+            navigationController?.dismiss(animated: true) {
+                retryHandler()
+            }
+        }
+
+        presenter.present(navigationController, animated: true)
+    }
+
+    private func showSteamPrivacyInstructions(url: URL, navigationController: UINavigationController) {
+        let instructionsViewController = SteamPrivacyInstructionsViewController()
+        instructionsViewController.onOpenSteamSettings = { [weak self, weak instructionsViewController] in
+            let presenter = instructionsViewController ?? navigationController.topViewController
+            self?.showWebPage(url: url, presenter: presenter)
+        }
+        navigationController.pushViewController(instructionsViewController, animated: true)
+    }
+
+    private func showWebPage(url: URL, presenter: UIViewController?) {
+        guard let presenter else { return }
+        let safariViewController = SFSafariViewController(url: url)
+        safariViewController.preferredControlTintColor = .gpPrimary
+        presenter.present(safariViewController, animated: true)
     }
 }

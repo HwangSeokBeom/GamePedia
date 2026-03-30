@@ -41,12 +41,16 @@ struct LibraryState {
     var steamSyncErrorCode: String? = nil
     var recentlyPlayed: [LibraryGameSummary] = []
     var playingGames: [LibraryGameSummary] = []
+    var ownedGames: [LibraryGameSummary] = []
+    var backlogGames: [LibraryGameSummary] = []
     var likedGames: [Game] = []
     var reviews: [ReviewedGame] = []
     var addingToPlayingIdentifiers: Set<LibraryGameIdentifier> = []
+    var isSyncingOwnedSteamLibrary: Bool = false
     var sections: [LibrarySectionViewState] = []
     var isLoading: Bool = false
     var isRefreshing: Bool = false
     var errorMessage: String? = nil
+    var successMessage: String? = nil
     var pendingFocusSection: LibrarySectionKind? = nil
 }

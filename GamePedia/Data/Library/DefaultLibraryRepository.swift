@@ -15,7 +15,9 @@ final class DefaultLibraryRepository: LibraryRepository {
                 "steamConnected=\(data.steamConnected.map(String.init) ?? "nil") " +
                 "steamSyncAvailable=\(data.steamSyncAvailable.map(String.init) ?? "nil") " +
                 "recentlyPlayedCount=\(data.recentlyPlayed?.count ?? 0) " +
-                "playingCount=\(data.playing?.count ?? 0)"
+                "playingCount=\(data.playing?.count ?? 0) " +
+                "ownedCount=\(data.owned?.count ?? 0) " +
+                "backlogCount=\(data.backlog?.count ?? 0)"
             )
             let steamLinkStatus = try await resolveSteamLinkStatus(
                 from: data.steamLinkStatus,
@@ -23,18 +25,24 @@ final class DefaultLibraryRepository: LibraryRepository {
             )
             let recentlyPlayed = try (data.recentlyPlayed ?? []).map(LibraryMapper.toGameSummary)
             let playing = try (data.playing ?? []).map(LibraryMapper.toGameSummary)
+            let owned = try (data.owned ?? []).map(LibraryMapper.toGameSummary)
+            let backlog = try (data.backlog ?? []).map(LibraryMapper.toGameSummary)
 
             let overview = LibraryOverview(
                 steamLinkStatus: steamLinkStatus,
                 isSteamSyncAvailable: data.steamSyncAvailable ?? true,
                 steamSyncErrorCode: sanitized(data.steamSyncErrorCode),
                 recentlyPlayed: recentlyPlayed,
-                playing: playing
+                playing: playing,
+                owned: owned,
+                backlog: backlog
             )
             print(
                 "[Library] mapped overview " +
                 "recentlyPlayedCount=\(overview.recentlyPlayed.count) " +
                 "playingCount=\(overview.playing.count) " +
+                "ownedCount=\(overview.owned.count) " +
+                "backlogCount=\(overview.backlog.count) " +
                 "isSteamConnected=\(overview.steamLinkStatus.isLinked) " +
                 "isSteamSyncAvailable=\(overview.isSteamSyncAvailable)"
             )
@@ -49,6 +57,22 @@ final class DefaultLibraryRepository: LibraryRepository {
         do {
             let data = try await libraryRemoteDataSource.startSteamLink()
             return try LibraryMapper.toSteamLinkURL(data)
+        } catch {
+            throw LibraryError.from(error: error)
+        }
+    }
+
+    func syncOwnedSteamLibrary() async throws -> SteamOwnedLibrarySyncResult {
+        do {
+            let data = try await libraryRemoteDataSource.syncOwnedSteamLibrary()
+            return SteamOwnedLibrarySyncResult(
+                syncedCount: data.syncedCount,
+                insertedCount: data.insertedCount,
+                updatedCount: data.updatedCount,
+                syncWarningCode: sanitized(data.syncWarningCode),
+                igdbEnrichmentApplied: data.igdbEnrichmentApplied,
+                igdbEnrichmentSkippedReason: sanitized(data.igdbEnrichmentSkippedReason)
+            )
         } catch {
             throw LibraryError.from(error: error)
         }

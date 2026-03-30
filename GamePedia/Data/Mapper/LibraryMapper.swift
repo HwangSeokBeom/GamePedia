@@ -33,6 +33,17 @@ enum LibraryMapper {
         let genre = sanitized(dto.genre) ?? dto.genres?.first ?? "기타"
         let platform = sanitized(dto.platform) ?? dto.platforms?.first ?? defaultPlatform(for: source)
         let releaseYear = resolvedReleaseYear(from: dto)
+        let resolvedIGDBCoverURL = igdbCoverURL(from: dto.coverUrl ?? dto.coverImageUrl)
+        let resolvedImageURLs = source == .steam
+            ? LibraryGameImageURLResolver.resolveImageURLs(
+                gameSource: source,
+                externalGameId: resolvedSteamAppID(from: dto, fallbackSourceID: resolvedSourceID),
+                igdbCoverUrl: resolvedIGDBCoverURL
+            )
+            : LibraryResolvedImageURLs(
+                primaryURL: makeURL(from: dto.coverUrl ?? dto.coverImageUrl),
+                fallbackURLs: []
+            )
 
         return LibraryGameSummary(
             identifier: LibraryGameIdentifier(
@@ -42,7 +53,8 @@ enum LibraryMapper {
             ),
             title: title,
             translatedTitle: translatedTitle,
-            coverImageURL: makeURL(from: dto.coverUrl ?? dto.coverImageUrl),
+            coverImageURL: resolvedImageURLs.primaryURL,
+            fallbackCoverImageURLs: resolvedImageURLs.fallbackURLs,
             genre: genre,
             platform: platform,
             releaseYear: releaseYear,
@@ -175,6 +187,39 @@ enum LibraryMapper {
     private static func makeURL(from rawURL: String?) -> URL? {
         guard let rawURL = sanitized(rawURL) else { return nil }
         return URL(string: rawURL)
+    }
+
+    private static func igdbCoverURL(from rawURL: String?) -> URL? {
+        guard let rawURL = sanitized(rawURL) else { return nil }
+        let normalizedURLString = rawURL.hasPrefix("//") ? "https:\(rawURL)" : rawURL
+        guard let url = URL(string: normalizedURLString),
+              url.host?.lowercased() == "images.igdb.com" else {
+            return nil
+        }
+        return url
+    }
+
+    private static func resolvedSteamAppID(
+        from dto: LibraryGameItemDTO,
+        fallbackSourceID: String?
+    ) -> String? {
+        if let externalGameId = sanitized(dto.externalGameId), externalGameId.allSatisfy(\.isNumber) {
+            return externalGameId
+        }
+
+        if let sourceId = sanitized(dto.sourceId), sourceId.allSatisfy(\.isNumber) {
+            return sourceId
+        }
+
+        if let fallbackSourceID, fallbackSourceID.allSatisfy(\.isNumber) {
+            return fallbackSourceID
+        }
+
+        if let gameId = dto.gameId {
+            return String(gameId)
+        }
+
+        return nil
     }
 
     private static func sanitized(_ value: String?) -> String? {

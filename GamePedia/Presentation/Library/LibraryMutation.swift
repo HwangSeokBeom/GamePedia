@@ -8,13 +8,18 @@ enum LibraryMutation {
     case setLibraryItems(
         recentlyPlayed: [LibraryGameSummary],
         playingGames: [LibraryGameSummary],
+        ownedGames: [LibraryGameSummary],
+        backlogGames: [LibraryGameSummary],
         likedGames: [Game],
         reviews: [ReviewedGame]
     )
     case setAddingToPlaying(LibraryGameIdentifier, isUpdating: Bool)
     case clearAddingToPlaying
+    case setSyncingOwnedSteamLibrary(Bool)
     case setSections([LibrarySectionViewState])
     case setError(String)
+    case setSuccessMessage(String)
+    case clearSuccessMessage
     case clearError
     case consumeInitialFocus
 }

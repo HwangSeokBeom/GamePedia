@@ -34,6 +34,13 @@ struct LibraryGameIdentifier: Hashable {
     var detailGameID: Int? {
         canonicalGameID ?? (source == .igdb ? Int(sourceID) : nil)
     }
+
+    var steamAppID: String? {
+        guard source == .steam else { return nil }
+        let normalizedSourceID = sourceID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedSourceID.isEmpty, normalizedSourceID.allSatisfy(\.isNumber) else { return nil }
+        return normalizedSourceID
+    }
 }
 
 struct SteamLinkStatus: Hashable {
@@ -59,6 +66,7 @@ struct LibraryGameSummary: Hashable {
     let title: String
     let translatedTitle: String?
     let coverImageURL: URL?
+    let fallbackCoverImageURLs: [URL]
     let genre: String
     let platform: String
     let releaseYear: Int
@@ -79,6 +87,7 @@ struct LibraryGameSummary: Hashable {
             title: title,
             translatedTitle: translatedTitle ?? self.translatedTitle,
             coverImageURL: coverImageURL,
+            fallbackCoverImageURLs: fallbackCoverImageURLs,
             genre: genre,
             platform: platform,
             releaseYear: releaseYear,
@@ -96,6 +105,8 @@ struct LibraryOverview: Hashable {
     let steamSyncErrorCode: String?
     let recentlyPlayed: [LibraryGameSummary]
     let playing: [LibraryGameSummary]
+    let owned: [LibraryGameSummary]
+    let backlog: [LibraryGameSummary]
 }
 
 struct LibraryGameStatusUpdateRequest: Hashable {
@@ -116,6 +127,21 @@ struct LibraryGameStatusUpdateRequest: Hashable {
 struct LibraryGameStatusMutationResult: Hashable {
     let identifier: LibraryGameIdentifier
     let status: UserGameStatus
+}
+
+struct SteamOwnedLibrarySyncResult: Hashable {
+    let syncedCount: Int
+    let insertedCount: Int
+    let updatedCount: Int
+    let syncWarningCode: String?
+    let igdbEnrichmentApplied: Bool?
+    let igdbEnrichmentSkippedReason: String?
+
+    var isRateLimitedIGDBEnrichmentPartialSuccess: Bool {
+        syncedCount > 0
+            && igdbEnrichmentApplied == false
+            && igdbEnrichmentSkippedReason?.uppercased() == "RATE_LIMITED"
+    }
 }
 
 enum LibraryError: Error, LocalizedError, Equatable {

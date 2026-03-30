@@ -98,7 +98,12 @@ final class LibraryGameRowCell: UICollectionViewCell {
     }
 
     func configure(with viewState: LibraryGameRowViewState) {
-        thumbnailView.loadImage(url: viewState.coverImageURL)
+        thumbnailView.loadImage(
+            url: viewState.coverImageURL,
+            fallbackURLs: viewState.fallbackCoverImageURLs,
+            placeholder: .gpGameCoverPlaceholder,
+            logContext: "Library.row.\(viewState.identifier.uniqueKey)"
+        )
         titleLabel.text = viewState.title
         subtitleLabel.text = viewState.subtitleText
         metadataLabel.text = viewState.metadataText

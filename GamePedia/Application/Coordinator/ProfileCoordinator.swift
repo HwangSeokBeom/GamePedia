@@ -178,7 +178,28 @@ final class ProfileCoordinator: NSObject {
             let presenter = libraryViewController ?? self?.navigationController.topViewController ?? self?.navigationController
             self?.showSteamLink(url: url, presenter: presenter)
         }
+        libraryViewController.onSteamPrivacyGuideRequested = { [weak self, weak libraryViewController] url in
+            let presenter = libraryViewController ?? self?.navigationController.topViewController ?? self?.navigationController
+            self?.showSteamPrivacyGuidance(
+                url: url,
+                presenter: presenter,
+                retryHandler: { [weak libraryViewController] in
+                    libraryViewController?.retrySteamPrivacyGuidance()
+                }
+            )
+        }
+        libraryViewController.onSectionListRequested = { [weak self] route in
+            self?.showLibrarySectionList(route)
+        }
         navigationController.pushViewController(libraryViewController, animated: true)
+    }
+
+    private func showLibrarySectionList(_ route: LibrarySectionListRoute) {
+        let listViewController = LibrarySectionListViewController(route: route)
+        listViewController.onGameSelected = { [weak self] gameID in
+            self?.showDetail(gameId: gameID)
+        }
+        navigationController.pushViewController(listViewController, animated: true)
     }
 
     private func showEditProfile() {
@@ -204,6 +225,48 @@ final class ProfileCoordinator: NSObject {
         let safariViewController = SFSafariViewController(url: url)
         safariViewController.preferredControlTintColor = .gpPrimary
         navigationController.topViewController?.present(safariViewController, animated: true)
+    }
+
+    private func showSteamPrivacyGuidance(
+        url: URL,
+        presenter: UIViewController?,
+        retryHandler: @escaping () -> Void
+    ) {
+        guard let presenter else { return }
+
+        let guidanceViewController = SteamPrivacyGuidanceViewController()
+        let modalNavigationController = UINavigationController(rootViewController: guidanceViewController)
+        modalNavigationController.modalPresentationStyle = .pageSheet
+        NavigationBarStyler.configureGlobalAppearance(on: modalNavigationController.navigationBar)
+
+        if let sheetPresentationController = modalNavigationController.sheetPresentationController {
+            sheetPresentationController.detents = [.medium(), .large()]
+            sheetPresentationController.prefersGrabberVisible = true
+        }
+
+        guidanceViewController.onShowInstructions = { [weak self, weak modalNavigationController] in
+            guard let modalNavigationController else { return }
+            self?.showSteamPrivacyInstructions(url: url, navigationController: modalNavigationController)
+        }
+        guidanceViewController.onRetry = { [weak modalNavigationController] in
+            modalNavigationController?.dismiss(animated: true) {
+                retryHandler()
+            }
+        }
+
+        presenter.present(modalNavigationController, animated: true)
+    }
+
+    private func showSteamPrivacyInstructions(url: URL, navigationController: UINavigationController) {
+        let instructionsViewController = SteamPrivacyInstructionsViewController()
+        instructionsViewController.onOpenSteamSettings = { [weak instructionsViewController] in
+            let presenter = instructionsViewController ?? navigationController.topViewController
+            guard let presenter else { return }
+            let safariViewController = SFSafariViewController(url: url)
+            safariViewController.preferredControlTintColor = .gpPrimary
+            presenter.present(safariViewController, animated: true)
+        }
+        navigationController.pushViewController(instructionsViewController, animated: true)
     }
 
     private func contactSupport() {

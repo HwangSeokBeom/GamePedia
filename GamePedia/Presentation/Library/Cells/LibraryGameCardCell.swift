@@ -84,7 +84,12 @@ final class LibraryGameCardCell: UICollectionViewCell {
     }
 
     func configure(with viewState: LibraryRecentGameCardViewState) {
-        artworkView.configure(title: viewState.title, imageURL: viewState.coverImageURL)
+        artworkView.configure(
+            title: viewState.title,
+            identifier: viewState.identifier,
+            imageURL: viewState.coverImageURL,
+            fallbackImageURLs: viewState.fallbackCoverImageURLs
+        )
         badgeLabel.text = viewState.badgeText
         titleLabel.text = viewState.title
         metadataLabel.text = viewState.metadataText
@@ -197,16 +202,31 @@ private final class LibraryArtworkView: UIView {
         gradientLayer.frame = bounds
     }
 
-    func configure(title: String, imageURL: URL?) {
+    func configure(
+        title: String,
+        identifier: LibraryGameIdentifier,
+        imageURL: URL?,
+        fallbackImageURLs: [URL]
+    ) {
         gradientLayer.colors = [
             UIColor(hex: "#164B8C").cgColor,
             UIColor(hex: "#0B0B0E").cgColor
         ]
         monogramLabel.text = String(title.prefix(1))
-        imageView.loadImage(url: imageURL)
-        imageView.isHidden = imageURL == nil
-        symbolImageView.isHidden = imageURL != nil
-        monogramLabel.isHidden = imageURL != nil
+        let hasRemoteImage = imageURL != nil || fallbackImageURLs.isEmpty == false
+        if hasRemoteImage {
+            imageView.loadImage(
+                url: imageURL,
+                fallbackURLs: fallbackImageURLs,
+                placeholder: .gpGameCoverPlaceholder,
+                logContext: "Library.recentlyPlayed.\(identifier.uniqueKey)"
+            )
+        } else {
+            imageView.image = nil
+        }
+        imageView.isHidden = hasRemoteImage == false
+        symbolImageView.isHidden = hasRemoteImage
+        monogramLabel.isHidden = hasRemoteImage
     }
 
     func prepareForReuse() {

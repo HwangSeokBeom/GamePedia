@@ -6,10 +6,15 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     private var dataSource: UICollectionViewDiffableDataSource<LibrarySectionKind, LibraryCollectionItem>!
     private var currentSections: [LibrarySectionViewState] = []
     private var lastPresentedErrorMessage: String?
+    private var lastPresentedSuccessMessage: String?
     private let refreshControl = UIRefreshControl()
+    private var toastHideWorkItem: DispatchWorkItem?
+    private weak var toastView: LibraryToastView?
 
     var onGameSelected: ((Int) -> Void)?
     var onSteamLinkRequested: ((URL) -> Void)?
+    var onSteamPrivacyGuideRequested: ((URL) -> Void)?
+    var onSectionListRequested: ((LibrarySectionListRoute) -> Void)?
 
     init(
         rootView: LibraryRootView = LibraryRootView(),
@@ -53,12 +58,33 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         } else if state.errorMessage == nil {
             lastPresentedErrorMessage = nil
         }
+
+        if let successMessage = state.successMessage,
+           successMessage != lastPresentedSuccessMessage {
+            lastPresentedSuccessMessage = successMessage
+            showToast(message: successMessage)
+            viewModel.send(.didConsumeSuccessMessage)
+        } else if state.successMessage == nil {
+            lastPresentedSuccessMessage = nil
+        }
+
+        updateSyncOwnedLibraryButton(isSyncing: state.isSyncingOwnedSteamLibrary)
+    }
+
+    func retrySteamPrivacyGuidance() {
+        viewModel.send(.retrySteamPrivacyGuideTapped)
     }
 
     private func configureNavigationItem() {
         UIView.performWithoutAnimation {
             navigationItem.title = "내 라이브러리"
             navigationItem.largeTitleDisplayMode = .never
+            navigationItem.rightBarButtonItem = UIBarButtonItem(
+                title: "Steam 보관함 가져오기",
+                style: .plain,
+                target: self,
+                action: #selector(didTapSyncOwnedSteamLibrary)
+            )
         }
     }
 
@@ -121,6 +147,8 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
                     switch action {
                     case .connectSteam:
                         self?.viewModel.send(.connectSteamButtonTapped)
+                    case .showSteamPrivacyGuide:
+                        self?.viewModel.send(.steamPrivacyGuideButtonTapped)
                     case .retrySteamSync:
                         self?.viewModel.send(.retrySteamSyncTapped)
                     }
@@ -152,9 +180,13 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
                 switch section.kind {
                 case .recentlyPlayed:
                     self.viewModel.send(.didTapSeeAllRecentlyPlayed)
+                case .playing:
+                    self.viewModel.send(.didTapSeeAllPlaying)
+                case .owned:
+                    self.viewModel.send(.didTapSeeAllOwned)
                 case .reviewed:
                     self.viewModel.send(.didTapSeeAllReviewed)
-                case .playing, .wishlist:
+                case .wishlist:
                     break
                 }
             }
@@ -181,7 +213,11 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
                 self?.onGameSelected?(gameID)
             case .showSteamLink(let url):
                 self?.onSteamLinkRequested?(url)
-            case .showRecentlyPlayed, .showReviewed:
+            case .showSteamPrivacyGuide(let url):
+                self?.onSteamPrivacyGuideRequested?(url)
+            case .showSectionList(let route):
+                self?.onSectionListRequested?(route)
+            case .showReviewed:
                 break
             }
         }
@@ -235,6 +271,51 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     private func didPullToRefresh() {
         print("[Library] pullToRefresh")
         viewModel.send(.pullToRefresh)
+    }
+
+    @objc
+    private func didTapSyncOwnedSteamLibrary() {
+        viewModel.send(.syncOwnedSteamLibraryButtonTapped)
+    }
+
+    private func updateSyncOwnedLibraryButton(isSyncing: Bool) {
+        navigationItem.rightBarButtonItem?.title = isSyncing ? "가져오는 중..." : "Steam 보관함 가져오기"
+        navigationItem.rightBarButtonItem?.isEnabled = !isSyncing
+    }
+
+    private func showToast(message: String) {
+        toastHideWorkItem?.cancel()
+        toastView?.removeFromSuperview()
+
+        let toastView = LibraryToastView(message: message)
+        toastView.translatesAutoresizingMaskIntoConstraints = false
+        toastView.alpha = 0
+        view.addSubview(toastView)
+        self.toastView = toastView
+
+        NSLayoutConstraint.activate([
+            toastView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            toastView.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+                constant: -20
+            ),
+            toastView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
+            toastView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20)
+        ])
+
+        UIView.animate(withDuration: 0.2) {
+            toastView.alpha = 1
+        }
+
+        let hideWorkItem = DispatchWorkItem { [weak toastView] in
+            UIView.animate(withDuration: 0.2, animations: {
+                toastView?.alpha = 0
+            }, completion: { _ in
+                toastView?.removeFromSuperview()
+            })
+        }
+        toastHideWorkItem = hideWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: hideWorkItem)
     }
 
     private func makeLayout() -> UICollectionViewLayout {
@@ -332,6 +413,8 @@ extension LibraryViewController: UICollectionViewDelegate {
             switch section.kind {
             case .playing:
                 viewModel.send(.didTapPlayingGame(viewState.identifier))
+            case .owned:
+                viewModel.send(.didTapPlayingGame(viewState.identifier))
             case .wishlist:
                 viewModel.send(.didTapWishlistGame(viewState.identifier))
             case .reviewed:
@@ -390,5 +473,41 @@ private final class LibrarySectionHeaderReusableView: UICollectionReusableView {
     @objc
     private func didTapSeeMore() {
         onSeeMoreTapped?()
+    }
+}
+
+private final class LibraryToastView: UIView {
+    private let messageLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.textColor = .gpTextPrimary
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    init(message: String) {
+        super.init(frame: .zero)
+        messageLabel.text = message
+        setup()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func setup() {
+        backgroundColor = UIColor.gpSurface.withAlphaComponent(0.96)
+        layer.cornerRadius = 14
+        layer.masksToBounds = true
+
+        addSubview(messageLabel)
+
+        NSLayoutConstraint.activate([
+            messageLabel.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+            messageLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            messageLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+            messageLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12)
+        ])
     }
 }

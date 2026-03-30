@@ -3,13 +3,25 @@ import Foundation
 enum LibraryRoute {
     case showGameDetail(Int)
     case showSteamLink(URL)
-    case showRecentlyPlayed
+    case showSteamPrivacyGuide(URL)
+    case showSectionList(LibrarySectionListRoute)
     case showReviewed
+}
+
+struct LibrarySectionListRoute: Hashable {
+    let kind: LibrarySectionKind
+    let layoutStyle: LibrarySectionLayoutStyle
+    let items: [LibraryCollectionItem]
+
+    var title: String {
+        kind.title
+    }
 }
 
 enum LibrarySectionKind: Int, CaseIterable, Hashable {
     case recentlyPlayed
     case playing
+    case owned
     case wishlist
     case reviewed
 
@@ -19,6 +31,8 @@ enum LibrarySectionKind: Int, CaseIterable, Hashable {
             return "최근 플레이한 게임"
         case .playing:
             return "플레이 중"
+        case .owned:
+            return "보유 게임"
         case .wishlist:
             return "찜한 게임"
         case .reviewed:
@@ -32,6 +46,8 @@ enum LibrarySectionKind: Int, CaseIterable, Hashable {
             return "clock.arrow.circlepath"
         case .playing:
             return "gamecontroller.fill"
+        case .owned:
+            return "shippingbox.fill"
         case .wishlist:
             return "heart.fill"
         case .reviewed:
@@ -65,9 +81,32 @@ struct LibraryRecentGameCardViewState: Hashable {
     let metadataText: String
     let ratingText: String?
     let coverImageURL: URL?
+    let fallbackCoverImageURLs: [URL]
     let badgeText: String
     let actionTitle: String?
     let isActionEnabled: Bool
+
+    init(
+        identifier: LibraryGameIdentifier,
+        title: String,
+        metadataText: String,
+        ratingText: String?,
+        coverImageURL: URL?,
+        fallbackCoverImageURLs: [URL] = [],
+        badgeText: String,
+        actionTitle: String?,
+        isActionEnabled: Bool
+    ) {
+        self.identifier = identifier
+        self.title = title
+        self.metadataText = metadataText
+        self.ratingText = ratingText
+        self.coverImageURL = coverImageURL
+        self.fallbackCoverImageURLs = fallbackCoverImageURLs
+        self.badgeText = badgeText
+        self.actionTitle = actionTitle
+        self.isActionEnabled = isActionEnabled
+    }
 }
 
 struct LibraryGameRowViewState: Hashable {
@@ -76,8 +115,29 @@ struct LibraryGameRowViewState: Hashable {
     let subtitleText: String
     let metadataText: String
     let coverImageURL: URL?
+    let fallbackCoverImageURLs: [URL]
     let ratingText: String?
     let trailingAction: LibraryRowTrailingAction?
+
+    init(
+        identifier: LibraryGameIdentifier,
+        title: String,
+        subtitleText: String,
+        metadataText: String,
+        coverImageURL: URL?,
+        fallbackCoverImageURLs: [URL] = [],
+        ratingText: String?,
+        trailingAction: LibraryRowTrailingAction?
+    ) {
+        self.identifier = identifier
+        self.title = title
+        self.subtitleText = subtitleText
+        self.metadataText = metadataText
+        self.coverImageURL = coverImageURL
+        self.fallbackCoverImageURLs = fallbackCoverImageURLs
+        self.ratingText = ratingText
+        self.trailingAction = trailingAction
+    }
 }
 
 enum LibraryRowTrailingAction: Hashable {
@@ -102,5 +162,6 @@ enum LibraryMessageStyle: Hashable {
 
 enum LibraryMessageAction: Hashable {
     case connectSteam
+    case showSteamPrivacyGuide
     case retrySteamSync
 }

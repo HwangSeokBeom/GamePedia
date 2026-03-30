@@ -4,7 +4,10 @@ enum LibraryIntent {
     case viewDidLoad
     case pullToRefresh
     case didSelectSort(Int)
+    case syncOwnedSteamLibraryButtonTapped
     case connectSteamButtonTapped
+    case steamPrivacyGuideButtonTapped
+    case retrySteamPrivacyGuideTapped
     case retrySteamSyncTapped
     case didTapSteamLink
     case didTapRecentlyPlayedGame(LibraryGameIdentifier)
@@ -13,7 +16,10 @@ enum LibraryIntent {
     case didTapPlayingGame(LibraryGameIdentifier)
     case didTapReviewedGame(LibraryGameIdentifier)
     case didTapSeeAllRecentlyPlayed
+    case didTapSeeAllPlaying
+    case didTapSeeAllOwned
     case didTapSeeAllReviewed
     case didConfirmRemoveFavorite(LibraryGameIdentifier)
+    case didConsumeSuccessMessage
     case didConsumeInitialFocus
 }
