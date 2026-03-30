@@ -174,6 +174,9 @@ final class ProfileCoordinator: NSObject {
         libraryViewController.onGameSelected = { [weak self] gameId in
             self?.showDetail(gameId: gameId)
         }
+        libraryViewController.onSteamDetailRequested = { [weak self] viewState in
+            self?.showSteamDetail(viewState: viewState)
+        }
         libraryViewController.onSteamLinkRequested = { [weak self, weak libraryViewController] url in
             let presenter = libraryViewController ?? self?.navigationController.topViewController ?? self?.navigationController
             self?.showSteamLink(url: url, presenter: presenter)
@@ -199,7 +202,15 @@ final class ProfileCoordinator: NSObject {
         listViewController.onGameSelected = { [weak self] gameID in
             self?.showDetail(gameId: gameID)
         }
+        listViewController.onSteamDetailRequested = { [weak self] viewState in
+            self?.showSteamDetail(viewState: viewState)
+        }
         navigationController.pushViewController(listViewController, animated: true)
+    }
+
+    private func showSteamDetail(viewState: SteamFallbackGameDetailViewState) {
+        let viewController = SteamFallbackGameDetailViewController(viewState: viewState)
+        navigationController.pushViewController(viewController, animated: true)
     }
 
     private func showEditProfile() {

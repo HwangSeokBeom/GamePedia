@@ -17,6 +17,14 @@ enum UserGameCollectionSortOption: String, CaseIterable {
     case oldest
 }
 
+enum LibraryGameMatchStatus: String, Codable, Hashable {
+    case confirmed
+    case candidate
+    case unmatched
+    case rejected
+    case unknown
+}
+
 enum SteamLinkConnectionState: Hashable {
     case linked
     case notLinked
@@ -74,6 +82,13 @@ struct LibraryGameSummary: Hashable {
     let recentPlaytimeMinutes: Int?
     let recentPlaytimeText: String?
     let userStatus: UserGameStatus?
+    let metadataEnriched: Bool
+    let detailAvailable: Bool
+    let matchStatus: LibraryGameMatchStatus
+
+    var gameSource: GameSource { identifier.source }
+    var externalGameId: String { identifier.sourceID }
+    var igdbGameId: Int? { identifier.canonicalGameID }
 
     var displayTitle: String { resolvedTitle }
 
@@ -94,7 +109,10 @@ struct LibraryGameSummary: Hashable {
             rating: rating,
             recentPlaytimeMinutes: recentPlaytimeMinutes,
             recentPlaytimeText: recentPlaytimeText,
-            userStatus: userStatus
+            userStatus: userStatus,
+            metadataEnriched: metadataEnriched,
+            detailAvailable: detailAvailable,
+            matchStatus: matchStatus
         )
     }
 }
@@ -105,6 +123,11 @@ struct LibraryOverview: Hashable {
     let steamSyncErrorCode: String?
     let recentlyPlayed: [LibraryGameSummary]
     let playing: [LibraryGameSummary]
+    let owned: [LibraryGameSummary]
+    let backlog: [LibraryGameSummary]
+}
+
+struct OwnedLibraryCollection: Hashable {
     let owned: [LibraryGameSummary]
     let backlog: [LibraryGameSummary]
 }
@@ -142,6 +165,11 @@ struct SteamOwnedLibrarySyncResult: Hashable {
             && igdbEnrichmentApplied == false
             && igdbEnrichmentSkippedReason?.uppercased() == "RATE_LIMITED"
     }
+}
+
+struct SteamUnlinkResult: Hashable {
+    let isUnlinked: Bool
+    let steamLinkStatus: SteamLinkStatus
 }
 
 enum LibraryError: Error, LocalizedError, Equatable {

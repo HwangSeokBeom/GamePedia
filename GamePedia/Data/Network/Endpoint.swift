@@ -217,8 +217,16 @@ extension Endpoint {
         .post("/users/me/library/steam/link", userAuth: true)
     }
 
+    static var unlinkSteamLink: Endpoint {
+        .delete("/users/me/library/steam/link", userAuth: true)
+    }
+
     static var syncOwnedSteamLibrary: Endpoint {
         .post("/users/me/library/steam/sync-owned", userAuth: true)
+    }
+
+    static var myOwnedLibrary: Endpoint {
+        .get("/users/me/library/owned", userAuth: true)
     }
 
     static func updateLibraryStatus(body: UpdateLibraryStatusRequestDTO) -> Endpoint {

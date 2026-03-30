@@ -100,6 +100,10 @@ final class LibraryInfoCell: UICollectionViewCell {
             contentView.backgroundColor = UIColor.gpOrange.withAlphaComponent(0.10)
             iconView.image = UIImage(systemName: "exclamationmark.triangle.fill")
             iconView.tintColor = .gpOrange
+        case .loading:
+            contentView.backgroundColor = .gpCardBackground
+            iconView.image = UIImage(systemName: "hourglass")
+            iconView.tintColor = .gpTextTertiary
         }
     }
 

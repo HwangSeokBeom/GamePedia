@@ -65,12 +65,7 @@ final class LibraryRootView: UIView {
 
     func render(_ state: LibraryState) {
         setSelectedFilter(index: state.selectedSort.rawValue)
-
-        if (state.isLoading || state.isRefreshing) && state.sections.isEmpty {
-            loadingIndicatorView.startAnimating()
-        } else {
-            loadingIndicatorView.stopAnimating()
-        }
+        loadingIndicatorView.stopAnimating()
     }
 
     private func setupView() {

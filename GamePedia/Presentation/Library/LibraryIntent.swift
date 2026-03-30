@@ -9,6 +9,7 @@ enum LibraryIntent {
     case steamPrivacyGuideButtonTapped
     case retrySteamPrivacyGuideTapped
     case retrySteamSyncTapped
+    case unlinkSteamConfirmed
     case didTapSteamLink
     case didTapRecentlyPlayedGame(LibraryGameIdentifier)
     case didTapAddToPlaying(gameID: LibraryGameIdentifier, source: GameSource)

@@ -16,6 +16,7 @@ enum LibraryMutation {
     case setAddingToPlaying(LibraryGameIdentifier, isUpdating: Bool)
     case clearAddingToPlaying
     case setSyncingOwnedSteamLibrary(Bool)
+    case setUnlinkingSteamAccount(Bool)
     case setSections([LibrarySectionViewState])
     case setError(String)
     case setSuccessMessage(String)

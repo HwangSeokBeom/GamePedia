@@ -2,8 +2,10 @@ import Foundation
 
 protocol LibraryRemoteDataSource {
     func fetchLibraryOverview(sort: UserGameCollectionSortOption?) async throws -> LibraryOverviewResponseDataDTO
+    func fetchOwnedLibrary() async throws -> LibraryOverviewResponseDataDTO
     func fetchSteamLinkStatus() async throws -> SteamLinkStatusDTO
     func startSteamLink() async throws -> SteamLinkStartResponseDataDTO
+    func unlinkSteamAccount() async throws -> SteamUnlinkResponseDataDTO
     func syncOwnedSteamLibrary() async throws -> SyncOwnedSteamLibraryResponseDataDTO
     func updateGameStatus(requestDTO: UpdateLibraryStatusRequestDTO) async throws -> LibraryStatusMutationResponseDataDTO
 }
@@ -36,6 +38,21 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
         return data
     }
 
+    func fetchOwnedLibrary() async throws -> LibraryOverviewResponseDataDTO {
+        print("[Library] request endpoint=GET /users/me/library/owned")
+        let response = try await apiClient.request(
+            .myOwnedLibrary,
+            as: LibraryResponseEnvelopeDTO<LibraryOverviewResponseDataDTO>.self
+        )
+        print(
+            "[Library] response endpoint=GET /users/me/library/owned " +
+            "steamConnected=\(response.data.steamConnected.map(String.init) ?? "nil") " +
+            "ownedCount=\(response.data.owned?.count ?? 0) " +
+            "backlogCount=\(response.data.backlog?.count ?? 0)"
+        )
+        return response.data
+    }
+
     func fetchSteamLinkStatus() async throws -> SteamLinkStatusDTO {
         let response = try await apiClient.request(
             .mySteamLinkStatus,
@@ -51,6 +68,21 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
             as: LibraryResponseEnvelopeDTO<SteamLinkStartResponseDataDTO>.self
         )
         print("[SteamLink] response authUrl=\(response.data.steamLink.authUrl ?? "nil")")
+        return response.data
+    }
+
+    func unlinkSteamAccount() async throws -> SteamUnlinkResponseDataDTO {
+        print("[SteamLink] request endpoint=DELETE /users/me/library/steam/link")
+        let response = try await apiClient.request(
+            .unlinkSteamLink,
+            as: LibraryResponseEnvelopeDTO<SteamUnlinkResponseDataDTO>.self
+        )
+        let isLinkedDescription = response.data.steamLinkStatus?.isLinked.description ?? "nil"
+        print(
+            "[SteamLink] response endpoint=DELETE /users/me/library/steam/link " +
+            "unlinked=\(response.data.unlinked) " +
+            "isLinked=\(isLinkedDescription)"
+        )
         return response.data
     }
 

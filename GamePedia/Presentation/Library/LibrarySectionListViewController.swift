@@ -7,6 +7,7 @@ final class LibrarySectionListViewController: UIViewController {
     }
 
     private let route: LibrarySectionListRoute
+    private let fetchOwnedLibraryUseCase: FetchOwnedLibraryUseCase
     private lazy var collectionView: UICollectionView = {
         let collectionView = UICollectionView(
             frame: .zero,
@@ -20,11 +21,21 @@ final class LibrarySectionListViewController: UIViewController {
     }()
 
     private var dataSource: UICollectionViewDiffableDataSource<Section, LibraryCollectionItem>!
+    private var currentItems: [LibraryCollectionItem]
+    private var loadTask: Task<Void, Never>?
 
     var onGameSelected: ((Int) -> Void)?
+    var onSteamDetailRequested: ((SteamFallbackGameDetailViewState) -> Void)?
 
-    init(route: LibrarySectionListRoute) {
+    init(
+        route: LibrarySectionListRoute,
+        fetchOwnedLibraryUseCase: FetchOwnedLibraryUseCase = FetchOwnedLibraryUseCase(
+            libraryRepository: DefaultLibraryRepository()
+        )
+    ) {
         self.route = route
+        self.fetchOwnedLibraryUseCase = fetchOwnedLibraryUseCase
+        self.currentItems = route.items
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -40,6 +51,11 @@ final class LibrarySectionListViewController: UIViewController {
         setupCollectionView()
         setupDataSource()
         applySnapshot()
+        loadFullContentIfNeeded()
+    }
+
+    deinit {
+        loadTask?.cancel()
     }
 
     private func setupCollectionView() {
@@ -103,8 +119,40 @@ final class LibrarySectionListViewController: UIViewController {
     private func applySnapshot() {
         var snapshot = NSDiffableDataSourceSnapshot<Section, LibraryCollectionItem>()
         snapshot.appendSections([.main])
-        snapshot.appendItems(route.items, toSection: .main)
+        snapshot.appendItems(currentItems, toSection: .main)
         dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func loadFullContentIfNeeded() {
+        switch route.loadBehavior {
+        case .staticPreview:
+            break
+        case .ownedGames:
+            loadFullOwnedGames()
+        }
+    }
+
+    private func loadFullOwnedGames() {
+        guard route.kind == .owned else { return }
+
+        loadTask?.cancel()
+        loadTask = Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let collection = try await fetchOwnedLibraryUseCase.execute()
+                if Task.isCancelled { return }
+
+                let items = collection.owned.map(makeOwnedRowItem)
+                await MainActor.run {
+                    guard !items.isEmpty else { return }
+                    self.currentItems = items
+                    self.applySnapshot()
+                }
+            } catch {
+                print("[LibraryOwnedList] loadFailed error=\(error.localizedDescription)")
+            }
+        }
     }
 
     private func makeLayout() -> UICollectionViewLayout {
@@ -176,6 +224,91 @@ final class LibrarySectionListViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
     }
+
+    private func makeOwnedRowItem(from summary: LibraryGameSummary) -> LibraryCollectionItem {
+        let subtitleText = ownedSubtitleText(for: summary)
+        return .row(
+            LibraryGameRowViewState(
+                identifier: summary.identifier,
+                detailDestination: detailDestination(for: summary),
+                title: summary.displayTitle,
+                subtitleText: subtitleText,
+                metadataText: ownedMetadataText(for: summary, subtitleText: subtitleText),
+                coverImageURL: summary.coverImageURL,
+                fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
+                ratingText: summary.rating.map { String(format: "%.1f", $0) },
+                trailingAction: nil
+            )
+        )
+    }
+
+    private func ownedSubtitleText(for summary: LibraryGameSummary) -> String {
+        if summary.gameSource == .steam, summary.matchStatus != .confirmed {
+            return summary.matchStatus == .confirmed ? "Steam" : "Steam · 정보 보강 중"
+        }
+
+        if summary.gameSource == .steam,
+           let genre = sanitized(summary.genre),
+           genre != "기타" {
+            return "Steam · \(genre)"
+        }
+
+        if let genre = sanitized(summary.genre), genre != "기타" {
+            if summary.releaseYear > 0 {
+                return "\(genre) · \(summary.releaseYear)"
+            }
+            return genre
+        }
+
+        return summary.gameSource == .steam ? "Steam" : "정보 보강 중"
+    }
+
+    private func ownedMetadataText(
+        for summary: LibraryGameSummary,
+        subtitleText: String
+    ) -> String {
+        guard let platform = sanitized(summary.platform),
+              platform != "—",
+              subtitleText.contains(platform) == false else {
+            return ""
+        }
+
+        return platform
+    }
+
+    private func detailDestination(for summary: LibraryGameSummary) -> LibraryGameDetailDestination? {
+        if summary.matchStatus == .confirmed,
+           let igdbGameID = summary.igdbGameId {
+            return .igdb(igdbGameID)
+        }
+
+        guard summary.gameSource == .steam,
+              summary.detailAvailable else {
+            return nil
+        }
+
+        return .steamFallback(
+            SteamFallbackGameDetailViewState(
+                title: summary.displayTitle,
+                coverImageURL: summary.coverImageURL,
+                fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
+                sourceLabelText: "Steam",
+                metadataText: summary.matchStatus == .confirmed ? "Steam" : "Steam · 정보 보강 중",
+                descriptionText: "Steam에서 가져온 게임입니다.",
+                playtimeText: sanitized(summary.recentPlaytimeText),
+                externalGameId: summary.externalGameId,
+                gameSource: summary.gameSource,
+                metadataEnriched: summary.metadataEnriched,
+                matchStatus: summary.matchStatus
+            )
+        )
+    }
+
+    private func sanitized(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 extension LibrarySectionListViewController: UICollectionViewDelegate {
@@ -184,18 +317,24 @@ extension LibrarySectionListViewController: UICollectionViewDelegate {
 
         switch item {
         case .recentCard(let viewState):
-            guard let gameID = viewState.identifier.detailGameID else {
+            switch viewState.detailDestination {
+            case .igdb(let gameID):
+                onGameSelected?(gameID)
+            case .steamFallback(let steamViewState):
+                onSteamDetailRequested?(steamViewState)
+            case .none:
                 presentUnavailableDetailAlert()
-                return
             }
-            onGameSelected?(gameID)
 
         case .row(let viewState):
-            guard let gameID = viewState.identifier.detailGameID else {
+            switch viewState.detailDestination {
+            case .igdb(let gameID):
+                onGameSelected?(gameID)
+            case .steamFallback(let steamViewState):
+                onSteamDetailRequested?(steamViewState)
+            case .none:
                 presentUnavailableDetailAlert()
-                return
             }
-            onGameSelected?(gameID)
 
         case .message:
             break

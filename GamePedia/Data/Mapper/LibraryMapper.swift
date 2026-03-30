@@ -14,8 +14,8 @@ enum LibraryMapper {
     }
 
     static func toGameSummary(_ dto: LibraryGameItemDTO) throws -> LibraryGameSummary {
-        let source = resolvedSource(from: dto.source)
-        let canonicalGameID = dto.gameId
+        let source = resolvedSource(from: dto.gameSource ?? dto.source)
+        let canonicalGameID = resolvedIGDBGameID(from: dto)
         let resolvedSourceID = resolvedSourceID(from: dto, source: source)
         guard let resolvedSourceID else {
             print(
@@ -33,6 +33,19 @@ enum LibraryMapper {
         let genre = sanitized(dto.genre) ?? dto.genres?.first ?? "기타"
         let platform = sanitized(dto.platform) ?? dto.platforms?.first ?? defaultPlatform(for: source)
         let releaseYear = resolvedReleaseYear(from: dto)
+        let metadataEnriched = dto.metadataEnriched ?? (canonicalGameID != nil)
+        let detailAvailable = dto.detailAvailable ?? defaultDetailAvailability(
+            source: source,
+            externalGameId: sanitized(dto.externalGameId) ?? resolvedSourceID,
+            igdbGameID: canonicalGameID
+        )
+        let matchStatus = resolvedMatchStatus(
+            from: dto.matchStatus,
+            source: source,
+            igdbGameID: canonicalGameID,
+            metadataEnriched: metadataEnriched,
+            detailAvailable: detailAvailable
+        )
         let resolvedIGDBCoverURL = igdbCoverURL(from: dto.coverUrl ?? dto.coverImageUrl)
         let resolvedImageURLs = source == .steam
             ? LibraryGameImageURLResolver.resolveImageURLs(
@@ -61,7 +74,10 @@ enum LibraryMapper {
             rating: normalizedRating(from: dto),
             recentPlaytimeMinutes: dto.recentPlaytimeMinutes,
             recentPlaytimeText: resolvedRecentPlaytimeText(from: dto),
-            userStatus: resolvedStatus(from: dto.userStatus ?? dto.status)
+            userStatus: resolvedStatus(from: dto.userStatus ?? dto.status),
+            metadataEnriched: metadataEnriched,
+            detailAvailable: detailAvailable,
+            matchStatus: matchStatus
         )
     }
 
@@ -115,6 +131,7 @@ enum LibraryMapper {
     private static func resolvedTitle(from dto: LibraryGameItemDTO) -> String {
         sanitized(dto.originalTitle)
             ?? sanitized(dto.originalName)
+            ?? sanitized(dto.gameName)
             ?? sanitized(dto.title)
             ?? sanitized(dto.name)
             ?? "이름 없는 게임"
@@ -122,6 +139,7 @@ enum LibraryMapper {
 
     private static func resolvedTranslatedTitle(from dto: LibraryGameItemDTO, fallbackTitle: String) -> String? {
         let candidate = sanitized(dto.translatedTitle)
+            ?? sanitized(dto.gameName)
             ?? sanitized(dto.title)
             ?? sanitized(dto.name)
         guard let candidate, candidate != fallbackTitle else { return nil }
@@ -141,6 +159,33 @@ enum LibraryMapper {
         return UserGameStatus(rawValue: rawValue)
     }
 
+    private static func resolvedMatchStatus(
+        from rawValue: String?,
+        source: GameSource,
+        igdbGameID: Int?,
+        metadataEnriched: Bool,
+        detailAvailable: Bool
+    ) -> LibraryGameMatchStatus {
+        if let rawValue = sanitized(rawValue)?.lowercased(),
+           let matchStatus = LibraryGameMatchStatus(rawValue: rawValue) {
+            return matchStatus
+        }
+
+        if source == .igdb {
+            return .confirmed
+        }
+
+        if igdbGameID != nil, metadataEnriched {
+            return .confirmed
+        }
+
+        if igdbGameID != nil {
+            return .candidate
+        }
+
+        return detailAvailable ? .unmatched : .unknown
+    }
+
     private static func resolvedReleaseYear(from dto: LibraryGameItemDTO) -> Int {
         if let releaseYear = dto.releaseYear, releaseYear > 0 {
             return releaseYear
@@ -149,6 +194,18 @@ enum LibraryMapper {
         guard let releaseDate = dto.releaseDate else { return 0 }
         let date = Date(timeIntervalSince1970: TimeInterval(releaseDate))
         return Calendar.current.component(.year, from: date)
+    }
+
+    private static func resolvedIGDBGameID(from dto: LibraryGameItemDTO) -> Int? {
+        if let gameId = dto.gameId {
+            return gameId
+        }
+
+        if let igdbGameId = sanitized(dto.igdbGameId) {
+            return Int(igdbGameId)
+        }
+
+        return nil
     }
 
     private static func normalizedRating(from dto: LibraryGameItemDTO) -> Double? {
@@ -182,6 +239,22 @@ enum LibraryMapper {
         case .igdb:
             return "—"
         }
+    }
+
+    private static func defaultDetailAvailability(
+        source: GameSource,
+        externalGameId: String?,
+        igdbGameID: Int?
+    ) -> Bool {
+        if igdbGameID != nil {
+            return true
+        }
+
+        if source == .steam, let externalGameId, externalGameId.isEmpty == false {
+            return true
+        }
+
+        return false
     }
 
     private static func makeURL(from rawURL: String?) -> URL? {

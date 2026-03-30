@@ -31,6 +31,9 @@ final class LibraryCoordinator {
         libraryVC.onGameSelected = { [weak self] gameId in
             self?.showDetail(gameId: gameId)
         }
+        libraryVC.onSteamDetailRequested = { [weak self] viewState in
+            self?.showSteamDetail(viewState: viewState)
+        }
         libraryVC.onSteamLinkRequested = { [weak self, weak libraryVC] url in
             let presenter = libraryVC ?? self?.navigationController.topViewController ?? self?.navigationController
             self?.showSteamLink(url: url, presenter: presenter)
@@ -78,7 +81,15 @@ final class LibraryCoordinator {
         listViewController.onGameSelected = { [weak self] gameID in
             self?.showDetail(gameId: gameID)
         }
+        listViewController.onSteamDetailRequested = { [weak self] viewState in
+            self?.showSteamDetail(viewState: viewState)
+        }
         navigationController.pushViewController(listViewController, animated: true)
+    }
+
+    private func showSteamDetail(viewState: SteamFallbackGameDetailViewState) {
+        let viewController = SteamFallbackGameDetailViewController(viewState: viewState)
+        navigationController.pushViewController(viewController, animated: true)
     }
 
     private func showReview(

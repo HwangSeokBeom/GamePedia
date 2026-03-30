@@ -29,10 +29,13 @@ struct LibraryOverviewResponseDataDTO: Decodable {
 
 struct LibraryGameItemDTO: Decodable {
     let source: String?
+    let gameSource: String?
     let sourceId: String?
     let externalGameId: String?
     let gameId: Int?
+    let igdbGameId: String?
     let title: String?
+    let gameName: String?
     let name: String?
     let originalTitle: String?
     let originalName: String?
@@ -52,6 +55,9 @@ struct LibraryGameItemDTO: Decodable {
     let recentPlaytimeText: String?
     let userStatus: String?
     let status: String?
+    let metadataEnriched: Bool?
+    let detailAvailable: Bool?
+    let matchStatus: String?
 }
 
 struct LibraryReviewedGameItemDTO: Decodable {
@@ -104,6 +110,11 @@ struct SyncOwnedSteamLibraryResponseDataDTO: Decodable {
     let syncWarningCode: String?
     let igdbEnrichmentApplied: Bool?
     let igdbEnrichmentSkippedReason: String?
+}
+
+struct SteamUnlinkResponseDataDTO: Decodable {
+    let unlinked: Bool
+    let steamLinkStatus: SteamLinkStatusDTO?
 }
 
 struct SteamLinkStartResponseDataDTO: Decodable {

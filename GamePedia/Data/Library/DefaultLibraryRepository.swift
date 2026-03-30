@@ -53,10 +53,34 @@ final class DefaultLibraryRepository: LibraryRepository {
         }
     }
 
+    func fetchOwnedLibrary() async throws -> OwnedLibraryCollection {
+        do {
+            let data = try await libraryRemoteDataSource.fetchOwnedLibrary()
+            let owned = try (data.owned ?? []).map(LibraryMapper.toGameSummary)
+            let backlog = try (data.backlog ?? []).map(LibraryMapper.toGameSummary)
+            return OwnedLibraryCollection(owned: owned, backlog: backlog)
+        } catch {
+            throw LibraryError.from(error: error)
+        }
+    }
+
     func startSteamLink() async throws -> URL {
         do {
             let data = try await libraryRemoteDataSource.startSteamLink()
             return try LibraryMapper.toSteamLinkURL(data)
+        } catch {
+            throw LibraryError.from(error: error)
+        }
+    }
+
+    func unlinkSteamAccount() async throws -> SteamUnlinkResult {
+        do {
+            let data = try await libraryRemoteDataSource.unlinkSteamAccount()
+            let steamLinkStatus = data.steamLinkStatus.map(LibraryMapper.toSteamLinkStatus) ?? .notLinked
+            return SteamUnlinkResult(
+                isUnlinked: data.unlinked,
+                steamLinkStatus: steamLinkStatus
+            )
         } catch {
             throw LibraryError.from(error: error)
         }

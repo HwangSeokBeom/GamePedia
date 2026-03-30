@@ -32,6 +32,8 @@ enum LibraryReducer {
             state.addingToPlayingIdentifiers.removeAll()
         case .setSyncingOwnedSteamLibrary(let isSyncing):
             state.isSyncingOwnedSteamLibrary = isSyncing
+        case .setUnlinkingSteamAccount(let isUnlinking):
+            state.isUnlinkingSteamAccount = isUnlinking
         case .setSections(let sections):
             state.sections = sections
             state.errorMessage = nil

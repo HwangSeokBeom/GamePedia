@@ -28,6 +28,8 @@ final class SectionHeaderView: UIView {
         config.contentInsets = .zero
         let button = UIButton(configuration: config)
         button.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
         return button
     }()
 

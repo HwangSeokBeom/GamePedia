@@ -2,20 +2,32 @@ import Foundation
 
 enum LibraryRoute {
     case showGameDetail(Int)
+    case showSteamDetail(SteamFallbackGameDetailViewState)
     case showSteamLink(URL)
     case showSteamPrivacyGuide(URL)
     case showSectionList(LibrarySectionListRoute)
     case showReviewed
 }
 
+enum LibraryGameDetailDestination: Hashable {
+    case igdb(Int)
+    case steamFallback(SteamFallbackGameDetailViewState)
+}
+
 struct LibrarySectionListRoute: Hashable {
     let kind: LibrarySectionKind
     let layoutStyle: LibrarySectionLayoutStyle
     let items: [LibraryCollectionItem]
+    let loadBehavior: LibrarySectionListLoadBehavior
 
     var title: String {
         kind.title
     }
+}
+
+enum LibrarySectionListLoadBehavior: Hashable {
+    case staticPreview
+    case ownedGames(sort: UserGameCollectionSortOption)
 }
 
 enum LibrarySectionKind: Int, CaseIterable, Hashable {
@@ -77,6 +89,7 @@ enum LibraryCollectionItem: Hashable {
 
 struct LibraryRecentGameCardViewState: Hashable {
     let identifier: LibraryGameIdentifier
+    let detailDestination: LibraryGameDetailDestination?
     let title: String
     let metadataText: String
     let ratingText: String?
@@ -88,6 +101,7 @@ struct LibraryRecentGameCardViewState: Hashable {
 
     init(
         identifier: LibraryGameIdentifier,
+        detailDestination: LibraryGameDetailDestination?,
         title: String,
         metadataText: String,
         ratingText: String?,
@@ -98,6 +112,7 @@ struct LibraryRecentGameCardViewState: Hashable {
         isActionEnabled: Bool
     ) {
         self.identifier = identifier
+        self.detailDestination = detailDestination
         self.title = title
         self.metadataText = metadataText
         self.ratingText = ratingText
@@ -111,6 +126,7 @@ struct LibraryRecentGameCardViewState: Hashable {
 
 struct LibraryGameRowViewState: Hashable {
     let identifier: LibraryGameIdentifier
+    let detailDestination: LibraryGameDetailDestination?
     let title: String
     let subtitleText: String
     let metadataText: String
@@ -121,6 +137,7 @@ struct LibraryGameRowViewState: Hashable {
 
     init(
         identifier: LibraryGameIdentifier,
+        detailDestination: LibraryGameDetailDestination?,
         title: String,
         subtitleText: String,
         metadataText: String,
@@ -130,6 +147,7 @@ struct LibraryGameRowViewState: Hashable {
         trailingAction: LibraryRowTrailingAction?
     ) {
         self.identifier = identifier
+        self.detailDestination = detailDestination
         self.title = title
         self.subtitleText = subtitleText
         self.metadataText = metadataText
@@ -158,6 +176,7 @@ enum LibraryMessageStyle: Hashable {
     case banner
     case empty
     case error
+    case loading
 }
 
 enum LibraryMessageAction: Hashable {

@@ -47,6 +47,7 @@ struct LibraryState {
     var reviews: [ReviewedGame] = []
     var addingToPlayingIdentifiers: Set<LibraryGameIdentifier> = []
     var isSyncingOwnedSteamLibrary: Bool = false
+    var isUnlinkingSteamAccount: Bool = false
     var sections: [LibrarySectionViewState] = []
     var isLoading: Bool = false
     var isRefreshing: Bool = false

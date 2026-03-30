@@ -10,8 +10,21 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     private let refreshControl = UIRefreshControl()
     private var toastHideWorkItem: DispatchWorkItem?
     private weak var toastView: LibraryToastView?
+    private lazy var syncOwnedLibraryBarButtonItem = UIBarButtonItem(
+        title: "Steam 보관함 가져오기",
+        style: .plain,
+        target: self,
+        action: #selector(didTapSyncOwnedSteamLibrary)
+    )
+    private lazy var steamManagementBarButtonItem = UIBarButtonItem(
+        image: UIImage(systemName: "ellipsis.circle"),
+        style: .plain,
+        target: nil,
+        action: nil
+    )
 
     var onGameSelected: ((Int) -> Void)?
+    var onSteamDetailRequested: ((SteamFallbackGameDetailViewState) -> Void)?
     var onSteamLinkRequested: ((URL) -> Void)?
     var onSteamPrivacyGuideRequested: ((URL) -> Void)?
     var onSectionListRequested: ((LibrarySectionListRoute) -> Void)?
@@ -68,7 +81,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
             lastPresentedSuccessMessage = nil
         }
 
-        updateSyncOwnedLibraryButton(isSyncing: state.isSyncingOwnedSteamLibrary)
+        updateNavigationItems(with: state)
     }
 
     func retrySteamPrivacyGuidance() {
@@ -79,12 +92,6 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         UIView.performWithoutAnimation {
             navigationItem.title = "내 라이브러리"
             navigationItem.largeTitleDisplayMode = .never
-            navigationItem.rightBarButtonItem = UIBarButtonItem(
-                title: "Steam 보관함 가져오기",
-                style: .plain,
-                target: self,
-                action: #selector(didTapSyncOwnedSteamLibrary)
-            )
         }
     }
 
@@ -211,6 +218,8 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
             switch route {
             case .showGameDetail(let gameID):
                 self?.onGameSelected?(gameID)
+            case .showSteamDetail(let viewState):
+                self?.onSteamDetailRequested?(viewState)
             case .showSteamLink(let url):
                 self?.onSteamLinkRequested?(url)
             case .showSteamPrivacyGuide(let url):
@@ -278,9 +287,42 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         viewModel.send(.syncOwnedSteamLibraryButtonTapped)
     }
 
-    private func updateSyncOwnedLibraryButton(isSyncing: Bool) {
-        navigationItem.rightBarButtonItem?.title = isSyncing ? "가져오는 중..." : "Steam 보관함 가져오기"
-        navigationItem.rightBarButtonItem?.isEnabled = !isSyncing
+    private func updateNavigationItems(with state: LibraryState) {
+        guard state.isSteamConnected else {
+            navigationItem.rightBarButtonItems = nil
+            return
+        }
+
+        syncOwnedLibraryBarButtonItem.title = state.isSyncingOwnedSteamLibrary ? "가져오는 중..." : "Steam 보관함 가져오기"
+        syncOwnedLibraryBarButtonItem.isEnabled = !state.isSyncingOwnedSteamLibrary && !state.isUnlinkingSteamAccount
+        steamManagementBarButtonItem.isEnabled = !state.isSyncingOwnedSteamLibrary && !state.isUnlinkingSteamAccount
+        steamManagementBarButtonItem.menu = makeSteamManagementMenu()
+        navigationItem.rightBarButtonItems = [steamManagementBarButtonItem, syncOwnedLibraryBarButtonItem]
+    }
+
+    private func makeSteamManagementMenu() -> UIMenu {
+        let unlinkAction = UIAction(
+            title: "Steam 연동 해제",
+            image: UIImage(systemName: "link.badge.minus"),
+            attributes: .destructive
+        ) { [weak self] _ in
+            self?.presentSteamUnlinkConfirmationAlert()
+        }
+
+        return UIMenu(title: "", children: [unlinkAction])
+    }
+
+    private func presentSteamUnlinkConfirmationAlert() {
+        let alert = UIAlertController(
+            title: "Steam 연동을 해제할까요?",
+            message: "연동을 해제하면 Steam에서 가져온 최근 플레이 및 보유 게임 연결 정보가 더 이상 동기화되지 않아요.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alert.addAction(UIAlertAction(title: "연동 해제", style: .destructive) { [weak self] _ in
+            self?.viewModel.send(.unlinkSteamConfirmed)
+        })
+        present(alert, animated: true)
     }
 
     private func showToast(message: String) {
