@@ -67,6 +67,24 @@ final class DefaultLibraryRepository: LibraryRepository {
         }
     }
 
+    func fetchPlayingLibrary() async throws -> [LibraryGameSummary] {
+        do {
+            let data = try await libraryRemoteDataSource.fetchPlayingLibrary()
+            return try (data.playing ?? []).map(LibraryMapper.toGameSummary)
+        } catch {
+            throw LibraryError.from(error: error)
+        }
+    }
+
+    func fetchRecentlyPlayedLibrary() async throws -> [LibraryGameSummary] {
+        do {
+            let data = try await libraryRemoteDataSource.fetchRecentlyPlayedLibrary()
+            return try (data.recentlyPlayed ?? []).map(LibraryMapper.toGameSummary)
+        } catch {
+            throw LibraryError.from(error: error)
+        }
+    }
+
     func fetchPlaytimeRecommendations() async throws -> [PlaytimeRecommendation] {
         do {
             let data = try await libraryRemoteDataSource.fetchPlaytimeRecommendations()

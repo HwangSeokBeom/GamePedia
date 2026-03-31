@@ -7,7 +7,13 @@ final class LibrarySectionListViewController: UIViewController {
     }
 
     private let route: LibrarySectionListRoute
+    private let fetchRecentlyPlayedLibraryUseCase: FetchRecentlyPlayedLibraryUseCase
+    private let fetchPlayingLibraryUseCase: FetchPlayingLibraryUseCase
     private let fetchOwnedLibraryUseCase: FetchOwnedLibraryUseCase
+    private let fetchFavoriteGamesUseCase: FetchFavoriteGamesUseCase
+    private let fetchMyReviewedGamesUseCase: FetchMyReviewedGamesUseCase
+    private let fetchSteamFriendRecommendationsUseCase: FetchSteamFriendRecommendationsUseCase
+    private let fetchPlaytimeRecommendationsUseCase: FetchPlaytimeRecommendationsUseCase
     private lazy var collectionView: UICollectionView = {
         let collectionView = UICollectionView(
             frame: .zero,
@@ -22,6 +28,7 @@ final class LibrarySectionListViewController: UIViewController {
 
     private var dataSource: UICollectionViewDiffableDataSource<Section, LibraryCollectionItem>!
     private var currentItems: [LibraryCollectionItem]
+    private var currentLayoutStyle: LibrarySectionLayoutStyle
     private var loadTask: Task<Void, Never>?
 
     var onGameSelected: ((Int) -> Void)?
@@ -29,13 +36,47 @@ final class LibrarySectionListViewController: UIViewController {
 
     init(
         route: LibrarySectionListRoute,
+        fetchRecentlyPlayedLibraryUseCase: FetchRecentlyPlayedLibraryUseCase = FetchRecentlyPlayedLibraryUseCase(
+            libraryRepository: DefaultLibraryRepository()
+        ),
+        fetchPlayingLibraryUseCase: FetchPlayingLibraryUseCase = FetchPlayingLibraryUseCase(
+            libraryRepository: DefaultLibraryRepository()
+        ),
         fetchOwnedLibraryUseCase: FetchOwnedLibraryUseCase = FetchOwnedLibraryUseCase(
+            libraryRepository: DefaultLibraryRepository()
+        ),
+        fetchFavoriteGamesUseCase: FetchFavoriteGamesUseCase = FetchFavoriteGamesUseCase(
+            fetchMyFavoritesUseCase: FetchMyFavoritesUseCase(
+                favoriteRepository: DefaultFavoriteRepository()
+            ),
+            gameRepository: DefaultGameRepository()
+        ),
+        fetchMyReviewedGamesUseCase: FetchMyReviewedGamesUseCase = FetchMyReviewedGamesUseCase(
+            fetchMyReviewsUseCase: FetchMyReviewsUseCase(
+                reviewRepository: DefaultReviewRepository()
+            ),
+            gameRepository: DefaultGameRepository()
+        ),
+        fetchSteamFriendRecommendationsUseCase: FetchSteamFriendRecommendationsUseCase = FetchSteamFriendRecommendationsUseCase(
+            libraryRepository: DefaultLibraryRepository()
+        ),
+        fetchPlaytimeRecommendationsUseCase: FetchPlaytimeRecommendationsUseCase = FetchPlaytimeRecommendationsUseCase(
             libraryRepository: DefaultLibraryRepository()
         )
     ) {
         self.route = route
+        self.fetchRecentlyPlayedLibraryUseCase = fetchRecentlyPlayedLibraryUseCase
+        self.fetchPlayingLibraryUseCase = fetchPlayingLibraryUseCase
         self.fetchOwnedLibraryUseCase = fetchOwnedLibraryUseCase
-        self.currentItems = route.items
+        self.fetchFavoriteGamesUseCase = fetchFavoriteGamesUseCase
+        self.fetchMyReviewedGamesUseCase = fetchMyReviewedGamesUseCase
+        self.fetchSteamFriendRecommendationsUseCase = fetchSteamFriendRecommendationsUseCase
+        self.fetchPlaytimeRecommendationsUseCase = fetchPlaytimeRecommendationsUseCase
+
+        let initialState = Self.initialState(for: route)
+        self.currentItems = initialState.items
+        self.currentLayoutStyle = initialState.layoutStyle
+
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -95,6 +136,7 @@ final class LibrarySectionListViewController: UIViewController {
                     for: indexPath
                 ) as! LibraryGameCardCell
                 cell.configure(with: viewState)
+                cell.onActionButtonTapped = nil
                 return cell
 
             case .row(let viewState):
@@ -103,6 +145,7 @@ final class LibrarySectionListViewController: UIViewController {
                     for: indexPath
                 ) as! LibraryGameRowCell
                 cell.configure(with: viewState)
+                cell.onTrailingActionTapped = nil
                 return cell
 
             case .message(let viewState):
@@ -111,6 +154,7 @@ final class LibrarySectionListViewController: UIViewController {
                     for: indexPath
                 ) as! LibraryInfoCell
                 cell.configure(with: viewState)
+                cell.onButtonTapped = nil
                 return cell
             }
         }
@@ -123,34 +167,142 @@ final class LibrarySectionListViewController: UIViewController {
         dataSource.apply(snapshot, animatingDifferences: false)
     }
 
+    private func render(
+        items: [LibraryCollectionItem],
+        layoutStyle: LibrarySectionLayoutStyle,
+        animated: Bool = false
+    ) {
+        currentItems = items
+        if currentLayoutStyle != layoutStyle {
+            currentLayoutStyle = layoutStyle
+            collectionView.setCollectionViewLayout(makeLayout(), animated: animated)
+        }
+        applySnapshot()
+    }
+
     private func loadFullContentIfNeeded() {
         switch route.loadBehavior {
         case .staticPreview:
             break
+
+        case .recentlyPlayed:
+            loadContent(
+                logLabel: "recentlyPlayed",
+                layoutStyle: .recentCards,
+                emptyMessage: emptyMessageViewState(for: .recentlyPlayed)
+            ) { [weak self] in
+                guard let self else { return [] }
+                let summaries = try await self.fetchRecentlyPlayedLibraryUseCase.execute()
+                return summaries.map(self.makeRecentlyPlayedCardItem)
+            }
+
+        case .playing:
+            loadContent(
+                logLabel: "playing",
+                layoutStyle: .list,
+                emptyMessage: emptyMessageViewState(for: .playing)
+            ) { [weak self] in
+                guard let self else { return [] }
+                let summaries = try await self.fetchPlayingLibraryUseCase.execute()
+                return summaries.map(self.makeLibraryRowItem)
+            }
+
         case .ownedGames:
-            loadFullOwnedGames()
+            loadContent(
+                logLabel: "owned",
+                layoutStyle: .list,
+                emptyMessage: emptyMessageViewState(for: .owned)
+            ) { [weak self] in
+                guard let self else { return [] }
+                let collection = try await self.fetchOwnedLibraryUseCase.execute()
+                return collection.owned.map(self.makeLibraryRowItem)
+            }
+
+        case .wishlist(let sort):
+            loadContent(
+                logLabel: "wishlist",
+                layoutStyle: .list,
+                emptyMessage: emptyMessageViewState(for: .wishlist)
+            ) { [weak self] in
+                guard let self else { return [] }
+                let entries = try await self.fetchFavoriteGamesUseCase.execute(sort: sort)
+                return entries.map(self.makeWishlistRowItem)
+            }
+
+        case .reviewed(let sort):
+            loadContent(
+                logLabel: "reviewed",
+                layoutStyle: .list,
+                emptyMessage: emptyMessageViewState(for: .reviewed)
+            ) { [weak self] in
+                guard let self else { return [] }
+                let reviewedGames = try await self.fetchMyReviewedGamesUseCase.execute(sort: sort)
+                return reviewedGames.map(self.makeReviewedRowItem)
+            }
+
+        case .friendRecommendations:
+            loadContent(
+                logLabel: "friendRecommendations",
+                layoutStyle: .list,
+                emptyMessage: emptyMessageViewState(for: .friendRecommendations)
+            ) { [weak self] in
+                guard let self else { return [] }
+                let recommendations = try await self.fetchSteamFriendRecommendationsUseCase.execute()
+                return recommendations.map(self.makeFriendRecommendationRowItem)
+            }
+
+        case .playtimeRecommendations:
+            loadContent(
+                logLabel: "playtimeRecommendations",
+                layoutStyle: .list,
+                emptyMessage: emptyMessageViewState(for: .playtimeRecommendations)
+            ) { [weak self] in
+                guard let self else { return [] }
+                let recommendations = try await self.fetchPlaytimeRecommendationsUseCase.execute()
+                return recommendations.map(self.makePlaytimeRecommendationRowItem)
+            }
         }
     }
 
-    private func loadFullOwnedGames() {
-        guard route.kind == .owned else { return }
-
+    private func loadContent(
+        logLabel: String,
+        layoutStyle: LibrarySectionLayoutStyle,
+        emptyMessage: LibraryMessageViewState,
+        loader: @escaping () async throws -> [LibraryCollectionItem]
+    ) {
         loadTask?.cancel()
+        render(items: [.message(Self.loadingMessageViewState(for: route.kind))], layoutStyle: .message)
+
         loadTask = Task { [weak self] in
             guard let self else { return }
 
             do {
-                let collection = try await fetchOwnedLibraryUseCase.execute()
+                let items = try await loader()
                 if Task.isCancelled { return }
 
-                let items = collection.owned.map(makeOwnedRowItem)
                 await MainActor.run {
-                    guard !items.isEmpty else { return }
-                    self.currentItems = items
-                    self.applySnapshot()
+                    print("[LibrarySectionList] loadSucceeded kind=\(self.route.kind.title) itemCount=\(items.count)")
+                    if items.isEmpty {
+                        self.render(items: [.message(emptyMessage)], layoutStyle: .message)
+                    } else {
+                        self.render(items: items, layoutStyle: layoutStyle)
+                    }
                 }
             } catch {
-                print("[LibraryOwnedList] loadFailed error=\(error.localizedDescription)")
+                if Task.isCancelled { return }
+
+                await MainActor.run {
+                    print(
+                        "[LibrarySectionList] loadFailed " +
+                        "kind=\(self.route.kind.title) " +
+                        "label=\(logLabel) " +
+                        "error=\(error.localizedDescription)"
+                    )
+                    self.render(
+                        items: [.message(Self.errorMessageViewState(for: self.route.kind))],
+                        layoutStyle: .message
+                    )
+                }
             }
         }
     }
@@ -159,7 +311,7 @@ final class LibrarySectionListViewController: UIViewController {
         UICollectionViewCompositionalLayout { [weak self] _, environment in
             guard let self else { return nil }
 
-            switch route.layoutStyle {
+            switch self.currentLayoutStyle {
             case .recentCards:
                 return self.makeRecentCardsSection(environment: environment)
             case .list, .message:
@@ -225,15 +377,32 @@ final class LibrarySectionListViewController: UIViewController {
         present(alert, animated: true)
     }
 
-    private func makeOwnedRowItem(from summary: LibraryGameSummary) -> LibraryCollectionItem {
-        let subtitleText = ownedSubtitleText(for: summary)
+    private func makeRecentlyPlayedCardItem(from summary: LibraryGameSummary) -> LibraryCollectionItem {
+        .recentCard(
+            LibraryRecentGameCardViewState(
+                identifier: summary.identifier,
+                detailDestination: detailDestination(for: summary),
+                title: summary.displayTitle,
+                metadataText: recentlyPlayedMetadataText(for: summary),
+                ratingText: summary.rating.map { String(format: "%.1f", $0) },
+                coverImageURL: summary.coverImageURL,
+                fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
+                badgeText: "Steam",
+                actionTitle: nil,
+                isActionEnabled: true
+            )
+        )
+    }
+
+    private func makeLibraryRowItem(from summary: LibraryGameSummary) -> LibraryCollectionItem {
+        let subtitleText = librarySubtitleText(for: summary)
         return .row(
             LibraryGameRowViewState(
                 identifier: summary.identifier,
                 detailDestination: detailDestination(for: summary),
                 title: summary.displayTitle,
                 subtitleText: subtitleText,
-                metadataText: ownedMetadataText(for: summary, subtitleText: subtitleText),
+                metadataText: libraryRowMetadataText(for: summary, subtitleText: subtitleText),
                 coverImageURL: summary.coverImageURL,
                 fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
                 ratingText: summary.rating.map { String(format: "%.1f", $0) },
@@ -242,23 +411,113 @@ final class LibrarySectionListViewController: UIViewController {
         )
     }
 
-    private func ownedSubtitleText(for summary: LibraryGameSummary) -> String {
-        if summary.gameSource == .steam,
-           let genre = summary.displayableGenreText {
-            return "Steam · \(genre)"
-        }
-
-        if let genre = summary.displayableGenreText {
-            if summary.releaseYear > 0 {
-                return "\(genre) · \(summary.releaseYear)"
-            }
-            return genre
-        }
-
-        return summary.gameSource == .steam ? "Steam" : "정보 보강 중"
+    private func makeWishlistRowItem(from entry: FavoriteGameEntry) -> LibraryCollectionItem {
+        .row(
+            LibraryGameRowViewState(
+                identifier: LibraryGameIdentifier(
+                    source: .igdb,
+                    sourceID: String(entry.game.id),
+                    canonicalGameID: entry.game.id
+                ),
+                detailDestination: .igdb(entry.game.id),
+                title: entry.game.displayTitle,
+                subtitleText: "\(entry.game.genre) · \(releaseText(for: entry.game.releaseYear))",
+                metadataText: entry.game.platform,
+                coverImageURL: entry.game.coverImageURL,
+                ratingText: entry.game.rating > 0 ? String(format: "%.1f", entry.game.rating) : nil,
+                trailingAction: nil
+            )
+        )
     }
 
-    private func ownedMetadataText(
+    private func makeReviewedRowItem(from reviewedGame: ReviewedGame) -> LibraryCollectionItem {
+        .row(
+            LibraryGameRowViewState(
+                identifier: LibraryGameIdentifier(
+                    source: .igdb,
+                    sourceID: String(reviewedGame.gameId),
+                    canonicalGameID: reviewedGame.gameId
+                ),
+                detailDestination: .igdb(reviewedGame.gameId),
+                title: reviewedGame.game.displayTitle,
+                subtitleText: reviewedGame.contentPreview,
+                metadataText: "\(reviewedGame.game.genre) · \(releaseText(for: reviewedGame.game.releaseYear))",
+                coverImageURL: reviewedGame.game.coverImageURL,
+                fallbackCoverImageURLs: [],
+                ratingText: String(format: "%.1f", reviewedGame.rating),
+                trailingAction: nil
+            )
+        )
+    }
+
+    private func makeFriendRecommendationRowItem(
+        from recommendation: SteamFriendRecommendation
+    ) -> LibraryCollectionItem {
+        let summary = recommendation.game
+        return .row(
+            LibraryGameRowViewState(
+                identifier: summary.identifier,
+                detailDestination: detailDestination(for: summary),
+                title: summary.displayTitle,
+                subtitleText: friendRecommendationSubtitleText(for: recommendation),
+                metadataText: librarySubtitleText(for: summary),
+                coverImageURL: summary.coverImageURL,
+                fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
+                ratingText: summary.rating.map { String(format: "%.1f", $0) },
+                trailingAction: nil
+            )
+        )
+    }
+
+    private func makePlaytimeRecommendationRowItem(
+        from recommendation: PlaytimeRecommendation
+    ) -> LibraryCollectionItem {
+        let summary = recommendation.game
+        return .row(
+            LibraryGameRowViewState(
+                identifier: summary.identifier,
+                detailDestination: detailDestination(for: summary),
+                title: summary.displayTitle,
+                subtitleText: playtimeRecommendationSubtitleText(for: recommendation),
+                metadataText: librarySubtitleText(for: summary),
+                coverImageURL: summary.coverImageURL,
+                fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
+                ratingText: summary.rating.map { String(format: "%.1f", $0) },
+                trailingAction: nil
+            )
+        )
+    }
+
+    private func recentlyPlayedMetadataText(for summary: LibraryGameSummary) -> String {
+        if summary.gameSource == .steam,
+           let playtimeText = SteamPlaytimeFormatter.recentPlaytimeText(
+                recentPlaytimeMinutes: summary.recentPlaytimeMinutes,
+                fallbackPlaytimeMinutes: summary.playtimeMinutes
+           ) {
+            return playtimeText
+        }
+
+        if let recentPlaytimeText = sanitized(summary.recentPlaytimeText) {
+            return recentPlaytimeText
+        }
+
+        if summary.gameSource == .steam,
+           summary.matchStatus != .confirmed {
+            return steamLibraryFallbackText(for: summary)
+        }
+
+        if let subtitleText = conciseLibraryMetadataText(for: summary) {
+            return subtitleText
+        }
+
+        return steamLibraryFallbackText(for: summary)
+    }
+
+    private func librarySubtitleText(for summary: LibraryGameSummary) -> String {
+        conciseLibraryMetadataText(for: summary) ?? steamLibraryFallbackText(for: summary)
+    }
+
+    private func libraryRowMetadataText(
         for summary: LibraryGameSummary,
         subtitleText: String
     ) -> String {
@@ -267,13 +526,52 @@ final class LibrarySectionListViewController: UIViewController {
             return playtimeText
         }
 
-        guard let platform = sanitized(summary.platform),
-              platform != "—",
-              subtitleText.contains(platform) == false else {
+        guard let platformText = normalizedPlatformText(for: summary),
+              subtitleText.contains(platformText) == false else {
             return ""
         }
 
-        return platform
+        return platformText
+    }
+
+    private func conciseLibraryMetadataText(for summary: LibraryGameSummary) -> String? {
+        if summary.gameSource == .steam {
+            if let genreText = summary.displayableGenreText {
+                return "Steam · \(genreText)"
+            }
+
+            return "Steam"
+        }
+
+        let components = [
+            summary.displayableGenreText,
+            knownReleaseText(for: summary)
+        ].compactMap { $0 }
+
+        guard !components.isEmpty else { return nil }
+        return components.joined(separator: " · ")
+    }
+
+    private func knownReleaseText(for summary: LibraryGameSummary) -> String? {
+        guard summary.releaseYear > 0 else { return nil }
+        return "\(summary.releaseYear)"
+    }
+
+    private func normalizedPlatformText(for summary: LibraryGameSummary) -> String? {
+        guard let platformText = sanitized(summary.platform),
+              platformText != "—" else {
+            return nil
+        }
+
+        return platformText
+    }
+
+    private func steamLibraryFallbackText(for summary: LibraryGameSummary) -> String {
+        guard summary.identifier.source == .steam else {
+            return "정보 보강 중"
+        }
+
+        return summary.matchStatus == .confirmed ? "Steam" : "Steam · 정보 보강 중"
     }
 
     private func detailDestination(for summary: LibraryGameSummary) -> LibraryGameDetailDestination? {
@@ -306,18 +604,159 @@ final class LibrarySectionListViewController: UIViewController {
         )
     }
 
-    private func sanitized(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
     private func steamMetadataText(for summary: LibraryGameSummary) -> String {
         if let genre = summary.displayableGenreText {
             return "Steam · \(genre)"
         }
 
         return summary.matchStatus == .confirmed ? "Steam" : "Steam · 정보 보강 중"
+    }
+
+    private func playtimeRecommendationSubtitleText(
+        for recommendation: PlaytimeRecommendation
+    ) -> String {
+        guard let reason = sanitized(recommendation.reason) else {
+            return "플레이 성향과 잘 맞는 게임이에요"
+        }
+
+        switch reason {
+        case "자주 즐기는 장르와 잘 맞아요":
+            return "자주 즐기는 장르에 가까워요"
+        default:
+            return reason
+        }
+    }
+
+    private func friendRecommendationSubtitleText(
+        for recommendation: SteamFriendRecommendation
+    ) -> String {
+        let friendCount = max(recommendation.friendCount, 0)
+        if let reason = sanitized(recommendation.reason), reason.contains("플레이 중") {
+            return friendCount > 0 ? "친구 \(friendCount)명이 플레이 중" : "친구들이 플레이 중인 게임"
+        }
+
+        if let reason = sanitized(recommendation.reason), reason.contains("보유") {
+            return "친구들이 많이 보유한 게임"
+        }
+
+        return friendCount > 0 ? "친구 \(friendCount)명이 주목한 게임" : "친구들이 많이 보유한 게임"
+    }
+
+    private func releaseText(for year: Int) -> String {
+        year > 0 ? "\(year)" : "출시 예정"
+    }
+
+    private func sanitized(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func initialState(
+        for route: LibrarySectionListRoute
+    ) -> (layoutStyle: LibrarySectionLayoutStyle, items: [LibraryCollectionItem]) {
+        switch route.loadBehavior {
+        case .staticPreview:
+            return (route.layoutStyle, route.items)
+        case .recentlyPlayed,
+             .playing,
+             .ownedGames,
+             .wishlist,
+             .reviewed,
+             .friendRecommendations,
+             .playtimeRecommendations:
+            return (.message, [.message(loadingMessageViewState(for: route.kind))])
+        }
+    }
+
+    private static func loadingMessageViewState(for kind: LibrarySectionKind) -> LibraryMessageViewState {
+        let message: String
+        switch kind {
+        case .recentlyPlayed:
+            message = "최근 플레이한 게임을 불러오는 중..."
+        case .playing:
+            message = "플레이 중인 게임을 불러오는 중..."
+        case .owned:
+            message = "보유 게임을 불러오는 중..."
+        case .wishlist:
+            message = "찜한 게임을 불러오는 중..."
+        case .reviewed:
+            message = "작성한 리뷰를 불러오는 중..."
+        case .friendRecommendations:
+            message = "친구 기반 추천을 불러오는 중..."
+        case .playtimeRecommendations:
+            message = "플레이 성향 기반 추천을 불러오는 중..."
+        }
+
+        return LibraryMessageViewState(
+            id: "sectionList.loading.\(kind.rawValue)",
+            style: .loading,
+            title: nil,
+            message: message,
+            detailText: nil,
+            buttonTitle: nil,
+            action: nil
+        )
+    }
+
+    private func emptyMessageViewState(for kind: LibrarySectionKind) -> LibraryMessageViewState {
+        let message: String
+        switch kind {
+        case .recentlyPlayed:
+            message = "최근 플레이한 게임이 없어요"
+        case .playing:
+            message = "플레이 중인 게임이 없어요"
+        case .owned:
+            message = "보유 게임이 없어요"
+        case .wishlist:
+            message = "찜한 게임이 없어요"
+        case .reviewed:
+            message = "작성한 리뷰가 없어요"
+        case .friendRecommendations:
+            message = "친구 기반 추천이 없어요"
+        case .playtimeRecommendations:
+            message = "플레이 성향 기반 추천이 없어요"
+        }
+
+        return LibraryMessageViewState(
+            id: "sectionList.empty.\(kind.rawValue)",
+            style: .empty,
+            title: nil,
+            message: message,
+            detailText: nil,
+            buttonTitle: nil,
+            action: nil
+        )
+    }
+
+    private static func errorMessageViewState(for kind: LibrarySectionKind) -> LibraryMessageViewState {
+        let message: String
+        switch kind {
+        case .recentlyPlayed:
+            message = "최근 플레이한 게임을 불러오지 못했어요."
+        case .playing:
+            message = "플레이 중인 게임을 불러오지 못했어요."
+        case .owned:
+            message = "보유 게임을 불러오지 못했어요."
+        case .wishlist:
+            message = "찜한 게임을 불러오지 못했어요."
+        case .reviewed:
+            message = "작성한 리뷰를 불러오지 못했어요."
+        case .friendRecommendations:
+            message = "친구 기반 추천을 불러오지 못했어요."
+        case .playtimeRecommendations:
+            message = "플레이 성향 기반 추천을 불러오지 못했어요."
+        }
+
+        return LibraryMessageViewState(
+            id: "sectionList.error.\(kind.rawValue)",
+            style: .error,
+            title: nil,
+            message: message,
+            detailText: nil,
+            buttonTitle: nil,
+            action: nil
+        )
     }
 }
 

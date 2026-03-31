@@ -23,7 +23,10 @@ enum LibraryIntent {
     case didTapSeeAllRecentlyPlayed
     case didTapSeeAllPlaying
     case didTapSeeAllOwned
+    case didTapSeeAllWishlist
     case didTapSeeAllReviewed
+    case didTapSeeAllFriendRecommendations
+    case didTapSeeAllPlaytimeRecommendations
     case didConfirmRemoveFavorite(LibraryGameIdentifier)
     case didConsumeSuccessMessage
     case didConsumeSteamConnectionOnboarding

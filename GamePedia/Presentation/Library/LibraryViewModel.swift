@@ -27,6 +27,7 @@ final class LibraryViewModel {
     private enum PreviewLimit {
         static let recentCards = 4
         static let listRows = 3
+        static let recommendationRows = 4
     }
 
     private enum SteamOwnedSyncTrigger {
@@ -223,22 +224,25 @@ final class LibraryViewModel {
             routeToGameDetailIfPossible(identifier)
 
         case .didTapSeeAllRecentlyPlayed:
-            if let route = makeSectionListRoute(for: .recentlyPlayed) {
-                onRoute?(.showSectionList(route))
-            }
+            routeToRecentlyPlayedList()
 
         case .didTapSeeAllPlaying:
-            if let route = makeSectionListRoute(for: .playing) {
-                onRoute?(.showSectionList(route))
-            }
+            routeToPlayingGamesList()
 
         case .didTapSeeAllOwned:
-            if let route = makeSectionListRoute(for: .owned) {
-                onRoute?(.showSectionList(route))
-            }
+            routeToOwnedGamesList()
+
+        case .didTapSeeAllWishlist:
+            routeToLikedGamesList()
 
         case .didTapSeeAllReviewed:
-            onRoute?(.showReviewed)
+            routeToWrittenReviewsList()
+
+        case .didTapSeeAllFriendRecommendations:
+            routeToFriendRecommendationsList()
+
+        case .didTapSeeAllPlaytimeRecommendations:
+            routeToPlaytimeRecommendationsList()
 
         case .didConfirmRemoveFavorite(let identifier):
             removeFavorite(identifier)
@@ -1330,17 +1334,11 @@ final class LibraryViewModel {
         switch kind {
         case .recentlyPlayed:
             guard !state.recentlyPlayed.isEmpty else { return nil }
-            let playingIdentifiers = Set(state.playingGames.map(\.identifier))
             return LibrarySectionListRoute(
                 kind: .recentlyPlayed,
                 layoutStyle: .recentCards,
-                items: makeRecentlyPlayedItems(
-                    summaries: state.recentlyPlayed,
-                    playingIdentifiers: playingIdentifiers,
-                    limit: nil,
-                    showsAddToPlayingAction: false
-                ),
-                loadBehavior: .staticPreview
+                items: sectionItems(for: .recentlyPlayed),
+                loadBehavior: .recentlyPlayed
             )
 
         case .playing:
@@ -1348,11 +1346,8 @@ final class LibraryViewModel {
             return LibrarySectionListRoute(
                 kind: .playing,
                 layoutStyle: .list,
-                items: makeLibraryRowItems(
-                    summaries: state.playingGames,
-                    limit: nil
-                ),
-                loadBehavior: .staticPreview
+                items: sectionItems(for: .playing),
+                loadBehavior: .playing
             )
 
         case .owned:
@@ -1360,16 +1355,83 @@ final class LibraryViewModel {
             return LibrarySectionListRoute(
                 kind: .owned,
                 layoutStyle: .list,
-                items: makeLibraryRowItems(
-                    summaries: state.ownedGames,
-                    limit: nil
-                ),
+                items: sectionItems(for: .owned),
                 loadBehavior: .ownedGames(sort: state.selectedSort.userGameSort)
             )
 
-        case .playtimeRecommendations, .friendRecommendations, .wishlist, .reviewed:
-            return nil
+        case .wishlist:
+            guard !state.likedGames.isEmpty else { return nil }
+            return LibrarySectionListRoute(
+                kind: .wishlist,
+                layoutStyle: .list,
+                items: sectionItems(for: .wishlist),
+                loadBehavior: .wishlist(sort: state.selectedSort.favoriteSort)
+            )
+
+        case .reviewed:
+            guard !state.reviews.isEmpty else { return nil }
+            return LibrarySectionListRoute(
+                kind: .reviewed,
+                layoutStyle: .list,
+                items: sectionItems(for: .reviewed),
+                loadBehavior: .reviewed(sort: state.selectedSort.reviewSort)
+            )
+
+        case .friendRecommendations:
+            guard !state.friendRecommendations.isEmpty else { return nil }
+            return LibrarySectionListRoute(
+                kind: .friendRecommendations,
+                layoutStyle: .list,
+                items: sectionItems(for: .friendRecommendations),
+                loadBehavior: .friendRecommendations
+            )
+
+        case .playtimeRecommendations:
+            guard !state.playtimeRecommendations.isEmpty else { return nil }
+            return LibrarySectionListRoute(
+                kind: .playtimeRecommendations,
+                layoutStyle: .list,
+                items: sectionItems(for: .playtimeRecommendations),
+                loadBehavior: .playtimeRecommendations
+            )
         }
+    }
+
+    private func sectionItems(for kind: LibrarySectionKind) -> [LibraryCollectionItem] {
+        state.sections.first(where: { $0.kind == kind })?.items ?? []
+    }
+
+    private func routeToRecentlyPlayedList() {
+        routeToSectionListIfPossible(kind: .recentlyPlayed)
+    }
+
+    private func routeToPlayingGamesList() {
+        routeToSectionListIfPossible(kind: .playing)
+    }
+
+    private func routeToOwnedGamesList() {
+        routeToSectionListIfPossible(kind: .owned)
+    }
+
+    private func routeToLikedGamesList() {
+        routeToSectionListIfPossible(kind: .wishlist)
+    }
+
+    private func routeToWrittenReviewsList() {
+        routeToSectionListIfPossible(kind: .reviewed)
+    }
+
+    private func routeToFriendRecommendationsList() {
+        routeToSectionListIfPossible(kind: .friendRecommendations)
+    }
+
+    private func routeToPlaytimeRecommendationsList() {
+        routeToSectionListIfPossible(kind: .playtimeRecommendations)
+    }
+
+    private func routeToSectionListIfPossible(kind: LibrarySectionKind) {
+        guard let route = makeSectionListRoute(for: kind) else { return }
+        onRoute?(.showSectionList(route))
     }
 
     private func makeRecentlyPlayedItems(
@@ -1726,7 +1788,7 @@ final class LibraryViewModel {
                     limit: PreviewLimit.recentCards,
                     showsAddToPlayingAction: true
                 ),
-                showsSeeAll: overview.recentlyPlayed.count > PreviewLimit.recentCards
+                showsSeeAll: overview.recentlyPlayed.count >= PreviewLimit.recentCards
             )
 
         case .failure:
@@ -1782,7 +1844,7 @@ final class LibraryViewModel {
                     summaries: overview.playing,
                     limit: PreviewLimit.listRows
                 ),
-                showsSeeAll: overview.playing.count > PreviewLimit.listRows
+                showsSeeAll: overview.playing.count >= PreviewLimit.listRows
             )
 
         case .failure:
@@ -1831,7 +1893,7 @@ final class LibraryViewModel {
                 )
             }
 
-            let items = wishlist.map { entry in
+            let items = wishlist.prefix(PreviewLimit.listRows).map { entry in
                 LibraryCollectionItem.row(
                     LibraryGameRowViewState(
                         identifier: LibraryGameIdentifier(
@@ -1854,7 +1916,7 @@ final class LibraryViewModel {
                 kind: .wishlist,
                 layoutStyle: .list,
                 items: items,
-                showsSeeAll: false
+                showsSeeAll: wishlist.count > PreviewLimit.listRows
             )
 
         case .failure:
@@ -2078,12 +2140,12 @@ final class LibraryViewModel {
                 )
             }
 
-            let items = recommendations.prefix(PreviewLimit.listRows).map(makePlaytimeRecommendationRowItem)
+            let items = recommendations.prefix(PreviewLimit.recommendationRows).map(makePlaytimeRecommendationRowItem)
             return LibrarySectionViewState(
                 kind: .playtimeRecommendations,
                 layoutStyle: .list,
                 items: items,
-                showsSeeAll: false
+                showsSeeAll: recommendations.count > PreviewLimit.recommendationRows
             )
 
         case .failure:
@@ -2168,12 +2230,12 @@ final class LibraryViewModel {
                 )
             }
 
-            let items = recommendations.prefix(PreviewLimit.listRows).map(makeFriendRecommendationRowItem)
+            let items = recommendations.prefix(PreviewLimit.recommendationRows).map(makeFriendRecommendationRowItem)
             return LibrarySectionViewState(
                 kind: .friendRecommendations,
                 layoutStyle: .list,
                 items: items,
-                showsSeeAll: false
+                showsSeeAll: recommendations.count > PreviewLimit.recommendationRows
             )
 
         case .failure:
@@ -2256,7 +2318,7 @@ final class LibraryViewModel {
                 )
             }
 
-            let items = reviewedGames.map { reviewedGame in
+            let items = reviewedGames.prefix(PreviewLimit.listRows).map { reviewedGame in
                 LibraryCollectionItem.row(
                     LibraryGameRowViewState(
                         identifier: LibraryGameIdentifier(
@@ -2279,7 +2341,7 @@ final class LibraryViewModel {
                 kind: .reviewed,
                 layoutStyle: .list,
                 items: items,
-                showsSeeAll: false
+                showsSeeAll: reviewedGames.count > PreviewLimit.listRows
             )
 
         case .failure:

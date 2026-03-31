@@ -229,6 +229,14 @@ extension Endpoint {
         .get("/users/me/library/owned", userAuth: true)
     }
 
+    static var myPlayingLibrary: Endpoint {
+        .get("/users/me/library/playing", userAuth: true)
+    }
+
+    static var myRecentlyPlayedLibrary: Endpoint {
+        .get("/users/me/library/recently-played", userAuth: true)
+    }
+
     static var mySteamFriendRecommendations: Endpoint {
         .get("/users/me/recommendations/steam-friends", userAuth: true)
     }

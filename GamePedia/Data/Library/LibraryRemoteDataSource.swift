@@ -3,6 +3,8 @@ import Foundation
 protocol LibraryRemoteDataSource {
     func fetchLibraryOverview(sort: UserGameCollectionSortOption?) async throws -> LibraryOverviewResponseDataDTO
     func fetchOwnedLibrary() async throws -> LibraryOverviewResponseDataDTO
+    func fetchPlayingLibrary() async throws -> LibraryOverviewResponseDataDTO
+    func fetchRecentlyPlayedLibrary() async throws -> LibraryOverviewResponseDataDTO
     func fetchPlaytimeRecommendations() async throws -> PlaytimeRecommendationsResponseDataDTO
     func fetchSteamFriendRecommendations() async throws -> SteamFriendRecommendationsResponseDataDTO
     func fetchSteamLinkStatus() async throws -> SteamLinkStatusDTO
@@ -52,6 +54,34 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
             "steamConnected=\(response.data.steamConnected.map(String.init) ?? "nil") " +
             "ownedCount=\(response.data.owned?.count ?? 0) " +
             "backlogCount=\(response.data.backlog?.count ?? 0)"
+        )
+        return response.data
+    }
+
+    func fetchPlayingLibrary() async throws -> LibraryOverviewResponseDataDTO {
+        print("[Library] request endpoint=GET /users/me/library/playing")
+        let response = try await apiClient.request(
+            .myPlayingLibrary,
+            as: LibraryResponseEnvelopeDTO<LibraryOverviewResponseDataDTO>.self
+        )
+        print(
+            "[Library] response endpoint=GET /users/me/library/playing " +
+            "playingCount=\(response.data.playing?.count ?? 0)"
+        )
+        return response.data
+    }
+
+    func fetchRecentlyPlayedLibrary() async throws -> LibraryOverviewResponseDataDTO {
+        print("[Library] request endpoint=GET /users/me/library/recently-played")
+        let response = try await apiClient.request(
+            .myRecentlyPlayedLibrary,
+            as: LibraryResponseEnvelopeDTO<LibraryOverviewResponseDataDTO>.self
+        )
+        print(
+            "[Library] response endpoint=GET /users/me/library/recently-played " +
+            "steamConnected=\(response.data.steamConnected.map(String.init) ?? "nil") " +
+            "steamSyncStatus=\(response.data.steamSyncStatus ?? "nil") " +
+            "recentlyPlayedCount=\(response.data.recentlyPlayed?.count ?? 0)"
         )
         return response.data
     }

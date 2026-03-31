@@ -3,6 +3,8 @@ import Foundation
 protocol LibraryRepository {
     func fetchLibraryOverview(sort: UserGameCollectionSortOption?) async throws -> LibraryOverview
     func fetchOwnedLibrary() async throws -> OwnedLibraryCollection
+    func fetchPlayingLibrary() async throws -> [LibraryGameSummary]
+    func fetchRecentlyPlayedLibrary() async throws -> [LibraryGameSummary]
     func fetchPlaytimeRecommendations() async throws -> [PlaytimeRecommendation]
     func fetchSteamFriendRecommendations() async throws -> [SteamFriendRecommendation]
     func fetchSteamLinkStatus() async throws -> SteamLinkStatus

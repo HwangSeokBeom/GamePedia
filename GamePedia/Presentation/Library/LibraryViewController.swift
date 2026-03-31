@@ -207,13 +207,13 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
                 case .owned:
                     self.viewModel.send(.didTapSeeAllOwned)
                 case .playtimeRecommendations:
-                    break
+                    self.viewModel.send(.didTapSeeAllPlaytimeRecommendations)
                 case .friendRecommendations:
-                    break
+                    self.viewModel.send(.didTapSeeAllFriendRecommendations)
                 case .reviewed:
                     self.viewModel.send(.didTapSeeAllReviewed)
                 case .wishlist:
-                    break
+                    self.viewModel.send(.didTapSeeAllWishlist)
                 }
             }
             return headerView

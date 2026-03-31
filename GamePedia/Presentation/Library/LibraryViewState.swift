@@ -27,7 +27,13 @@ struct LibrarySectionListRoute: Hashable {
 
 enum LibrarySectionListLoadBehavior: Hashable {
     case staticPreview
+    case recentlyPlayed
+    case playing
     case ownedGames(sort: UserGameCollectionSortOption)
+    case wishlist(sort: FavoriteSortOption)
+    case reviewed(sort: ReviewSortOption)
+    case friendRecommendations
+    case playtimeRecommendations
 }
 
 enum LibrarySectionKind: Int, CaseIterable, Hashable {
