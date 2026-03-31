@@ -107,12 +107,21 @@ final class ProfileEditViewModel {
                     self.apply(.setSaving(false))
 
                     if case .failure(let error) = completion {
-                        self.apply(
-                            .setError(
-                                error.errorDescription
-                                ?? "프로필을 저장하지 못했습니다. 잠시 후 다시 시도해주세요."
+                        switch error {
+                        case .nicknameAlreadyExists:
+                            self.apply(.setNicknameValidationMessage(error.errorDescription))
+                            self.apply(.setError(nil))
+                        case .server(let code, _) where code.uppercased() == "CONFLICT":
+                            self.apply(.setNicknameValidationMessage(AuthError.nicknameAlreadyExists.errorDescription))
+                            self.apply(.setError(nil))
+                        default:
+                            self.apply(
+                                .setError(
+                                    error.errorDescription
+                                    ?? "프로필을 저장하지 못했습니다. 잠시 후 다시 시도해주세요."
+                                )
                             )
-                        )
+                        }
                     }
                 },
                 receiveValue: { [weak self] authenticatedUser in

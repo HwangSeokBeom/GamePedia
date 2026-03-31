@@ -45,6 +45,7 @@ final class NotificationsViewModel {
     private func loadNotifications() {
         state.isLoading = true
         state.errorMessage = nil
+        print("[Notifications] loadNotifications page=1 limit=30")
 
         Task {
             do {
@@ -57,6 +58,10 @@ final class NotificationsViewModel {
                         name: .appNotificationsDidChange,
                         object: nil,
                         userInfo: [AppNotificationChangeUserInfoKey.unreadCount: page.unreadCount]
+                    )
+                    print(
+                        "[Notifications] stateUpdated success itemCount=\(page.notifications.count) " +
+                        "unreadCount=\(page.unreadCount)"
                     )
                 }
 
@@ -77,7 +82,9 @@ final class NotificationsViewModel {
             } catch {
                 await MainActor.run {
                     self.state.isLoading = false
+                    self.state.notifications = []
                     self.state.errorMessage = "알림을 불러오지 못했어요."
+                    print("[Notifications] stateUpdated failure error=\(error)")
                 }
             }
         }

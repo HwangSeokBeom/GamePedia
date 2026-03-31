@@ -108,6 +108,31 @@ final class HomeCoordinator {
         }
 
         let viewController = NotificationsViewController(rootView: NotificationsRootView())
+        viewController.onGameSelected = { [weak self] gameID in
+            self?.showDetail(gameId: gameID)
+        }
+        viewController.onFriendRequestsSelected = { [weak self] in
+            self?.showFriendRequests()
+        }
+        viewController.onFriendSelected = { [weak self] userID in
+            self?.showFriendProfile(userID: userID)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showFriendRequests() {
+        let viewController = FriendRequestsViewController()
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showFriendProfile(userID: String) {
+        let viewController = FriendProfileViewController(userID: userID)
+        viewController.onGameSelected = { [weak self] gameID in
+            self?.showDetail(gameId: gameID)
+        }
+        viewController.onReviewGameSelected = { [weak self] gameID in
+            self?.showDetail(gameId: gameID)
+        }
         navigationController.pushViewController(viewController, animated: true)
     }
 

@@ -3,6 +3,7 @@ import Foundation
 enum AuthError: Error, LocalizedError, Equatable {
     case invalidCredentials
     case emailAlreadyExists
+    case nicknameAlreadyExists
     case accountDeletionUnavailable
     case appleLoginUnavailable
     case googleLoginUnavailable
@@ -29,8 +30,10 @@ enum AuthError: Error, LocalizedError, Equatable {
         switch serverCode.uppercased() {
         case "INVALID_CREDENTIALS":
             return .invalidCredentials
-        case "EMAIL_ALREADY_EXISTS":
+        case "EMAIL_ALREADY_EXISTS", "EMAIL_ALREADY_IN_USE":
             return .emailAlreadyExists
+        case "NICKNAME_ALREADY_EXISTS", "NICKNAME_ALREADY_IN_USE", "DUPLICATE_NICKNAME":
+            return .nicknameAlreadyExists
         case "ACCOUNT_DELETION_UNAVAILABLE":
             return .accountDeletionUnavailable
         case "APPLE_LOGIN_UNAVAILABLE", "APPLE_AUTH_NOT_CONFIGURED", "APPLE_AUTH_UNAVAILABLE":
@@ -64,6 +67,8 @@ enum AuthError: Error, LocalizedError, Equatable {
             return "이메일 또는 비밀번호를 다시 확인해주세요."
         case .emailAlreadyExists:
             return "이미 가입된 이메일입니다."
+        case .nicknameAlreadyExists:
+            return "이미 사용 중인 닉네임이에요"
         case .accountDeletionUnavailable:
             return "현재 서버에서 회원 탈퇴를 지원하지 않습니다. 잠시 후 다시 시도해주세요."
         case .appleLoginUnavailable:

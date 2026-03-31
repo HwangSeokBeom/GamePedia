@@ -3,6 +3,9 @@ import UIKit
 final class NotificationsViewController: BaseViewController<NotificationsRootView, NotificationsState> {
     private let viewModel: NotificationsViewModel
     private var notifications: [AppNotification] = []
+    var onGameSelected: ((Int) -> Void)?
+    var onFriendRequestsSelected: (() -> Void)?
+    var onFriendSelected: ((String) -> Void)?
 
     init(
         rootView: NotificationsRootView,
@@ -54,5 +57,32 @@ extension NotificationsViewController: UITableViewDataSource, UITableViewDelegat
         let cell = tableView.dequeueReusableCell(withIdentifier: NotificationCell.reuseID, for: indexPath) as! NotificationCell
         cell.configure(with: notifications[indexPath.row])
         return cell
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        let notification = notifications[indexPath.row]
+        switch notification.kind {
+        case .friendRequestReceived:
+            onFriendRequestsSelected?()
+        case .friendRequestAccepted:
+            if let relatedUserID = notification.relatedUserID {
+                onFriendSelected?(relatedUserID)
+            }
+        case .friendReviewReaction,
+             .friendStartedPlaying,
+             .friendWroteReview,
+             .friendWishlistedGame,
+             .friendRatedHigh:
+            if let relatedGameID = notification.relatedGameID {
+                onGameSelected?(relatedGameID)
+            } else if let relatedUserID = notification.relatedUserID {
+                onFriendSelected?(relatedUserID)
+            }
+        case .generic:
+            if let relatedGameID = notification.relatedGameID {
+                onGameSelected?(relatedGameID)
+            }
+        }
     }
 }

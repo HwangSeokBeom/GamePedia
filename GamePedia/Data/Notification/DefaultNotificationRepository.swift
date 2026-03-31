@@ -17,10 +17,15 @@ final class DefaultNotificationRepository: NotificationRepository {
                     title: dto.title,
                     message: dto.message,
                     relatedGameID: Int(dto.relatedGameId ?? ""),
+                    relatedUserID: dto.relatedUserId,
                     isRead: dto.isRead,
                     createdAt: dto.createdAt
                 )
             }
+            print(
+                "[Notifications] repository mappedItemCount=\(notifications.count) " +
+                "unreadCount=\(data.unreadCount) totalCount=\(data.meta?.totalCount ?? notifications.count)"
+            )
             return AppNotificationPage(
                 notifications: notifications,
                 unreadCount: data.unreadCount

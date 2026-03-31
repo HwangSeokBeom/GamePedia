@@ -77,6 +77,24 @@ final class ProfileCoordinator: NSObject {
         profileVC.onShowWrittenReviews = { [weak self] in
             self?.showLibrary(tab: .reviewed)
         }
+        profileVC.onShowFriendsList = { [weak self] in
+            self?.showFriendsList()
+        }
+        profileVC.onShowSteamFriends = { [weak self] in
+            self?.showSteamFriends()
+        }
+        profileVC.onShowFriendRequests = { [weak self] in
+            self?.showFriendRequests()
+        }
+        profileVC.onShowFriendSearch = { [weak self] in
+            self?.showFriendSearch()
+        }
+        profileVC.onShowFriendActivity = { [weak self] in
+            self?.showFriendActivity()
+        }
+        profileVC.onShowSocialPrivacySettings = { [weak self] in
+            self?.showSocialPrivacySettings()
+        }
         profileVC.onShowTermsOfService = { [weak self] in
             self?.showWebPage(url: AppConfig.termsOfServiceURL)
         }
@@ -206,6 +224,59 @@ final class ProfileCoordinator: NSObject {
             self?.showSteamDetail(viewState: viewState)
         }
         navigationController.pushViewController(listViewController, animated: true)
+    }
+
+    private func showFriendsList() {
+        let viewController = FriendsListViewController()
+        viewController.onFriendSelected = { [weak self] userID in
+            self?.showFriendProfile(userID: userID)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showSteamFriends() {
+        let viewController = SteamFriendsViewController()
+        viewController.onLinkedFriendSelected = { [weak self] userID in
+            self?.showFriendProfile(userID: userID)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showFriendRequests() {
+        let viewController = FriendRequestsViewController()
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showFriendSearch() {
+        let viewController = FriendSearchViewController()
+        viewController.onFriendSelected = { [weak self] userID in
+            self?.showFriendProfile(userID: userID)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showFriendProfile(userID: String) {
+        let viewController = FriendProfileViewController(userID: userID)
+        viewController.onGameSelected = { [weak self] gameID in
+            self?.showDetail(gameId: gameID)
+        }
+        viewController.onReviewGameSelected = { [weak self] gameID in
+            self?.showDetail(gameId: gameID)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showFriendActivity() {
+        let viewController = FriendActivityFeedViewController()
+        viewController.onGameSelected = { [weak self] gameID in
+            self?.showDetail(gameId: gameID)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showSocialPrivacySettings() {
+        let viewController = SocialPrivacySettingsViewController()
+        navigationController.pushViewController(viewController, animated: true)
     }
 
     private func showSteamDetail(viewState: SteamFallbackGameDetailViewState) {

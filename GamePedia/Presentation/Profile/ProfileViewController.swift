@@ -18,6 +18,12 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     var onShowEditProfile: (() -> Void)?
     var onShowFavoriteGames: (() -> Void)?
     var onShowWrittenReviews: (() -> Void)?
+    var onShowFriendsList: (() -> Void)?
+    var onShowSteamFriends: (() -> Void)?
+    var onShowFriendRequests: (() -> Void)?
+    var onShowFriendSearch: (() -> Void)?
+    var onShowFriendActivity: (() -> Void)?
+    var onShowSocialPrivacySettings: (() -> Void)?
     var onShowTermsOfService: (() -> Void)?
     var onShowPrivacyPolicy: (() -> Void)?
     var onShowCommunityGuidelines: (() -> Void)?
@@ -63,6 +69,12 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
         rootView.logoutButton.addTarget(self, action: #selector(didTapLogout), for: .touchUpInside)
         rootView.deleteAccountButton.addTarget(self, action: #selector(didTapDeleteAccount), for: .touchUpInside)
         rootView.steamUnlinkButton.addTarget(self, action: #selector(didTapSteamUnlink), for: .touchUpInside)
+        rootView.friendsListButton.addTarget(self, action: #selector(didTapFriendsList), for: .touchUpInside)
+        rootView.steamFriendsButton.addTarget(self, action: #selector(didTapSteamFriends), for: .touchUpInside)
+        rootView.friendRequestsButton.addTarget(self, action: #selector(didTapFriendRequests), for: .touchUpInside)
+        rootView.friendSearchButton.addTarget(self, action: #selector(didTapFriendSearch), for: .touchUpInside)
+        rootView.friendActivityButton.addTarget(self, action: #selector(didTapFriendActivity), for: .touchUpInside)
+        rootView.socialPrivacySettingsButton.addTarget(self, action: #selector(didTapSocialPrivacySettings), for: .touchUpInside)
         rootView.sectionHeader.seeMoreButton.addTarget(
             self, action: #selector(didTapSeeMoreRecentPlay), for: .touchUpInside
         )
@@ -97,6 +109,18 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
                 self?.onShowWrittenReviews?()
             case .showFavoriteGames:
                 self?.onShowFavoriteGames?()
+            case .showFriendsList:
+                self?.onShowFriendsList?()
+            case .showSteamFriends:
+                self?.onShowSteamFriends?()
+            case .showFriendRequests:
+                self?.onShowFriendRequests?()
+            case .showFriendSearch:
+                self?.onShowFriendSearch?()
+            case .showFriendActivity:
+                self?.onShowFriendActivity?()
+            case .showSocialPrivacySettings:
+                self?.onShowSocialPrivacySettings?()
             case .showTermsOfService:
                 self?.onShowTermsOfService?()
             case .showPrivacyPolicy:
@@ -150,6 +174,30 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
 
     @objc private func didTapFavoriteGames() {
         viewModel.send(.didTapFavoriteGames)
+    }
+
+    @objc private func didTapFriendsList() {
+        viewModel.send(.didTapFriendsList)
+    }
+
+    @objc private func didTapSteamFriends() {
+        viewModel.send(.didTapSteamFriends)
+    }
+
+    @objc private func didTapFriendRequests() {
+        viewModel.send(.didTapFriendRequests)
+    }
+
+    @objc private func didTapFriendSearch() {
+        viewModel.send(.didTapFriendSearch)
+    }
+
+    @objc private func didTapFriendActivity() {
+        viewModel.send(.didTapFriendActivity)
+    }
+
+    @objc private func didTapSocialPrivacySettings() {
+        viewModel.send(.didTapSocialPrivacySettings)
     }
 
     @objc private func didTapTermsOfService() {

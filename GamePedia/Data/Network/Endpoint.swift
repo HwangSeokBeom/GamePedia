@@ -220,6 +220,79 @@ extension Endpoint {
     static var markAllNotificationsRead: Endpoint {
         .patch("/users/me/notifications/read-all", body: EmptyRequestBody(), userAuth: true)
     }
+
+    static func searchFriends(keyword: String) -> Endpoint {
+        .get("/users/search", query: [
+            URLQueryItem(name: "keyword", value: keyword)
+        ], userAuth: true)
+    }
+
+    static func myFriendRequests(kind: FriendRequestListKind) -> Endpoint {
+        let pathComponent: String
+        switch kind {
+        case .received:
+            pathComponent = "received"
+        case .sent:
+            pathComponent = "sent"
+        }
+        return .get("/users/me/friend-requests/\(pathComponent)", userAuth: true)
+    }
+
+    static func sendFriendRequest(body: SendFriendRequestDTO) -> Endpoint {
+        .post("/users/me/friend-requests", body: body, userAuth: true)
+    }
+
+    static func acceptFriendRequest(requestID: String) -> Endpoint {
+        .patch("/users/me/friend-requests/\(requestID)/accept", body: EmptyRequestBody(), userAuth: true)
+    }
+
+    static func rejectFriendRequest(requestID: String) -> Endpoint {
+        .patch("/users/me/friend-requests/\(requestID)/reject", body: EmptyRequestBody(), userAuth: true)
+    }
+
+    static func cancelFriendRequest(requestID: String) -> Endpoint {
+        .delete("/users/me/friend-requests/\(requestID)", userAuth: true)
+    }
+
+    static var myFriends: Endpoint {
+        .get("/users/me/friends", userAuth: true)
+    }
+
+    static var mySteamFriends: Endpoint {
+        .get("/users/me/steam-friends", userAuth: true)
+    }
+
+    static func friendProfile(userID: String) -> Endpoint {
+        .get("/users/\(userID)/profile", userAuth: true)
+    }
+
+    static var friendActivityFeed: Endpoint {
+        .get("/users/me/friends/activity", userAuth: true)
+    }
+
+    static func friendRecommendations(userID: String) -> Endpoint {
+        .get("/users/\(userID)/friend-recommendations", userAuth: true)
+    }
+
+    static func removeFriend(userID: String) -> Endpoint {
+        .delete("/users/me/friends/\(userID)", userAuth: true)
+    }
+
+    static func blockUser(body: BlockUserRequestDTO) -> Endpoint {
+        .post("/users/me/blocks", body: body, userAuth: true)
+    }
+
+    static var socialPrivacySettings: Endpoint {
+        .get("/users/me/privacy-settings", userAuth: true)
+    }
+
+    static func updateSocialPrivacySettings(body: UpdateSocialPrivacySettingsRequestDTO) -> Endpoint {
+        .patch("/users/me/privacy-settings", body: body, userAuth: true)
+    }
+
+    static var importSteamFriends: Endpoint {
+        .post("/users/me/friends/steam/import", userAuth: true)
+    }
 }
 
 // MARK: - Library Endpoints

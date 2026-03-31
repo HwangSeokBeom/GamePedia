@@ -81,6 +81,18 @@ final class ProfileViewModel {
             onRoute?(.showWrittenReviews)
         case .didTapFavoriteGames:
             onRoute?(.showFavoriteGames)
+        case .didTapFriendsList:
+            onRoute?(.showFriendsList)
+        case .didTapSteamFriends:
+            onRoute?(.showSteamFriends)
+        case .didTapFriendRequests:
+            onRoute?(.showFriendRequests)
+        case .didTapFriendSearch:
+            onRoute?(.showFriendSearch)
+        case .didTapFriendActivity:
+            onRoute?(.showFriendActivity)
+        case .didTapSocialPrivacySettings:
+            onRoute?(.showSocialPrivacySettings)
         case .didTapTermsOfService:
             onRoute?(.showTermsOfService)
         case .didTapPrivacyPolicy:

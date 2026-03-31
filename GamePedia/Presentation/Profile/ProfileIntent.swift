@@ -13,6 +13,12 @@ enum ProfileIntent {
     case didTapSeeMoreRecentPlay
     case didTapWrittenReviews
     case didTapFavoriteGames
+    case didTapFriendsList
+    case didTapSteamFriends
+    case didTapFriendRequests
+    case didTapFriendSearch
+    case didTapFriendActivity
+    case didTapSocialPrivacySettings
     case didTapTermsOfService
     case didTapPrivacyPolicy
     case didTapCommunityGuidelines
@@ -25,6 +31,12 @@ enum ProfileRoute {
     case showEditProfile
     case showWrittenReviews
     case showFavoriteGames
+    case showFriendsList
+    case showSteamFriends
+    case showFriendRequests
+    case showFriendSearch
+    case showFriendActivity
+    case showSocialPrivacySettings
     case showTermsOfService
     case showPrivacyPolicy
     case showCommunityGuidelines
