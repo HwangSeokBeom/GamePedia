@@ -6,6 +6,8 @@ enum HomeIntent {
     case viewDidLoad
     case didTapGame(Game)
     case didTapFavorite(gameId: Int)
+    case didTapHomeFilter
+    case didTapApplyHomeFilters(HomeContentFilter)
     case didTapSeeMore(section: HomeSection)
     case didTapNotification
 }
@@ -61,5 +63,7 @@ enum HomeSection {
 }
 
 enum HomeRoute {
+    case presentHomeFilterSheet(HomeContentFilter)
     case showGameList(section: HomeSection, games: [Game], wishlistedGameIDs: Set<Int>)
+    case showNotifications
 }

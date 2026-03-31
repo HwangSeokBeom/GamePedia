@@ -24,6 +24,7 @@ final class HomeViewModel {
     private let fetchMyFavoritesUseCase: FetchMyFavoritesUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let translateTextUseCase: TranslateTextUseCase
+    private let fetchUnreadNotificationCountUseCase: FetchUnreadNotificationCountUseCase
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: Init
@@ -36,7 +37,10 @@ final class HomeViewModel {
         toggleFavoriteUseCase: ToggleFavoriteUseCase = ToggleFavoriteUseCase(
             favoriteRepository: DefaultFavoriteRepository()
         ),
-        translateTextUseCase: TranslateTextUseCase? = nil
+        translateTextUseCase: TranslateTextUseCase? = nil,
+        fetchUnreadNotificationCountUseCase: FetchUnreadNotificationCountUseCase = FetchUnreadNotificationCountUseCase(
+            notificationRepository: DefaultNotificationRepository()
+        )
     ) {
         let resolvedActivityRepository = userActivityRepository ?? LocalUserActivityRepository.shared
         self.userActivityRepository = resolvedActivityRepository
@@ -49,7 +53,9 @@ final class HomeViewModel {
             repository: DefaultTranslationRepository(),
             languageProvider: DefaultLanguageProvider.shared
         )
+        self.fetchUnreadNotificationCountUseCase = fetchUnreadNotificationCountUseCase
         observeFavoriteChanges()
+        observeNotificationChanges()
     }
 
     // MARK: - Intent Processing
@@ -64,10 +70,15 @@ final class HomeViewModel {
             }
         case .didTapFavorite(let gameId):
             toggleFavorite(gameId: gameId)
+        case .didTapHomeFilter:
+            onRoute?(.presentHomeFilterSheet(state.selectedFilter))
+        case .didTapApplyHomeFilters(let filter):
+            apply(.setSelectedFilter(filter))
+            loadHomeData()
         case .didTapSeeMore(let section):
             routeToSectionList(section)
         case .didTapNotification:
-            break   // navigation handled by ViewController
+            onRoute?(.showNotifications)
         }
     }
 
@@ -82,14 +93,17 @@ final class HomeViewModel {
 
         Task {
             do {
-                async let feedTask = loadHomeFeedUseCase.execute()
+                async let feedTask = loadHomeFeedUseCase.execute(filter: state.selectedFilter)
                 async let favoritesTask = fetchMyFavoritesUseCase.execute(sort: .latest)
+                async let unreadCountTask = loadUnreadNotificationCount()
                 let feed = try await feedTask
                 let favoriteItems = (try? await favoritesTask) ?? []
+                let unreadCount = (try? await unreadCountTask) ?? 0
                 let translatedFeed = await translateHomeFeed(feed)
                 await MainActor.run {
                     self.apply(.setHomeFeed(translatedFeed))
                     self.apply(.setWishlistedGameIDs(Set(favoriteItems.map(\.gameId))))
+                    self.apply(.setUnreadNotificationCount(unreadCount))
                     self.apply(.setLoading(false))
                 }
             } catch {
@@ -97,6 +111,21 @@ final class HomeViewModel {
                     self.apply(.setError(error.localizedDescription))
                 }
             }
+        }
+    }
+
+    private func loadUnreadNotificationCount() async throws -> Int {
+        do {
+            return try await fetchUnreadNotificationCountUseCase.execute()
+        } catch let networkError as NetworkError {
+            switch networkError {
+            case .unauthorized:
+                return 0
+            default:
+                throw networkError
+            }
+        } catch {
+            throw error
         }
     }
 
@@ -117,6 +146,17 @@ final class HomeViewModel {
                     updatedIDs.remove(gameId)
                 }
                 self.apply(.setWishlistedGameIDs(updatedIDs))
+            }
+            .store(in: &cancellables)
+    }
+
+    private func observeNotificationChanges() {
+        NotificationCenter.default.publisher(for: .appNotificationsDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self else { return }
+                let unreadCount = notification.userInfo?[AppNotificationChangeUserInfoKey.unreadCount] as? Int ?? 0
+                self.apply(.setUnreadNotificationCount(unreadCount))
             }
             .store(in: &cancellables)
     }

@@ -15,6 +15,8 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
     private var dataSource: UICollectionViewDiffableDataSource<HomeRootView.Section, HomeCollectionItem>!
     private var isShowingSkeletonSnapshot = false
     private var lastRenderedWishlistedGameIDs = Set<Int>()
+    private let filterButton = HomeNavigationIconButton(systemImageName: "gamecontroller.fill")
+    private let notificationButton = HomeNavigationIconButton(systemImageName: "bell")
 
     // Set by HomeCoordinator — called when the user taps a game cell.
     var onGameSelected: ((Int) -> Void)?
@@ -49,19 +51,19 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
             navigationItem.largeTitleDisplayMode = .never
             navigationItem.titleView = nil
             navigationItem.title = "GamePedia"
-            navigationItem.leftBarButtonItem = makeNavigationLogoItem()
-            navigationItem.rightBarButtonItem = UIBarButtonItem(
-                image: UIImage(systemName: "bell"),
-                style: .plain,
-                target: self,
-                action: #selector(didTapNotification)
-            )
+            navigationItem.leftBarButtonItem = makeFilterItem()
+            navigationItem.rightBarButtonItem = makeNotificationItem()
         }
     }
 
-    private func makeNavigationLogoItem() -> UIBarButtonItem {
-        let logoView = HomeNavigationTitleView(frame: CGRect(origin: .zero, size: HomeNavigationTitleView.preferredSize))
-        return UIBarButtonItem(customView: logoView)
+    private func makeFilterItem() -> UIBarButtonItem {
+        filterButton.addTarget(self, action: #selector(didTapHomeFilter), for: .touchUpInside)
+        return UIBarButtonItem(customView: filterButton)
+    }
+
+    private func makeNotificationItem() -> UIBarButtonItem {
+        notificationButton.addTarget(self, action: #selector(didTapNotification), for: .touchUpInside)
+        return UIBarButtonItem(customView: notificationButton)
     }
 
     private func applyTitleAppearance() {
@@ -236,11 +238,13 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
             }
         }
         viewModel.onRoute = { [weak self] route in
-            self?.onRoute?(route)
+            self?.handle(route)
         }
     }
 
     override func render(_ state: HomeState) {
+        filterButton.setTintColor(state.hasActiveFilters ? .gpPrimary : .gpTextSecondary)
+        notificationButton.setBadgeVisible(state.unreadNotificationCount > 0)
         rootView.setHighlightLoadingVisible(state.showsSkeleton)
 
         if state.showsSkeleton {
@@ -251,6 +255,23 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
         }
 
         applySnapshot(state: state)
+    }
+
+    private func handle(_ route: HomeRoute) {
+        switch route {
+        case .presentHomeFilterSheet(let filter):
+            presentHomeFilterSheet(filter: filter)
+        case .showGameList, .showNotifications:
+            onRoute?(route)
+        }
+    }
+
+    private func presentHomeFilterSheet(filter: HomeContentFilter) {
+        let viewController = HomeFilterSheetViewController(filter: filter)
+        viewController.onApply = { [weak self] updatedFilter in
+            self?.viewModel.send(.didTapApplyHomeFilters(updatedFilter))
+        }
+        present(viewController, animated: true)
     }
 
     private func applySnapshot(state: HomeState) {
@@ -335,6 +356,10 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
 
     @objc private func didTapNotification() {
         viewModel.send(.didTapNotification)
+    }
+
+    @objc private func didTapHomeFilter() {
+        viewModel.send(.didTapHomeFilter)
     }
 
     @objc private func didTapTodayRecommendationSeeMore() {

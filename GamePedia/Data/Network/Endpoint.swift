@@ -23,6 +23,8 @@ struct Endpoint {
     }
 }
 
+struct EmptyRequestBody: Encodable {}
+
 // MARK: - Generic Factory Helpers
 
 extension Endpoint {
@@ -101,26 +103,20 @@ extension Endpoint {
 
 extension Endpoint {
 
-    static func highlightGames(limit: Int = 10) -> Endpoint {
-        .get("/games/highlights", query: [
-            URLQueryItem(name: "limit", value: "\(limit)")
-        ])
+    static func highlightGames(limit: Int = 10, filter: HomeContentFilter? = nil) -> Endpoint {
+        .get("/games/highlights", query: homeFilterQueryItems(limit: limit, filter: filter))
     }
 
     static var featuredGame: Endpoint {
         highlightGames(limit: 1)
     }
 
-    static func popularGames(limit: Int = 10) -> Endpoint {
-        .get("/games/popular", query: [
-            URLQueryItem(name: "limit", value: "\(limit)")
-        ])
+    static func popularGames(limit: Int = 10, filter: HomeContentFilter? = nil) -> Endpoint {
+        .get("/games/popular", query: homeFilterQueryItems(limit: limit, filter: filter))
     }
 
-    static func recommendedGames(limit: Int = 10) -> Endpoint {
-        .get("/games/recommended", query: [
-            URLQueryItem(name: "limit", value: "\(limit)")
-        ])
+    static func recommendedGames(limit: Int = 10, filter: HomeContentFilter? = nil) -> Endpoint {
+        .get("/games/recommended", query: homeFilterQueryItems(limit: limit, filter: filter))
     }
 
     static func latestGames(limit: Int = 10) -> Endpoint {
@@ -137,6 +133,20 @@ extension Endpoint {
 
     static func gameDetail(id: Int) -> Endpoint {
         .get("/games/\(id)")
+    }
+
+    private static func homeFilterQueryItems(limit: Int, filter: HomeContentFilter?) -> [URLQueryItem] {
+        var queryItems = [URLQueryItem(name: "limit", value: "\(limit)")]
+        if let platform = filter?.platform.queryValue {
+            queryItems.append(URLQueryItem(name: "platform", value: platform))
+        }
+        if let category = filter?.category.queryValue {
+            queryItems.append(URLQueryItem(name: "category", value: category))
+        }
+        if let gameMode = filter?.gameMode.queryValue {
+            queryItems.append(URLQueryItem(name: "gameMode", value: gameMode))
+        }
+        return queryItems
     }
 }
 
@@ -198,6 +208,17 @@ extension Endpoint {
         .get("/users/me/recent-plays", query: [
             URLQueryItem(name: "limit", value: "\(limit)")
         ], userAuth: true)
+    }
+
+    static func myNotifications(page: Int = 1, limit: Int = 20) -> Endpoint {
+        .get("/users/me/notifications", query: [
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ], userAuth: true)
+    }
+
+    static var markAllNotificationsRead: Endpoint {
+        .patch("/users/me/notifications/read-all", body: EmptyRequestBody(), userAuth: true)
     }
 }
 

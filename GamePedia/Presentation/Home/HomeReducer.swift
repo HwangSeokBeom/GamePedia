@@ -17,6 +17,12 @@ enum HomeReducer {
             state.translatedTitles = [:]
         case .setWishlistedGameIDs(let ids):
             state.wishlistedGameIDs = ids
+        case .setSelectedFilter(let filter):
+            state.selectedPlatformFilter = filter.platform
+            state.selectedCategoryFilter = filter.category
+            state.selectedGameModeFilter = filter.gameMode
+        case .setUnreadNotificationCount(let unreadCount):
+            state.unreadNotificationCount = max(unreadCount, 0)
         case .setError(let message):
             state.errorMessage = message
             state.isLoading = false

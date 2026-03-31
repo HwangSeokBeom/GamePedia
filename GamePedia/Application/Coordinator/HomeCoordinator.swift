@@ -71,6 +71,10 @@ final class HomeCoordinator {
         switch route {
         case .showGameList(let section, let games, let wishlistedGameIDs):
             showGameList(section: section, games: games, wishlistedGameIDs: wishlistedGameIDs)
+        case .showNotifications:
+            showNotifications()
+        case .presentHomeFilterSheet:
+            break
         }
     }
 
@@ -92,6 +96,19 @@ final class HomeCoordinator {
             self?.showDetail(gameId: gameId)
         }
         navigationController.pushViewController(listViewController, animated: true)
+    }
+
+    private func showNotifications() {
+        guard APIClient.shared.userAuthToken != nil else {
+            let presenter = navigationController.topViewController ?? navigationController
+            onAuthenticationRequested?(presenter, .profile) { [weak self] in
+                self?.showNotifications()
+            }
+            return
+        }
+
+        let viewController = NotificationsViewController(rootView: NotificationsRootView())
+        navigationController.pushViewController(viewController, animated: true)
     }
 
     private func showReview(

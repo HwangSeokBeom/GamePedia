@@ -16,10 +16,10 @@ final class LoadHomeFeedUseCase {
         self.homeHighlightSelector = homeHighlightSelector
     }
 
-    func execute() async throws -> HomeFeed {
-        async let highlightGames = gameRepository.fetchHighlights(limit: 5)
-        async let popularGames = gameRepository.fetchPopularGames(limit: 10)
-        async let trendingGames = gameRepository.fetchTrendingGames(limit: 10)
+    func execute(filter: HomeContentFilter = .default) async throws -> HomeFeed {
+        async let highlightGames = gameRepository.fetchHighlights(limit: 5, filter: filter)
+        async let popularGames = gameRepository.fetchPopularGames(limit: 10, filter: filter)
+        async let trendingGames = gameRepository.fetchTrendingGames(limit: 10, filter: filter)
 
         let highlightsSource = try await highlightGames
         let popular = try await popularGames
