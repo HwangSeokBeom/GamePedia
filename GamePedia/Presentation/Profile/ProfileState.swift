@@ -6,15 +6,32 @@ struct ProfileState {
     var isLoading: Bool = false
     var isLoggingOut: Bool = false
     var isDeletingAccount: Bool = false
+    var isLoadingSteamLinkStatus: Bool = false
+    var isUnlinkingSteamAccount: Bool = false
     var authenticatedUser: AuthUser? = nil
     var recentGames: [RecentGame] = []
     var writtenReviewCount: Int = 0
     var wishlistCountValue: Int = 0
+    var steamLinkStatus: SteamLinkStatus = .notLinked
     var errorMessage: String? = nil
+    var successMessage: String? = nil
     var translatedRecentGameTitles: [Int: String] = [:]
 
     var isAccountActionInProgress: Bool {
-        isLoggingOut || isDeletingAccount
+        isLoggingOut || isDeletingAccount || isUnlinkingSteamAccount
+    }
+
+    var isSteamConnected: Bool {
+        steamLinkStatus.isLinked
+    }
+
+    var steamConnectionSubtitle: String {
+        if let displayName = steamLinkStatus.displayName,
+           displayName.isEmpty == false {
+            return "\(displayName) · 자동 동기화 활성화됨"
+        }
+
+        return "자동 동기화 활성화됨"
     }
 
     var displayName: String? { authenticatedUser?.nickname }

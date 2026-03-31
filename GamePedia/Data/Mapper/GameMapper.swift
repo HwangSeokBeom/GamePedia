@@ -106,7 +106,8 @@ enum GameMapper {
             formattedRating: formatRating(ratingOnFiveScale, hasRating: resolvedRating != nil),
             formattedReviewCount: "—",
             formattedPlaytime: "—",
-            developerLine: "\(developerName) · \(genre) · \(releaseYear)"
+            developerLine: "\(developerName) · \(genre) · \(releaseYear)",
+            hasSteamReview: dto.hasSteamReview ?? false
         )
     }
 

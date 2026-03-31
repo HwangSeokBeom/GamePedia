@@ -36,15 +36,19 @@ enum LibrarySortOption: Int {
 
 struct LibraryState {
     var selectedSort: LibrarySortOption = .latest
-    var isSteamConnected: Bool = true
+    var isSteamConnected: Bool = false
+    var steamSyncStatus: SteamSyncStatus = .idle
     var isSteamSyncAvailable: Bool = true
     var steamSyncErrorCode: String? = nil
     var recentlyPlayed: [LibraryGameSummary] = []
     var playingGames: [LibraryGameSummary] = []
     var ownedGames: [LibraryGameSummary] = []
     var backlogGames: [LibraryGameSummary] = []
+    var playtimeRecommendations: [PlaytimeRecommendation] = []
+    var friendRecommendations: [SteamFriendRecommendation] = []
     var likedGames: [Game] = []
     var reviews: [ReviewedGame] = []
+    var steamOwnedSyncErrorCode: String? = nil
     var addingToPlayingIdentifiers: Set<LibraryGameIdentifier> = []
     var isSyncingOwnedSteamLibrary: Bool = false
     var isUnlinkingSteamAccount: Bool = false
@@ -53,5 +57,12 @@ struct LibraryState {
     var isRefreshing: Bool = false
     var errorMessage: String? = nil
     var successMessage: String? = nil
+    var steamConnectionOnboarding: LibraryOnboardingViewState? = nil
     var pendingFocusSection: LibrarySectionKind? = nil
+}
+
+struct LibraryOnboardingViewState: Equatable {
+    let title: String
+    let message: String
+    let helperText: String?
 }

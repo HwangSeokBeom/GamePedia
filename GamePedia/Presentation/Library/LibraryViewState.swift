@@ -34,6 +34,8 @@ enum LibrarySectionKind: Int, CaseIterable, Hashable {
     case recentlyPlayed
     case playing
     case owned
+    case playtimeRecommendations
+    case friendRecommendations
     case wishlist
     case reviewed
 
@@ -45,6 +47,10 @@ enum LibrarySectionKind: Int, CaseIterable, Hashable {
             return "플레이 중"
         case .owned:
             return "보유 게임"
+        case .playtimeRecommendations:
+            return "플레이 성향 기반 추천"
+        case .friendRecommendations:
+            return "친구 기반 추천"
         case .wishlist:
             return "찜한 게임"
         case .reviewed:
@@ -60,6 +66,10 @@ enum LibrarySectionKind: Int, CaseIterable, Hashable {
             return "gamecontroller.fill"
         case .owned:
             return "shippingbox.fill"
+        case .playtimeRecommendations:
+            return "sparkles"
+        case .friendRecommendations:
+            return "person.3.fill"
         case .wishlist:
             return "heart.fill"
         case .reviewed:
@@ -183,4 +193,7 @@ enum LibraryMessageAction: Hashable {
     case connectSteam
     case showSteamPrivacyGuide
     case retrySteamSync
+    case retryOwnedSteamSync
+    case retryPlaytimeRecommendations
+    case retryFriendRecommendations
 }

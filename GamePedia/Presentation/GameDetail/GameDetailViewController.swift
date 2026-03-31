@@ -60,6 +60,9 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         rootView.heartButton.addTarget(self, action: #selector(didTapHaveIt), for: .touchUpInside)
         rootView.writeReviewButton.addTarget(self, action: #selector(didTapWriteReview), for: .touchUpInside)
         rootView.reviewSectionHeader.seeMoreButton.addTarget(self, action: #selector(didTapSeeAllReviews), for: .touchUpInside)
+        rootView.steamReviewBannerView.onWriteReviewTapped = { [weak self] in
+            self?.didTapWriteReview()
+        }
     }
 
     private func setupTableView() {

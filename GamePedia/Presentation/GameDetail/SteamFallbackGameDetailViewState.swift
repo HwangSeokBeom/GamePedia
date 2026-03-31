@@ -7,7 +7,7 @@ struct SteamFallbackGameDetailViewState: Hashable {
     let sourceLabelText: String
     let metadataText: String
     let descriptionText: String
-    let playtimeText: String?
+    let playtimeValueText: String?
     let externalGameId: String
     let gameSource: GameSource
     let metadataEnriched: Bool

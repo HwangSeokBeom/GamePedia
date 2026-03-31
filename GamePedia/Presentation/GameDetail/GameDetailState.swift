@@ -41,4 +41,8 @@ struct GameDetailState {
     var shouldShowReviewSeeMore: Bool {
         !reviews.isEmpty
     }
+
+    var showSteamReviewLinkage: Bool {
+        game?.hasSteamReview == true
+    }
 }

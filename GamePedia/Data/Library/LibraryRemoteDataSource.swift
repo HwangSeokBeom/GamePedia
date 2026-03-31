@@ -3,6 +3,8 @@ import Foundation
 protocol LibraryRemoteDataSource {
     func fetchLibraryOverview(sort: UserGameCollectionSortOption?) async throws -> LibraryOverviewResponseDataDTO
     func fetchOwnedLibrary() async throws -> LibraryOverviewResponseDataDTO
+    func fetchPlaytimeRecommendations() async throws -> PlaytimeRecommendationsResponseDataDTO
+    func fetchSteamFriendRecommendations() async throws -> SteamFriendRecommendationsResponseDataDTO
     func fetchSteamLinkStatus() async throws -> SteamLinkStatusDTO
     func startSteamLink() async throws -> SteamLinkStartResponseDataDTO
     func unlinkSteamAccount() async throws -> SteamUnlinkResponseDataDTO
@@ -29,6 +31,7 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
         print(
             "[Library] response endpoint=GET /users/me/library " +
             "steamConnected=\(data.steamConnected.map(String.init) ?? "nil") " +
+            "steamSyncStatus=\(data.steamSyncStatus ?? "nil") " +
             "steamSyncAvailable=\(data.steamSyncAvailable.map(String.init) ?? "nil") " +
             "recentlyPlayedCount=\(data.recentlyPlayed?.count ?? 0) " +
             "playingCount=\(data.playing?.count ?? 0) " +
@@ -53,10 +56,42 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
         return response.data
     }
 
+    func fetchPlaytimeRecommendations() async throws -> PlaytimeRecommendationsResponseDataDTO {
+        print("[Library] request endpoint=GET /users/me/recommendations/playtime-based")
+        let response = try await apiClient.request(
+            .myPlaytimeRecommendations,
+            as: LibraryResponseEnvelopeDTO<PlaytimeRecommendationsResponseDataDTO>.self
+        )
+        print(
+            "[Library] response endpoint=GET /users/me/recommendations/playtime-based " +
+            "recommendationCount=\(response.data.recommendations?.count ?? 0)"
+        )
+        return response.data
+    }
+
+    func fetchSteamFriendRecommendations() async throws -> SteamFriendRecommendationsResponseDataDTO {
+        print("[Library] request endpoint=GET /users/me/recommendations/steam-friends")
+        let response = try await apiClient.request(
+            .mySteamFriendRecommendations,
+            as: LibraryResponseEnvelopeDTO<SteamFriendRecommendationsResponseDataDTO>.self
+        )
+        print(
+            "[Library] response endpoint=GET /users/me/recommendations/steam-friends " +
+            "recommendationCount=\(response.data.recommendations?.count ?? 0)"
+        )
+        return response.data
+    }
+
     func fetchSteamLinkStatus() async throws -> SteamLinkStatusDTO {
+        print("[SteamLink] request endpoint=GET /users/me/steam")
         let response = try await apiClient.request(
             .mySteamLinkStatus,
             as: LibraryResponseEnvelopeDTO<SteamLinkStatusDTO>.self
+        )
+        print(
+            "[SteamLink] response endpoint=GET /users/me/steam " +
+            "isLinked=\(response.data.isLinked) " +
+            "steamId=\(response.data.steamId ?? "nil")"
         )
         return response.data
     }

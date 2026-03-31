@@ -6,6 +6,7 @@ enum ProfileIntent {
     case viewDidLoad
     case didTapEditProfile
     case didTapSettings
+    case didTapSteamUnlink
     case didTapLogout
     case didTapDeleteAccount
     case didTapGame(id: Int)
@@ -16,6 +17,7 @@ enum ProfileIntent {
     case didTapPrivacyPolicy
     case didTapCommunityGuidelines
     case didTapContactSupport
+    case didConsumeSuccessMessage
 }
 
 enum ProfileRoute {

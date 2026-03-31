@@ -53,6 +53,96 @@ final class ProfileRootView: UIView {
         return view
     }()
 
+    let connectedAccountsSectionStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.spacing = 12
+        stackView.isHidden = true
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+
+    let connectedAccountsHeaderView: SectionHeaderView = {
+        let view = SectionHeaderView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    let connectedAccountsContainerView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpCardBackground
+        view.layer.cornerRadius = 18
+        view.layer.cornerCurve = .continuous
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let steamAccountIconContainerView: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.gpPrimary.withAlphaComponent(0.14)
+        view.layer.cornerRadius = 18
+        view.layer.cornerCurve = .continuous
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let steamAccountIconImageView: UIImageView = {
+        let imageView = UIImageView(
+            image: UIImage(
+                systemName: "gamecontroller.fill",
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+            )
+        )
+        imageView.tintColor = .gpPrimary
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let steamAccountTitleLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 16, weight: .semibold)
+        label.textColor = .gpTextPrimary
+        label.text = "Steam"
+        return label
+    }()
+
+    private let steamAccountSubtitleLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 13)
+        label.textColor = .gpTextSecondary
+        label.numberOfLines = 2
+        return label
+    }()
+
+    private let steamConnectedBadgeView: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.gpPrimary.withAlphaComponent(0.18)
+        view.layer.cornerRadius = 10
+        view.layer.cornerCurve = .continuous
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let steamConnectedBadgeLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 11, weight: .semibold)
+        label.textColor = .gpPrimaryLight
+        label.text = "연결됨"
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    let steamUnlinkButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.title = "연동 해제"
+        configuration.baseForegroundColor = .gpCoral
+        configuration.contentInsets = .zero
+        let button = UIButton(configuration: configuration)
+        button.titleLabel?.font = .systemFont(ofSize: 13, weight: .semibold)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     let accountActionContainerView: UIView = {
         let view = UIView()
         view.backgroundColor = .gpCardBackground
@@ -250,6 +340,9 @@ final class ProfileRootView: UIView {
         sectionHeader.titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
         sectionHeader.translatesAutoresizingMaskIntoConstraints = false
 
+        connectedAccountsHeaderView.configure(title: "연결된 계정", showSeeMore: false)
+        connectedAccountsHeaderView.titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
+
         accountActionContainerView.addSubview(logoutButton)
         accountActionContainerView.addSubview(accountActionDivider)
         accountActionContainerView.addSubview(deleteAccountButton)
@@ -262,7 +355,27 @@ final class ProfileRootView: UIView {
         supportActionContainerView.addSubview(supportActionDividerBottom)
         supportActionContainerView.addSubview(contactSupportButton)
 
-        [userRow, statsContainerView, accountActionContainerView, supportActionContainerView, sectionHeader, tableView].forEach {
+        steamConnectedBadgeView.addSubview(steamConnectedBadgeLabel)
+        steamAccountIconContainerView.addSubview(steamAccountIconImageView)
+
+        let steamTitleRow = UIStackView(arrangedSubviews: [steamAccountTitleLabel, steamConnectedBadgeView])
+        steamTitleRow.axis = .horizontal
+        steamTitleRow.alignment = .center
+        steamTitleRow.spacing = 8
+
+        let steamTextStack = UIStackView(arrangedSubviews: [steamTitleRow, steamAccountSubtitleLabel])
+        steamTextStack.axis = .vertical
+        steamTextStack.spacing = 4
+        steamTextStack.translatesAutoresizingMaskIntoConstraints = false
+
+        connectedAccountsContainerView.addSubview(steamAccountIconContainerView)
+        connectedAccountsContainerView.addSubview(steamTextStack)
+        connectedAccountsContainerView.addSubview(steamUnlinkButton)
+
+        connectedAccountsSectionStackView.addArrangedSubview(connectedAccountsHeaderView)
+        connectedAccountsSectionStackView.addArrangedSubview(connectedAccountsContainerView)
+
+        [userRow, statsContainerView, connectedAccountsSectionStackView, accountActionContainerView, supportActionContainerView, sectionHeader, tableView].forEach {
             addSubview($0)
         }
 
@@ -283,7 +396,32 @@ final class ProfileRootView: UIView {
             statsContainerView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
             statsContainerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
 
-            accountActionContainerView.topAnchor.constraint(equalTo: statsContainerView.bottomAnchor, constant: 20),
+            connectedAccountsSectionStackView.topAnchor.constraint(equalTo: statsContainerView.bottomAnchor, constant: 20),
+            connectedAccountsSectionStackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            connectedAccountsSectionStackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+
+            steamAccountIconContainerView.leadingAnchor.constraint(equalTo: connectedAccountsContainerView.leadingAnchor, constant: 16),
+            steamAccountIconContainerView.centerYAnchor.constraint(equalTo: connectedAccountsContainerView.centerYAnchor),
+            steamAccountIconContainerView.widthAnchor.constraint(equalToConstant: 36),
+            steamAccountIconContainerView.heightAnchor.constraint(equalToConstant: 36),
+
+            steamAccountIconImageView.centerXAnchor.constraint(equalTo: steamAccountIconContainerView.centerXAnchor),
+            steamAccountIconImageView.centerYAnchor.constraint(equalTo: steamAccountIconContainerView.centerYAnchor),
+
+            steamConnectedBadgeLabel.topAnchor.constraint(equalTo: steamConnectedBadgeView.topAnchor, constant: 3),
+            steamConnectedBadgeLabel.bottomAnchor.constraint(equalTo: steamConnectedBadgeView.bottomAnchor, constant: -3),
+            steamConnectedBadgeLabel.leadingAnchor.constraint(equalTo: steamConnectedBadgeView.leadingAnchor, constant: 8),
+            steamConnectedBadgeLabel.trailingAnchor.constraint(equalTo: steamConnectedBadgeView.trailingAnchor, constant: -8),
+
+            steamUnlinkButton.trailingAnchor.constraint(equalTo: connectedAccountsContainerView.trailingAnchor, constant: -16),
+            steamUnlinkButton.centerYAnchor.constraint(equalTo: connectedAccountsContainerView.centerYAnchor),
+
+            steamTextStack.topAnchor.constraint(equalTo: connectedAccountsContainerView.topAnchor, constant: 16),
+            steamTextStack.leadingAnchor.constraint(equalTo: steamAccountIconContainerView.trailingAnchor, constant: 12),
+            steamTextStack.trailingAnchor.constraint(lessThanOrEqualTo: steamUnlinkButton.leadingAnchor, constant: -12),
+            steamTextStack.bottomAnchor.constraint(equalTo: connectedAccountsContainerView.bottomAnchor, constant: -16),
+
+            accountActionContainerView.topAnchor.constraint(equalTo: connectedAccountsSectionStackView.bottomAnchor, constant: 20),
             accountActionContainerView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
             accountActionContainerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
 
@@ -375,6 +513,8 @@ final class ProfileRootView: UIView {
         playedStatView.configure(value: "\(state.playedGameCount)", label: "플레이한 게임")
         reviewStatView.configure(value: "\(state.writtenReviewCount)", label: "작성한 리뷰")
         wishlistStatView.configure(value: "\(state.wishlistCount)", label: "찜한 게임")
+        connectedAccountsSectionStackView.isHidden = !state.isSteamConnected
+        steamAccountSubtitleLabel.text = state.steamConnectionSubtitle
 
         updateAccountActionButtons(with: state)
     }
@@ -384,6 +524,8 @@ final class ProfileRootView: UIView {
         deleteAccountButton.isEnabled = !state.isAccountActionInProgress
         logoutButton.alpha = logoutButton.isEnabled ? 1.0 : 0.7
         deleteAccountButton.alpha = deleteAccountButton.isEnabled ? 1.0 : 0.7
+        steamUnlinkButton.isEnabled = state.isSteamConnected && !state.isUnlinkingSteamAccount
+        steamUnlinkButton.alpha = steamUnlinkButton.isEnabled ? 1.0 : 0.6
 
         var logoutConfiguration = logoutButton.configuration
         logoutConfiguration?.showsActivityIndicator = state.isLoggingOut
@@ -394,6 +536,10 @@ final class ProfileRootView: UIView {
         deleteConfiguration?.showsActivityIndicator = state.isDeletingAccount
         deleteConfiguration?.image = state.isDeletingAccount ? nil : UIImage(systemName: "person.crop.circle.badge.minus")
         deleteAccountButton.configuration = deleteConfiguration
+
+        var steamConfiguration = steamUnlinkButton.configuration
+        steamConfiguration?.showsActivityIndicator = state.isUnlinkingSteamAccount
+        steamUnlinkButton.configuration = steamConfiguration
     }
 
     private static func makeAccountActionConfiguration(

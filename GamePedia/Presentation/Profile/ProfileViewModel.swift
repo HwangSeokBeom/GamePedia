@@ -17,8 +17,10 @@ final class ProfileViewModel {
     private let fetchCurrentUserUseCase: FetchCurrentUserUseCase
     private let fetchMyReviewsUseCase: FetchMyReviewsUseCase
     private let fetchMyFavoritesUseCase: FetchMyFavoritesUseCase
+    private let fetchSteamLinkStatusUseCase: FetchSteamLinkStatusUseCase
     private let logoutUseCase: LogoutUseCase
     private let deleteAccountUseCase: DeleteAccountUseCase
+    private let unlinkSteamAccountUseCase: UnlinkSteamAccountUseCase
     private let userSessionStore: any UserSessionStore
     private let apiClient: APIClient
     private let translateTextUseCase: TranslateTextUseCase
@@ -33,8 +35,14 @@ final class ProfileViewModel {
         fetchMyFavoritesUseCase: FetchMyFavoritesUseCase = FetchMyFavoritesUseCase(
             favoriteRepository: DefaultFavoriteRepository()
         ),
+        fetchSteamLinkStatusUseCase: FetchSteamLinkStatusUseCase = FetchSteamLinkStatusUseCase(
+            libraryRepository: DefaultLibraryRepository()
+        ),
         logoutUseCase: LogoutUseCase,
         deleteAccountUseCase: DeleteAccountUseCase,
+        unlinkSteamAccountUseCase: UnlinkSteamAccountUseCase = UnlinkSteamAccountUseCase(
+            libraryRepository: DefaultLibraryRepository()
+        ),
         userSessionStore: any UserSessionStore,
         apiClient: APIClient = .shared,
         translateTextUseCase: TranslateTextUseCase? = nil
@@ -42,8 +50,10 @@ final class ProfileViewModel {
         self.fetchCurrentUserUseCase = fetchCurrentUserUseCase
         self.fetchMyReviewsUseCase = fetchMyReviewsUseCase
         self.fetchMyFavoritesUseCase = fetchMyFavoritesUseCase
+        self.fetchSteamLinkStatusUseCase = fetchSteamLinkStatusUseCase
         self.logoutUseCase = logoutUseCase
         self.deleteAccountUseCase = deleteAccountUseCase
+        self.unlinkSteamAccountUseCase = unlinkSteamAccountUseCase
         self.userSessionStore = userSessionStore
         self.apiClient = apiClient
         self.translateTextUseCase = translateTextUseCase ?? DefaultTranslateTextUseCase(
@@ -61,6 +71,8 @@ final class ProfileViewModel {
             loadProfileData()
         case .didTapEditProfile:
             onRoute?(.showEditProfile)
+        case .didTapSteamUnlink:
+            unlinkSteamAccount()
         case .didTapLogout:
             logout()
         case .didTapDeleteAccount:
@@ -77,6 +89,8 @@ final class ProfileViewModel {
             onRoute?(.showCommunityGuidelines)
         case .didTapContactSupport:
             onRoute?(.contactSupport)
+        case .didConsumeSuccessMessage:
+            apply(.clearSuccessMessage)
         case .didTapSettings, .didTapGame, .didTapSeeMoreRecentPlay:
             break
         }
@@ -108,6 +122,10 @@ final class ProfileViewModel {
 
         Task {
             await fetchWishlistCount()
+        }
+
+        Task {
+            await fetchSteamLinkStatus()
         }
     }
 
@@ -192,6 +210,32 @@ final class ProfileViewModel {
                 self.apply(.setAuthenticatedUser(user))
             }
             .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .steamLinkDidComplete)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.userSessionStore.fetchUser() != nil else { return }
+                Task {
+                    await self.fetchSteamLinkStatus()
+                }
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .steamLinkStateDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self else { return }
+                if let isLinked = notification.userInfo?[SteamLinkStateChangeUserInfoKey.isLinked] as? Bool,
+                   isLinked == false {
+                    self.apply(.setSteamLinkStatus(.notLinked))
+                }
+
+                guard self.userSessionStore.fetchUser() != nil else { return }
+                Task {
+                    await self.fetchSteamLinkStatus()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     private func logout() {
@@ -257,6 +301,66 @@ final class ProfileViewModel {
             if case .unauthorized = favoriteError {
                 await MainActor.run {
                     _ = self.handleProtectedSessionFailure(.unauthorized)
+                }
+            }
+        }
+    }
+
+    private func fetchSteamLinkStatus() async {
+        await MainActor.run {
+            self.apply(.setLoadingSteamLinkStatus(true))
+        }
+
+        do {
+            let steamLinkStatus = try await fetchSteamLinkStatusUseCase.execute()
+            await MainActor.run {
+                self.apply(.setSteamLinkStatus(steamLinkStatus))
+            }
+        } catch {
+            let libraryError = LibraryError.from(error: error)
+            if case .unauthorized = libraryError {
+                await MainActor.run {
+                    _ = self.handleProtectedSessionFailure(.unauthorized)
+                }
+                return
+            }
+
+            await MainActor.run {
+                self.apply(.setLoadingSteamLinkStatus(false))
+            }
+        }
+    }
+
+    private func unlinkSteamAccount() {
+        guard state.isSteamConnected else { return }
+        guard !state.isUnlinkingSteamAccount else { return }
+
+        apply(.clearError)
+        apply(.clearSuccessMessage)
+        apply(.setUnlinkingSteamAccount(true))
+
+        Task {
+            do {
+                let result = try await unlinkSteamAccountUseCase.execute()
+                await MainActor.run {
+                    self.apply(.setUnlinkingSteamAccount(false))
+                    self.apply(.setSteamLinkStatus(result.steamLinkStatus))
+                    self.apply(.setSuccessMessage("Steam 연동이 해제되었어요"))
+                    NotificationCenter.default.post(
+                        name: .steamLinkStateDidChange,
+                        object: nil,
+                        userInfo: [SteamLinkStateChangeUserInfoKey.isLinked: result.steamLinkStatus.isLinked]
+                    )
+                }
+            } catch {
+                let libraryError = LibraryError.from(error: error)
+                await MainActor.run {
+                    self.apply(.setUnlinkingSteamAccount(false))
+                    if case .unauthorized = libraryError {
+                        _ = self.handleProtectedSessionFailure(.unauthorized)
+                        return
+                    }
+                    self.apply(.setError(libraryError.errorDescription ?? "Steam 연동을 해제하지 못했어요."))
                 }
             }
         }

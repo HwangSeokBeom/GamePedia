@@ -11,8 +11,9 @@ enum LibraryReducer {
             state.isRefreshing = isRefreshing
         case .setSort(let sort):
             state.selectedSort = sort
-        case .setSteamState(let isConnected, let isSyncAvailable, let errorCode):
+        case .setSteamState(let isConnected, let syncStatus, let isSyncAvailable, let errorCode):
             state.isSteamConnected = isConnected
+            state.steamSyncStatus = syncStatus
             state.isSteamSyncAvailable = isSyncAvailable
             state.steamSyncErrorCode = errorCode
         case .setLibraryItems(let recentlyPlayed, let playingGames, let ownedGames, let backlogGames, let likedGames, let reviews):
@@ -22,6 +23,12 @@ enum LibraryReducer {
             state.backlogGames = backlogGames
             state.likedGames = likedGames
             state.reviews = reviews
+        case .setPlaytimeRecommendations(let recommendations):
+            state.playtimeRecommendations = recommendations
+        case .setFriendRecommendations(let recommendations):
+            state.friendRecommendations = recommendations
+        case .setSteamOwnedSyncErrorCode(let errorCode):
+            state.steamOwnedSyncErrorCode = errorCode
         case .setAddingToPlaying(let identifier, let isUpdating):
             if isUpdating {
                 state.addingToPlayingIdentifiers.insert(identifier)
@@ -43,8 +50,12 @@ enum LibraryReducer {
             state.isRefreshing = false
         case .setSuccessMessage(let message):
             state.successMessage = message
+        case .setSteamConnectionOnboarding(let onboarding):
+            state.steamConnectionOnboarding = onboarding
         case .clearSuccessMessage:
             state.successMessage = nil
+        case .clearSteamConnectionOnboarding:
+            state.steamConnectionOnboarding = nil
         case .clearError:
             state.errorMessage = nil
         case .consumeInitialFocus:

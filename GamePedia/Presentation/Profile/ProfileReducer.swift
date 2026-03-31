@@ -12,6 +12,10 @@ enum ProfileReducer {
             state.isLoggingOut = isLoggingOut
         case .setDeletingAccount(let isDeletingAccount):
             state.isDeletingAccount = isDeletingAccount
+        case .setLoadingSteamLinkStatus(let isLoadingSteamLinkStatus):
+            state.isLoadingSteamLinkStatus = isLoadingSteamLinkStatus
+        case .setUnlinkingSteamAccount(let isUnlinkingSteamAccount):
+            state.isUnlinkingSteamAccount = isUnlinkingSteamAccount
         case .setAuthenticatedUser(let authenticatedUser):
             state.authenticatedUser = authenticatedUser
             state.isLoading = false
@@ -22,11 +26,20 @@ enum ProfileReducer {
             state.writtenReviewCount = count
         case .setWishlistCount(let count):
             state.wishlistCountValue = count
+        case .setSteamLinkStatus(let steamLinkStatus):
+            state.steamLinkStatus = steamLinkStatus
+            state.isLoadingSteamLinkStatus = false
         case .setError(let msg):
             state.errorMessage = msg
             state.isLoading = false
+            state.isLoadingSteamLinkStatus = false
+            state.isUnlinkingSteamAccount = false
+        case .setSuccessMessage(let message):
+            state.successMessage = message
         case .clearError:
             state.errorMessage = nil
+        case .clearSuccessMessage:
+            state.successMessage = nil
         case .setTranslatedRecentGameTitles(let recentGameTitles):
             state.translatedRecentGameTitles.merge(recentGameTitles) { _, new in new }
         }

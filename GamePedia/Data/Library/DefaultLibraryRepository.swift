@@ -13,6 +13,7 @@ final class DefaultLibraryRepository: LibraryRepository {
             print(
                 "[Library] mapping overview " +
                 "steamConnected=\(data.steamConnected.map(String.init) ?? "nil") " +
+                "steamSyncStatus=\(data.steamSyncStatus ?? "nil") " +
                 "steamSyncAvailable=\(data.steamSyncAvailable.map(String.init) ?? "nil") " +
                 "recentlyPlayedCount=\(data.recentlyPlayed?.count ?? 0) " +
                 "playingCount=\(data.playing?.count ?? 0) " +
@@ -30,6 +31,7 @@ final class DefaultLibraryRepository: LibraryRepository {
 
             let overview = LibraryOverview(
                 steamLinkStatus: steamLinkStatus,
+                steamSyncStatus: resolvedSteamSyncStatus(from: data.steamSyncStatus),
                 isSteamSyncAvailable: data.steamSyncAvailable ?? true,
                 steamSyncErrorCode: sanitized(data.steamSyncErrorCode),
                 recentlyPlayed: recentlyPlayed,
@@ -44,6 +46,7 @@ final class DefaultLibraryRepository: LibraryRepository {
                 "ownedCount=\(overview.owned.count) " +
                 "backlogCount=\(overview.backlog.count) " +
                 "isSteamConnected=\(overview.steamLinkStatus.isLinked) " +
+                "steamSyncStatus=\(overview.steamSyncStatus.rawValue) " +
                 "isSteamSyncAvailable=\(overview.isSteamSyncAvailable)"
             )
             return overview
@@ -59,6 +62,56 @@ final class DefaultLibraryRepository: LibraryRepository {
             let owned = try (data.owned ?? []).map(LibraryMapper.toGameSummary)
             let backlog = try (data.backlog ?? []).map(LibraryMapper.toGameSummary)
             return OwnedLibraryCollection(owned: owned, backlog: backlog)
+        } catch {
+            throw LibraryError.from(error: error)
+        }
+    }
+
+    func fetchPlaytimeRecommendations() async throws -> [PlaytimeRecommendation] {
+        do {
+            let data = try await libraryRemoteDataSource.fetchPlaytimeRecommendations()
+            let recommendations = try (data.recommendations ?? []).map { dto in
+                PlaytimeRecommendation(
+                    game: try LibraryMapper.toGameSummary(dto),
+                    reason: sanitized(dto.reason)
+                )
+            }
+            return recommendations
+        } catch {
+            throw LibraryError.from(error: error)
+        }
+    }
+
+    func fetchSteamFriendRecommendations() async throws -> [SteamFriendRecommendation] {
+        do {
+            let data = try await libraryRemoteDataSource.fetchSteamFriendRecommendations()
+            let recommendations = try (data.recommendations ?? []).map { dto in
+                SteamFriendRecommendation(
+                    game: try LibraryMapper.toGameSummary(dto),
+                    friendCount: max(dto.friendCount ?? 0, 0),
+                    reason: sanitized(dto.reason)
+                )
+            }
+            return recommendations
+        } catch {
+            throw LibraryError.from(error: error)
+        }
+    }
+
+    func fetchSteamLinkStatus() async throws -> SteamLinkStatus {
+        do {
+            let steamLinkStatusDTO = try await libraryRemoteDataSource.fetchSteamLinkStatus()
+            return LibraryMapper.toSteamLinkStatus(steamLinkStatusDTO)
+        } catch let networkError as NetworkError {
+            switch networkError {
+            case .serverError(let statusCode, _, _):
+                if statusCode == 404 {
+                    return .notLinked
+                }
+            default:
+                break
+            }
+            throw LibraryError.from(error: networkError)
         } catch {
             throw LibraryError.from(error: error)
         }
@@ -155,5 +208,13 @@ final class DefaultLibraryRepository: LibraryRepository {
         guard let value else { return nil }
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedValue.isEmpty ? nil : trimmedValue
+    }
+
+    private func resolvedSteamSyncStatus(from rawValue: String?) -> SteamSyncStatus {
+        guard let rawValue = sanitized(rawValue)?.lowercased() else {
+            return .idle
+        }
+
+        return SteamSyncStatus(rawValue: rawValue) ?? .unknown
     }
 }

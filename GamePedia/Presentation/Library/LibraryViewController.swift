@@ -7,6 +7,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     private var currentSections: [LibrarySectionViewState] = []
     private var lastPresentedErrorMessage: String?
     private var lastPresentedSuccessMessage: String?
+    private var lastPresentedSteamOnboarding: LibraryOnboardingViewState?
     private let refreshControl = UIRefreshControl()
     private var toastHideWorkItem: DispatchWorkItem?
     private weak var toastView: LibraryToastView?
@@ -79,6 +80,14 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
             viewModel.send(.didConsumeSuccessMessage)
         } else if state.successMessage == nil {
             lastPresentedSuccessMessage = nil
+        }
+
+        if let onboarding = state.steamConnectionOnboarding,
+           onboarding != lastPresentedSteamOnboarding {
+            lastPresentedSteamOnboarding = onboarding
+            presentSteamConnectionOnboardingAlert(onboarding)
+        } else if state.steamConnectionOnboarding == nil {
+            lastPresentedSteamOnboarding = nil
         }
 
         updateNavigationItems(with: state)
@@ -158,6 +167,12 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
                         self?.viewModel.send(.steamPrivacyGuideButtonTapped)
                     case .retrySteamSync:
                         self?.viewModel.send(.retrySteamSyncTapped)
+                    case .retryOwnedSteamSync:
+                        self?.viewModel.send(.syncOwnedSteamLibraryButtonTapped)
+                    case .retryPlaytimeRecommendations:
+                        self?.viewModel.send(.retryPlaytimeRecommendationsTapped)
+                    case .retryFriendRecommendations:
+                        self?.viewModel.send(.retryFriendRecommendationsTapped)
                     }
                 }
                 return cell
@@ -191,6 +206,10 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
                     self.viewModel.send(.didTapSeeAllPlaying)
                 case .owned:
                     self.viewModel.send(.didTapSeeAllOwned)
+                case .playtimeRecommendations:
+                    break
+                case .friendRecommendations:
+                    break
                 case .reviewed:
                     self.viewModel.send(.didTapSeeAllReviewed)
                 case .wishlist:
@@ -321,6 +340,19 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         alert.addAction(UIAlertAction(title: "취소", style: .cancel))
         alert.addAction(UIAlertAction(title: "연동 해제", style: .destructive) { [weak self] _ in
             self?.viewModel.send(.unlinkSteamConfirmed)
+        })
+        present(alert, animated: true)
+    }
+
+    private func presentSteamConnectionOnboardingAlert(_ onboarding: LibraryOnboardingViewState) {
+        let messageComponents = [onboarding.message, onboarding.helperText].compactMap { $0 }
+        let alert = UIAlertController(
+            title: onboarding.title,
+            message: messageComponents.joined(separator: "\n\n"),
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "확인", style: .default) { [weak self] _ in
+            self?.viewModel.send(.didConsumeSteamConnectionOnboarding)
         })
         present(alert, animated: true)
     }
@@ -457,6 +489,10 @@ extension LibraryViewController: UICollectionViewDelegate {
                 viewModel.send(.didTapPlayingGame(viewState.identifier))
             case .owned:
                 viewModel.send(.didTapPlayingGame(viewState.identifier))
+            case .playtimeRecommendations:
+                viewModel.send(.didTapPlaytimeRecommendationGame(viewState.identifier))
+            case .friendRecommendations:
+                viewModel.send(.didTapFriendRecommendationGame(viewState.identifier))
             case .wishlist:
                 viewModel.send(.didTapWishlistGame(viewState.identifier))
             case .reviewed:

@@ -64,7 +64,8 @@ enum IGDBGameMapper {
             formattedRating: formattedRating5(ratingOn5Scale, hasRating: dto.rating != nil),
             formattedReviewCount: ratingCount.abbreviated,
             formattedPlaytime: "—",
-            developerLine: "\(developerName) · \(genreName) · \(year)"
+            developerLine: "\(developerName) · \(genreName) · \(year)",
+            hasSteamReview: false
         )
     }
 

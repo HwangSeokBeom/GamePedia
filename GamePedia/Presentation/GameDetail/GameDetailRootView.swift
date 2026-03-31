@@ -100,6 +100,13 @@ final class GameDetailRootView: UIView {
         return UIButton(configuration: configuration)
     }()
 
+    let steamReviewBannerView: SteamReviewLinkageBannerView = {
+        let view = SteamReviewLinkageBannerView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+
     let descriptionTitleLabel: UILabel = {
         let label = UILabel()
         label.text = "게임 소개"
@@ -190,6 +197,7 @@ final class GameDetailRootView: UIView {
             titleRowStackView,
             statsView,
             actionStackView,
+            steamReviewBannerView,
             descriptionTitleLabel,
             descriptionLabel,
             reviewSectionHeader,
@@ -253,6 +261,7 @@ final class GameDetailRootView: UIView {
         descriptionLabel.text = state.summary
         reviewSummaryLabel.text = state.reviewSummaryText
         reviewSectionHeader.seeMoreButton.isHidden = !state.shouldShowReviewSeeMore
+        steamReviewBannerView.isHidden = !state.showSteamReviewLinkage
         print("[UI] rendered resolvedTitle:", state.title)
         print("[UI] rendered resolvedSummary:", state.summary)
     }

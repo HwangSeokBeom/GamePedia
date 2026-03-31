@@ -8,6 +8,9 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     private let viewModel: ProfileViewModel
     private var recentGames: [RecentGame] = []
     private var lastPresentedErrorMessage: String?
+    private var lastPresentedSuccessMessage: String?
+    private var toastHideWorkItem: DispatchWorkItem?
+    private weak var toastView: ProfileToastView?
 
     // Set by ProfileCoordinator.
     var onGameSelected: ((Int) -> Void)?
@@ -59,6 +62,7 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
         rootView.tableView.delegate = self
         rootView.logoutButton.addTarget(self, action: #selector(didTapLogout), for: .touchUpInside)
         rootView.deleteAccountButton.addTarget(self, action: #selector(didTapDeleteAccount), for: .touchUpInside)
+        rootView.steamUnlinkButton.addTarget(self, action: #selector(didTapSteamUnlink), for: .touchUpInside)
         rootView.sectionHeader.seeMoreButton.addTarget(
             self, action: #selector(didTapSeeMoreRecentPlay), for: .touchUpInside
         )
@@ -117,6 +121,15 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
             showErrorAlert(message: errorMessage)
         } else if state.errorMessage == nil {
             lastPresentedErrorMessage = nil
+        }
+
+        if let successMessage = state.successMessage,
+           successMessage != lastPresentedSuccessMessage {
+            lastPresentedSuccessMessage = successMessage
+            showToast(message: successMessage)
+            viewModel.send(.didConsumeSuccessMessage)
+        } else if state.successMessage == nil {
+            lastPresentedSuccessMessage = nil
         }
     }
 
@@ -185,10 +198,57 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
         present(alertController, animated: true)
     }
 
+    @objc private func didTapSteamUnlink() {
+        let alertController = UIAlertController(
+            title: "Steam 연동을 해제할까요?",
+            message: "연동을 해제하면 Steam에서 가져온 최근 플레이 및 보유 게임 연결 정보가 더 이상 동기화되지 않아요.",
+            preferredStyle: .alert
+        )
+        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alertController.addAction(
+            UIAlertAction(title: "연동 해제", style: .destructive) { [weak self] _ in
+                self?.viewModel.send(.didTapSteamUnlink)
+            }
+        )
+        present(alertController, animated: true)
+    }
+
     private func showErrorAlert(message: String) {
         let alert = UIAlertController(title: "오류", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
+    }
+
+    private func showToast(message: String) {
+        toastHideWorkItem?.cancel()
+        toastView?.removeFromSuperview()
+
+        let toastView = ProfileToastView(message: message)
+        toastView.translatesAutoresizingMaskIntoConstraints = false
+        toastView.alpha = 0
+        view.addSubview(toastView)
+        self.toastView = toastView
+
+        NSLayoutConstraint.activate([
+            toastView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            toastView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            toastView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
+            toastView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20)
+        ])
+
+        UIView.animate(withDuration: 0.2) {
+            toastView.alpha = 1
+        }
+
+        let hideWorkItem = DispatchWorkItem { [weak toastView] in
+            UIView.animate(withDuration: 0.2, animations: {
+                toastView?.alpha = 0
+            }, completion: { _ in
+                toastView?.removeFromSuperview()
+            })
+        }
+        toastHideWorkItem = hideWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: hideWorkItem)
     }
 }
 
@@ -213,5 +273,36 @@ extension ProfileViewController: UITableViewDataSource, UITableViewDelegate {
         let game = recentGames[indexPath.row]
         viewModel.send(.didTapGame(id: game.gameId))
         onGameSelected?(game.gameId)
+    }
+}
+
+private final class ProfileToastView: UIView {
+    private let messageLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.textColor = .gpTextPrimary
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    init(message: String) {
+        super.init(frame: .zero)
+        messageLabel.text = message
+        backgroundColor = UIColor.gpSurface.withAlphaComponent(0.96)
+        layer.cornerRadius = 14
+        layer.masksToBounds = true
+
+        addSubview(messageLabel)
+        NSLayoutConstraint.activate([
+            messageLabel.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+            messageLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            messageLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+            messageLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }

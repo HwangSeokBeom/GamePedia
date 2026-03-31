@@ -63,8 +63,18 @@ final class SteamFallbackGameDetailRootView: UIView {
 
     private let playtimeLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 13, weight: .medium)
-        label.textColor = .gpPrimaryLight
+        label.text = "플레이 시간"
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextSecondary
+        label.numberOfLines = 1
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let playtimeValueLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 15, weight: .semibold)
+        label.textColor = .gpTextPrimary
         label.numberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -125,8 +135,10 @@ final class SteamFallbackGameDetailRootView: UIView {
         sourceLabel.text = state.sourceLabelText
         metadataLabel.text = state.metadataText
         descriptionLabel.text = state.descriptionText
-        playtimeLabel.text = state.playtimeText
-        playtimeLabel.isHidden = state.playtimeText == nil
+        playtimeValueLabel.text = state.playtimeValueText
+        let hasPlaytime = state.playtimeValueText != nil
+        playtimeLabel.isHidden = !hasPlaytime
+        playtimeValueLabel.isHidden = !hasPlaytime
         coverImageView.loadImage(
             url: state.coverImageURL,
             fallbackURLs: state.fallbackCoverImageURLs,
@@ -150,6 +162,7 @@ final class SteamFallbackGameDetailRootView: UIView {
             titleLabel,
             metadataLabel,
             playtimeLabel,
+            playtimeValueLabel,
             descriptionTitleLabel,
             descriptionLabel,
             noteContainerView

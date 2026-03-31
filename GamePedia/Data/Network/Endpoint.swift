@@ -229,6 +229,14 @@ extension Endpoint {
         .get("/users/me/library/owned", userAuth: true)
     }
 
+    static var mySteamFriendRecommendations: Endpoint {
+        .get("/users/me/recommendations/steam-friends", userAuth: true)
+    }
+
+    static var myPlaytimeRecommendations: Endpoint {
+        .get("/users/me/recommendations/playtime-based", userAuth: true)
+    }
+
     static func updateLibraryStatus(body: UpdateLibraryStatusRequestDTO) -> Endpoint {
         .post("/users/me/library/status", body: body, userAuth: true)
     }

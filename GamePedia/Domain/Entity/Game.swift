@@ -81,6 +81,7 @@ struct GameDetail {
     let formattedReviewCount: String
     let formattedPlaytime: String   // "60+ 시간"
     let developerLine: String       // "FromSoftware · 액션 RPG · 2024"
+    let hasSteamReview: Bool
 
     var displayTitle: String { resolvedTitle }
     var displayDescription: String { resolvedSummary }
@@ -121,7 +122,8 @@ struct GameDetail {
             formattedRating: formattedRating,
             formattedReviewCount: formattedReviewCount,
             formattedPlaytime: formattedPlaytime,
-            developerLine: developerLine
+            developerLine: developerLine,
+            hasSteamReview: hasSteamReview
         )
     }
 }

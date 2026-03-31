@@ -30,10 +30,17 @@ enum LibraryMapper {
 
         let title = resolvedTitle(from: dto)
         let translatedTitle = resolvedTranslatedTitle(from: dto, fallbackTitle: title)
-        let genre = sanitized(dto.genre) ?? dto.genres?.first ?? "기타"
+        let genre = resolvedGenre(from: dto) ?? ""
         let platform = sanitized(dto.platform) ?? dto.platforms?.first ?? defaultPlatform(for: source)
         let releaseYear = resolvedReleaseYear(from: dto)
         let metadataEnriched = dto.metadataEnriched ?? (canonicalGameID != nil)
+        let genreSource = resolvedGenreSource(
+            from: dto,
+            source: source,
+            igdbGameID: canonicalGameID,
+            metadataEnriched: metadataEnriched,
+            hasGenre: !genre.isEmpty
+        )
         let detailAvailable = dto.detailAvailable ?? defaultDetailAvailability(
             source: source,
             externalGameId: sanitized(dto.externalGameId) ?? resolvedSourceID,
@@ -69,11 +76,13 @@ enum LibraryMapper {
             coverImageURL: resolvedImageURLs.primaryURL,
             fallbackCoverImageURLs: resolvedImageURLs.fallbackURLs,
             genre: genre,
+            genreSource: genreSource,
             platform: platform,
             releaseYear: releaseYear,
             rating: normalizedRating(from: dto),
             recentPlaytimeMinutes: dto.recentPlaytimeMinutes,
             recentPlaytimeText: resolvedRecentPlaytimeText(from: dto),
+            playtimeMinutes: dto.playtimeMinutes,
             userStatus: resolvedStatus(from: dto.userStatus ?? dto.status),
             metadataEnriched: metadataEnriched,
             detailAvailable: detailAvailable,
@@ -212,6 +221,37 @@ enum LibraryMapper {
         let rawRating = dto.totalRating ?? dto.aggregatedRating ?? dto.rating
         guard let rawRating else { return nil }
         return rawRating > 5 ? rawRating / 20.0 : rawRating
+    }
+
+    private static func resolvedGenre(from dto: LibraryGameItemDTO) -> String? {
+        sanitized(dto.genreDisplayName)
+            ?? sanitized(dto.genre)
+            ?? dto.genres?.compactMap(sanitized).first
+    }
+
+    private static func resolvedGenreSource(
+        from dto: LibraryGameItemDTO,
+        source: GameSource,
+        igdbGameID: Int?,
+        metadataEnriched: Bool,
+        hasGenre: Bool
+    ) -> LibraryGenreSource? {
+        guard hasGenre else { return nil }
+
+        if let rawGenreSource = sanitized(dto.genreSource)?.lowercased(),
+           let genreSource = LibraryGenreSource(rawValue: rawGenreSource) {
+            return genreSource
+        }
+
+        if source == .igdb {
+            return .igdb
+        }
+
+        if source == .steam, igdbGameID != nil, metadataEnriched {
+            return .igdb
+        }
+
+        return nil
     }
 
     private static func resolvedRecentPlaytimeText(from dto: LibraryGameItemDTO) -> String? {

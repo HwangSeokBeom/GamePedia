@@ -25,9 +25,24 @@ enum LibraryGameMatchStatus: String, Codable, Hashable {
     case unknown
 }
 
+enum LibraryGenreSource: String, Codable, Hashable {
+    case igdb
+    case steamTag = "steam_tag"
+}
+
 enum SteamLinkConnectionState: Hashable {
     case linked
     case notLinked
+}
+
+enum SteamSyncStatus: String, Codable, Hashable {
+    case idle
+    case syncing
+    case failed
+    case privateProfile = "private_profile"
+    case success
+    case tokenExpired = "token_expired"
+    case unknown
 }
 
 struct LibraryGameIdentifier: Hashable {
@@ -76,11 +91,13 @@ struct LibraryGameSummary: Hashable {
     let coverImageURL: URL?
     let fallbackCoverImageURLs: [URL]
     let genre: String
+    let genreSource: LibraryGenreSource?
     let platform: String
     let releaseYear: Int
     let rating: Double?
     let recentPlaytimeMinutes: Int?
     let recentPlaytimeText: String?
+    let playtimeMinutes: Int?
     let userStatus: UserGameStatus?
     let metadataEnriched: Bool
     let detailAvailable: Bool
@@ -96,6 +113,13 @@ struct LibraryGameSummary: Hashable {
         Self.resolvedText(translatedTitle, fallback: title) ?? title
     }
 
+    var displayableGenreText: String? {
+        guard genreSource != nil else { return nil }
+        let trimmedGenre = genre.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedGenre.isEmpty, trimmedGenre != "기타" else { return nil }
+        return trimmedGenre
+    }
+
     func replacingTranslatedTitle(_ translatedTitle: String?) -> LibraryGameSummary {
         LibraryGameSummary(
             identifier: identifier,
@@ -104,11 +128,13 @@ struct LibraryGameSummary: Hashable {
             coverImageURL: coverImageURL,
             fallbackCoverImageURLs: fallbackCoverImageURLs,
             genre: genre,
+            genreSource: genreSource,
             platform: platform,
             releaseYear: releaseYear,
             rating: rating,
             recentPlaytimeMinutes: recentPlaytimeMinutes,
             recentPlaytimeText: recentPlaytimeText,
+            playtimeMinutes: playtimeMinutes,
             userStatus: userStatus,
             metadataEnriched: metadataEnriched,
             detailAvailable: detailAvailable,
@@ -119,6 +145,7 @@ struct LibraryGameSummary: Hashable {
 
 struct LibraryOverview: Hashable {
     let steamLinkStatus: SteamLinkStatus
+    let steamSyncStatus: SteamSyncStatus
     let isSteamSyncAvailable: Bool
     let steamSyncErrorCode: String?
     let recentlyPlayed: [LibraryGameSummary]
@@ -130,6 +157,17 @@ struct LibraryOverview: Hashable {
 struct OwnedLibraryCollection: Hashable {
     let owned: [LibraryGameSummary]
     let backlog: [LibraryGameSummary]
+}
+
+struct SteamFriendRecommendation: Hashable {
+    let game: LibraryGameSummary
+    let friendCount: Int
+    let reason: String?
+}
+
+struct PlaytimeRecommendation: Hashable {
+    let game: LibraryGameSummary
+    let reason: String?
 }
 
 struct LibraryGameStatusUpdateRequest: Hashable {

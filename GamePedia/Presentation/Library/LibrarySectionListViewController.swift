@@ -243,17 +243,12 @@ final class LibrarySectionListViewController: UIViewController {
     }
 
     private func ownedSubtitleText(for summary: LibraryGameSummary) -> String {
-        if summary.gameSource == .steam, summary.matchStatus != .confirmed {
-            return summary.matchStatus == .confirmed ? "Steam" : "Steam · 정보 보강 중"
-        }
-
         if summary.gameSource == .steam,
-           let genre = sanitized(summary.genre),
-           genre != "기타" {
+           let genre = summary.displayableGenreText {
             return "Steam · \(genre)"
         }
 
-        if let genre = sanitized(summary.genre), genre != "기타" {
+        if let genre = summary.displayableGenreText {
             if summary.releaseYear > 0 {
                 return "\(genre) · \(summary.releaseYear)"
             }
@@ -267,6 +262,11 @@ final class LibrarySectionListViewController: UIViewController {
         for summary: LibraryGameSummary,
         subtitleText: String
     ) -> String {
+        if summary.gameSource == .steam,
+           let playtimeText = SteamPlaytimeFormatter.compactPlaytimeText(minutes: summary.playtimeMinutes) {
+            return playtimeText
+        }
+
         guard let platform = sanitized(summary.platform),
               platform != "—",
               subtitleText.contains(platform) == false else {
@@ -293,9 +293,11 @@ final class LibrarySectionListViewController: UIViewController {
                 coverImageURL: summary.coverImageURL,
                 fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
                 sourceLabelText: "Steam",
-                metadataText: summary.matchStatus == .confirmed ? "Steam" : "Steam · 정보 보강 중",
+                metadataText: steamMetadataText(for: summary),
                 descriptionText: "Steam에서 가져온 게임입니다.",
-                playtimeText: sanitized(summary.recentPlaytimeText),
+                playtimeValueText: SteamPlaytimeFormatter.expandedPlaytimeValue(
+                    minutes: summary.playtimeMinutes ?? summary.recentPlaytimeMinutes
+                ),
                 externalGameId: summary.externalGameId,
                 gameSource: summary.gameSource,
                 metadataEnriched: summary.metadataEnriched,
@@ -308,6 +310,14 @@ final class LibrarySectionListViewController: UIViewController {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func steamMetadataText(for summary: LibraryGameSummary) -> String {
+        if let genre = summary.displayableGenreText {
+            return "Steam · \(genre)"
+        }
+
+        return summary.matchStatus == .confirmed ? "Steam" : "Steam · 정보 보강 중"
     }
 }
 

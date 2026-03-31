@@ -14,6 +14,7 @@ struct SteamLinkStatusDTO: Decodable {
 
 struct LibraryOverviewResponseDataDTO: Decodable {
     let steamConnected: Bool?
+    let steamSyncStatus: String?
     let steamSyncAvailable: Bool?
     let steamSyncErrorCode: String?
     let steamLinkStatus: SteamLinkStatusDTO?
@@ -25,6 +26,14 @@ struct LibraryOverviewResponseDataDTO: Decodable {
     let wishlist: [LibraryGameItemDTO]?
     let reviews: [LibraryReviewedGameItemDTO]?
     let reviewed: [LibraryReviewedGameItemDTO]?
+}
+
+struct SteamFriendRecommendationsResponseDataDTO: Decodable {
+    let recommendations: [LibraryGameItemDTO]?
+}
+
+struct PlaytimeRecommendationsResponseDataDTO: Decodable {
+    let recommendations: [LibraryGameItemDTO]?
 }
 
 struct LibraryGameItemDTO: Decodable {
@@ -42,6 +51,8 @@ struct LibraryGameItemDTO: Decodable {
     let translatedTitle: String?
     let coverUrl: String?
     let coverImageUrl: String?
+    let genreDisplayName: String?
+    let genreSource: String?
     let genre: String?
     let genres: [String]?
     let platform: String?
@@ -51,8 +62,11 @@ struct LibraryGameItemDTO: Decodable {
     let rating: Double?
     let aggregatedRating: Double?
     let totalRating: Double?
+    let friendCount: Int?
+    let reason: String?
     let recentPlaytimeMinutes: Int?
     let recentPlaytimeText: String?
+    let playtimeMinutes: Int?
     let userStatus: String?
     let status: String?
     let metadataEnriched: Bool?

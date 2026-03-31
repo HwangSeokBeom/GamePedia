@@ -2,12 +2,15 @@ import Foundation
 
 struct LibraryCachedState {
     let isSteamConnected: Bool
+    let steamSyncStatus: SteamSyncStatus
     let isSteamSyncAvailable: Bool
     let steamSyncErrorCode: String?
     let recentlyPlayed: [LibraryGameSummary]
     let playingGames: [LibraryGameSummary]
     let ownedGames: [LibraryGameSummary]
     let backlogGames: [LibraryGameSummary]
+    let playtimeRecommendations: [PlaytimeRecommendation]
+    let friendRecommendations: [SteamFriendRecommendation]
     let sections: [LibrarySectionViewState]
 }
 
@@ -17,7 +20,10 @@ final class LibraryCacheStore {
     private let userDefaults: UserDefaults
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
-    private let cacheKey = "gamepedia.library.cached_state.v1"
+    private let cacheKey = "gamepedia.library.cached_state.v4"
+    private let steamConnectionOnboardingKey = "gamepedia.library.steam_connection_onboarding_shown.v1"
+    private let lastSuccessfulSteamSyncDateKey = "gamepedia.library.last_successful_steam_sync_date.v1"
+    private let lastAttemptedSteamSyncDateKey = "gamepedia.library.last_attempted_steam_sync_date.v1"
 
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
@@ -31,34 +37,43 @@ final class LibraryCacheStore {
 
         return LibraryCachedState(
             isSteamConnected: storedState.isSteamConnected,
+            steamSyncStatus: SteamSyncStatus(rawValue: storedState.steamSyncStatus) ?? .idle,
             isSteamSyncAvailable: storedState.isSteamSyncAvailable,
             steamSyncErrorCode: storedState.steamSyncErrorCode,
             recentlyPlayed: storedState.recentlyPlayed.map(\.libraryGameSummary),
             playingGames: storedState.playingGames.map(\.libraryGameSummary),
             ownedGames: storedState.ownedGames.map(\.libraryGameSummary),
             backlogGames: storedState.backlogGames.map(\.libraryGameSummary),
+            playtimeRecommendations: storedState.playtimeRecommendations.map(\.recommendation),
+            friendRecommendations: storedState.friendRecommendations.map(\.recommendation),
             sections: storedState.sections.compactMap(\.sectionViewState)
         )
     }
 
     func save(
         isSteamConnected: Bool,
+        steamSyncStatus: SteamSyncStatus,
         isSteamSyncAvailable: Bool,
         steamSyncErrorCode: String?,
         recentlyPlayed: [LibraryGameSummary],
         playingGames: [LibraryGameSummary],
         ownedGames: [LibraryGameSummary],
         backlogGames: [LibraryGameSummary],
+        playtimeRecommendations: [PlaytimeRecommendation],
+        friendRecommendations: [SteamFriendRecommendation],
         sections: [LibrarySectionViewState]
     ) {
         let storedState = StoredLibraryCachedState(
             isSteamConnected: isSteamConnected,
+            steamSyncStatus: steamSyncStatus.rawValue,
             isSteamSyncAvailable: isSteamSyncAvailable,
             steamSyncErrorCode: steamSyncErrorCode,
             recentlyPlayed: recentlyPlayed.map(StoredLibraryGameSummary.init),
             playingGames: playingGames.map(StoredLibraryGameSummary.init),
             ownedGames: ownedGames.map(StoredLibraryGameSummary.init),
             backlogGames: backlogGames.map(StoredLibraryGameSummary.init),
+            playtimeRecommendations: playtimeRecommendations.map(StoredPlaytimeRecommendation.init),
+            friendRecommendations: friendRecommendations.map(StoredSteamFriendRecommendation.init),
             sections: sections.map(StoredLibrarySection.init)
         )
 
@@ -69,17 +84,86 @@ final class LibraryCacheStore {
     func clear() {
         userDefaults.removeObject(forKey: cacheKey)
     }
+
+    func loadLastSuccessfulSteamSyncDate() -> Date? {
+        userDefaults.object(forKey: lastSuccessfulSteamSyncDateKey) as? Date
+    }
+
+    func saveLastSuccessfulSteamSyncDate(_ date: Date) {
+        userDefaults.set(date, forKey: lastSuccessfulSteamSyncDateKey)
+    }
+
+    func loadLastAttemptedSteamSyncDate() -> Date? {
+        userDefaults.object(forKey: lastAttemptedSteamSyncDateKey) as? Date
+    }
+
+    func saveLastAttemptedSteamSyncDate(_ date: Date) {
+        userDefaults.set(date, forKey: lastAttemptedSteamSyncDateKey)
+    }
+
+    func clearSteamSyncDates() {
+        userDefaults.removeObject(forKey: lastSuccessfulSteamSyncDateKey)
+        userDefaults.removeObject(forKey: lastAttemptedSteamSyncDateKey)
+    }
+
+    func hasShownSteamConnectionOnboarding() -> Bool {
+        userDefaults.bool(forKey: steamConnectionOnboardingKey)
+    }
+
+    func markSteamConnectionOnboardingShown() {
+        userDefaults.set(true, forKey: steamConnectionOnboardingKey)
+    }
 }
 
 private struct StoredLibraryCachedState: Codable {
     let isSteamConnected: Bool
+    let steamSyncStatus: String
     let isSteamSyncAvailable: Bool
     let steamSyncErrorCode: String?
     let recentlyPlayed: [StoredLibraryGameSummary]
     let playingGames: [StoredLibraryGameSummary]
     let ownedGames: [StoredLibraryGameSummary]
     let backlogGames: [StoredLibraryGameSummary]
+    let playtimeRecommendations: [StoredPlaytimeRecommendation]
+    let friendRecommendations: [StoredSteamFriendRecommendation]
     let sections: [StoredLibrarySection]
+}
+
+private struct StoredPlaytimeRecommendation: Codable {
+    let game: StoredLibraryGameSummary
+    let reason: String?
+
+    init(_ recommendation: PlaytimeRecommendation) {
+        game = StoredLibraryGameSummary(recommendation.game)
+        reason = recommendation.reason
+    }
+
+    var recommendation: PlaytimeRecommendation {
+        PlaytimeRecommendation(
+            game: game.libraryGameSummary,
+            reason: reason
+        )
+    }
+}
+
+private struct StoredSteamFriendRecommendation: Codable {
+    let game: StoredLibraryGameSummary
+    let friendCount: Int
+    let reason: String?
+
+    init(_ recommendation: SteamFriendRecommendation) {
+        game = StoredLibraryGameSummary(recommendation.game)
+        friendCount = recommendation.friendCount
+        reason = recommendation.reason
+    }
+
+    var recommendation: SteamFriendRecommendation {
+        SteamFriendRecommendation(
+            game: game.libraryGameSummary,
+            friendCount: friendCount,
+            reason: reason
+        )
+    }
 }
 
 private struct StoredLibraryGameSummary: Codable {
@@ -91,11 +175,13 @@ private struct StoredLibraryGameSummary: Codable {
     let coverImageURL: URL?
     let fallbackCoverImageURLs: [URL]
     let genre: String
+    let genreSource: String?
     let platform: String
     let releaseYear: Int
     let rating: Double?
     let recentPlaytimeMinutes: Int?
     let recentPlaytimeText: String?
+    let playtimeMinutes: Int?
     let userStatus: String?
     let metadataEnriched: Bool
     let detailAvailable: Bool
@@ -110,11 +196,13 @@ private struct StoredLibraryGameSummary: Codable {
         coverImageURL = summary.coverImageURL
         fallbackCoverImageURLs = summary.fallbackCoverImageURLs
         genre = summary.genre
+        genreSource = summary.genreSource?.rawValue
         platform = summary.platform
         releaseYear = summary.releaseYear
         rating = summary.rating
         recentPlaytimeMinutes = summary.recentPlaytimeMinutes
         recentPlaytimeText = summary.recentPlaytimeText
+        playtimeMinutes = summary.playtimeMinutes
         userStatus = summary.userStatus?.rawValue
         metadataEnriched = summary.metadataEnriched
         detailAvailable = summary.detailAvailable
@@ -133,11 +221,13 @@ private struct StoredLibraryGameSummary: Codable {
             coverImageURL: coverImageURL,
             fallbackCoverImageURLs: fallbackCoverImageURLs,
             genre: genre,
+            genreSource: genreSource.flatMap(LibraryGenreSource.init(rawValue:)),
             platform: platform,
             releaseYear: releaseYear,
             rating: rating,
             recentPlaytimeMinutes: recentPlaytimeMinutes,
             recentPlaytimeText: recentPlaytimeText,
+            playtimeMinutes: playtimeMinutes,
             userStatus: userStatus.flatMap(UserGameStatus.init(rawValue:)),
             metadataEnriched: metadataEnriched,
             detailAvailable: detailAvailable,
@@ -426,6 +516,12 @@ private extension LibraryMessageAction {
             return "showSteamPrivacyGuide"
         case .retrySteamSync:
             return "retrySteamSync"
+        case .retryOwnedSteamSync:
+            return "retryOwnedSteamSync"
+        case .retryPlaytimeRecommendations:
+            return "retryPlaytimeRecommendations"
+        case .retryFriendRecommendations:
+            return "retryFriendRecommendations"
         }
     }
 
@@ -437,6 +533,12 @@ private extension LibraryMessageAction {
             self = .showSteamPrivacyGuide
         case "retrySteamSync":
             self = .retrySteamSync
+        case "retryOwnedSteamSync":
+            self = .retryOwnedSteamSync
+        case "retryPlaytimeRecommendations":
+            self = .retryPlaytimeRecommendations
+        case "retryFriendRecommendations":
+            self = .retryFriendRecommendations
         default:
             return nil
         }
