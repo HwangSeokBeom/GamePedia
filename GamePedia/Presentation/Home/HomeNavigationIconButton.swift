@@ -1,6 +1,11 @@
 import UIKit
 
 final class HomeNavigationIconButton: UIControl {
+    private enum Layout {
+        static let touchTargetSize: CGFloat = 36
+        static let iconSize: CGFloat = 20
+    }
+
     private let imageView = UIImageView()
     private let badgeView = UIView()
 
@@ -22,13 +27,10 @@ final class HomeNavigationIconButton: UIControl {
         addSubview(badgeView)
 
         NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: 28),
-            heightAnchor.constraint(equalToConstant: 28),
-
             imageView.centerXAnchor.constraint(equalTo: centerXAnchor),
             imageView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            imageView.widthAnchor.constraint(equalToConstant: 20),
-            imageView.heightAnchor.constraint(equalToConstant: 20),
+            imageView.widthAnchor.constraint(equalToConstant: Layout.iconSize),
+            imageView.heightAnchor.constraint(equalToConstant: Layout.iconSize),
 
             badgeView.topAnchor.constraint(equalTo: topAnchor, constant: 4),
             badgeView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
@@ -39,6 +41,10 @@ final class HomeNavigationIconButton: UIControl {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: Layout.touchTargetSize, height: Layout.touchTargetSize)
     }
 
     func setTintColor(_ color: UIColor) {

@@ -169,7 +169,7 @@ final class LibraryGameRowCell: UICollectionViewCell {
 
         NSLayoutConstraint.activate([
             trailingButtonWidthConstraint,
-            textStackTrailingToButtonConstraint
+            textStackTrailingToContentConstraint
         ])
 
         applyTrailingActionVisibility(false)
@@ -181,10 +181,15 @@ final class LibraryGameRowCell: UICollectionViewCell {
     }
 
     private func applyTrailingActionVisibility(_ isVisible: Bool) {
+        textStackTrailingToButtonConstraint?.isActive = false
+        textStackTrailingToContentConstraint?.isActive = false
         trailingButton.isHidden = !isVisible
         trailingButtonWidthConstraint?.constant = isVisible ? 44 : 0
-        textStackTrailingToButtonConstraint?.isActive = isVisible
-        textStackTrailingToContentConstraint?.isActive = !isVisible
+        if isVisible {
+            textStackTrailingToButtonConstraint?.isActive = true
+        } else {
+            textStackTrailingToContentConstraint?.isActive = true
+        }
     }
 
     private func updateTrailingButtonAppearance(isFilled: Bool) {

@@ -254,10 +254,11 @@ final class HomeRootView: UIView {
     }
 
     private func updateHighlightVisibility() {
+        let shouldReserveHeight = showsHighlightSkeleton || showsHighlightContent
+        highlightCarouselView.setCollapsed(!shouldReserveHeight)
+        highlightSkeletonView.setCollapsed(!shouldReserveHeight)
         highlightSkeletonView.isHidden = !showsHighlightSkeleton
         highlightCarouselView.isHidden = showsHighlightSkeleton || !showsHighlightContent
-
-        let shouldReserveHeight = showsHighlightSkeleton || showsHighlightContent
         highlightHeightConstraint?.constant = shouldReserveHeight ? HomeHighlightCarouselView.preferredHeight : 0
     }
 }
