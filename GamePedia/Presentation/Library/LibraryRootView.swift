@@ -289,14 +289,6 @@ final class LibraryRootView: UIView {
         }
 
         if lastRenderedSummaryMetrics != summaryMetrics {
-            print(
-                "[LibrarySummaryUI] " +
-                "selectedTab=\(state.selectedTab) " +
-                "gameCount=\(summaryMetrics.gameCountText) " +
-                "totalPlaytimeHours=\(summaryMetrics.totalPlaytimeText) " +
-                "source=\(summaryMetrics.sourceDescription)"
-            )
-
             totalPlaySummaryView.configure(
                 value: summaryMetrics.totalPlaytimeText,
                 title: summaryMetrics.primaryTitle,
@@ -312,11 +304,7 @@ final class LibraryRootView: UIView {
                 title: summaryMetrics.gameCountTitle,
                 valueColor: .gpCoral
             )
-            logSummaryMetrics(summaryMetrics, for: state)
             lastRenderedSummaryMetrics = summaryMetrics
-            print("[LibraryRender] summaryUpdated reason=changed selectedTab=\(state.selectedTab)")
-        } else {
-            print("[LibraryRender] summarySkipped reason=unchanged selectedTab=\(state.selectedTab)")
         }
 
         if lastRenderedHighlightChip != state.selectedHighlightChip {
@@ -599,22 +587,6 @@ final class LibraryRootView: UIView {
         return (
             display.displayText ?? "-",
             display.selectedDisplaySource
-        )
-    }
-
-    private func logSummaryMetrics(_ summaryMetrics: LibrarySummaryMetrics, for state: LibraryState) {
-        let rawAverageRatingText = summaryMetrics.rawAverageRating.map { String(format: "%.2f", $0) } ?? "nil"
-
-        print(
-            "[LibrarySummary] " +
-            "selectedTab=\(state.selectedTab) " +
-            "rawReviewsCount=\(summaryMetrics.rawReviewsCount) " +
-            "rawAverageRating=\(rawAverageRatingText) " +
-            "mappedAverageRatingText=\(summaryMetrics.averageRatingText) " +
-            "averageRatingDisplaySource=\(summaryMetrics.averageRatingDisplaySource) " +
-            "finalTotalPlaytime=\(summaryMetrics.totalPlaytimeText) " +
-            "finalGameCount=\(summaryMetrics.gameCountText) " +
-            "source=\(summaryMetrics.sourceDescription)"
         )
     }
 

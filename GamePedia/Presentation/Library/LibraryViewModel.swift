@@ -331,11 +331,9 @@ final class LibraryViewModel {
     private func apply(_ mutation: LibraryMutation) {
         let reducedState = LibraryReducer.reduce(state, mutation)
         guard reducedState != state else {
-            print("[LibraryState] reducedSkipped mutation=\(mutation.logName) reason=unchanged")
             return
         }
 
-        print("[LibraryState] reduced mutation=\(mutation.logName)")
         state = reducedState
     }
 
@@ -1636,16 +1634,6 @@ final class LibraryViewModel {
             )
         }
 
-        print(
-            "[LibrarySummary] " +
-            "selectedTab=\(LibraryTab.playing) " +
-            "gameCount=\(derivedGameCount) " +
-            "totalPlaytimeHours=\(derivedPrimaryValue) " +
-            "source.gameCount=derived.uniqueSummaries " +
-            "source.totalPlaytimeHours=derived.playtimeMinutes " +
-            "fallbackTriggered=true"
-        )
-
         return LibraryTabSummaryState(
             primaryTitle: L10n.Library.Summary.totalPlay,
             primaryValue: derivedPrimaryValue,
@@ -2626,7 +2614,6 @@ final class LibraryViewModel {
         let limitedSummaries = limitedLibrarySummaries(summaries, limit: limit)
 
         return limitedSummaries.map { summary in
-            logRatingMapping(summary: summary, context: "Library.preview.recentCard")
             let isAddingToPlaying = state.addingToPlayingIdentifiers.contains(summary.identifier)
             let actionTitle: String?
             if showsAddToPlayingAction, !playingIdentifiers.contains(summary.identifier) {
@@ -2661,7 +2648,6 @@ final class LibraryViewModel {
         let limitedSummaries = limitedLibrarySummaries(summaries, limit: limit)
 
         return limitedSummaries.map { summary in
-            logRatingMapping(summary: summary, context: "Library.preview.row")
             let subtitleText = librarySubtitleText(for: summary)
             return LibraryCollectionItem.row(
                 LibraryGameRowViewState(
@@ -2685,17 +2671,6 @@ final class LibraryViewModel {
     ) -> [LibraryGameSummary] {
         guard let limit else { return summaries }
         return Array(summaries.prefix(limit))
-    }
-
-    private func logRatingMapping(summary: LibraryGameSummary, context: String) {
-        print(
-            "[LibraryRatingMapping] " +
-            "context=\(context) " +
-            "title=\(summary.displayTitle) " +
-            "igdbGameId=\(summary.igdbGameId.map(String.init) ?? "nil") " +
-            "aggregatedRating=nil totalRating=nil " +
-            "final ratingText=\(summary.formattedRatingText ?? "nil")"
-        )
     }
 
     private func recentlyPlayedMetadataText(for summary: LibraryGameSummary) -> String {

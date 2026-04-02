@@ -189,30 +189,16 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
             translatedRecentGameTitles: state.translatedRecentGameTitles
         )
 
-        print(
-            "[Profile] render " +
-            "selectedTitle=\(state.selectedTitle ?? "nil") " +
-            "selectedTitleKey=\(state.selectedTitleKey ?? "nil") " +
-            "selectedTitles=\(state.selectedTitles) " +
-            "recentPlayCount=\(state.recentlyPlayedGames.count) " +
-            "recentPlayState=\(String(describing: state.recentPlayLoadState))"
-        )
         GameDetailSeedStore.shared.store(recentGames: state.recentlyPlayedGames, screen: "Profile.render")
         if lastRootRenderSignature != rootRenderSignature {
-            print("[ProfileRender] rootUpdated reason=changed")
             rootView.render(state)
             lastRootRenderSignature = rootRenderSignature
-        } else {
-            print("[ProfileRender] renderSkipped reason=identicalViewState")
         }
 
         if lastRecentPlayRenderSignature != recentPlayRenderSignature {
             recentlyPlayedGames = state.recentlyPlayedGames
-            print("[ProfileRender] recentPlayUpdated reason=changed count=\(recentlyPlayedGames.count)")
             rootView.tableView.reloadData()
             lastRecentPlayRenderSignature = recentPlayRenderSignature
-        } else {
-            print("[ProfileRender] recentPlaySkipped reason=unchanged")
         }
 
         if let errorMessage = state.errorMessage,
