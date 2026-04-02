@@ -5,11 +5,11 @@ extension Int {
     var abbreviated: String {
         switch self {
         case 0..<1_000:
-            return "\(self)"
+            return LocalizedNumberFormatter.integer(self)
         case 1_000..<10_000:
-            return String(format: "%.1fK", Double(self) / 1_000)
+            return "\(LocalizedNumberFormatter.oneFraction(Double(self) / 1_000))K"
         default:
-            return String(format: "%.0fK", Double(self) / 1_000)
+            return "\(LocalizedNumberFormatter.integer(Int((Double(self) / 1_000).rounded())))K"
         }
     }
 }

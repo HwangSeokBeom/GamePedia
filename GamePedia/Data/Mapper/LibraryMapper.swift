@@ -188,16 +188,13 @@ enum LibraryMapper {
             ?? sanitized(dto.gameName)
             ?? sanitized(dto.title)
             ?? sanitized(dto.name)
-            ?? "이름 없는 게임"
+            ?? L10n.tr("Localizable", "common.label.untitledGame")
     }
 
     private static func resolvedTranslatedTitle(from dto: LibraryGameItemDTO, fallbackTitle: String) -> String? {
-        let candidate = sanitized(dto.translatedTitle)
-            ?? sanitized(dto.gameName)
-            ?? sanitized(dto.title)
-            ?? sanitized(dto.name)
-        guard let candidate, candidate != fallbackTitle else { return nil }
-        return candidate
+        _ = dto
+        _ = fallbackTitle
+        return nil
     }
 
     private static func resolvedSource(from rawValue: String?) -> GameSource {

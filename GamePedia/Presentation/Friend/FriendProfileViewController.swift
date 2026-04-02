@@ -98,7 +98,7 @@ final class FriendProfileViewModel {
             } catch {
                 await MainActor.run {
                     self.state.isManagingRelationship = false
-                    self.state.relationshipErrorMessage = "친구를 삭제하지 못했어요."
+                    self.state.relationshipErrorMessage = L10n.Friend.Profile.errorRemoveFailed
                 }
             }
         }
@@ -118,7 +118,7 @@ final class FriendProfileViewModel {
             } catch {
                 await MainActor.run {
                     self.state.isManagingRelationship = false
-                    self.state.relationshipErrorMessage = "사용자를 차단하지 못했어요."
+                    self.state.relationshipErrorMessage = L10n.Friend.Profile.errorBlockFailed
                 }
             }
         }
@@ -139,15 +139,15 @@ final class FriendProfileViewController: BaseViewController<UIView, FriendProfil
 
         var title: String {
             switch self {
-            case .similarity: return "취향"
-            case .sharedGames: return "같이 플레이한 게임"
-            case .commonLiked: return "함께 좋아한 게임"
-            case .commonInterest: return "공통 관심 게임"
-            case .commonHighlyRated: return "둘 다 높게 평가한 게임"
-            case .recent: return "최근 플레이한 게임"
-            case .liked: return "찜한 게임"
-            case .reviews: return "작성한 리뷰"
-            case .recommendations: return "친구 기반 추천"
+            case .similarity: return L10n.Friend.Profile.sectionTaste
+            case .sharedGames: return L10n.Friend.Profile.sectionSharedGames
+            case .commonLiked: return L10n.Friend.Profile.sectionCommonLikedGames
+            case .commonInterest: return L10n.Friend.Profile.sectionCommonInterestGames
+            case .commonHighlyRated: return L10n.Friend.Profile.sectionCommonHighlyRatedGames
+            case .recent: return L10n.Friend.Profile.sectionRecentlyPlayedGames
+            case .liked: return L10n.Friend.Profile.sectionLikedGames
+            case .reviews: return L10n.Friend.Profile.sectionReviews
+            case .recommendations: return L10n.Friend.Profile.sectionRecommendations
             }
         }
     }
@@ -185,7 +185,7 @@ final class FriendProfileViewController: BaseViewController<UIView, FriendProfil
             items: state.recommendations,
             errorMessage: state.recommendationsErrorMessage
         )
-        navigationItem.title = state.profile?.user.nickname ?? "친구 프로필"
+        navigationItem.title = state.profile?.user.nickname ?? L10n.Friend.Profile.title
         state.isLoading ? loadingIndicatorView.startAnimating() : loadingIndicatorView.stopAnimating()
         tableView.reloadData()
         emptyLabel.isHidden = true
@@ -195,8 +195,8 @@ final class FriendProfileViewController: BaseViewController<UIView, FriendProfil
         if let errorMessage = state.relationshipErrorMessage,
            errorMessage != lastRelationshipErrorMessage {
             lastRelationshipErrorMessage = errorMessage
-            let alert = UIAlertController(title: "오류", message: errorMessage, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "확인", style: .default))
+            let alert = UIAlertController(title: L10n.Common.Error.title, message: errorMessage, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default))
             present(alert, animated: true)
         } else if state.relationshipErrorMessage == nil {
             lastRelationshipErrorMessage = nil
@@ -260,7 +260,7 @@ final class FriendProfileViewController: BaseViewController<UIView, FriendProfil
                         FriendRelationshipChangeUserInfoKey.action: FriendRelationshipChangeAction.removed.rawValue
                     ]
                 )
-                self.showCompletionAlert(message: "친구를 삭제했어요.")
+                self.showCompletionAlert(message: L10n.Friend.Profile.successRemoved)
             case .didBlockUser:
                 NotificationCenter.default.post(
                     name: .friendRelationshipDidChange,
@@ -270,7 +270,7 @@ final class FriendProfileViewController: BaseViewController<UIView, FriendProfil
                         FriendRelationshipChangeUserInfoKey.action: FriendRelationshipChangeAction.blocked.rawValue
                     ]
                 )
-                self.showCompletionAlert(message: "사용자를 차단했어요.")
+                self.showCompletionAlert(message: L10n.Friend.Profile.successBlocked)
             }
         }
     }
@@ -338,7 +338,7 @@ final class FriendProfileViewController: BaseViewController<UIView, FriendProfil
 
         avatarView.loadImage(url: profile?.user.profileImageURL, placeholder: UIImage(systemName: "person.fill"))
         nameLabel.text = profile?.user.nickname
-        bioLabel.text = profile?.user.bio ?? "소개가 아직 없어요"
+        bioLabel.text = profile?.user.bio ?? L10n.Friend.Profile.bioEmpty
         tableView.tableHeaderView = headerView
     }
 
@@ -360,13 +360,13 @@ final class FriendProfileViewController: BaseViewController<UIView, FriendProfil
         var actions: [UIAction] = []
         if relationshipStatus == .friends {
             actions.append(
-                UIAction(title: "친구 삭제", image: UIImage(systemName: "person.crop.circle.badge.minus"), attributes: .destructive) { [weak self] _ in
+                UIAction(title: L10n.Friend.Action.remove, image: UIImage(systemName: "person.crop.circle.badge.minus"), attributes: .destructive) { [weak self] _ in
                     self?.confirmRemoveFriend()
                 }
             )
         }
         actions.append(
-            UIAction(title: "차단", image: UIImage(systemName: "hand.raised.fill"), attributes: .destructive) { [weak self] _ in
+            UIAction(title: L10n.Friend.Action.block, image: UIImage(systemName: "hand.raised.fill"), attributes: .destructive) { [weak self] _ in
                 self?.confirmBlockUser()
             }
         )
@@ -375,12 +375,12 @@ final class FriendProfileViewController: BaseViewController<UIView, FriendProfil
 
     private func confirmRemoveFriend() {
         let alert = UIAlertController(
-            title: "친구를 삭제할까요?",
-            message: "친구 관계를 해제하면 서로의 친구 기반 연결이 더 이상 유지되지 않아요.",
+            title: L10n.Friend.Profile.alertRemoveTitle,
+            message: L10n.Friend.Profile.alertRemoveMessage,
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
-        alert.addAction(UIAlertAction(title: "친구 삭제", style: .destructive) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
+        alert.addAction(UIAlertAction(title: L10n.Friend.Action.remove, style: .destructive) { [weak self] _ in
             self?.viewModel.send(.didTapRemoveFriend)
         })
         present(alert, animated: true)
@@ -388,12 +388,12 @@ final class FriendProfileViewController: BaseViewController<UIView, FriendProfil
 
     private func confirmBlockUser() {
         let alert = UIAlertController(
-            title: "사용자를 차단할까요?",
-            message: "차단하면 친구 요청과 프로필 탐색 등 소셜 연결이 제한될 수 있어요.",
+            title: L10n.Friend.Profile.alertBlockTitle,
+            message: L10n.Friend.Profile.alertBlockMessage,
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
-        alert.addAction(UIAlertAction(title: "차단", style: .destructive) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
+        alert.addAction(UIAlertAction(title: L10n.Friend.Action.block, style: .destructive) { [weak self] _ in
             self?.viewModel.send(.didTapBlockUser)
         })
         present(alert, animated: true)
@@ -401,7 +401,7 @@ final class FriendProfileViewController: BaseViewController<UIView, FriendProfil
 
     private func showCompletionAlert(message: String) {
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "확인", style: .default) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default) { [weak self] _ in
             self?.navigationController?.popViewController(animated: true)
         })
         present(alert, animated: true)
@@ -460,29 +460,29 @@ extension FriendProfileViewController: UITableViewDataSource, UITableViewDelegat
         switch section {
         case .similarity:
             guard let profile else {
-                return emptyCell(message: isProfileLoading ? "취향 정보를 불러오는 중..." : "아직 취향 데이터가 없어요")
+                return emptyCell(message: isProfileLoading ? L10n.Friend.Profile.loadingTaste : L10n.Friend.Profile.emptyTaste)
             }
-            let title = profile.tasteProfile?.highlightTitle ?? profile.tasteSimilarity?.titleText ?? "취향 유사도"
-            let summary = profile.tasteProfile?.summaryText ?? profile.tasteSimilarity?.summaryText ?? "비슷한 장르를 자주 즐겨요"
+            let title = profile.tasteProfile?.highlightTitle ?? profile.tasteSimilarity?.titleText ?? L10n.Friend.Profile.tasteFallbackTitle
+            let summary = profile.tasteProfile?.summaryText ?? profile.tasteSimilarity?.summaryText ?? L10n.Friend.Profile.tasteFallbackSummary
             let chips = profile.tasteProfile?.displayChips ?? []
             guard profile.tasteProfile != nil || profile.tasteSimilarity != nil else {
-                return emptyCell(message: "아직 취향 데이터가 없어요")
+                return emptyCell(message: L10n.Friend.Profile.emptyTaste)
             }
             let cell = tableView.dequeueReusableCell(withIdentifier: FriendTasteSummaryCell.reuseID, for: indexPath) as! FriendTasteSummaryCell
             cell.configure(title: title, summary: summary, chips: chips)
             return cell
         case .sharedGames:
             if isProfileLoading && profile == nil {
-                return emptyCell(message: "같이 플레이한 게임을 불러오는 중...")
+                return emptyCell(message: L10n.Friend.Profile.loadingSharedGames)
             }
             guard let profile else {
-                return emptyCell(message: "같이 즐길 게임이 아직 없어요")
+                return emptyCell(message: L10n.Friend.Profile.emptySharedGames)
             }
             if profile.steamFriendsContext?.isLimitedByPrivacy == true {
-                return emptyCell(message: "친구의 최근 플레이 공개 설정 때문에 같이 플레이한 게임을 확인할 수 없어요")
+                return emptyCell(message: L10n.Friend.Profile.emptySharedGamesPrivate)
             }
             guard !profile.sharedGames.isEmpty else {
-                return emptyCell(message: "같이 즐길 게임이 아직 없어요")
+                return emptyCell(message: L10n.Friend.Profile.emptySharedGames)
             }
             let cell = tableView.dequeueReusableCell(withIdentifier: FriendGamePreviewCell.reuseID, for: indexPath) as! FriendGamePreviewCell
             let sharedGame = profile.sharedGames[indexPath.row]
@@ -490,70 +490,70 @@ extension FriendProfileViewController: UITableViewDataSource, UITableViewDelegat
             return cell
         case .commonLiked:
             if isProfileLoading && profile == nil {
-                return emptyCell(message: "함께 좋아한 게임을 불러오는 중...")
+                return emptyCell(message: L10n.Friend.Profile.loadingCommonLikedGames)
             }
             guard let profile, !profile.commonLikedGames.isEmpty else {
-                return emptyCell(message: "함께 좋아한 게임이 없어요")
+                return emptyCell(message: L10n.Friend.Profile.emptyCommonLikedGames)
             }
             let cell = tableView.dequeueReusableCell(withIdentifier: FriendGamePreviewCell.reuseID, for: indexPath) as! FriendGamePreviewCell
             cell.configure(game: profile.commonLikedGames[indexPath.row])
             return cell
         case .commonInterest:
             if isProfileLoading && profile == nil {
-                return emptyCell(message: "공통 관심 게임을 불러오는 중...")
+                return emptyCell(message: L10n.Friend.Profile.loadingCommonInterestGames)
             }
             guard let profile, !profile.commonInterestGames.isEmpty else {
-                return emptyCell(message: "아직 공통 관심 게임이 없어요")
+                return emptyCell(message: L10n.Friend.Profile.emptyCommonInterestGames)
             }
             let cell = tableView.dequeueReusableCell(withIdentifier: FriendGamePreviewCell.reuseID, for: indexPath) as! FriendGamePreviewCell
             cell.configure(game: profile.commonInterestGames[indexPath.row])
             return cell
         case .commonHighlyRated:
             if isProfileLoading && profile == nil {
-                return emptyCell(message: "함께 높게 평가한 게임을 불러오는 중...")
+                return emptyCell(message: L10n.Friend.Profile.loadingCommonHighlyRatedGames)
             }
             guard let profile, !profile.commonHighlyRatedGames.isEmpty else {
-                return emptyCell(message: "함께 높게 평가한 게임이 없어요")
+                return emptyCell(message: L10n.Friend.Profile.emptyCommonHighlyRatedGames)
             }
             let cell = tableView.dequeueReusableCell(withIdentifier: FriendGamePreviewCell.reuseID, for: indexPath) as! FriendGamePreviewCell
             cell.configure(game: profile.commonHighlyRatedGames[indexPath.row])
             return cell
         case .recent:
             if isProfileLoading && profile == nil {
-                return emptyCell(message: "최근 플레이한 게임을 불러오는 중...")
+                return emptyCell(message: L10n.Friend.Profile.loadingRecentlyPlayedGames)
             }
             guard let profile, !profile.recentlyPlayed.isEmpty else {
-                return emptyCell(message: "최근 플레이한 게임이 없어요")
+                return emptyCell(message: L10n.Friend.Profile.emptyRecentlyPlayedGames)
             }
             let cell = tableView.dequeueReusableCell(withIdentifier: FriendGamePreviewCell.reuseID, for: indexPath) as! FriendGamePreviewCell
             cell.configure(recentGame: profile.recentlyPlayed[indexPath.row])
             return cell
         case .liked:
             if isProfileLoading && profile == nil {
-                return emptyCell(message: "찜한 게임을 불러오는 중...")
+                return emptyCell(message: L10n.Friend.Profile.loadingLikedGames)
             }
             guard let profile, !profile.likedGames.isEmpty else {
-                return emptyCell(message: "찜한 게임이 없어요")
+                return emptyCell(message: L10n.Friend.Profile.emptyLikedGames)
             }
             let cell = tableView.dequeueReusableCell(withIdentifier: FriendGamePreviewCell.reuseID, for: indexPath) as! FriendGamePreviewCell
             cell.configure(game: profile.likedGames[indexPath.row])
             return cell
         case .reviews:
             if isProfileLoading && profile == nil {
-                return emptyCell(message: "작성한 리뷰를 불러오는 중...")
+                return emptyCell(message: L10n.Friend.Profile.loadingReviews)
             }
             guard let profile, !profile.writtenReviews.isEmpty else {
-                return emptyCell(message: "작성한 리뷰가 없어요")
+                return emptyCell(message: L10n.Friend.Profile.emptyReviews)
             }
             let cell = tableView.dequeueReusableCell(withIdentifier: FriendReviewPreviewCell.reuseID, for: indexPath) as! FriendReviewPreviewCell
             cell.configure(review: profile.writtenReviews[indexPath.row])
             return cell
         case .recommendations:
             if recommendationState.isLoading || (isProfileLoading && profile == nil) {
-                return emptyCell(message: "친구 기반 추천을 불러오는 중...")
+                return emptyCell(message: L10n.Friend.Profile.loadingRecommendations)
             }
             if recommendationState.items.isEmpty {
-                return emptyCell(message: "추천할 게임이 아직 없어요")
+                return emptyCell(message: L10n.Friend.Profile.emptyRecommendations)
             }
             let recommendation = recommendationState.items[indexPath.row]
             let cell = tableView.dequeueReusableCell(withIdentifier: FriendGamePreviewCell.reuseID, for: indexPath) as! FriendGamePreviewCell

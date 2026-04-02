@@ -34,7 +34,7 @@ enum GameRatingDisplayFormatter {
         let normalizedRating = rawValue > 5 ? rawValue / 20.0 : rawValue
         return GameRatingDisplayParts(
             normalizedRating: normalizedRating,
-            displayText: String(format: "%.1f", normalizedRating),
+            displayText: LocalizedNumberFormatter.oneFraction(normalizedRating),
             selectedDisplaySource: selected.source
         )
     }

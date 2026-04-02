@@ -15,7 +15,7 @@ final class NotificationsViewController: BaseViewController<NotificationsRootVie
         self.viewModel = viewModel
         super.init(rootView: rootView)
         NavigationBarStyler.apply(.opaque, to: navigationItem, buttonTintColor: .gpTextSecondary)
-        navigationItem.title = "알림"
+        navigationItem.title = L10n.tr("Localizable", "notifications.title")
         navigationItem.largeTitleDisplayMode = .never
     }
 

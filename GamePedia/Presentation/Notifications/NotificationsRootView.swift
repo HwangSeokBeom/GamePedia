@@ -13,7 +13,7 @@ final class NotificationsRootView: UIView {
         let label = UILabel()
         label.font = .systemFont(ofSize: 15, weight: .medium)
         label.textColor = .gpTextSecondary
-        label.text = "아직 새로운 알림이 없어요"
+        label.text = L10n.Notifications.empty
         label.textAlignment = .center
         label.numberOfLines = 0
         label.isHidden = true
@@ -31,7 +31,7 @@ final class NotificationsRootView: UIView {
 
     let retryButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
-        configuration.title = "다시 시도"
+        configuration.title = L10n.Common.Button.retry
         configuration.baseForegroundColor = .gpPrimary
         let button = UIButton(configuration: configuration)
         button.isHidden = true
@@ -61,7 +61,7 @@ final class NotificationsRootView: UIView {
             emptyLabel.text = errorMessage
             emptyLabel.isHidden = false
         } else {
-            emptyLabel.text = "아직 새로운 알림이 없어요"
+            emptyLabel.text = L10n.Notifications.empty
         }
     }
 

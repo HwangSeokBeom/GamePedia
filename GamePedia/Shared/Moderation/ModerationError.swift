@@ -9,11 +9,11 @@ enum ModerationError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidReportTarget:
-            return "신고할 콘텐츠 정보를 확인하지 못했습니다."
+            return L10n.tr("Localizable", "moderation.error.invalidReportTarget")
         case .invalidBlockedUser:
-            return "차단할 사용자를 확인하지 못했습니다."
+            return L10n.tr("Localizable", "moderation.error.invalidBlockedUser")
         case .persistenceFailed:
-            return "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."
+            return L10n.tr("Localizable", "moderation.error.persistenceFailed")
         case .unknown(let message):
             return message
         }

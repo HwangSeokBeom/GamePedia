@@ -59,9 +59,11 @@ final class FriendRequestCell: UITableViewCell {
         avatarView.loadImage(url: request.user.profileImageURL, placeholder: UIImage(systemName: "person.fill"))
         nameLabel.text = request.user.nickname
         let createdAtText = request.createdAt.map {
-            RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: Date())
+            let formatter = RelativeDateTimeFormatter()
+            formatter.locale = .autoupdatingCurrent
+            return formatter.localizedString(for: $0, relativeTo: Date())
         }
-        subtitleLabel.text = createdAtText ?? request.user.bio ?? "친구 요청"
+        subtitleLabel.text = createdAtText ?? request.user.bio ?? L10n.Friend.Requests.requestLabel
         primaryButton.setTitle(primaryTitle, for: .normal)
         primaryButton.isHidden = false
         secondaryButton.setTitle(secondaryTitle, for: .normal)

@@ -56,11 +56,11 @@ struct ReviewState {
     }
 
     var formattedRating: String {
-        String(format: "%.1f / 5.0", rating)
+        L10n.tr("Localizable", "review.rating.outOfFive", LocalizedNumberFormatter.oneFraction(Double(rating)))
     }
 
     var formattedCharCount: String {
-        "\(charCount) / \(maxChars)자"
+        L10n.Review.Count.characters(charCount, maxChars)
     }
 
     var trimmedReviewText: String {
@@ -77,15 +77,15 @@ struct ReviewState {
 
     var validationMessage: String? {
         if !hasSelectedRating {
-            return "별점을 선택해주세요."
+            return L10n.Review.Validation.selectRating
         }
 
         if trimmedReviewText.isEmpty {
-            return "리뷰 내용을 입력해주세요."
+            return L10n.Review.Validation.enterContent
         }
 
         if trimmedReviewText.count < ValidationConstants.minimumReviewLength {
-            return "리뷰 내용은 10자 이상 작성해주세요."
+            return L10n.Review.Validation.minLength(ValidationConstants.minimumReviewLength)
         }
 
         return nil
@@ -106,19 +106,19 @@ struct ReviewState {
     }
 
     var navigationTitle: String {
-        isEditing ? "리뷰 수정" : "리뷰 작성"
+        isEditing ? L10n.Review.Navigation.edit : L10n.Review.Navigation.create
     }
 
     var submitButtonTitle: String {
-        isEditing ? "저장" : "리뷰 작성하기"
+        isEditing ? L10n.Review.Button.save : L10n.Review.Button.submit
     }
 
     var submitLoadingTitle: String {
-        isEditing ? "저장 중..." : "작성 중..."
+        isEditing ? L10n.Review.Button.saving : L10n.Review.Button.submitting
     }
 
     var deleteButtonTitle: String {
-        isDeleting ? "삭제 중..." : "삭제"
+        isDeleting ? L10n.Review.Button.deleting : L10n.Review.Button.delete
     }
 
     var isProcessing: Bool {

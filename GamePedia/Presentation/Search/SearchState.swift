@@ -4,8 +4,15 @@ import Foundation
 
 struct SearchState {
     var query: String = ""
-    var selectedGenre: String = "전체"
-    var genres: [String] = ["전체", "RPG", "액션", "인디", "전략", "스포츠"]
+    var selectedGenre: String = L10n.Search.Filter.all
+    var genres: [String] = [
+        L10n.Search.Filter.all,
+        L10n.tr("Localizable", "search.genre.rpg"),
+        L10n.tr("Localizable", "search.genre.action"),
+        L10n.tr("Localizable", "search.genre.indie"),
+        L10n.tr("Localizable", "search.genre.strategy"),
+        L10n.tr("Localizable", "search.genre.sports")
+    ]
     var results: [Game] = []
     var resultCount: Int = 0
     var isSearching: Bool = false

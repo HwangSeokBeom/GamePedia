@@ -16,17 +16,17 @@ enum NetworkError: Error, LocalizedError {
         case .configurationMissing(let message):
             return message
         case .invalidURL:
-            return "잘못된 URL입니다."
+            return L10n.Common.Error.invalidURL
         case .noData:
-            return "데이터가 없습니다."
+            return L10n.Common.Error.noData
         case .decodingFailed(let error):
-            return "데이터 파싱 실패: \(error.localizedDescription)"
+            return L10n.Common.Error.decodingFailed(error.localizedDescription)
         case .serverError(let statusCode, _, let message):
-            return "서버 오류 (\(statusCode)): \(message ?? "알 수 없는 오류")"
+            return L10n.Common.Error.serverStatus(statusCode, message ?? L10n.Common.Error.unknown)
         case .unauthorized:
-            return "인증이 필요합니다."
+            return L10n.Common.Error.unauthorized
         case .unknown(let error):
-            return "알 수 없는 오류: \(error.localizedDescription)"
+            return L10n.Common.Error.unknownWithMessage(error.localizedDescription)
         }
     }
 

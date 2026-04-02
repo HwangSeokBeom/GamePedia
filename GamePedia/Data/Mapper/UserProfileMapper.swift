@@ -83,7 +83,7 @@ enum UserProfileMapper {
             externalGameId: dto.externalGameId,
             detailAvailable: detailAvailable,
             title: dto.title,
-            translatedTitle: dto.translatedTitle ?? dto.titleKo,
+            translatedTitle: nil,
             coverImageURL: URL(string: dto.coverImageUrl),
             userRating: ratingDisplay.normalizedRating,
             formattedRating: ratingDisplay.displayText,

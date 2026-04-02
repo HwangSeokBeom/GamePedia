@@ -64,9 +64,9 @@ final class SteamFriendsViewModel {
                     self.state.alreadyFriendUserIDs = []
                     if let networkError = error as? NetworkError,
                        networkError.serverCode?.uppercased() == "STEAM_NOT_CONNECTED" {
-                        self.state.errorMessage = "Steam 계정을 연동하면 Steam 친구를 불러올 수 있어요"
+                        self.state.errorMessage = L10n.Friend.Steam.connectRequired
                     } else {
-                        self.state.errorMessage = "Steam 친구 목록을 불러올 수 없어요"
+                        self.state.errorMessage = L10n.Friend.Steam.loadFailed
                     }
                 }
             }
@@ -88,7 +88,7 @@ final class SteamFriendsViewController: BaseViewController<UIView, SteamFriendsS
     init(viewModel: SteamFriendsViewModel = SteamFriendsViewModel()) {
         self.viewModel = viewModel
         super.init(rootView: UIView())
-        navigationItem.title = "Steam 친구"
+        navigationItem.title = L10n.Friend.Steam.title
         navigationItem.largeTitleDisplayMode = .never
     }
 
@@ -176,20 +176,20 @@ final class SteamFriendsViewController: BaseViewController<UIView, SteamFriendsS
             return errorMessage
         }
         if state.isLimitedByPrivacy {
-            return "Steam 친구 데이터가 비공개예요\nSteam 친구 정보가 비공개일 수 있어요"
+            return L10n.Friend.Steam.privateData
         }
         if state.isAvailable == false, let syncWarningCode = state.syncWarningCode, !syncWarningCode.isEmpty {
-            return "Steam 친구 목록을 불러올 수 없어요\nSteam 친구 정보가 비공개일 수 있어요"
+            return L10n.Friend.Steam.unavailable
         }
-        return "아직 표시할 Steam 친구가 없어요"
+        return L10n.Friend.Steam.empty
     }
 
     private func actionConfiguration(for friend: SteamFriend) -> FriendUserCell.ActionConfiguration? {
         guard let userId = friend.userId else { return nil }
         if alreadyFriendUserIDs.contains(userId) {
-            return .init(title: "이미 친구", style: .secondary, isEnabled: false)
+            return .init(title: L10n.Friend.Action.alreadyFriend, style: .secondary, isEnabled: false)
         }
-        return .init(title: "GamePedia 프로필 보기", style: .primary, isEnabled: true)
+        return .init(title: L10n.Friend.Action.viewProfile, style: .primary, isEnabled: true)
     }
 
     private func configuredUserSummary(for friend: SteamFriend) -> FriendUserSummary {
@@ -215,9 +215,9 @@ extension SteamFriendsViewController: UITableViewDataSource, UITableViewDelegate
         let friend = friends[indexPath.row]
         let subtitle: String
         if friend.isLinkedToGamePedia {
-            subtitle = friend.nickname == nil ? "Steam 친구 · GamePedia 연결됨" : "GamePedia 연결됨"
+            subtitle = friend.nickname == nil ? L10n.Friend.Steam.subtitleLinkedSteam : L10n.Friend.Steam.subtitleLinked
         } else {
-            subtitle = "Steam 친구 · GamePedia 미연동"
+            subtitle = L10n.Friend.Steam.subtitleUnlinked
         }
         cell.configure(
             user: configuredUserSummary(for: friend),

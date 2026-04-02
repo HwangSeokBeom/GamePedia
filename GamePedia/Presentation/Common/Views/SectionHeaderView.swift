@@ -23,7 +23,7 @@ final class SectionHeaderView: UIView {
 
     let seeMoreButton: UIButton = {
         var config = UIButton.Configuration.plain()
-        config.title = "더보기"
+        config.title = L10n.Common.Button.seeAll
         config.baseForegroundColor = .gpPrimary
         config.contentInsets = .zero
         let button = UIButton(configuration: config)

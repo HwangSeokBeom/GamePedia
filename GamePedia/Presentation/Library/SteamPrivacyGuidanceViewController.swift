@@ -13,7 +13,7 @@ final class SteamPrivacyGuidanceViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .gpSurface
-        title = "Steam 안내"
+        title = L10n.tr("Localizable", "library.steam.privacy.guidance.title")
 
         contentView.configure(
             title: SteamPrivacyGuideContent.title,
@@ -80,7 +80,7 @@ private final class SteamPrivacyGuidanceContentView: UIView {
         configuration.baseBackgroundColor = .gpPrimary
         configuration.baseForegroundColor = .gpOnPrimary
         configuration.cornerStyle = .large
-        configuration.title = "설정 방법 보기"
+        configuration.title = L10n.tr("Localizable", "library.steam.privacy.guidance.showInstructions")
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 18, bottom: 14, trailing: 18)
         let button = UIButton(configuration: configuration)
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -92,7 +92,7 @@ private final class SteamPrivacyGuidanceContentView: UIView {
         configuration.baseBackgroundColor = .gpPrimary.withAlphaComponent(0.12)
         configuration.baseForegroundColor = .gpPrimaryLight
         configuration.cornerStyle = .large
-        configuration.title = "다시 확인"
+        configuration.title = L10n.tr("Localizable", "library.steam.privacy.guidance.retry")
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 18, bottom: 14, trailing: 18)
         let button = UIButton(configuration: configuration)
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -102,7 +102,7 @@ private final class SteamPrivacyGuidanceContentView: UIView {
     private let laterButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
         configuration.baseForegroundColor = .gpTextSecondary
-        configuration.title = "나중에"
+        configuration.title = L10n.tr("Localizable", "common.button.later")
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 18, bottom: 10, trailing: 18)
         let button = UIButton(configuration: configuration)
         button.translatesAutoresizingMaskIntoConstraints = false

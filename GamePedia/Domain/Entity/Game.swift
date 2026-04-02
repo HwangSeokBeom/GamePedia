@@ -25,11 +25,11 @@ struct Game: Hashable {
     var displayTitle: String { resolvedTitle }
 
     var resolvedTitle: String {
-        Self.resolvedText(translatedTitle, fallback: title) ?? title
+        title
     }
 
     var resolvedSummary: String? {
-        Self.resolvedText(translatedSummary, fallback: summary)
+        summary
     }
 
     func replacingTranslated(
@@ -87,15 +87,15 @@ struct GameDetail {
     var displayDescription: String { resolvedSummary }
 
     var resolvedTitle: String {
-        Self.resolvedText(translatedTitle, fallback: title) ?? title
+        title
     }
 
     var resolvedSummary: String {
-        Self.resolvedText(translatedSummary, fallback: summary) ?? summary
+        summary
     }
 
     var resolvedStoryline: String {
-        Self.resolvedText(translatedStoryline, fallback: storyline) ?? storyline
+        storyline
     }
 
     func replacingTranslated(

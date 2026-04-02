@@ -53,8 +53,12 @@ final class FriendGamePreviewCell: UITableViewCell {
             subtitleLabel.text = subtitleOverride
             return
         }
-        let metadataParts = [game.genre == "기타" ? nil : game.genre, game.releaseYear > 0 ? "\(game.releaseYear)" : nil].compactMap { $0 }
-        subtitleLabel.text = metadataParts.isEmpty ? "게임 정보" : metadataParts.joined(separator: " · ")
+        let genreText = game.genre.trimmingCharacters(in: .whitespacesAndNewlines)
+        let metadataParts = [
+            (genreText.isEmpty || genreText == "—" || genreText == L10n.Common.Label.other) ? nil : genreText,
+            game.releaseYear > 0 ? LocalizedNumberFormatter.integer(game.releaseYear) : nil
+        ].compactMap { $0 }
+        subtitleLabel.text = metadataParts.isEmpty ? L10n.Friend.Fallback.gameInfo : metadataParts.joined(separator: " · ")
     }
 
     func configure(recentGame: RecentGame) {

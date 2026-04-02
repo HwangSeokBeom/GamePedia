@@ -99,9 +99,8 @@ final class HomeViewModel {
                 let feed = try await feedTask
                 let favoriteItems = (try? await favoritesTask) ?? []
                 let unreadCount = (try? await unreadCountTask) ?? 0
-                let translatedFeed = await translateHomeFeed(feed)
                 await MainActor.run {
-                    self.apply(.setHomeFeed(translatedFeed))
+                    self.apply(.setHomeFeed(feed))
                     self.apply(.setWishlistedGameIDs(Set(favoriteItems.map(\.gameId))))
                     self.apply(.setUnreadNotificationCount(unreadCount))
                     self.apply(.setLoading(false))
@@ -208,64 +207,22 @@ final class HomeViewModel {
             } catch {
                 let favoriteError = FavoriteError.from(error: error)
                 await MainActor.run {
-                    self.apply(.setError(favoriteError.errorDescription ?? "찜 상태를 변경하지 못했습니다."))
+                    self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
                 }
             }
         }
     }
 
     private func translateHomeFeed(_ feed: HomeFeed) async -> HomeFeed {
-        async let translatedHighlights = translateHighlights(feed.highlights)
-        async let translatedTodayRecommendations = translateTodayRecommendations(feed.todayRecommendations)
-        async let translatedPopularGames = translateGames(feed.popularGames, context: "Home.popular")
-        async let translatedTrendingGames = translateGames(feed.trendingGames, context: "Home.trending")
-
-        let (highlights, todayRecommendations, popularGames, trendingGames) = await (
-            translatedHighlights,
-            translatedTodayRecommendations,
-            translatedPopularGames,
-            translatedTrendingGames
-        )
-        return HomeFeed(
-            highlights: highlights,
-            todayRecommendations: todayRecommendations,
-            popularGames: popularGames,
-            trendingGames: trendingGames
-        )
+        feed
     }
 
     private func translateHighlights(_ highlights: [HomeHighlightItem]) async -> [HomeHighlightItem] {
-        let translatedGames = await translateGames(
-            highlights.map(\.game),
-            context: "highlight",
-            translateSummary: true
-        )
-        let gamesByID = Dictionary(uniqueKeysWithValues: translatedGames.map { ($0.id, $0) })
-        return highlights.map { item in
-            let translatedGame = gamesByID[item.game.id] ?? item.game
-            return HomeHighlightItem(
-                game: translatedGame,
-                badgeText: item.badgeText,
-                titleText: translatedGame.resolvedTitle,
-                metaText: item.metaText,
-                supportingText: item.supportingText
-            )
-        }
+        highlights
     }
 
     private func translateTodayRecommendations(_ recommendations: [TodayRecommendation]) async -> [TodayRecommendation] {
-        let translatedGames = await translateGames(recommendations.map(\.game), context: "home.today")
-        let gamesByID = Dictionary(uniqueKeysWithValues: translatedGames.map { ($0.id, $0) })
-        return recommendations.map { recommendation in
-            TodayRecommendation(
-                game: gamesByID[recommendation.game.id] ?? recommendation.game,
-                score: recommendation.score,
-                primaryReason: recommendation.primaryReason,
-                reasons: recommendation.reasons,
-                scoreBreakdown: recommendation.scoreBreakdown,
-                source: recommendation.source
-            )
-        }
+        recommendations
     }
 
     private func translateGames(
@@ -273,50 +230,9 @@ final class HomeViewModel {
         context: String,
         translateSummary: Bool = false
     ) async -> [Game] {
-        guard !games.isEmpty else { return games }
-
-        let titleItems = games.compactMap { game -> TranslationRequestItem? in
-            guard game.translatedTitle == nil else { return nil }
-            return TranslationRequestItem(
-                identifier: String(game.id),
-                field: "title",
-                text: game.title
-            )
-        }
-
-        let summaryItems = translateSummary
-            ? games.compactMap { game -> TranslationRequestItem? in
-                guard let summary = game.summary?.trimmingCharacters(in: .whitespacesAndNewlines),
-                      !summary.isEmpty else { return nil }
-                return TranslationRequestItem(
-                    identifier: String(game.id),
-                    field: "summary",
-                    text: summary
-                )
-            }
-            : []
-
-        guard !titleItems.isEmpty || !summaryItems.isEmpty else { return games }
-
-        async let titleResults = translateTextUseCase.execute(
-            items: titleItems,
-            context: "\(context).title",
-            sourceLanguage: "en"
-        )
-        async let summaryResults = translateTextUseCase.execute(
-            items: summaryItems,
-            context: "\(context).summary",
-            sourceLanguage: "en"
-        )
-        let translatedTitles = Dictionary(uniqueKeysWithValues: await titleResults.map { ($0.identifier, $0.translatedText) })
-        let translatedSummaries = Dictionary(uniqueKeysWithValues: await summaryResults.map { ($0.identifier, $0.translatedText) })
-
-        return games.map { game in
-            game.replacingTranslated(
-                translatedTitle: translatedTitles[String(game.id)],
-                translatedSummary: translatedSummaries[String(game.id)]
-            )
-        }
+        _ = context
+        _ = translateSummary
+        return games
     }
 }
 

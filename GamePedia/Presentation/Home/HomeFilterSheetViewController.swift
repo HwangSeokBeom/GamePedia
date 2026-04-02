@@ -11,7 +11,7 @@ final class HomeFilterSheetViewController: UIViewController {
         let label = UILabel()
         label.font = .systemFont(ofSize: 20, weight: .bold)
         label.textColor = .gpTextPrimary
-        label.text = "홈 필터"
+        label.text = L10n.tr("Localizable", "home.filter.title")
         return label
     }()
 
@@ -19,7 +19,7 @@ final class HomeFilterSheetViewController: UIViewController {
         let label = UILabel()
         label.font = .systemFont(ofSize: 13)
         label.textColor = .gpTextSecondary
-        label.text = "플랫폼, 카테고리, 게임 모드로 홈 콘텐츠를 좁혀볼 수 있어요."
+        label.text = L10n.tr("Localizable", "home.filter.subtitle")
         label.numberOfLines = 0
         return label
     }()
@@ -30,7 +30,7 @@ final class HomeFilterSheetViewController: UIViewController {
 
     private let resetButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
-        configuration.title = "초기화"
+        configuration.title = L10n.tr("Localizable", "home.filter.reset")
         configuration.baseForegroundColor = .gpTextSecondary
         let button = UIButton(configuration: configuration)
         button.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
@@ -39,7 +39,7 @@ final class HomeFilterSheetViewController: UIViewController {
 
     private let applyButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "적용하기"
+        configuration.title = L10n.tr("Localizable", "home.filter.apply")
         configuration.baseBackgroundColor = .gpPrimary
         configuration.baseForegroundColor = .gpOnPrimary
         configuration.cornerStyle = .large
@@ -79,9 +79,9 @@ final class HomeFilterSheetViewController: UIViewController {
         let stackView = UIStackView(arrangedSubviews: [
             titleLabel,
             subtitleLabel,
-            makeFilterRow(title: "플랫폼", selectionButton: platformButton),
-            makeFilterRow(title: "카테고리", selectionButton: categoryButton),
-            makeFilterRow(title: "게임 모드", selectionButton: gameModeButton),
+            makeFilterRow(title: L10n.tr("Localizable", "home.filter.platform"), selectionButton: platformButton),
+            makeFilterRow(title: L10n.tr("Localizable", "home.filter.category"), selectionButton: categoryButton),
+            makeFilterRow(title: L10n.tr("Localizable", "home.filter.gameMode"), selectionButton: gameModeButton),
             makeActionStack()
         ])
         stackView.axis = .vertical

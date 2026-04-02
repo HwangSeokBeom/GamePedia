@@ -34,13 +34,13 @@ enum RestrictedActionContext {
     var promptMessage: String {
         switch self {
         case .favoriteGame, .writeReview:
-            return "로그인하면 리뷰 작성과 찜 기능을 사용할 수 있어요."
+            return L10n.tr("Localizable", "app.authRequired.prompt.favorite")
         case .viewReviews:
-            return "리뷰를 확인하려면 로그인이 필요합니다."
+            return L10n.tr("Localizable", "app.authRequired.prompt.viewReviews")
         case .library, .profile:
-            return "내 라이브러리와 프로필을 사용하려면 로그인이 필요합니다."
+            return L10n.tr("Localizable", "app.authRequired.prompt.libraryProfile")
         case .moderation:
-            return "이 기능을 사용하려면 로그인이 필요합니다."
+            return L10n.tr("Localizable", "app.authRequired.prompt.default")
         }
     }
 }
@@ -365,12 +365,12 @@ final class AppCoordinator {
         print("[GuestMode] restrictedActionTriggered action=\(context.logName)")
 
         let alertController = UIAlertController(
-            title: "로그인이 필요합니다",
+            title: L10n.tr("Localizable", "app.authRequired.title"),
             message: context.promptMessage,
             preferredStyle: .alert
         )
-        alertController.addAction(UIAlertAction(title: "나중에 하기", style: .cancel))
-        alertController.addAction(UIAlertAction(title: "로그인", style: .default) { [weak self, weak presenter] _ in
+        alertController.addAction(UIAlertAction(title: L10n.tr("Localizable", "app.authRequired.later"), style: .cancel))
+        alertController.addAction(UIAlertAction(title: L10n.Settings.Action.login, style: .default) { [weak self, weak presenter] _ in
             guard let self, let presenter else { return }
             print("[GuestMode] loginRouteRequested action=\(context.logName)")
             self.presentAuthFlow(from: presenter, onAuthenticated: onAuthenticated)
@@ -476,16 +476,22 @@ final class AppCoordinator {
             DebugEnvironmentSelectionStore.selectedEnvironment = selectedEnvironment
             let resolvedEnvironment = selectedEnvironment ?? AppEnvironmentResolver.current
             let alertController = UIAlertController(
-                title: "환경이 저장되었습니다",
-                message: """
-                다음 실행부터 \(resolvedEnvironment.rawValue) 환경이 적용됩니다.
-
-                API: \(resolvedEnvironment.apiBaseURL.absoluteString)
-                Translation: \(resolvedEnvironment.translationBaseURL.absoluteString)
-                """,
+                title: L10n.tr("Localizable", "debug.environment.savedTitle"),
+                message: L10n.tr(
+                    "Localizable",
+                    "debug.environment.savedMessage",
+                    resolvedEnvironment.rawValue,
+                    resolvedEnvironment.apiBaseURL.absoluteString,
+                    resolvedEnvironment.translationBaseURL.absoluteString
+                ),
                 preferredStyle: .alert
             )
-            alertController.addAction(UIAlertAction(title: "확인", style: .default))
+            alertController.addAction(
+                UIAlertAction(
+                    title: L10n.tr("Localizable", "common.button.ok"),
+                    style: .default
+                )
+            )
             presenter?.present(alertController, animated: true)
         }
     }

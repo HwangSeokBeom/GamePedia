@@ -83,7 +83,7 @@ final class NotificationsViewModel {
                 await MainActor.run {
                     self.state.isLoading = false
                     self.state.notifications = []
-                    self.state.errorMessage = "알림을 불러오지 못했어요."
+                    self.state.errorMessage = L10n.tr("Localizable", "notifications.loadFailed")
                     print("[Notifications] stateUpdated failure error=\(error)")
                 }
             }

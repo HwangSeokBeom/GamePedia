@@ -94,14 +94,15 @@ struct SocialActivityPushPayload: Hashable {
         }
 
         let type = string("type", "activityType", "eventType") ?? "generic"
+        let fallbackTitle = L10n.Friend.Activity.feedTitle
         let title = string("title", "alertTitle")
             ?? (alert?["title"] as? String)
-            ?? "친구 활동"
+            ?? fallbackTitle
         let message = string("message", "body", "alertBody")
             ?? (alert?["body"] as? String)
             ?? ""
 
-        if type == "generic", message.isEmpty, title == "친구 활동" {
+        if type == "generic", message.isEmpty, title == fallbackTitle {
             return nil
         }
 

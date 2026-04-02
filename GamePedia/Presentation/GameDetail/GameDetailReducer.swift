@@ -11,9 +11,11 @@ enum GameDetailReducer {
         case .setGame(let game):
             state.game = game
             state.isLoading = false
-            state.translatedTitle = nil
             state.translatedSummary = nil
             state.translatedStoryline = nil
+            state.isTranslationLoading = false
+            state.isShowingTranslated = false
+            state.translationRequest = nil
         case .setReviewFeed(let reviewFeed):
             state.reviews = reviewFeed.reviews
             state.reviewSummary = reviewFeed.summary
@@ -25,11 +27,7 @@ enum GameDetailReducer {
         case .setError(let msg):
             state.errorMessage = msg
             state.isLoading = false
-        case .setTranslatedFields(let title, let summary, let storyline):
-            if let title {
-                state.translatedTitle = title
-                print("[Translation] reducer applied translatedTitle")
-            }
+        case .setTranslatedFields(let summary, let storyline):
             if let summary {
                 state.translatedSummary = summary
                 print("[Translation] reducer applied translatedSummary")
@@ -38,6 +36,12 @@ enum GameDetailReducer {
                 state.translatedStoryline = storyline
                 print("[Translation] reducer applied translatedStoryline")
             }
+        case .setTranslationLoading(let isTranslationLoading):
+            state.isTranslationLoading = isTranslationLoading
+        case .setTranslationRequest(let translationRequest):
+            state.translationRequest = translationRequest
+        case .setShowingTranslated(let isShowingTranslated):
+            state.isShowingTranslated = isShowingTranslated
         }
         return state
     }

@@ -3,8 +3,8 @@ import UIKit
 final class ProfileEditRootView: UIView {
 
     let nicknameFieldView = AuthInputFieldView(
-        title: "닉네임",
-        placeholder: "닉네임 입력",
+        title: L10n.Profile.Edit.nicknameTitle,
+        placeholder: L10n.Profile.Edit.nicknamePlaceholder,
         systemImageName: "person"
     )
     private(set) var badgeButtons: [ProfileBadgeOptionButton] = []
@@ -27,7 +27,7 @@ final class ProfileEditRootView: UIView {
 
     private let subtitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "닉네임과 프로필 사진을 수정할 수 있어요."
+        label.text = L10n.Profile.Edit.subtitle
         label.font = .systemFont(ofSize: 14, weight: .medium)
         label.textColor = .gpTextSecondary
         label.numberOfLines = 0
@@ -57,7 +57,7 @@ final class ProfileEditRootView: UIView {
 
     private let photoHelperLabel: UILabel = {
         let label = UILabel()
-        label.text = "사진은 저장 후 반영됩니다."
+        label.text = L10n.Profile.Edit.photoPending
         label.font = .systemFont(ofSize: 12, weight: .medium)
         label.textColor = .gpTextSecondary
         label.textAlignment = .center
@@ -85,7 +85,7 @@ final class ProfileEditRootView: UIView {
 
     private let badgeSelectionTitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "칭호"
+        label.text = L10n.Profile.Edit.badgeTitle
         label.font = .systemFont(ofSize: 14, weight: .semibold)
         label.textColor = .gpTextPrimary
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -94,7 +94,7 @@ final class ProfileEditRootView: UIView {
 
     private let badgeSelectionHelperLabel: UILabel = {
         let label = UILabel()
-        label.text = "대표 칭호 1개를 선택할 수 있어요."
+        label.text = L10n.Profile.Edit.badgeHelper
         label.font = .systemFont(ofSize: 12, weight: .medium)
         label.textColor = .gpTextSecondary
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -246,9 +246,9 @@ final class ProfileEditRootView: UIView {
         photoActionConfiguration.imagePadding = 8
         photoActionConfiguration.imagePlacement = .leading
         photoActionConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16)
-        photoActionConfiguration.title = "사진 추가"
+        photoActionConfiguration.title = L10n.Profile.Action.addPhoto
         photoActionConfiguration.attributedTitle = AttributedString(
-            "사진 추가",
+            L10n.Profile.Action.addPhoto,
             attributes: AttributeContainer([
                 .font: UIFont.systemFont(ofSize: 14, weight: .semibold)
             ])
@@ -257,9 +257,9 @@ final class ProfileEditRootView: UIView {
 
         var removeConfiguration = UIButton.Configuration.plain()
         removeConfiguration.baseForegroundColor = .gpCoral
-        removeConfiguration.title = "사진 제거"
+        removeConfiguration.title = L10n.Profile.Action.removePhoto
         removeConfiguration.attributedTitle = AttributedString(
-            "사진 제거",
+            L10n.Profile.Action.removePhoto,
             attributes: AttributeContainer([
                 .font: UIFont.systemFont(ofSize: 13, weight: .semibold)
             ])
@@ -268,13 +268,13 @@ final class ProfileEditRootView: UIView {
         removePhotoButton.isHidden = true
 
         var saveConfiguration = UIButton.Configuration.filled()
-        saveConfiguration.title = "저장"
+        saveConfiguration.title = L10n.Common.Button.save
         saveConfiguration.baseBackgroundColor = .gpPrimary
         saveConfiguration.baseForegroundColor = .gpOnPrimary
         saveConfiguration.cornerStyle = .capsule
         saveConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 20, bottom: 14, trailing: 20)
         saveConfiguration.attributedTitle = AttributedString(
-            "저장",
+            L10n.Common.Button.save,
             attributes: AttributeContainer([
                 .font: UIFont.systemFont(ofSize: 16, weight: .semibold)
             ])

@@ -42,7 +42,7 @@ struct ProfileEditState {
     }
 
     var photoActionTitle: String {
-        hasExistingProfileImage ? "사진 변경" : "사진 추가"
+        hasExistingProfileImage ? L10n.Profile.Action.changePhoto : L10n.Profile.Action.addPhoto
     }
 
     var showsRemovePhotoButton: Bool {

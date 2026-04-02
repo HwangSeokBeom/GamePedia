@@ -13,32 +13,32 @@ enum UserPresenceDisplayFormatter {
         switch presence.state {
         case .online:
             return UserPresenceDisplayModel(
-                text: "온라인",
+                text: L10n.Friend.Presence.online,
                 dotColor: .systemGreen,
                 textColor: .gpTextSecondary
             )
         case .playing:
             if let gameTitle = sanitized(presence.gameTitle) {
                 return UserPresenceDisplayModel(
-                    text: "\(gameTitle) 플레이 중",
+                    text: L10n.Friend.Presence.playingGame(gameTitle),
                     dotColor: .gpPrimary,
                     textColor: .gpTextSecondary
                 )
             }
             return UserPresenceDisplayModel(
-                text: "플레이 중",
+                text: L10n.Friend.Presence.playing,
                 dotColor: .gpPrimary,
                 textColor: .gpTextSecondary
             )
         case .recentlyActive:
             return UserPresenceDisplayModel(
-                text: "최근 활동",
+                text: L10n.Friend.Presence.recentActivity,
                 dotColor: .gpStar,
                 textColor: .gpTextSecondary
             )
         case .lastPlayed:
             return UserPresenceDisplayModel(
-                text: "최근 플레이",
+                text: L10n.Friend.Presence.recentPlay,
                 dotColor: .gpTextTertiary,
                 textColor: .gpTextSecondary
             )

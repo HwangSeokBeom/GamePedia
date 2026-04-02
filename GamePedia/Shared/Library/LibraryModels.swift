@@ -129,13 +129,13 @@ struct LibraryGameSummary: Hashable {
     var igdbGameId: Int? { identifier.canonicalGameID }
     var formattedRatingText: String? {
         guard let rating, rating.isFinite, rating > 0 else { return nil }
-        return String(format: "%.1f", rating)
+        return LocalizedNumberFormatter.oneFraction(rating)
     }
 
     var displayTitle: String { resolvedTitle }
 
     var resolvedTitle: String {
-        Self.resolvedText(translatedTitle, fallback: title) ?? title
+        title
     }
 
     var displayableGenreText: String? {
@@ -350,7 +350,7 @@ enum LibraryError: Error, LocalizedError, Equatable {
                 return .unauthorized
             case .serverError(_, let code, let message):
                 let resolvedCode = code?.uppercased() ?? "UNKNOWN_ERROR"
-                let resolvedMessage = message ?? "라이브러리 요청을 처리하지 못했습니다."
+                let resolvedMessage = message ?? L10n.tr("Localizable", "library.error.requestFailed")
                 switch resolvedCode {
                 case "UNAUTHORIZED":
                     return .unauthorized
@@ -380,15 +380,15 @@ enum LibraryError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unauthorized:
-            return "로그인이 필요합니다."
+            return L10n.Common.Error.unauthorized
         case .invalidGameIdentifier:
-            return "게임 식별 정보를 확인하지 못했습니다."
+            return L10n.tr("Localizable", "library.error.invalidGameIdentifier")
         case .invalidStatus:
-            return "게임 상태를 처리하지 못했습니다."
+            return L10n.tr("Localizable", "library.error.invalidStatus")
         case .invalidResponse:
-            return "서버 응답을 처리하지 못했습니다."
+            return L10n.Common.Error.server
         case .network:
-            return "네트워크 연결을 확인해주세요."
+            return L10n.Common.Error.network
         case .server(_, let message):
             return message
         case .unknown(let message):

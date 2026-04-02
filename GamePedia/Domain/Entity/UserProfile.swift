@@ -90,7 +90,7 @@ struct RecentGame {
     var displayTitle: String { resolvedTitle }
 
     var resolvedTitle: String {
-        Self.resolvedText(translatedTitle, fallback: title) ?? title
+        title
     }
 
     var resolvedDetailGameId: Int? {

@@ -114,7 +114,7 @@ final class FriendActivityFeedViewModel {
                     if reset {
                         self.state.items = []
                     }
-                    self.state.errorMessage = "친구 활동을 불러오지 못했어요"
+                    self.state.errorMessage = L10n.Friend.Activity.loadFailed
                     self.isLoadInFlight = false
                     print("[FriendActivity] loadFailure error=\(error.localizedDescription)")
                 }
@@ -174,8 +174,8 @@ final class FriendActivityFeedViewModel {
 
         let snapshot = FriendActivitySummaryWidgetData(
             generatedAt: Date(),
-            title: "친구 활동",
-            summary: widgetItems.first?.subtitle ?? "친구 활동을 확인해보세요",
+            title: L10n.Friend.Activity.feedTitle,
+            summary: widgetItems.first?.subtitle ?? L10n.Friend.Activity.feedSummary,
             items: Array(widgetItems)
         )
         widgetSnapshotStore.saveFriendActivitySummary(snapshot)
@@ -196,7 +196,7 @@ final class FriendActivityFeedViewController: BaseViewController<UIView, FriendA
     init(viewModel: FriendActivityFeedViewModel = FriendActivityFeedViewModel()) {
         self.viewModel = viewModel
         super.init(rootView: UIView())
-        navigationItem.title = "친구 활동"
+        navigationItem.title = L10n.Friend.Activity.feedTitle
         navigationItem.largeTitleDisplayMode = .never
     }
 
@@ -223,7 +223,7 @@ final class FriendActivityFeedViewController: BaseViewController<UIView, FriendA
             emptyLabel.text = errorMessage
         } else if state.isEmpty {
             emptyLabel.isHidden = false
-            emptyLabel.text = "친구 활동이 아직 없어요"
+            emptyLabel.text = L10n.Friend.Activity.empty
         } else {
             emptyLabel.text = nil
         }

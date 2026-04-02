@@ -17,7 +17,7 @@ final class LibraryCoordinator {
         self.steamLinkFlowController = steamLinkFlowController
         navigationController = UINavigationController()
         navigationController.tabBarItem = UITabBarItem(
-            title: "라이브러리",
+            title: L10n.Library.Tab.title,
             image: UIImage(systemName: "books.vertical"),
             selectedImage: UIImage(systemName: "books.vertical.fill")
         )
@@ -69,7 +69,7 @@ final class LibraryCoordinator {
         }
         detailVC.onShare = { [weak self] game in
             guard let topVC = self?.navigationController.topViewController else { return }
-            let items: [Any] = ["\(game.displayTitle) — GamePedia에서 확인해보세요!"]
+            let items: [Any] = [L10n.tr("Localizable", "common.share.gameInvitation", game.displayTitle)]
             let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
             topVC.present(activityVC, animated: true)
         }

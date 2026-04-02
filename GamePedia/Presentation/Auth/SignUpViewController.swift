@@ -35,7 +35,7 @@ final class SignUpViewController: BaseViewController<SignUpRootView, SignUpViewM
 
     private func configureNavigationItem() {
         UIView.performWithoutAnimation {
-            navigationItem.title = "회원가입"
+            navigationItem.title = L10n.tr("Localizable", "auth.signup.title")
             navigationItem.largeTitleDisplayMode = .never
             navigationItem.backButtonDisplayMode = .minimal
         }
@@ -112,8 +112,12 @@ final class SignUpViewController: BaseViewController<SignUpRootView, SignUpViewM
     }
 
     private func showErrorAlert(message: String) {
-        let alert = UIAlertController(title: "회원가입 실패", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        let alert = UIAlertController(
+            title: L10n.tr("Localizable", "auth.signup.errorTitle"),
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: L10n.tr("Localizable", "common.button.ok"), style: .default))
         present(alert, animated: true)
     }
 

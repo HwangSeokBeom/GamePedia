@@ -75,7 +75,7 @@ struct LibraryTabSummaryState: Hashable {
         switch tab {
         case .playing:
             return LibraryTabSummaryState(
-                primaryTitle: "총 플레이",
+                primaryTitle: L10n.Library.Label.playtime,
                 primaryValue: 0,
                 primaryValueKind: .hours,
                 averageRating: nil,
@@ -85,7 +85,7 @@ struct LibraryTabSummaryState: Hashable {
             )
         case .favorites:
             return LibraryTabSummaryState(
-                primaryTitle: "찜한 게임",
+                primaryTitle: L10n.Library.Summary.wishlist,
                 primaryValue: 0,
                 primaryValueKind: .count,
                 averageRating: nil,
@@ -95,7 +95,7 @@ struct LibraryTabSummaryState: Hashable {
             )
         case .reviewed:
             return LibraryTabSummaryState(
-                primaryTitle: "작성한 리뷰",
+                primaryTitle: L10n.Library.Summary.reviewed,
                 primaryValue: 0,
                 primaryValueKind: .count,
                 averageRating: nil,

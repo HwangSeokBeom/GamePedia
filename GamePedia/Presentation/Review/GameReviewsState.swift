@@ -22,14 +22,14 @@ struct GameReviewsState {
     }
 
     var composeButtonTitle: String {
-        myReview == nil ? "작성" : "수정"
+        myReview == nil ? L10n.Review.Compose.create : L10n.Review.Compose.edit
     }
 
     var summaryText: String {
-        reviewSummary?.summaryText ?? "아직 리뷰가 없어요"
+        reviewSummary?.summaryText ?? L10n.Review.Empty.noReviews
     }
 
     var emptyMessage: String {
-        "아직 작성된 리뷰가 없어요.\n첫 리뷰를 남겨보세요."
+        L10n.Review.Empty.firstReview
     }
 }

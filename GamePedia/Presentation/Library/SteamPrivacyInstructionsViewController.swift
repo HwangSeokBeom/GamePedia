@@ -12,7 +12,7 @@ final class SteamPrivacyInstructionsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .gpSurface
-        title = "설정 방법"
+        title = L10n.tr("Localizable", "library.steam.privacy.instructions.title")
 
         contentView.configure(
             summary: SteamPrivacyGuideContent.summary,
@@ -55,7 +55,7 @@ private final class SteamPrivacyInstructionsContentView: UIView {
         configuration.baseBackgroundColor = .gpPrimary
         configuration.baseForegroundColor = .gpOnPrimary
         configuration.cornerStyle = .large
-        configuration.title = "Steam 설정 열기"
+        configuration.title = L10n.tr("Localizable", "library.steam.privacy.instructions.openSettings")
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 18, bottom: 14, trailing: 18)
         let button = UIButton(configuration: configuration)
         button.translatesAutoresizingMaskIntoConstraints = false

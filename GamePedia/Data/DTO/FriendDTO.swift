@@ -62,7 +62,7 @@ struct FriendUserDTO: Decodable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = (try? container.decode(String.self, forKey: .id)) ?? ""
-        nickname = (try? container.decode(String.self, forKey: .nickname)) ?? "알 수 없는 사용자"
+        nickname = (try? container.decode(String.self, forKey: .nickname)) ?? L10n.Friend.Fallback.unknownUser
         bio = try? container.decodeIfPresent(String.self, forKey: .bio)
         profileImageUrl = try? container.decodeIfPresent(String.self, forKey: .profileImageUrl)
         friendshipStatus = try? container.decodeIfPresent(String.self, forKey: .friendshipStatus)
@@ -224,7 +224,7 @@ struct FriendshipDTO: Decodable {
             ?? (try? FriendUserDTO(from: decoder))
             ?? FriendUserDTO(
                 id: "",
-                nickname: "알 수 없는 사용자",
+                nickname: L10n.Friend.Fallback.unknownUser,
                 bio: nil,
                 profileImageUrl: nil,
                 friendshipStatus: nil,
@@ -372,7 +372,7 @@ struct FriendActivityDTO: Decodable {
             ?? (try? container.decode(FriendUserDTO.self, forKey: .user))
             ?? FriendUserDTO(
                 id: "",
-                nickname: "알 수 없는 친구",
+                nickname: L10n.Friend.Fallback.unknownFriend,
                 bio: nil,
                 profileImageUrl: nil,
                 friendshipStatus: nil,
@@ -470,8 +470,8 @@ struct FriendActivityGamePreviewDTO: Decodable {
     static let emptyFallback = FriendActivityGamePreviewDTO(
         gameSource: nil,
         externalGameId: nil,
-        title: "게임",
-        gameName: "게임",
+        title: L10n.Friend.Fallback.game,
+        gameName: L10n.Friend.Fallback.game,
         coverUrl: nil,
         igdbGameId: nil,
         metadataEnriched: nil,

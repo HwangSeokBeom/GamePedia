@@ -103,8 +103,12 @@ final class LoginViewController: BaseViewController<LoginRootView, LoginViewMode
     }
 
     private func showErrorAlert(message: String) {
-        let alert = UIAlertController(title: "로그인 실패", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        let alert = UIAlertController(
+            title: L10n.tr("Localizable", "auth.login.errorTitle"),
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: L10n.tr("Localizable", "common.button.ok"), style: .default))
         present(alert, animated: true)
     }
 

@@ -42,7 +42,7 @@ final class ProfileCoordinator: NSObject {
         self.steamLinkFlowController = steamLinkFlowController
         navigationController = UINavigationController()
         navigationController.tabBarItem = UITabBarItem(
-            title: "프로필",
+            title: L10n.Profile.Tab.title,
             image: UIImage(systemName: "person"),
             selectedImage: UIImage(systemName: "person.fill")
         )
@@ -150,7 +150,7 @@ final class ProfileCoordinator: NSObject {
         }
         detailVC.onShare = { [weak self] game in
             guard let topVC = self?.navigationController.topViewController else { return }
-            let items: [Any] = ["\(game.displayTitle) — GamePedia에서 확인해보세요!"]
+            let items: [Any] = [L10n.tr("Localizable", "common.share.gameInvitation", game.displayTitle)]
             let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
             topVC.present(activityVC, animated: true)
         }
@@ -420,11 +420,11 @@ final class ProfileCoordinator: NSObject {
         guard let mailURL = URL(string: "mailto:\(AppConfig.supportEmail)") else { return }
         guard UIApplication.shared.canOpenURL(mailURL) else {
             let alertController = UIAlertController(
-                title: "메일을 열 수 없어요",
-                message: "Mail 앱을 사용할 수 있는 환경에서 다시 시도해 주세요.",
+                title: L10n.Common.Error.title,
+                message: L10n.Common.Error.tryAgain,
                 preferredStyle: .alert
             )
-            alertController.addAction(UIAlertAction(title: "확인", style: .default))
+            alertController.addAction(UIAlertAction(title: L10n.tr("Localizable", "common.button.ok"), style: .default))
             navigationController.topViewController?.present(alertController, animated: true)
             return
         }

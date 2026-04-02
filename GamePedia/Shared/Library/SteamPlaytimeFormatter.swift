@@ -3,28 +3,12 @@ import Foundation
 enum SteamPlaytimeFormatter {
     static func compactPlaytimeText(minutes: Int?) -> String? {
         guard let normalizedMinutes = normalizedMinutes(from: minutes) else { return nil }
-
-        if normalizedMinutes < 60 {
-            return "플레이 \(normalizedMinutes)분"
-        }
-
-        return "플레이 \(normalizedMinutes / 60)시간"
+        return L10n.tr("Localizable", "steam.playtime.compact", durationText(minutes: normalizedMinutes))
     }
 
     static func expandedPlaytimeValue(minutes: Int?) -> String? {
         guard let normalizedMinutes = normalizedMinutes(from: minutes) else { return nil }
-
-        if normalizedMinutes < 60 {
-            return "\(normalizedMinutes)분"
-        }
-
-        let hours = normalizedMinutes / 60
-        let remainingMinutes = normalizedMinutes % 60
-        if remainingMinutes == 0 {
-            return "\(hours)시간"
-        }
-
-        return "\(hours)시간 \(remainingMinutes)분"
+        return durationText(minutes: normalizedMinutes)
     }
 
     static func recentPlaytimeText(
@@ -32,11 +16,7 @@ enum SteamPlaytimeFormatter {
         fallbackPlaytimeMinutes: Int?
     ) -> String? {
         if let recentPlaytimeMinutes = normalizedMinutes(from: recentPlaytimeMinutes) {
-            if recentPlaytimeMinutes < 60 {
-                return "최근 2주 \(recentPlaytimeMinutes)분"
-            }
-
-            return "최근 2주 \(recentPlaytimeMinutes / 60)시간"
+            return L10n.tr("Localizable", "steam.playtime.recent", durationText(minutes: recentPlaytimeMinutes))
         }
 
         return compactPlaytimeText(minutes: fallbackPlaytimeMinutes)
@@ -45,5 +25,17 @@ enum SteamPlaytimeFormatter {
     private static func normalizedMinutes(from minutes: Int?) -> Int? {
         guard let minutes, minutes > 0 else { return nil }
         return minutes
+    }
+
+    private static func durationText(minutes: Int) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .full
+        formatter.allowedUnits = minutes < 60 ? [.minute] : [.hour, .minute]
+        formatter.zeroFormattingBehavior = .dropAll
+        formatter.maximumUnitCount = minutes % 60 == 0 ? 1 : 2
+        var calendar = Calendar.current
+        calendar.locale = Locale.current
+        formatter.calendar = calendar
+        return formatter.string(from: TimeInterval(minutes * 60)) ?? "\(minutes)"
     }
 }

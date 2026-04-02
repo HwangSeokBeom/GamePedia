@@ -7,6 +7,22 @@ struct RecentPlayDisplayParts: Equatable {
 }
 
 enum RecentPlayMetadataFormatter {
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = .current
+        formatter.unitsStyle = .full
+        return formatter
+    }()
+
+    private static let durationFormatter: DateComponentsFormatter = {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute]
+        formatter.unitsStyle = .full
+        formatter.zeroFormattingBehavior = [.dropAll]
+        formatter.maximumUnitCount = 2
+        return formatter
+    }()
+
     static func format(
         now: Date = Date(),
         lastPlayedAt: Date?,
@@ -36,7 +52,7 @@ enum RecentPlayMetadataFormatter {
             return makeRelativeText(from: lastPlayedAt, now: now)
         }()
 
-        let durationText = normalizedRecentPlaytimeMinutes.map { "최근 플레이 \(expandedMinutesText($0))" }
+        let durationText = normalizedRecentPlaytimeMinutes.map { recentPlayDurationText($0) }
 
         let finalText: String
         if let relativeTimeText, let durationText {
@@ -63,9 +79,9 @@ enum RecentPlayMetadataFormatter {
 
         switch normalizedReason {
         case "timestamp_unavailable":
-            return "최근 플레이 기록"
+            return L10n.Empty.noRecentPlay
         default:
-            return "최근 플레이 기록"
+            return L10n.Empty.noRecentPlay
         }
     }
 
@@ -74,37 +90,18 @@ enum RecentPlayMetadataFormatter {
         return minutes
     }
 
-    private static func expandedMinutesText(_ minutes: Int) -> String {
-        if minutes < 60 {
-            return "\(minutes)분"
+    private static func recentPlayDurationText(_ minutes: Int) -> String {
+        guard let localizedDuration = durationFormatter.string(from: TimeInterval(minutes * 60)) else {
+            return L10n.Profile.Section.recentPlay
         }
-
-        let hours = minutes / 60
-        let remainingMinutes = minutes % 60
-        if remainingMinutes == 0 {
-            return "\(hours)시간"
-        }
-        return "\(hours)시간 \(remainingMinutes)분"
+        return L10n.Profile.RecentPlay.durationFormat(localizedDuration)
     }
 
     private static func makeRelativeText(from date: Date, now: Date) -> String {
         let seconds = max(0, Int(now.timeIntervalSince(date)))
-
-        switch seconds {
-        case ..<60:
-            return "방금 전"
-        case 60..<3_600:
-            return "\(seconds / 60)분 전"
-        case 3_600..<86_400:
-            return "\(seconds / 3_600)시간 전"
-        case 86_400..<604_800:
-            return "\(seconds / 86_400)일 전"
-        case 604_800..<2_592_000:
-            return "\(seconds / 604_800)주 전"
-        case 2_592_000..<31_536_000:
-            return "\(seconds / 2_592_000)달 전"
-        default:
-            return "\(seconds / 31_536_000)년 전"
+        if seconds < 60 {
+            return L10n.Common.Time.justNow
         }
+        return relativeDateFormatter.localizedString(for: date, relativeTo: now)
     }
 }

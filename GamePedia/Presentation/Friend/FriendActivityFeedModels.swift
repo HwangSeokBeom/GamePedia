@@ -40,36 +40,39 @@ enum FriendActivityFeedItemFormatter {
 
         switch item.type {
         case .reviewCreated:
-            return "\(item.actor.nickname)님이 새 리뷰를 남겼어요"
+            return L10n.Friend.Activity.reviewCreated(item.actor.nickname)
         case .reviewUpdated:
-            return "\(item.actor.nickname)님이 리뷰를 수정했어요"
+            return L10n.Friend.Activity.reviewUpdated(item.actor.nickname)
         case .likedGameAdded:
-            return "\(item.actor.nickname)님이 게임을 찜했어요"
+            return L10n.Friend.Activity.likedGameAdded(item.actor.nickname)
         case .likedGameRemoved:
-            return "\(item.actor.nickname)님이 찜을 정리했어요"
+            return L10n.Friend.Activity.likedGameRemoved(item.actor.nickname)
         case .ratingChanged:
             if let updatedRating = item.metadata?.updatedRating {
-                return "\(item.actor.nickname)님이 평점을 \(String(format: "%.1f", updatedRating))점으로 남겼어요"
+                return L10n.Friend.Activity.ratingChangedValue(
+                    item.actor.nickname,
+                    LocalizedNumberFormatter.oneFraction(updatedRating)
+                )
             }
-            return "\(item.actor.nickname)님이 평점을 변경했어요"
+            return L10n.Friend.Activity.ratingChanged(item.actor.nickname)
         case .playStatusChanged:
             if let updatedStatus = item.metadata?.updatedPlayStatus {
                 switch updatedStatus {
                 case .playing:
-                    return "\(item.actor.nickname)님이 지금 플레이 중이에요"
+                    return L10n.Friend.Activity.playStatusPlaying(item.actor.nickname)
                 case .completed:
-                    return "\(item.actor.nickname)님이 플레이를 완료했어요"
+                    return L10n.Friend.Activity.playStatusCompleted(item.actor.nickname)
                 case .wishlist:
-                    return "\(item.actor.nickname)님이 나중에 플레이할 게임으로 담아뒀어요"
+                    return L10n.Friend.Activity.playStatusWishlist(item.actor.nickname)
                 case .dropped:
-                    return "\(item.actor.nickname)님이 플레이 상태를 바꿨어요"
+                    return L10n.Friend.Activity.playStatusChanged(item.actor.nickname)
                 }
             }
-            return "\(item.actor.nickname)님이 플레이 상태를 업데이트했어요"
+            return L10n.Friend.Activity.playStatusChanged(item.actor.nickname)
         case .friendStartedPlaying:
-            return "\(item.actor.nickname)님이 지금 플레이 중이에요"
+            return L10n.Friend.Activity.playStatusPlaying(item.actor.nickname)
         case .friendRecentlyPlayed:
-            return "\(item.actor.nickname)님이 최근에 플레이했어요"
+            return L10n.Friend.Activity.recentlyPlayed(item.actor.nickname)
         }
     }
 
@@ -77,33 +80,33 @@ enum FriendActivityFeedItemFormatter {
         if let updatedStatus = item.metadata?.updatedPlayStatus {
             switch updatedStatus {
             case .playing:
-                return "플레이 상태 업데이트"
+                return L10n.Friend.Activity.Subheadline.playStatusUpdate
             case .completed:
-                return "엔딩까지 완료"
+                return L10n.Friend.Activity.Subheadline.completed
             case .wishlist:
-                return "나중에 플레이 예정"
+                return L10n.Friend.Activity.Subheadline.wishlist
             case .dropped:
-                return "중단한 게임"
+                return L10n.Friend.Activity.Subheadline.dropped
             }
         }
 
         switch item.type {
         case .reviewCreated:
-            return "새 리뷰"
+            return L10n.Friend.Activity.Subheadline.newReview
         case .reviewUpdated:
-            return "리뷰 수정"
+            return L10n.Friend.Activity.Subheadline.reviewUpdated
         case .likedGameAdded:
-            return "찜 추가"
+            return L10n.Friend.Activity.Subheadline.likedAdded
         case .likedGameRemoved:
-            return "찜 제거"
+            return L10n.Friend.Activity.Subheadline.likedRemoved
         case .ratingChanged:
-            return "평점 변경"
+            return L10n.Friend.Activity.Subheadline.ratingChanged
         case .playStatusChanged:
-            return "플레이 상태"
+            return L10n.Friend.Activity.Subheadline.playStatus
         case .friendStartedPlaying:
-            return "플레이 중"
+            return L10n.Friend.Activity.Subheadline.playing
         case .friendRecentlyPlayed:
-            return "최근 플레이"
+            return L10n.Friend.Activity.Subheadline.recentPlay
         }
     }
 
@@ -122,9 +125,12 @@ enum FriendActivityFeedItemFormatter {
     }
 
     private static func relativeDateText(for date: Date?) -> String {
-        guard let date else { return "방금 전" }
+        guard let date else { return L10n.Common.Time.justNow }
+        if abs(date.timeIntervalSinceNow) < 60 {
+            return L10n.Common.Time.justNow
+        }
         let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.locale = .autoupdatingCurrent
         formatter.unitsStyle = .short
         return formatter.localizedString(for: date, relativeTo: Date())
     }

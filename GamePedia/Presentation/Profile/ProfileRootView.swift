@@ -117,14 +117,14 @@ final class ProfileRootView: UIView {
         let label = UILabel()
         label.font = .systemFont(ofSize: 11, weight: .semibold)
         label.textColor = .gpPrimaryLight
-        label.text = "연결됨"
+        label.text = L10n.Profile.Account.connected
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
 
     let steamUnlinkButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
-        configuration.title = "연동 해제"
+        configuration.title = L10n.Profile.Action.unlinkSteam
         configuration.baseForegroundColor = .gpCoral
         configuration.contentInsets = .zero
         let button = UIButton(configuration: configuration)
@@ -171,7 +171,7 @@ final class ProfileRootView: UIView {
 
     let steamFriendsButton: UIButton = {
         let button = UIButton(configuration: ProfileRootView.makeCompactActionConfiguration(
-            title: "Steam 친구",
+            title: L10n.Profile.Action.steamFriends,
             systemImageName: "person.3",
             tintColor: .gpTextSecondary
         ))
@@ -181,7 +181,7 @@ final class ProfileRootView: UIView {
 
     let friendRequestsButton: UIButton = {
         let button = UIButton(configuration: ProfileRootView.makeCompactActionConfiguration(
-            title: "친구 요청",
+            title: L10n.Profile.Action.friendRequests,
             systemImageName: "person.crop.circle.badge.plus",
             tintColor: .gpPrimaryLight
         ))
@@ -191,7 +191,7 @@ final class ProfileRootView: UIView {
 
     let friendSearchButton: UIButton = {
         let button = UIButton(configuration: ProfileRootView.makeCompactActionConfiguration(
-            title: "친구 찾기",
+            title: L10n.Profile.Action.findFriends,
             systemImageName: "magnifyingglass",
             tintColor: .gpPrimary
         ))
@@ -207,19 +207,19 @@ final class ProfileRootView: UIView {
 
     private let socialManagementRowView = SocialTasteRowView(
         systemImageName: "person.2.fill",
-        title: "친구 관리",
+        title: L10n.Profile.Social.friendManagement,
         tintColor: .gpPrimary
     )
 
     private let socialActivityRowView = SocialTasteRowView(
         systemImageName: "waveform.path.ecg",
-        title: "친구 활동",
+        title: L10n.Profile.Social.friendActivity,
         tintColor: .gpTeal
     )
 
     private let tasteSummaryRowView = SocialTasteRowView(
         systemImageName: "sparkles",
-        title: "취향 태그",
+        title: L10n.Profile.Social.tasteTags,
         tintColor: .gpPrimaryLight,
         isInteractive: false
     )
@@ -235,7 +235,7 @@ final class ProfileRootView: UIView {
 
     let logoutButton: UIButton = {
         let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
-            title: "로그아웃",
+            title: L10n.Profile.Action.logout,
             systemImageName: "rectangle.portrait.and.arrow.right",
             tintColor: .gpTextPrimary
         ))
@@ -246,7 +246,7 @@ final class ProfileRootView: UIView {
 
     let deleteAccountButton: UIButton = {
         let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
-            title: "회원 탈퇴",
+            title: L10n.Profile.Action.deleteAccount,
             systemImageName: "person.crop.circle.badge.minus",
             tintColor: .gpCoral
         ))
@@ -264,7 +264,7 @@ final class ProfileRootView: UIView {
 
     let termsOfServiceButton: UIButton = {
         let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
-            title: "이용약관",
+            title: L10n.Profile.Action.terms,
             systemImageName: "doc.text",
             tintColor: .gpTextPrimary
         ))
@@ -275,7 +275,7 @@ final class ProfileRootView: UIView {
 
     let privacyPolicyButton: UIButton = {
         let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
-            title: "개인정보처리방침",
+            title: L10n.Profile.Action.privacyPolicy,
             systemImageName: "lock.shield",
             tintColor: .gpTextPrimary
         ))
@@ -286,7 +286,7 @@ final class ProfileRootView: UIView {
 
     let communityGuidelinesButton: UIButton = {
         let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
-            title: "커뮤니티 가이드라인",
+            title: L10n.Profile.Action.communityGuidelines,
             systemImageName: "person.2.wave.2",
             tintColor: .gpTextPrimary
         ))
@@ -297,7 +297,7 @@ final class ProfileRootView: UIView {
 
     let contactSupportButton: UIButton = {
         let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
-            title: "문의하기",
+            title: L10n.Profile.Action.contactSupport,
             systemImageName: "envelope",
             tintColor: .gpPrimary
         ))
@@ -308,7 +308,7 @@ final class ProfileRootView: UIView {
 
     let socialPrivacySettingsButton: UIButton = {
         let button = UIButton(configuration: ProfileRootView.makeAccountActionConfiguration(
-            title: "공개 설정",
+            title: L10n.Profile.Action.socialPrivacy,
             systemImageName: "switch.2",
             tintColor: .gpTextPrimary
         ))
@@ -377,7 +377,7 @@ final class ProfileRootView: UIView {
         label.textColor = .gpTextSecondary
         label.textAlignment = .center
         label.numberOfLines = 0
-        label.text = "최근 플레이한 게임이 아직 없어요"
+        label.text = L10n.Profile.Empty.noRecentPlayedGames
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -435,13 +435,13 @@ final class ProfileRootView: UIView {
         statsContainerView.addSubview(statsStack)
 
         // Section header
-        sectionHeader.configure(title: "최근 플레이")
+        sectionHeader.configure(title: L10n.Profile.Section.recentPlay)
         sectionHeader.titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
         sectionHeader.translatesAutoresizingMaskIntoConstraints = false
 
-        connectedAccountsHeaderView.configure(title: "연결된 계정", showSeeMore: false)
+        connectedAccountsHeaderView.configure(title: L10n.Profile.Section.connectedAccounts, showSeeMore: false)
         connectedAccountsHeaderView.titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
-        friendSectionHeaderView.configure(title: "소셜 & 취향", showSeeMore: false)
+        friendSectionHeaderView.configure(title: L10n.Profile.Section.socialTaste, showSeeMore: false)
         friendSectionHeaderView.titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
 
         recentPlayEmptyCardView.addSubview(recentPlayEmptyLabel)
@@ -595,22 +595,22 @@ final class ProfileRootView: UIView {
             email: state.displayEmail,
             badgeTitles: state.heroBadgeTitles,
             descriptionText: makeProfileDescription(from: state),
-            primaryMetaText: "친구 \(state.friendCount)명",
-            secondaryMetaText: "좋아요 \(state.wishlistCount)",
+            primaryMetaText: L10n.Common.Count.friends(state.friendCount),
+            secondaryMetaText: L10n.Profile.Count.likes(state.wishlistCount),
             isLoading: state.isLoading && state.authenticatedUser == nil
         )
 
-        playedStatView.configure(value: "\(state.playedGameCount)", title: "플레이한 게임")
-        reviewStatView.configure(value: "\(state.writtenReviewCount)", title: "작성한 리뷰")
-        wishlistStatView.configure(value: "\(state.wishlistCount)", title: "찜한 게임")
+        playedStatView.configure(value: "\(state.playedGameCount)", title: L10n.Profile.Stat.playedGames)
+        reviewStatView.configure(value: "\(state.writtenReviewCount)", title: L10n.Profile.Stat.writtenReviews)
+        wishlistStatView.configure(value: "\(state.wishlistCount)", title: L10n.Profile.Stat.wishlistedGames)
         connectedAccountsSectionStackView.isHidden = !state.isSteamConnected
         steamAccountSubtitleLabel.text = state.steamConnectionSubtitle
-        socialManagementRowView.setSecondaryText("\(state.friendCount)명 연결됨")
+        socialManagementRowView.setSecondaryText(L10n.Profile.Meta.friendsConnected(state.friendCount))
         let friendActivitySubtitle: String
         if state.friendCount == 0 || state.friendActivityCount == 0 {
-            friendActivitySubtitle = "새 활동이 아직 없어요"
+            friendActivitySubtitle = L10n.Profile.Activity.none
         } else {
-            friendActivitySubtitle = "새 활동 \(state.friendActivityCount)개"
+            friendActivitySubtitle = L10n.Profile.Activity.newCount(state.friendActivityCount)
         }
         print(
             "[Profile] friendActivitySubtitle " +
@@ -705,36 +705,36 @@ final class ProfileRootView: UIView {
             return "RPG · Soulslike"
         }
         if state.selectedBadgeTitles.contains("Hardcore Gamer") {
-            return "액션 · 로그라이크"
+            return L10n.tr("Localizable", "profile.taste.placeholderHardcore")
         }
         if state.selectedBadgeTitles.contains("Pro Reviewer") {
-            return "리뷰 · 스토리 중심"
+            return L10n.Profile.Taste.reviewStoryFocused
         }
         if !state.selectedBadgeTitles.isEmpty {
             return state.selectedBadgeTitles.joined(separator: " · ")
         }
         if state.writtenReviewCount > 0 && state.wishlistCount > 0 {
-            return "리뷰 · 찜 기반 취향"
+            return L10n.Profile.Taste.reviewWishlistBased
         }
         if state.recentlyPlayedGames.isEmpty == false {
-            return "플레이 기록 기반 태그"
+            return L10n.Profile.Taste.playRecordBased
         }
-        return "취향 데이터가 쌓이는 중"
+        return L10n.Profile.Taste.dataAccumulating
     }
 
     private func makeRecentPlayEmptyText(from state: ProfileState) -> String {
         switch state.recentPlayLoadState {
         case .loading:
-            return "최근 플레이 정보를 불러오는 중이에요"
+            return L10n.Profile.Empty.recentPlayLoading
         case .partialFailure, .failed:
-            return "최근 플레이 정보를 아직 불러오지 못했어요"
+            return L10n.Profile.Empty.recentPlayUnavailable
         case .idle, .empty, .loaded:
-            return "최근 플레이한 게임이 아직 없어요"
+            return L10n.Profile.Empty.noRecentPlayedGames
         }
     }
 
     private func makeProfileDescription(from state: ProfileState) -> String {
-        return "플레이 기록과 취향이 쌓일수록 프로필이 더 선명해져요."
+        return L10n.Profile.Description.growth
     }
 }
 
@@ -821,7 +821,7 @@ final class ProfileHeaderCardView: UIView {
 
     let editProfileButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "편집"
+        configuration.title = L10n.tr("Localizable", "common.button.edit")
         configuration.baseBackgroundColor = UIColor.gpPrimary.withAlphaComponent(0.14)
         configuration.baseForegroundColor = .gpPrimaryLight
         configuration.cornerStyle = .capsule
@@ -1183,7 +1183,7 @@ private final class SocialTasteRowView: UIView {
         let label = UILabel()
         label.font = .systemFont(ofSize: 12, weight: .medium)
         label.textColor = .gpTextSecondary
-        label.textAlignment = .right
+        label.textAlignment = .natural
         label.numberOfLines = 1
         label.lineBreakMode = .byTruncatingTail
         return label
@@ -1192,7 +1192,7 @@ private final class SocialTasteRowView: UIView {
     private let disclosureImageView: UIImageView = {
         let imageView = UIImageView(
             image: UIImage(
-                systemName: "chevron.right",
+                systemName: "chevron.forward",
                 withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
             )
         )

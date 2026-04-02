@@ -37,7 +37,7 @@ struct HomeState {
     }
 
     func resolvedTitle(for game: Game) -> String {
-        translatedTitles[game.id] ?? game.resolvedTitle
+        game.title
     }
 
     func resolvedSupportingText(for highlight: HomeHighlightItem) -> String {

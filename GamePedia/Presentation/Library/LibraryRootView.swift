@@ -279,12 +279,12 @@ final class LibraryRootView: UIView {
         )
         averageRatingSummaryView.configure(
             value: summaryMetrics.averageRatingText,
-            title: "평균 평점",
+            title: L10n.Library.Summary.averageRating,
             valueColor: .gpPrimaryLight
         )
         gameCountSummaryView.configure(
             value: summaryMetrics.gameCountText,
-            title: "게임 수",
+            title: L10n.Library.Summary.gameCount,
             valueColor: .gpCoral
         )
 
@@ -332,7 +332,7 @@ final class LibraryRootView: UIView {
         [primaryTabStackView].forEach { primaryTabContainerView.addSubview($0) }
         [topContentStackView, collectionView, loadingIndicatorView].forEach { addSubview($0) }
 
-        ["플레이함", "찜한 게임", "리뷰 작성함"].enumerated().forEach { index, title in
+        [L10n.Library.PrimaryTab.playing, L10n.Library.PrimaryTab.wishlist, L10n.Library.PrimaryTab.reviewed].enumerated().forEach { index, title in
             let button = LibraryPillButton(title: title)
             button.tag = index
             button.addTarget(self, action: #selector(didTapPrimaryTab(_:)), for: .touchUpInside)
@@ -340,7 +340,7 @@ final class LibraryRootView: UIView {
             primaryTabStackView.addArrangedSubview(button)
         }
 
-        ["최근 플레이", "평점순", "플레이 시간순"].enumerated().forEach { index, title in
+        [L10n.Library.Filter.recent, L10n.Library.Filter.rating, L10n.Library.Filter.playtime].enumerated().forEach { index, title in
             let button = LibraryPillButton(title: title)
             button.tag = index
             button.addTarget(self, action: #selector(didTapFilter(_:)), for: .touchUpInside)
@@ -399,15 +399,15 @@ final class LibraryRootView: UIView {
         steamStatusLabel.text = statusPresentation.text
 
         if state.isSteamConnected {
-            steamCardTitleLabel.text = "Steam 연동됨"
+            steamCardTitleLabel.text = L10n.Library.Steam.Title.connected
             steamLastSyncLabel.text = lastSyncText(for: state)
             if state.isSyncingOwnedSteamLibrary {
-                steamCardMessageLabel.text = "최근 플레이와 보유 게임을 새로 가져오는 중이에요."
+                steamCardMessageLabel.text = L10n.Library.Steam.Message.syncing
             } else {
-                steamCardMessageLabel.text = "최근 플레이, 보유 게임, 리뷰 후보를 자동으로 정리해 더 개인적인 라이브러리를 완성할 수 있어요."
+                steamCardMessageLabel.text = L10n.Library.Steam.Message.connected
             }
             var configuration = steamPrimaryButton.configuration
-            configuration?.title = state.isSyncingOwnedSteamLibrary ? "가져오는 중..." : "보관함 동기화"
+            configuration?.title = state.isSyncingOwnedSteamLibrary ? L10n.Library.Steam.Button.syncing : L10n.Library.Steam.Button.sync
             configuration?.showsActivityIndicator = state.isSyncingOwnedSteamLibrary
             steamPrimaryButton.configuration = configuration
             steamPrimaryButton.isEnabled = state.steamLinkStatus.canSync && !state.isSyncingOwnedSteamLibrary
@@ -416,7 +416,7 @@ final class LibraryRootView: UIView {
             var secondaryConfiguration = UIButton.Configuration.plain()
             secondaryConfiguration.baseForegroundColor = .systemRed
             secondaryConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
-            secondaryConfiguration.title = "연결 해제"
+            secondaryConfiguration.title = L10n.Library.Steam.Button.disconnect
             secondaryConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
                 var attributes = attributes
                 attributes.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
@@ -427,11 +427,11 @@ final class LibraryRootView: UIView {
             steamSecondaryButton.isEnabled = state.steamLinkStatus.canDisconnect && !state.isUnlinkingSteamAccount
             steamSecondaryButton.alpha = steamSecondaryButton.isEnabled ? 1.0 : 0.6
         } else {
-            steamCardTitleLabel.text = "Steam 연동 안내"
-            steamLastSyncLabel.text = "Steam 계정을 연결하면 자동 정리를 시작할 수 있어요"
-            steamCardMessageLabel.text = "최근 플레이, 보유 게임, 리뷰 후보를 자동으로 정리해 더 개인적인 라이브러리를 완성할 수 있어요."
+            steamCardTitleLabel.text = L10n.Library.Steam.Title.guide
+            steamLastSyncLabel.text = L10n.Library.Steam.Message.guide
+            steamCardMessageLabel.text = L10n.Library.Steam.Message.connected
             var configuration = steamPrimaryButton.configuration
-            configuration?.title = "Steam 연결"
+            configuration?.title = L10n.Library.Steam.Button.connect
             configuration?.showsActivityIndicator = false
             steamPrimaryButton.configuration = configuration
             steamPrimaryButton.isEnabled = true
@@ -442,33 +442,35 @@ final class LibraryRootView: UIView {
 
     private func lastSyncText(for state: LibraryState) -> String {
         guard let lastSteamSyncAt = state.steamLinkStatus.lastSteamSyncAt else {
-            return "마지막 동기화: 아직 기록이 없어요"
+            return L10n.Library.Steam.LastSync.none
         }
 
         if abs(lastSteamSyncAt.timeIntervalSinceNow) < 60 {
-            return "마지막 동기화: 방금 전"
+            return L10n.Common.Format.lastSync(L10n.Common.Time.justNow)
         }
 
         let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.unitsStyle = .short
-        return "마지막 동기화: \(formatter.localizedString(for: lastSteamSyncAt, relativeTo: Date()))"
+        formatter.locale = .current
+        formatter.unitsStyle = .full
+        return L10n.Common.Format.lastSync(
+            formatter.localizedString(for: lastSteamSyncAt, relativeTo: Date())
+        )
     }
 
     private func steamStatusPresentation(for state: LibraryState) -> (text: String, color: UIColor) {
         if state.isSyncingOwnedSteamLibrary || state.steamSyncStatus == .syncing {
-            return ("동기화 중", .gpPrimary)
+            return (L10n.Library.Steam.Status.syncing, .gpPrimary)
         }
 
         if state.steamSyncErrorCode != nil || state.steamSyncStatus == .failed || state.steamSyncStatus == .privateProfile || state.steamSyncStatus == .tokenExpired {
-            return ("오류", .systemRed)
+            return (L10n.Library.Steam.Status.error, .systemRed)
         }
 
         if state.isSteamConnected {
-            return ("연동됨", .systemGreen)
+            return (L10n.Library.Steam.Status.connected, .systemGreen)
         }
 
-        return ("미연동", .gpTextTertiary)
+        return (L10n.Library.Steam.Status.disconnected, .gpTextTertiary)
     }
 
     private func summaryMetrics(for state: LibraryState) -> LibrarySummaryMetrics {
@@ -491,17 +493,17 @@ final class LibraryRootView: UIView {
         switch summaryState.primaryValueKind {
         case .hours:
             if summaryState.primaryValue.rounded(.towardZero) == summaryState.primaryValue {
-                return "\(Self.numberFormatter.string(from: NSNumber(value: Int(summaryState.primaryValue))) ?? "\(Int(summaryState.primaryValue))")h"
+                return "\(LocalizedNumberFormatter.integer(Int(summaryState.primaryValue)))h"
             }
-            return "\(String(format: "%.1f", summaryState.primaryValue))h"
+            return "\(LocalizedNumberFormatter.oneFraction(summaryState.primaryValue))h"
         case .count:
-            return Self.numberFormatter.string(from: NSNumber(value: Int(summaryState.primaryValue))) ?? "\(Int(summaryState.primaryValue))"
+            return LocalizedNumberFormatter.integer(Int(summaryState.primaryValue))
         }
     }
 
     private func formattedAverageRatingText(_ rating: Double?, reviewCount: Int) -> String {
         guard reviewCount > 0, let rating, rating.isFinite else { return "—" }
-        return String(format: "%.1f", rating)
+        return LocalizedNumberFormatter.oneFraction(rating)
     }
 
     private func logSummaryMetrics(_ summaryMetrics: LibrarySummaryMetrics, for state: LibraryState) {

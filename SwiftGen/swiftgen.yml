@@ -1,0 +1,10 @@
+strings:
+  inputs:
+    - GamePedia/Resources/Localization
+  filter: '.*\.lproj/Localizable\.(strings|stringsdict)$'
+  outputs:
+    - templateName: structured-swift5
+      output: GamePedia/Shared/Localization/L10n.swift
+      params:
+        enumName: L10n
+        publicAccess: false

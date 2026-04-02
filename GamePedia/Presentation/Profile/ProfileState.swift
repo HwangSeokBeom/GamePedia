@@ -48,10 +48,10 @@ struct ProfileState {
     var steamConnectionSubtitle: String {
         if let displayName = steamLinkStatus.displayName,
            displayName.isEmpty == false {
-            return "\(displayName) · 자동 동기화 활성화됨"
+            return L10n.tr("Localizable", "profile.steam.connectedStatus", displayName)
         }
 
-        return "자동 동기화 활성화됨"
+        return L10n.tr("Localizable", "profile.steam.autoSyncEnabled")
     }
 
     var displayName: String? { authenticatedUser?.nickname }
@@ -97,6 +97,6 @@ struct ProfileState {
     }
 
     func resolvedTitle(for game: RecentGame) -> String {
-        translatedRecentGameTitles[game.gameId] ?? game.resolvedTitle
+        game.title
     }
 }

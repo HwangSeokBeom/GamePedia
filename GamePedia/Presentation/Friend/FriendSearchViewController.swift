@@ -61,7 +61,7 @@ final class FriendSearchViewModel {
             } catch {
                 await MainActor.run {
                     self.state.isLoading = false
-                    self.state.errorMessage = "친구를 찾지 못했어요."
+                    self.state.errorMessage = L10n.Friend.Search.loadFailed
                     self.state.results = []
                 }
             }
@@ -84,7 +84,7 @@ final class FriendSearchViewModel {
                         print("[FriendSearch] sendFriendRequest conflict userId=\(userID) mappedStatus=\(relationshipStatus.rawValue)")
                         return
                     }
-                    self.state.errorMessage = "친구 요청을 보내지 못했어요."
+                    self.state.errorMessage = L10n.Friend.Search.requestFailed
                 }
             }
         }
@@ -137,7 +137,7 @@ final class FriendSearchViewController: BaseViewController<UIView, FriendSearchS
     init(viewModel: FriendSearchViewModel = FriendSearchViewModel()) {
         self.viewModel = viewModel
         super.init(rootView: UIView())
-        navigationItem.title = "친구 찾기"
+        navigationItem.title = L10n.Friend.Search.title
         navigationItem.largeTitleDisplayMode = .never
     }
 
@@ -159,13 +159,13 @@ final class FriendSearchViewController: BaseViewController<UIView, FriendSearchS
         results = state.results
         tableView.reloadData()
         emptyLabel.isHidden = state.isLoading || !state.results.isEmpty
-        emptyLabel.text = state.errorMessage ?? (state.keyword.isEmpty ? "닉네임으로 친구를 찾아보세요" : "검색 결과가 없어요")
+        emptyLabel.text = state.errorMessage ?? (state.keyword.isEmpty ? L10n.Friend.Search.prompt : L10n.Search.Empty.noResults)
         state.isLoading ? loadingIndicatorView.startAnimating() : loadingIndicatorView.stopAnimating()
     }
 
     private func setup() {
         rootView.backgroundColor = .gpBackground
-        searchBar.placeholder = "닉네임으로 검색"
+        searchBar.placeholder = L10n.Friend.Search.placeholder
         searchBar.searchBarStyle = .minimal
         searchBar.translatesAutoresizingMaskIntoConstraints = false
         searchBar.delegate = self
@@ -230,13 +230,13 @@ final class FriendSearchViewController: BaseViewController<UIView, FriendSearchS
     private func actionConfiguration(for user: FriendUserSummary) -> FriendUserCell.ActionConfiguration? {
         switch user.relationshipStatus {
         case .none:
-            return .init(title: "친구 추가", style: .primary, isEnabled: true)
+            return .init(title: L10n.Friend.Action.add, style: .primary, isEnabled: true)
         case .outgoing:
-            return .init(title: "요청됨", style: .secondary, isEnabled: false)
+            return .init(title: L10n.Friend.Action.requested, style: .secondary, isEnabled: false)
         case .friends:
-            return .init(title: "친구", style: .secondary, isEnabled: false)
+            return .init(title: L10n.Friend.Action.friend, style: .secondary, isEnabled: false)
         case .incoming:
-            return .init(title: "받은 요청 있음", style: .secondary, isEnabled: false)
+            return .init(title: L10n.Friend.Action.receivedRequestExists, style: .secondary, isEnabled: false)
         case .self:
             return nil
         }
@@ -244,7 +244,7 @@ final class FriendSearchViewController: BaseViewController<UIView, FriendSearchS
 
     private func subtitleText(for user: FriendUserSummary) -> String? {
         if let recentPlayTitle = user.recentPlayTitle, !recentPlayTitle.isEmpty {
-            return "최근 플레이: \(recentPlayTitle)"
+            return L10n.Friend.Search.recentPlay(recentPlayTitle)
         }
 
         if let bio = user.bio, !bio.isEmpty {
@@ -253,11 +253,11 @@ final class FriendSearchViewController: BaseViewController<UIView, FriendSearchS
 
         switch user.relationshipStatus {
         case .friends:
-            return "이미 친구예요"
+            return L10n.Friend.Search.alreadyFriends
         case .outgoing:
-            return "친구 요청을 보냈어요"
+            return L10n.Friend.Search.requestSent
         case .incoming:
-            return "받은 친구 요청이 있어요"
+            return L10n.Friend.Search.receivedRequest
         case .none, .self:
             return nil
         }

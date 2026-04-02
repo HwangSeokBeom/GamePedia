@@ -556,7 +556,7 @@ struct RecentGameDTO: Decodable {
             igdbGameId = nestedGame.id ?? nestedGame.igdbGameId
             externalGameId = nestedGame.externalGameId
             detailAvailable = nestedGame.detailAvailable
-            title = nestedGame.name ?? nestedGame.title ?? "이름 없는 게임"
+            title = nestedGame.name ?? nestedGame.title ?? L10n.tr("Localizable", "common.label.untitledGame")
             titleKo = nestedGame.titleKo
             translatedTitle = nestedGame.translatedTitle
             coverImageUrl = nestedGame.coverImageUrl ?? nestedGame.coverUrl ?? ""
@@ -572,7 +572,7 @@ struct RecentGameDTO: Decodable {
             detailAvailable = try? container.decodeIfPresent(Bool.self, forKey: .detailAvailable)
             title = (try? container.decodeIfPresent(String.self, forKey: .title)) ??
                 (try? container.decodeIfPresent(String.self, forKey: .name)) ??
-                "이름 없는 게임"
+                L10n.tr("Localizable", "common.label.untitledGame")
             titleKo = try? container.decodeIfPresent(String.self, forKey: .titleKo)
             translatedTitle = try? container.decodeIfPresent(String.self, forKey: .translatedTitle)
             coverImageUrl = (try? container.decodeIfPresent(String.self, forKey: .coverImageUrl)) ??

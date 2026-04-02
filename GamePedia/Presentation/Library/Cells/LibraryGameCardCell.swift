@@ -137,7 +137,7 @@ final class LibraryGameCardCell: UICollectionViewCell {
             ratingLabel.isHidden = false
             ratingLabel.textColor = .gpStar
         } else {
-            ratingLabel.text = "평가 없음"
+            ratingLabel.text = L10n.Common.Label.noRating
             ratingLabel.isHidden = false
             ratingLabel.textColor = .gpTextTertiary
         }

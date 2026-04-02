@@ -58,28 +58,28 @@ enum LibrarySectionKind: Int, CaseIterable, Hashable {
     var title: String {
         switch self {
         case .recentlyPlayed:
-            return "최근 플레이한 게임"
+            return L10n.Library.Section.recentlyPlayedGames
         case .playing:
-            return "플레이 중인 게임"
+            return L10n.Library.Section.playing
         case .owned:
-            return "보유 게임"
+            return L10n.Library.Section.owned
         case .playtimeRecommendations:
-            return "플레이 시간 기반 추천"
+            return L10n.Library.Section.playtimeRecommendations
         case .friendRecommendations:
-            return "친구 기반 추천"
+            return L10n.Library.Section.friendRecommendations
         case .wishlist:
-            return "찜한 게임"
+            return L10n.Library.Section.wishlist
         case .reviewed:
-            return "최근 평가한 게임"
+            return L10n.Library.Section.recentlyReviewed
         }
     }
 
     var subtitle: String? {
         switch self {
         case .recentlyPlayed:
-            return "플레이 기록과 취향이 드러나는 타이틀을 중심으로 정리했어요."
+            return L10n.Library.Subtitle.recentlyPlayed
         case .playtimeRecommendations:
-            return "오래 몰입한 패턴과 비슷한 좋아할 만한 작품을 골랐어요."
+            return L10n.Library.Subtitle.playtimeRecommendations
         case .reviewed:
             return nil
         case .playing:

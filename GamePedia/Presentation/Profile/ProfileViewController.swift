@@ -55,7 +55,7 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
 
     private func configureNavigationItem() {
         UIView.performWithoutAnimation {
-            navigationItem.title = "프로필"
+            navigationItem.title = L10n.Profile.Navigation.title
             navigationItem.largeTitleDisplayMode = .never
             navigationItem.rightBarButtonItem = UIBarButtonItem(
                 image: UIImage(systemName: "gearshape.fill"),
@@ -87,9 +87,9 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
         rootView.playedStatView.accessibilityTraits.insert(.button)
         rootView.reviewStatView.accessibilityTraits.insert(.button)
         rootView.wishlistStatView.accessibilityTraits.insert(.button)
-        rootView.playedStatView.accessibilityLabel = "플레이한 게임"
-        rootView.reviewStatView.accessibilityLabel = "작성한 리뷰"
-        rootView.wishlistStatView.accessibilityLabel = "찜한 게임"
+        rootView.playedStatView.accessibilityLabel = L10n.Profile.Stat.playedGames
+        rootView.reviewStatView.accessibilityLabel = L10n.Profile.Stat.writtenReviews
+        rootView.wishlistStatView.accessibilityLabel = L10n.Profile.Stat.wishlistedGames
     }
 
     // MARK: ViewModel Binding
@@ -212,28 +212,28 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     }
 
     @objc private func didTapFriendsList() {
-        let alertController = UIAlertController(title: "친구 관리", message: nil, preferredStyle: .actionSheet)
+        let alertController = UIAlertController(title: L10n.Profile.Social.friendManagement, message: nil, preferredStyle: .actionSheet)
         alertController.addAction(
-            UIAlertAction(title: "친구 목록", style: .default) { [weak self] _ in
+            UIAlertAction(title: L10n.Profile.Action.friendsList, style: .default) { [weak self] _ in
                 self?.viewModel.send(.didTapFriendsList)
             }
         )
         alertController.addAction(
-            UIAlertAction(title: "Steam 친구", style: .default) { [weak self] _ in
+            UIAlertAction(title: L10n.Profile.Action.steamFriends, style: .default) { [weak self] _ in
                 self?.viewModel.send(.didTapSteamFriends)
             }
         )
         alertController.addAction(
-            UIAlertAction(title: "친구 요청", style: .default) { [weak self] _ in
+            UIAlertAction(title: L10n.Profile.Action.friendRequests, style: .default) { [weak self] _ in
                 self?.viewModel.send(.didTapFriendRequests)
             }
         )
         alertController.addAction(
-            UIAlertAction(title: "친구 찾기", style: .default) { [weak self] _ in
+            UIAlertAction(title: L10n.Profile.Action.findFriends, style: .default) { [weak self] _ in
                 self?.viewModel.send(.didTapFriendSearch)
             }
         )
-        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
 
         if let popoverPresentationController = alertController.popoverPresentationController {
             popoverPresentationController.sourceView = rootView
@@ -286,13 +286,13 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
 
     @objc private func didTapLogout() {
         let alertController = UIAlertController(
-            title: "로그아웃",
-            message: "현재 기기에서 로그인 상태가 해제됩니다.",
+            title: L10n.Profile.Action.logout,
+            message: L10n.Profile.Settings.logoutMessage,
             preferredStyle: .alert
         )
-        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
         alertController.addAction(
-            UIAlertAction(title: "로그아웃", style: .destructive) { [weak self] _ in
+            UIAlertAction(title: L10n.Profile.Action.logout, style: .destructive) { [weak self] _ in
                 self?.viewModel.send(.didTapLogout)
             }
         )
@@ -301,13 +301,13 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
 
     @objc private func didTapDeleteAccount() {
         let alertController = UIAlertController(
-            title: "회원 탈퇴",
-            message: "회원 탈퇴 시 계정과 프로필 정보가 삭제되며 복구할 수 없습니다. 법령상 보관이 필요한 정보는 관련 법령에 따라 별도 보관될 수 있습니다.",
+            title: L10n.Profile.Action.deleteAccount,
+            message: L10n.Profile.Settings.deleteMessage,
             preferredStyle: .alert
         )
-        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
         alertController.addAction(
-            UIAlertAction(title: "회원 탈퇴", style: .destructive) { [weak self] _ in
+            UIAlertAction(title: L10n.Profile.Action.deleteAccount, style: .destructive) { [weak self] _ in
                 self?.viewModel.send(.didTapDeleteAccount)
             }
         )
@@ -316,13 +316,13 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
 
     @objc private func didTapSteamUnlink() {
         let alertController = UIAlertController(
-            title: "Steam 연동을 해제할까요?",
-            message: "연동을 해제하면 Steam에서 가져온 최근 플레이 및 보유 게임 연결 정보가 더 이상 동기화되지 않아요.",
+            title: L10n.Profile.Alert.steamUnlinkTitle,
+            message: L10n.Profile.Alert.steamUnlinkMessage,
             preferredStyle: .alert
         )
-        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
         alertController.addAction(
-            UIAlertAction(title: "연동 해제", style: .destructive) { [weak self] _ in
+            UIAlertAction(title: L10n.Profile.Action.unlinkSteam, style: .destructive) { [weak self] _ in
                 self?.viewModel.send(.didTapSteamUnlink)
             }
         )
@@ -338,8 +338,8 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     }
 
     private func showErrorAlert(message: String) {
-        let alert = UIAlertController(title: "오류", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        let alert = UIAlertController(title: L10n.Common.Error.title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default))
         present(alert, animated: true)
     }
 
@@ -434,11 +434,11 @@ extension ProfileViewController: UITableViewDataSource, UITableViewDelegate {
 private extension ProfileViewController {
     func presentUnavailableDetailAlert() {
         let alert = UIAlertController(
-            title: "안내",
-            message: "게임 상세 정보를 아직 불러올 수 없어요.",
+            title: L10n.tr("Localizable", "profile.alert.detailUnavailableTitle"),
+            message: L10n.tr("Localizable", "profile.alert.detailUnavailableMessage"),
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        alert.addAction(UIAlertAction(title: L10n.tr("Localizable", "common.button.ok"), style: .default))
         present(alert, animated: true)
     }
 }

@@ -26,9 +26,9 @@ struct SteamLinkCallbackResult: Equatable {
             return nil
         case .failed:
             return normalizedMessage
-                ?? "Steam 연동을 완료하지 못했어요. 잠시 후 다시 시도해주세요."
+                ?? L10n.tr("Localizable", "library.steam.callback.failed")
         case .cancelled:
-            return normalizedMessage ?? "Steam 연동이 취소되었어요."
+            return normalizedMessage ?? L10n.tr("Localizable", "library.steam.callback.cancelled")
         }
     }
 

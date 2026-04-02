@@ -23,7 +23,7 @@ final class HomeCoordinator {
     init() {
         navigationController = UINavigationController()
         navigationController.tabBarItem = UITabBarItem(
-            title: "홈",
+            title: L10n.Home.Tab.title,
             image: UIImage(systemName: "house"),
             selectedImage: UIImage(systemName: "house.fill")
         )
@@ -76,7 +76,7 @@ final class HomeCoordinator {
         }
         detailVC.onShare = { [weak self] game in
             guard let topVC = self?.navigationController.topViewController else { return }
-            let items: [Any] = ["\(game.displayTitle) — GamePedia에서 확인해보세요!"]
+            let items: [Any] = [L10n.tr("Localizable", "common.share.gameInvitation", game.displayTitle)]
             let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
             topVC.present(activityVC, animated: true)
         }

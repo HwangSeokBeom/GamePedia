@@ -227,7 +227,12 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
 
     private func logRecentPlayDecode(screen: String, items: [LibraryGameItemDTO]) {
         items.forEach { item in
-            let title = item.originalTitle ?? item.originalName ?? item.gameName ?? item.title ?? item.name ?? "이름 없는 게임"
+            let title = item.originalTitle
+                ?? item.originalName
+                ?? item.gameName
+                ?? item.title
+                ?? item.name
+                ?? L10n.tr("Localizable", "common.label.untitledGame")
             print(
                 "[RecentPlayDecode] " +
                 "screen=\(screen) " +

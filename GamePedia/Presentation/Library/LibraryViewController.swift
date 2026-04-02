@@ -58,8 +58,8 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         if let errorMessage = state.errorMessage,
            errorMessage != lastPresentedErrorMessage {
             lastPresentedErrorMessage = errorMessage
-            let alert = UIAlertController(title: "오류", message: errorMessage, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "확인", style: .default))
+            let alert = UIAlertController(title: L10n.Common.Error.title, message: errorMessage, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default))
             present(alert, animated: true)
         } else if state.errorMessage == nil {
             lastPresentedErrorMessage = nil
@@ -91,7 +91,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
 
     private func configureNavigationItem() {
         UIView.performWithoutAnimation {
-            navigationItem.title = "내 라이브러리"
+            navigationItem.title = L10n.Library.Navigation.title
             navigationItem.largeTitleDisplayMode = .never
         }
     }
@@ -306,12 +306,12 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
 
     private func presentRemoveFavoriteAlert(identifier: LibraryGameIdentifier, title: String) {
         let alert = UIAlertController(
-            title: "찜을 해제할까요?",
-            message: "\"\(title)\"을 찜한 게임 목록에서 제거합니다.",
+            title: L10n.Library.Alert.removeFavoriteTitle,
+            message: L10n.Library.Alert.removeFavoriteMessage(title),
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
-        alert.addAction(UIAlertAction(title: "삭제", style: .destructive) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
+        alert.addAction(UIAlertAction(title: L10n.Common.Button.delete, style: .destructive) { [weak self] _ in
             self?.viewModel.send(.didConfirmRemoveFavorite(identifier))
         })
         present(alert, animated: true)
@@ -364,12 +364,12 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
 
     private func presentSteamUnlinkConfirmationAlert() {
         let alert = UIAlertController(
-            title: "Steam 연동을 해제할까요?",
-            message: "연동을 해제하면 Steam에서 가져온 최근 플레이 및 보유 게임 연결 정보가 더 이상 동기화되지 않아요.",
+            title: L10n.Profile.Alert.steamUnlinkTitle,
+            message: L10n.Profile.Alert.steamUnlinkMessage,
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
-        alert.addAction(UIAlertAction(title: "연동 해제", style: .destructive) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
+        alert.addAction(UIAlertAction(title: L10n.Library.Steam.Button.disconnect, style: .destructive) { [weak self] _ in
             self?.viewModel.send(.unlinkSteamConfirmed)
         })
         present(alert, animated: true)
@@ -382,7 +382,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
             message: messageComponents.joined(separator: "\n\n"),
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "확인", style: .default) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default) { [weak self] _ in
             self?.viewModel.send(.didConsumeSteamConnectionOnboarding)
         })
         present(alert, animated: true)
@@ -617,7 +617,7 @@ private final class LibrarySectionHeaderReusableView: UICollectionReusableView {
 
     private let seeMoreButton: UIButton = {
         var config = UIButton.Configuration.plain()
-        config.title = "더보기"
+        config.title = L10n.Common.Button.seeAll
         config.baseForegroundColor = .gpPrimary
         config.contentInsets = .zero
         let button = UIButton(configuration: config)

@@ -69,16 +69,16 @@ final class DefaultFriendRepository: FriendRepository {
                 FriendProfileReview(
                     id: reviewDTO.id,
                     gameID: Int(reviewDTO.gameId ?? ""),
-                    gameTitle: sanitized(reviewDTO.gameTitle) ?? "게임",
+                    gameTitle: sanitized(reviewDTO.gameTitle) ?? L10n.Friend.Fallback.game,
                     content: reviewDTO.content,
-                    ratingText: reviewDTO.rating.map { String(format: "%.1f", $0) },
+                    ratingText: reviewDTO.rating.map(LocalizedNumberFormatter.oneFraction),
                     createdAtText: reviewDTO.createdAt.toRelativeDateString()
                 )
             },
             friendRecommendations: (data.friendRecommendations ?? []).map { recommendationDTO in
                 FriendRecommendation(
                     game: GameMapper.toEntity(recommendationDTO.game),
-                    reasonText: sanitized(recommendationDTO.reason) ?? "나와 비슷한 친구가 눈여겨본 게임이에요"
+                    reasonText: sanitized(recommendationDTO.reason) ?? L10n.Friend.Recommendation.similarFriendNoticed
                 )
             },
             steamFriendsContext: mapSteamFriendsContext(data.steamFriendsContext)
@@ -117,7 +117,7 @@ final class DefaultFriendRepository: FriendRepository {
         return data.recommendations.map { recommendationDTO in
             FriendRecommendation(
                 game: GameMapper.toEntity(recommendationDTO.game),
-                reasonText: sanitized(recommendationDTO.reason) ?? "나와 비슷한 친구가 높게 평가했어요"
+                reasonText: sanitized(recommendationDTO.reason) ?? L10n.Friend.Recommendation.similarFriendHighlyRated
             )
         }
     }
@@ -173,7 +173,7 @@ final class DefaultFriendRepository: FriendRepository {
     private func mapRequest(_ dto: FriendRequestDTO, kind: FriendRequestListKind) -> FriendRequest {
         let fallbackUser = FriendUserDTO(
             id: "",
-            nickname: "알 수 없는 사용자",
+            nickname: L10n.Friend.Fallback.unknownUser,
             bio: nil,
             profileImageUrl: nil,
             friendshipStatus: nil,
@@ -231,7 +231,7 @@ final class DefaultFriendRepository: FriendRepository {
         guard let dto else { return nil }
         return FriendTasteSimilarity(
             percentage: dto.percentage,
-            summaryText: sanitized(dto.summary) ?? "비슷한 장르를 자주 즐겨요"
+            summaryText: sanitized(dto.summary) ?? L10n.Friend.Profile.tasteFallbackSummary
         )
     }
 
@@ -240,7 +240,7 @@ final class DefaultFriendRepository: FriendRepository {
         let similarityScore = dto.similarityScore.map { Int(($0 * 100).rounded()) }
         return FriendTasteProfile(
             similarityScore: similarityScore,
-            summaryText: sanitized(dto.summary) ?? "비슷한 장르를 자주 즐겨요",
+            summaryText: sanitized(dto.summary) ?? L10n.Friend.Profile.tasteFallbackSummary,
             topGenres: uniqueLabels(dto.topGenres),
             topTags: uniqueLabels(dto.topTags)
         )
@@ -272,7 +272,7 @@ final class DefaultFriendRepository: FriendRepository {
         guard let gameDTO else { return nil }
         return SharedFriendGame(
             game: GameMapper.toEntity(gameDTO),
-            reasonText: sanitized(dto.sharedReason) ?? "둘 다 최근 플레이했어요"
+            reasonText: sanitized(dto.sharedReason) ?? L10n.Friend.Recommendation.sharedRecentPlay
         )
     }
 
@@ -363,7 +363,9 @@ final class DefaultFriendRepository: FriendRepository {
     }
 
     private func mapFriendActivityGame(_ dto: FriendActivityGamePreviewDTO) -> Game {
-        let title = sanitized(dto.title) ?? sanitized(dto.gameName) ?? "이름 없는 게임"
+        let title = sanitized(dto.title)
+            ?? sanitized(dto.gameName)
+            ?? L10n.tr("Localizable", "common.label.untitledGame")
         let identifier = Int(dto.igdbGameId ?? "") ?? Int(dto.externalGameId ?? "") ?? 0
         let isSteam = sanitized(dto.gameSource)?.lowercased() == "steam"
         return Game(

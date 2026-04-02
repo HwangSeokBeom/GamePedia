@@ -178,7 +178,7 @@ final class ProfileViewModel {
                         }
 
                         if self.state.authenticatedUser == nil {
-                            self.apply(.setError(error.errorDescription ?? "프로필 정보를 불러오지 못했습니다."))
+                            self.apply(.setError(error.errorDescription ?? L10n.tr("Localizable", "profile.error.loadFailed")))
                         }
                     }
                 },
@@ -530,7 +530,7 @@ final class ProfileViewModel {
                         self.apply(
                             .setError(
                                 error.errorDescription
-                                ?? "회원 탈퇴를 처리하지 못했습니다. 잠시 후 다시 시도해주세요."
+                                ?? L10n.tr("Localizable", "profile.error.deleteAccountFailed")
                             )
                         )
                     }
@@ -611,7 +611,7 @@ final class ProfileViewModel {
                     LibraryCacheStore.shared.clear()
                     LibraryCacheStore.shared.clearSteamSyncDates()
                     self.apply(.setSteamLinkStatus(result.steamLinkStatus))
-                    self.apply(.setSuccessMessage("Steam 연동이 해제되었어요"))
+                    self.apply(.setSuccessMessage(L10n.tr("Localizable", "profile.success.unlinkSteam")))
                     NotificationCenter.default.post(
                         name: .steamLinkStateDidChange,
                         object: nil,
@@ -626,44 +626,14 @@ final class ProfileViewModel {
                         _ = self.handleProtectedSessionFailure(.unauthorized)
                         return
                     }
-                    self.apply(.setError(libraryError.errorDescription ?? "Steam 연동을 해제하지 못했어요."))
+                    self.apply(.setError(libraryError.errorDescription ?? L10n.tr("Localizable", "profile.error.unlinkSteamFailed")))
                 }
             }
         }
     }
 
     private func translateRecentGames(_ games: [RecentGame]) async -> [RecentGame] {
-        guard !games.isEmpty else { return games }
-
-        let titleItems = games.compactMap { game -> TranslationRequestItem? in
-            guard game.translatedTitle == nil else { return nil }
-            return TranslationRequestItem(
-                identifier: String(game.gameId),
-                field: "title",
-                text: game.title
-            )
-        }
-
-        guard !titleItems.isEmpty else { return games }
-
-        let results = await translateTextUseCase.execute(
-            items: titleItems,
-            context: "Profile.recentGames",
-            sourceLanguage: "en"
-        )
-        let translatedTitles: [Int: String] = Dictionary(
-            uniqueKeysWithValues: results.compactMap { result in
-                guard let gameIdentifier = Int(result.identifier) else { return nil }
-                return (gameIdentifier, result.translatedText)
-            }
-        )
-        await MainActor.run {
-            self.apply(.setTranslatedRecentGameTitles(translatedTitles))
-        }
-
-        return games.map { game in
-            game.replacingTranslated(translatedTitle: translatedTitles[game.gameId])
-        }
+        games
     }
 
     private func refreshSelectedBadges() {

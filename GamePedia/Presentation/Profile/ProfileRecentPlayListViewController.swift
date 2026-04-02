@@ -33,7 +33,7 @@ final class ProfileRecentPlayListViewController: UIViewController {
         label.textColor = .gpTextSecondary
         label.numberOfLines = 0
         label.textAlignment = .center
-        label.text = "최근 플레이한 게임이 아직 없어요"
+        label.text = L10n.Profile.Empty.noRecentPlayedGames
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -52,7 +52,7 @@ final class ProfileRecentPlayListViewController: UIViewController {
         super.viewDidLoad()
         print("[Profile] recentPlayList didLoad count=\(games.count)")
         view.backgroundColor = .gpBackground
-        navigationItem.title = "최근 플레이"
+        navigationItem.title = L10n.Profile.Section.recentPlay
         navigationItem.largeTitleDisplayMode = .never
 
         tableView.register(RecentPlayCell.self, forCellReuseIdentifier: RecentPlayCell.reuseId)
@@ -95,14 +95,14 @@ extension ProfileRecentPlayListViewController: UITableViewDataSource, UITableVie
             for: indexPath
         ) as! RecentPlayCell
         let game = games[indexPath.row]
-        let resolvedTitle = translatedTitles[game.gameId] ?? game.resolvedTitle
+        let resolvedTitle = game.title
         cell.configure(with: game, resolvedTitle: resolvedTitle)
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let game = games[indexPath.row]
-        let resolvedTitle = translatedTitles[game.gameId] ?? game.resolvedTitle
+        let resolvedTitle = game.title
         let resolvedGameId = game.resolvedDetailGameId
         let blockedReason: String?
         if game.detailAvailable == false {
@@ -141,11 +141,11 @@ extension ProfileRecentPlayListViewController: UITableViewDataSource, UITableVie
 private extension ProfileRecentPlayListViewController {
     func presentUnavailableDetailAlert() {
         let alert = UIAlertController(
-            title: "안내",
-            message: "게임 상세 정보를 아직 불러올 수 없어요.",
+            title: L10n.tr("Localizable", "profile.alert.detailUnavailableTitle"),
+            message: L10n.tr("Localizable", "profile.alert.detailUnavailableMessage"),
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        alert.addAction(UIAlertAction(title: L10n.tr("Localizable", "common.button.ok"), style: .default))
         present(alert, animated: true)
     }
 }

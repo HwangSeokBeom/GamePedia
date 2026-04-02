@@ -42,42 +42,42 @@ final class ProfileSettingsViewController: UIViewController {
     private let supportContainerView = ProfileSettingsViewController.makeSectionContainerView()
 
     private let privacySettingsButton = ProfileSettingsViewController.makeActionButton(
-        title: "공개 설정",
+        title: L10n.Profile.Action.socialPrivacy,
         systemImageName: "switch.2",
         tintColor: .gpTextPrimary
     )
     private let notificationSettingsButton = ProfileSettingsViewController.makeActionButton(
-        title: "알림 설정",
+        title: L10n.Profile.Action.notificationSettings,
         systemImageName: "bell.badge",
         tintColor: .gpTextPrimary
     )
     private let logoutButton = ProfileSettingsViewController.makeActionButton(
-        title: "로그아웃",
+        title: L10n.Profile.Action.logout,
         systemImageName: "rectangle.portrait.and.arrow.right",
         tintColor: .gpTextPrimary
     )
     private let deleteAccountButton = ProfileSettingsViewController.makeActionButton(
-        title: "회원 탈퇴",
+        title: L10n.Profile.Action.deleteAccount,
         systemImageName: "person.crop.circle.badge.minus",
         tintColor: .gpCoral
     )
     private let termsButton = ProfileSettingsViewController.makeActionButton(
-        title: "이용약관",
+        title: L10n.Profile.Action.terms,
         systemImageName: "doc.text",
         tintColor: .gpTextPrimary
     )
     private let privacyPolicyButton = ProfileSettingsViewController.makeActionButton(
-        title: "개인정보처리방침",
+        title: L10n.Profile.Action.privacyPolicy,
         systemImageName: "lock.shield",
         tintColor: .gpTextPrimary
     )
     private let communityGuidelinesButton = ProfileSettingsViewController.makeActionButton(
-        title: "커뮤니티 가이드라인",
+        title: L10n.Profile.Action.communityGuidelines,
         systemImageName: "person.2.wave.2",
         tintColor: .gpTextPrimary
     )
     private let contactSupportButton = ProfileSettingsViewController.makeActionButton(
-        title: "문의하기",
+        title: L10n.Profile.Action.contactSupport,
         systemImageName: "envelope",
         tintColor: .gpPrimary
     )
@@ -91,16 +91,16 @@ final class ProfileSettingsViewController: UIViewController {
 
     private func setupView() {
         view.backgroundColor = .gpBackground
-        navigationItem.title = "설정"
+        navigationItem.title = L10n.Profile.Settings.title
         navigationItem.largeTitleDisplayMode = .never
 
         [accountHeaderView, serviceHeaderView, supportHeaderView].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
 
-        accountHeaderView.configure(title: "계정", showSeeMore: false)
-        serviceHeaderView.configure(title: "서비스", showSeeMore: false)
-        supportHeaderView.configure(title: "지원", showSeeMore: false)
+        accountHeaderView.configure(title: L10n.Profile.Settings.account, showSeeMore: false)
+        serviceHeaderView.configure(title: L10n.Profile.Settings.service, showSeeMore: false)
+        supportHeaderView.configure(title: L10n.Profile.Settings.support, showSeeMore: false)
 
         [scrollView].forEach { view.addSubview($0) }
         [contentView].forEach { scrollView.addSubview($0) }
@@ -204,13 +204,13 @@ final class ProfileSettingsViewController: UIViewController {
     @objc
     private func didTapLogout() {
         let alertController = UIAlertController(
-            title: "로그아웃",
-            message: "현재 기기에서 로그인 상태가 해제됩니다.",
+            title: L10n.Profile.Action.logout,
+            message: L10n.Profile.Settings.logoutMessage,
             preferredStyle: .alert
         )
-        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
         alertController.addAction(
-            UIAlertAction(title: "로그아웃", style: .destructive) { [weak self] _ in
+            UIAlertAction(title: L10n.Profile.Action.logout, style: .destructive) { [weak self] _ in
                 self?.onLogoutConfirmed?()
             }
         )
@@ -220,13 +220,13 @@ final class ProfileSettingsViewController: UIViewController {
     @objc
     private func didTapDeleteAccount() {
         let alertController = UIAlertController(
-            title: "회원 탈퇴",
-            message: "회원 탈퇴 시 계정과 프로필 정보가 삭제되며 복구할 수 없습니다. 법령상 보관이 필요한 정보는 관련 법령에 따라 별도 보관될 수 있습니다.",
+            title: L10n.Profile.Action.deleteAccount,
+            message: L10n.Profile.Settings.deleteMessage,
             preferredStyle: .alert
         )
-        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
         alertController.addAction(
-            UIAlertAction(title: "회원 탈퇴", style: .destructive) { [weak self] _ in
+            UIAlertAction(title: L10n.Profile.Action.deleteAccount, style: .destructive) { [weak self] _ in
                 self?.onDeleteAccountConfirmed?()
             }
         )

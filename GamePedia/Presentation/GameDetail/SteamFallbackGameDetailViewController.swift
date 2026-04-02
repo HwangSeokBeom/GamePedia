@@ -9,7 +9,7 @@ final class SteamFallbackGameDetailViewController: BaseViewController<SteamFallb
         super.init(rootView: SteamFallbackGameDetailRootView())
         NavigationBarStyler.apply(.opaque, to: navigationItem, buttonTintColor: .gpPrimary)
         navigationItem.largeTitleDisplayMode = .never
-        navigationItem.title = "게임 상세"
+        navigationItem.title = L10n.tr("Localizable", "detail.navigation.title")
     }
 
     override func viewDidLoad() {

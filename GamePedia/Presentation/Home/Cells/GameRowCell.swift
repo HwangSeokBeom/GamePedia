@@ -183,7 +183,7 @@ final class GameRowCell: UICollectionViewCell {
         if game.releaseYear > 0 {
             return "\(game.releaseYear)"
         }
-        return "출시 예정"
+        return L10n.tr("Localizable", "common.status.upcoming")
     }
 
     private func makeWishlistConfiguration(isWishlisted: Bool) -> UIButton.Configuration {
@@ -193,7 +193,7 @@ final class GameRowCell: UICollectionViewCell {
             weight: .semibold
         )
 
-        configuration.title = isWishlisted ? "찜됨" : "찜하기"
+        configuration.title = isWishlisted ? L10n.Detail.Button.favorited : L10n.Detail.Button.favorite
         configuration.image = UIImage(
             systemName: isWishlisted ? "bookmark.fill" : "bookmark",
             withConfiguration: symbolConfiguration

@@ -8,19 +8,19 @@ enum SocialPrivacySettingItem: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .friendsList: return "친구 목록 공개"
-        case .recentPlay: return "최근 플레이 공개"
-        case .likedGames: return "찜한 게임 공개"
-        case .reviews: return "리뷰 공개"
+        case .friendsList: return L10n.Profile.Privacy.friendsListTitle
+        case .recentPlay: return L10n.Profile.Privacy.recentPlayTitle
+        case .likedGames: return L10n.Profile.Privacy.likedGamesTitle
+        case .reviews: return L10n.Profile.Privacy.reviewsTitle
         }
     }
 
     var subtitle: String {
         switch self {
-        case .friendsList: return "다른 사용자가 내 친구 관계를 볼 수 있어요."
-        case .recentPlay: return "친구가 최근 플레이한 게임을 확인할 수 있어요."
-        case .likedGames: return "프로필에서 찜한 게임 목록을 보여줘요."
-        case .reviews: return "작성한 리뷰를 친구가 둘러볼 수 있어요."
+        case .friendsList: return L10n.Profile.Privacy.friendsListSubtitle
+        case .recentPlay: return L10n.Profile.Privacy.recentPlaySubtitle
+        case .likedGames: return L10n.Profile.Privacy.likedGamesSubtitle
+        case .reviews: return L10n.Profile.Privacy.reviewsSubtitle
         }
     }
 }
@@ -86,7 +86,7 @@ final class SocialPrivacySettingsViewModel {
             } catch {
                 await MainActor.run {
                     self.state.isLoading = false
-                    self.state.errorMessage = "공개 설정을 불러오지 못했어요."
+                    self.state.errorMessage = L10n.Profile.Privacy.loadFailed
                 }
             }
         }
@@ -121,7 +121,7 @@ final class SocialPrivacySettingsViewModel {
                 await MainActor.run {
                     self.state.isSaving = false
                     self.state.settings = currentSettings
-                    self.state.errorMessage = "공개 설정을 저장하지 못했어요."
+                    self.state.errorMessage = L10n.Profile.Privacy.saveFailed
                 }
             }
         }
@@ -136,12 +136,12 @@ final class SocialPrivacySettingsViewModel {
                 try await importSteamFriendsUseCase.execute()
                 await MainActor.run {
                     self.state.isImportingSteamFriends = false
-                    self.state.successMessage = "Steam 친구 정보를 불러오고 있어요."
+                    self.state.successMessage = L10n.Profile.Privacy.importSuccess
                 }
             } catch {
                 await MainActor.run {
                     self.state.isImportingSteamFriends = false
-                    self.state.errorMessage = "Steam 친구 정보를 불러오지 못했어요."
+                    self.state.errorMessage = L10n.Profile.Privacy.importFailed
                 }
             }
         }
@@ -159,7 +159,7 @@ final class SocialPrivacySettingsViewController: BaseViewController<UIView, Soci
     init(viewModel: SocialPrivacySettingsViewModel = SocialPrivacySettingsViewModel()) {
         self.viewModel = viewModel
         super.init(rootView: UIView())
-        navigationItem.title = "공개 설정"
+        navigationItem.title = L10n.Profile.Action.socialPrivacy
         navigationItem.largeTitleDisplayMode = .never
     }
 
@@ -183,7 +183,7 @@ final class SocialPrivacySettingsViewController: BaseViewController<UIView, Soci
            successMessage != lastPresentedSuccessMessage {
             lastPresentedSuccessMessage = successMessage
             let alert = UIAlertController(title: nil, message: successMessage, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "확인", style: .default) { [weak self] _ in
+            alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default) { [weak self] _ in
                 self?.viewModel.send(.didConsumeSuccessMessage)
             })
             present(alert, animated: true)
@@ -212,7 +212,7 @@ final class SocialPrivacySettingsViewController: BaseViewController<UIView, Soci
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
 
         var retryConfiguration = UIButton.Configuration.plain()
-        retryConfiguration.title = "다시 시도"
+        retryConfiguration.title = L10n.Common.Button.retry
         retryConfiguration.baseForegroundColor = .gpPrimary
         retryButton.configuration = retryConfiguration
         retryButton.translatesAutoresizingMaskIntoConstraints = false
@@ -257,7 +257,7 @@ final class SocialPrivacySettingsViewController: BaseViewController<UIView, Soci
         footerView.backgroundColor = .clear
 
         var configuration = UIButton.Configuration.filled()
-        configuration.title = isImporting ? "불러오는 중..." : "Steam 친구 불러오기"
+        configuration.title = isImporting ? L10n.Profile.Privacy.importLoading : L10n.Profile.Privacy.importButton
         configuration.baseBackgroundColor = .gpPrimary
         configuration.baseForegroundColor = .gpOnPrimary
         configuration.cornerStyle = .large
@@ -272,7 +272,7 @@ final class SocialPrivacySettingsViewController: BaseViewController<UIView, Soci
         helperLabel.font = .systemFont(ofSize: 12)
         helperLabel.textColor = .gpTextSecondary
         helperLabel.numberOfLines = 2
-        helperLabel.text = "지원되는 경우 Steam 친구 기반 연결을 가져올 수 있어요."
+        helperLabel.text = L10n.Profile.Privacy.importHelper
         helperLabel.translatesAutoresizingMaskIntoConstraints = false
 
         footerView.addSubview(button)

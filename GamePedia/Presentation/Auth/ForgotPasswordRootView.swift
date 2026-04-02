@@ -3,8 +3,8 @@ import UIKit
 final class ForgotPasswordRootView: UIView {
 
     let emailFieldView = AuthInputFieldView(
-        title: "이메일",
-        placeholder: "가입한 이메일 입력",
+        title: L10n.tr("Localizable", "auth.field.email.title"),
+        placeholder: L10n.tr("Localizable", "auth.field.emailRegistered.placeholder"),
         systemImageName: "envelope"
     )
     let sendButton = UIButton(type: .system)
@@ -28,7 +28,7 @@ final class ForgotPasswordRootView: UIView {
         let baseDescriptor = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .title2)
         let descriptor = baseDescriptor.withDesign(.serif) ?? baseDescriptor
         label.font = UIFont(descriptor: descriptor, size: 26)
-        label.text = "비밀번호 찾기"
+        label.text = L10n.tr("Localizable", "auth.forgotPassword.title")
         label.textColor = .gpTextPrimary
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -36,7 +36,7 @@ final class ForgotPasswordRootView: UIView {
 
     private let subtitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "가입한 이메일을 입력하면 비밀번호 재설정 링크를 보내드려요."
+        label.text = L10n.tr("Localizable", "auth.forgotPassword.subtitle")
         label.font = .systemFont(ofSize: 13, weight: .medium)
         label.textColor = .gpTextSecondary
         label.numberOfLines = 0
@@ -85,7 +85,7 @@ final class ForgotPasswordRootView: UIView {
         [titleLabel, subtitleLabel, formCardView].forEach { contentView.addSubview($0) }
 
         let footerLabel = UILabel()
-        footerLabel.text = "이미 재설정 토큰이 있나요?"
+        footerLabel.text = L10n.tr("Localizable", "auth.forgotPassword.footer")
         footerLabel.font = .systemFont(ofSize: 12, weight: .medium)
         footerLabel.textColor = .gpTextSecondary
 
@@ -145,8 +145,8 @@ final class ForgotPasswordRootView: UIView {
     }
 
     private func configureControls() {
-        sendButton.configuration = makePrimaryButton(title: "재설정 링크 보내기")
-        resetPasswordButton.configuration = makeFooterButton(title: "직접 재설정")
+        sendButton.configuration = makePrimaryButton(title: L10n.tr("Localizable", "auth.forgotPassword.send"))
+        resetPasswordButton.configuration = makeFooterButton(title: L10n.tr("Localizable", "auth.forgotPassword.manualReset"))
     }
 
     private func makePrimaryButton(title: String) -> UIButton.Configuration {

@@ -372,19 +372,19 @@ final class LibraryViewModel {
         let message: String
         switch kind {
         case .recentlyPlayed:
-            message = "최근 플레이 정보를 불러오는 중..."
+            message = L10n.tr("Localizable", "library.sectionList.loading.recentlyPlayed")
         case .playing:
-            message = "플레이 중인 게임을 불러오는 중이에요."
+            message = L10n.tr("Localizable", "library.sectionList.loading.playing")
         case .owned:
-            message = "보유 게임 목록을 가져오는 중..."
+            message = L10n.tr("Localizable", "library.sectionList.loading.owned")
         case .playtimeRecommendations:
-            message = "플레이 성향 기반 추천을 불러오는 중이에요."
+            message = L10n.tr("Localizable", "library.sectionList.loading.playtimeRecommendations")
         case .friendRecommendations:
-            message = "친구 기반 추천을 불러오는 중이에요."
+            message = L10n.tr("Localizable", "library.sectionList.loading.friendRecommendations")
         case .wishlist:
-            message = "찜한 게임을 불러오는 중이에요."
+            message = L10n.tr("Localizable", "library.sectionList.loading.wishlist")
         case .reviewed:
-            message = "리뷰 작성함 목록을 불러오는 중이에요."
+            message = L10n.tr("Localizable", "library.sectionList.loading.reviewed")
         }
 
         return LibrarySectionViewState(
@@ -1291,7 +1291,7 @@ final class LibraryViewModel {
             )
 
             return LibraryTabSummaryState(
-                primaryTitle: "총 플레이",
+                primaryTitle: L10n.tr("Localizable", "library.summary.totalPlay"),
                 primaryValue: resolvedPrimaryValue,
                 primaryValueKind: .hours,
                 averageRating: resolvedAverageRating,
@@ -1312,7 +1312,7 @@ final class LibraryViewModel {
         )
 
         return LibraryTabSummaryState(
-            primaryTitle: "총 플레이",
+            primaryTitle: L10n.tr("Localizable", "library.summary.totalPlay"),
             primaryValue: derivedPrimaryValue,
             primaryValueKind: .hours,
             averageRating: derivedAverageRating,
@@ -1330,7 +1330,7 @@ final class LibraryViewModel {
         }
 
         return LibraryTabSummaryState(
-            primaryTitle: "찜한 게임",
+            primaryTitle: L10n.Library.Summary.wishlist,
             primaryValue: Double(uniqueLikedGames.count),
             primaryValueKind: .count,
             averageRating: averageRating(from: ratings),
@@ -1349,7 +1349,7 @@ final class LibraryViewModel {
         let uniqueReviewedGameCount = Set(state.reviews.map(\.gameId)).count
 
         return LibraryTabSummaryState(
-            primaryTitle: "작성한 리뷰",
+            primaryTitle: L10n.Library.Summary.reviewed,
             primaryValue: Double(reviewCount),
             primaryValueKind: .count,
             averageRating: reviewCount == 0 ? nil : averageRating(from: ratings),
@@ -1392,14 +1392,14 @@ final class LibraryViewModel {
                 "enrichmentStatus=\(summary.enrichmentStatus.rawValue)"
             )
             apply(.clearError)
-            apply(.setError("게임 상세 정보를 아직 불러올 수 없어요."))
+            apply(.setError(L10n.tr("Localizable", "common.alert.detailUnavailableMessage")))
             return
         }
 
         guard let gameID = identifier.detailGameID else {
             print("[Library] detailUnavailable identifier=\(identifier.uniqueKey)")
             apply(.clearError)
-            apply(.setError("게임 상세 정보를 아직 불러올 수 없어요."))
+            apply(.setError(L10n.tr("Localizable", "common.alert.detailUnavailableMessage")))
             return
         }
 
@@ -1545,7 +1545,7 @@ final class LibraryViewModel {
                         self.replacingSection(section, in: sections)
                     }
                     self.apply(.setSections(clearedSteamSections))
-                    self.apply(.setSuccessMessage("Steam 연동이 해제되었어요"))
+                    self.apply(.setSuccessMessage(L10n.tr("Localizable", "profile.success.unlinkSteam")))
                     NotificationCenter.default.post(
                         name: .steamLinkStateDidChange,
                         object: nil,
@@ -1565,7 +1565,7 @@ final class LibraryViewModel {
 
     private func showSteamPrivacyGuide(reason: String) {
         guard let settingsURL = SteamPrivacyGuideContent.settingsURL else {
-            apply(.setError("Steam 설정 페이지를 열 수 없어요. 잠시 후 다시 시도해주세요."))
+            apply(.setError(L10n.tr("Localizable", "library.error.steamOpenSettingsFailed")))
             return
         }
 
@@ -1579,7 +1579,7 @@ final class LibraryViewModel {
         guard state.isSteamConnected else {
             if trigger != .silentAutomatic {
                 apply(.clearError)
-                apply(.setError("Steam 계정을 먼저 연결해주세요."))
+                apply(.setError(L10n.tr("Localizable", "library.error.steamAccountNotLinked")))
             }
             return
         }
@@ -1588,7 +1588,7 @@ final class LibraryViewModel {
            let lastSuccessfulSteamSyncDate = libraryCacheStore.loadLastSuccessfulSteamSyncDate(),
            Date().timeIntervalSince(lastSuccessfulSteamSyncDate) < SteamSyncPolicy.debounceInterval {
             print("[Library] syncOwnedSteamLibrary skipped reason=debounced trigger=\(trigger.logName)")
-            apply(.setSuccessMessage("최근에 동기화를 완료했어요"))
+            apply(.setSuccessMessage(L10n.tr("Localizable", "library.success.recentlySynced")))
             return
         }
 
@@ -1642,7 +1642,7 @@ final class LibraryViewModel {
                     )
                     self.apply(.setSteamOwnedSyncErrorCode(nil))
                     if trigger.showsSuccessToast, !result.isRateLimitedIGDBEnrichmentPartialSuccess {
-                        self.apply(.setSuccessMessage("보관함이 최신 상태로 업데이트됨"))
+                        self.apply(.setSuccessMessage(L10n.tr("Localizable", "library.success.libraryUpdated")))
                     }
                     self.shouldForceOverviewReplacementAfterSteamSync = true
                     self.refreshLibraryAfterSteamSync()
@@ -1792,7 +1792,7 @@ final class LibraryViewModel {
         guard let summary = state.recentlyPlayed.first(where: { $0.identifier == identifier }) else {
             print("[Library] addToPlaying invalidItem reason=missingSummary identifier=\(identifier.uniqueKey)")
             apply(.clearError)
-            apply(.setError("게임 정보를 확인하지 못해 플레이 중 상태로 추가할 수 없어요."))
+            apply(.setError(L10n.tr("Localizable", "library.error.addToPlayingInvalidGame")))
             return
         }
 
@@ -1804,7 +1804,7 @@ final class LibraryViewModel {
                 "title=\(summary.title)"
             )
             apply(.clearError)
-            apply(.setError("게임 정보를 확인하지 못해 플레이 중 상태로 추가할 수 없어요."))
+            apply(.setError(L10n.tr("Localizable", "library.error.addToPlayingInvalidGame")))
             return
         }
 
@@ -1828,7 +1828,7 @@ final class LibraryViewModel {
                 let libraryError = LibraryError.from(error: error)
                 await MainActor.run {
                     self.apply(.setAddingToPlaying(identifier, isUpdating: false))
-                    self.apply(.setError(libraryError.errorDescription ?? "플레이 중 상태를 저장하지 못했습니다."))
+                    self.apply(.setError(libraryError.errorDescription ?? L10n.tr("Localizable", "library.error.addToPlayingSaveFailed")))
                 }
             }
         }
@@ -1857,7 +1857,7 @@ final class LibraryViewModel {
             } catch {
                 let favoriteError = FavoriteError.from(error: error)
                 await MainActor.run {
-                    self.apply(.setError(favoriteError.errorDescription ?? "찜 상태를 변경하지 못했습니다."))
+                    self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
                 }
             }
         }
@@ -2183,7 +2183,9 @@ final class LibraryViewModel {
             let isAddingToPlaying = state.addingToPlayingIdentifiers.contains(summary.identifier)
             let actionTitle: String?
             if showsAddToPlayingAction, !playingIdentifiers.contains(summary.identifier) {
-                actionTitle = isAddingToPlaying ? "추가 중..." : "플레이 중으로 추가"
+                actionTitle = isAddingToPlaying
+                    ? L10n.tr("Localizable", "library.action.addingToPlaying")
+                    : L10n.tr("Localizable", "library.action.addToPlaying")
             } else {
                 actionTitle = nil
             }
@@ -2335,10 +2337,12 @@ final class LibraryViewModel {
 
     private func steamLibraryFallbackText(for summary: LibraryGameSummary) -> String {
         guard summary.identifier.source == .steam else {
-            return "정보 보강 중"
+            return L10n.tr("Localizable", "library.sectionList.fallback.enriching")
         }
 
-        return summary.shouldOpenFullGamePediaDetail ? "Steam" : "Steam · 정보 보강 중"
+        return summary.shouldOpenFullGamePediaDetail
+            ? "Steam"
+            : "Steam · \(L10n.tr("Localizable", "library.sectionList.fallback.enriching"))"
     }
 
     private func steamMetadataText(for summary: LibraryGameSummary) -> String {
@@ -2430,7 +2434,7 @@ final class LibraryViewModel {
             fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
             sourceLabelText: "Steam",
             metadataText: steamMetadataText(for: summary),
-            descriptionText: "Steam에서 가져온 게임입니다.",
+            descriptionText: L10n.tr("Localizable", "library.sectionList.fallback.importedFromSteam"),
             playtimeValueText: playtimeValueText,
             externalGameId: summary.externalGameId,
             gameSource: summary.gameSource,
@@ -2465,10 +2469,10 @@ final class LibraryViewModel {
                             LibraryMessageViewState(
                                 id: "recentlyPlayed.connect",
                                 style: .banner,
-                                title: "최근 플레이 기록이 없어요",
-                                message: "Steam 계정을 연동하면\n최근 플레이한 게임을 자동으로 가져올 수 있어요.",
+                                title: L10n.tr("Localizable", "library.recentlyPlayed.connect.title"),
+                                message: L10n.tr("Localizable", "library.recentlyPlayed.connect.message"),
                                 detailText: nil,
-                                buttonTitle: "Steam 연동하기",
+                                buttonTitle: L10n.tr("Localizable", "library.recentlyPlayed.connect.button"),
                                 action: .connectSteam
                             )
                         )
@@ -2489,10 +2493,10 @@ final class LibraryViewModel {
                             LibraryMessageViewState(
                                 id: "recentlyPlayed.tokenExpired",
                                 style: .error,
-                                title: "Steam 연결이 만료되었어요",
-                                message: "다시 연동하면 Steam 게임 정보를 계속 가져올 수 있어요.",
+                                title: L10n.tr("Localizable", "library.recentlyPlayed.tokenExpired.title"),
+                                message: L10n.tr("Localizable", "library.recentlyPlayed.tokenExpired.message"),
                                 detailText: nil,
-                                buttonTitle: "다시 연동하기",
+                                buttonTitle: L10n.tr("Localizable", "library.recentlyPlayed.tokenExpired.button"),
                                 action: .connectSteam
                             )
                         )
@@ -2513,10 +2517,10 @@ final class LibraryViewModel {
                             LibraryMessageViewState(
                                 id: "recentlyPlayed.privacyUnavailable",
                                 style: .error,
-                                title: "최근 플레이 정보를 가져올 수 없어요",
-                                message: "Steam 프로필 공개 설정을 확인해 주세요.",
+                                title: L10n.tr("Localizable", "library.recentlyPlayed.privacy.title"),
+                                message: L10n.tr("Localizable", "library.recentlyPlayed.privacy.message"),
                                 detailText: nil,
-                                buttonTitle: "설정 방법 보기",
+                                buttonTitle: L10n.tr("Localizable", "library.recentlyPlayed.privacy.button"),
                                 action: .showSteamPrivacyGuide
                             )
                         )
@@ -2536,8 +2540,8 @@ final class LibraryViewModel {
                             LibraryMessageViewState(
                                 id: "recentlyPlayed.loading",
                                 style: .loading,
-                                title: "최근 플레이 정보를 불러오는 중...",
-                                message: "Steam 데이터를 가져오는 중이에요.",
+                                title: L10n.tr("Localizable", "library.recentlyPlayed.loading.title"),
+                                message: L10n.tr("Localizable", "library.recentlyPlayed.loading.message"),
                                 detailText: nil,
                                 buttonTitle: nil,
                                 action: nil
@@ -2561,10 +2565,10 @@ final class LibraryViewModel {
                             LibraryMessageViewState(
                                 id: "recentlyPlayed.unavailable",
                                 style: .error,
-                                title: "최근 플레이 정보를 불러오지 못했어요",
-                                message: "잠시 후 다시 시도해 주세요.",
+                                title: L10n.tr("Localizable", "library.recentlyPlayed.unavailable.title"),
+                                message: L10n.Common.Error.tryAgain,
                                 detailText: nil,
-                                buttonTitle: "다시 시도",
+                                buttonTitle: L10n.Common.Button.retry,
                                 action: .retrySteamSync
                             )
                         )
@@ -2582,10 +2586,10 @@ final class LibraryViewModel {
                             LibraryMessageViewState(
                                 id: "recentlyPlayed.empty",
                                 style: .empty,
-                                title: "최근 플레이한 Steam 게임이 아직 없어요",
-                                message: "최근 2주 내 플레이한 Steam 게임이 있으면 여기에 표시돼요.",
+                                title: L10n.tr("Localizable", "library.recentlyPlayed.empty.title"),
+                                message: L10n.tr("Localizable", "library.recentlyPlayed.empty.message"),
                                 detailText: nil,
-                                buttonTitle: hasNonBlockingMetadataIssue ? nil : "라이브러리 새로고침",
+                                buttonTitle: hasNonBlockingMetadataIssue ? nil : L10n.tr("Localizable", "library.recentlyPlayed.empty.button"),
                                 action: hasNonBlockingMetadataIssue ? nil : .retrySteamSync
                             )
                         )
@@ -2616,7 +2620,7 @@ final class LibraryViewModel {
                             id: "recentlyPlayed.error",
                             style: .error,
                             title: nil,
-                            message: "최근 플레이 정보를 불러오지 못했어요.",
+                            message: L10n.tr("Localizable", "library.sectionList.error.recentlyPlayed"),
                             detailText: nil,
                             buttonTitle: nil,
                             action: nil
@@ -2654,7 +2658,7 @@ final class LibraryViewModel {
                                 id: "playing.empty",
                                 style: .empty,
                                 title: nil,
-                                message: "플레이 중인 게임이 아직 없어요.",
+                                message: L10n.tr("Localizable", "library.sectionList.empty.playing"),
                                 detailText: nil,
                                 buttonTitle: nil,
                                 action: nil
@@ -2685,7 +2689,7 @@ final class LibraryViewModel {
                             id: "playing.error",
                             style: .error,
                             title: nil,
-                            message: "플레이 중 목록을 불러오지 못했어요.",
+                            message: L10n.tr("Localizable", "library.sectionList.error.playing"),
                             detailText: nil,
                             buttonTitle: nil,
                             action: nil
@@ -2710,7 +2714,7 @@ final class LibraryViewModel {
                                 id: "wishlist.empty",
                                 style: .empty,
                                 title: nil,
-                                message: "찜한 게임이 아직 없어요.",
+                                message: L10n.tr("Localizable", "library.sectionList.empty.wishlist"),
                                 detailText: nil,
                                 buttonTitle: nil,
                                 action: nil
@@ -2757,7 +2761,7 @@ final class LibraryViewModel {
                             id: "wishlist.error",
                             style: .error,
                             title: nil,
-                            message: "찜한 게임을 불러오지 못했어요.",
+                            message: L10n.tr("Localizable", "library.sectionList.error.wishlist"),
                             detailText: nil,
                             buttonTitle: nil,
                             action: nil
@@ -2784,10 +2788,10 @@ final class LibraryViewModel {
                             LibraryMessageViewState(
                                 id: "owned.connect",
                                 style: .banner,
-                                title: "보유 게임이 없어요",
-                                message: "Steam 보관함을 연결하면\n보유 중인 게임 목록을 자동으로 불러올 수 있어요.",
+                                title: L10n.tr("Localizable", "library.owned.connect.title"),
+                                message: L10n.tr("Localizable", "library.owned.connect.message"),
                                 detailText: nil,
-                                buttonTitle: "Steam 보관함 가져오기",
+                                buttonTitle: L10n.tr("Localizable", "library.owned.connect.button"),
                                 action: .connectSteam
                             )
                         )
@@ -2808,10 +2812,10 @@ final class LibraryViewModel {
                             LibraryMessageViewState(
                                 id: "owned.tokenExpired",
                                 style: .error,
-                                title: "Steam 연결이 만료되었어요",
-                                message: "다시 연동하면 Steam 게임 정보를 계속 가져올 수 있어요.",
+                                title: L10n.tr("Localizable", "library.owned.tokenExpired.title"),
+                                message: L10n.tr("Localizable", "library.owned.tokenExpired.message"),
                                 detailText: nil,
-                                buttonTitle: "다시 연동하기",
+                                buttonTitle: L10n.tr("Localizable", "library.owned.tokenExpired.button"),
                                 action: .connectSteam
                             )
                         )
@@ -2831,7 +2835,7 @@ final class LibraryViewModel {
                                 id: "owned.loading",
                                 style: .loading,
                                 title: nil,
-                                message: "보유 게임 목록을 가져오는 중...",
+                                message: L10n.tr("Localizable", "library.owned.loading.message"),
                                 detailText: nil,
                                 buttonTitle: nil,
                                 action: nil
@@ -2853,10 +2857,10 @@ final class LibraryViewModel {
                             LibraryMessageViewState(
                                 id: "owned.privacyUnavailable",
                                 style: .error,
-                                title: "Steam 프로필이 비공개 상태예요",
-                                message: "Steam 프로필 및 게임 보관함이 공개 상태여야\n보유 게임 정보를 가져올 수 있어요.",
-                                detailText: "Steam 설정 → 개인정보 설정\n→ 게임 상세 정보 공개 로 변경해 주세요.",
-                                buttonTitle: "설정 방법 보기",
+                                title: L10n.tr("Localizable", "library.owned.privacy.title"),
+                                message: L10n.tr("Localizable", "library.owned.privacy.message"),
+                                detailText: L10n.tr("Localizable", "library.owned.privacy.detail"),
+                                buttonTitle: L10n.tr("Localizable", "library.owned.privacy.button"),
                                 action: .showSteamPrivacyGuide
                             )
                         )
@@ -2880,10 +2884,10 @@ final class LibraryViewModel {
                             LibraryMessageViewState(
                                 id: "owned.syncFailed",
                                 style: .error,
-                                title: "Steam 데이터를 불러오지 못했어요",
-                                message: "잠시 후 다시 시도해 주세요.",
+                                title: L10n.tr("Localizable", "library.owned.syncFailed.title"),
+                                message: L10n.Common.Error.tryAgain,
                                 detailText: nil,
-                                buttonTitle: "다시 시도",
+                                buttonTitle: L10n.Common.Button.retry,
                                 action: .retryOwnedSteamSync
                             )
                         )
@@ -2902,10 +2906,10 @@ final class LibraryViewModel {
                             LibraryMessageViewState(
                                 id: "owned.empty",
                                 style: .empty,
-                                title: "가져온 보유 게임이 아직 없어요",
-                                message: "Steam 보관함을 다시 동기화해 보세요.",
+                                title: L10n.tr("Localizable", "library.owned.empty.title"),
+                                message: L10n.tr("Localizable", "library.owned.empty.message"),
                                 detailText: nil,
-                                buttonTitle: hasNonBlockingMetadataIssue ? nil : "다시 동기화",
+                                buttonTitle: hasNonBlockingMetadataIssue ? nil : L10n.tr("Localizable", "library.owned.empty.button"),
                                 action: hasNonBlockingMetadataIssue ? nil : .retryOwnedSteamSync
                             )
                         )
@@ -2940,7 +2944,7 @@ final class LibraryViewModel {
                             id: "owned.error",
                             style: .error,
                             title: nil,
-                            message: "보유 게임을 불러오지 못했어요.",
+                            message: L10n.tr("Localizable", "library.sectionList.error.owned"),
                             detailText: nil,
                             buttonTitle: nil,
                             action: nil
@@ -2967,7 +2971,7 @@ final class LibraryViewModel {
                                 id: "playtimeRecommendations.empty",
                                 style: .empty,
                                 title: nil,
-                                message: "추천할 게임이 아직 없어요",
+                                message: L10n.tr("Localizable", "library.sectionList.empty.playtimeRecommendations"),
                                 detailText: nil,
                                 buttonTitle: nil,
                                 action: nil
@@ -2996,7 +3000,7 @@ final class LibraryViewModel {
                             id: "playtimeRecommendations.error",
                             style: .error,
                             title: nil,
-                            message: "추천 정보를 불러오지 못했어요",
+                            message: L10n.tr("Localizable", "library.sectionList.error.playtimeRecommendations"),
                             detailText: nil,
                             buttonTitle: nil,
                             action: nil
@@ -3038,12 +3042,12 @@ final class LibraryViewModel {
         for recommendation: PlaytimeRecommendation
     ) -> String {
         guard let reason = sanitized(recommendation.reason) else {
-            return "플레이 성향과 잘 맞는 게임이에요"
+            return L10n.tr("Localizable", "library.sectionList.playtimeRecommendation.default")
         }
 
         switch reason {
         case "자주 즐기는 장르와 잘 맞아요":
-            return "자주 즐기는 장르에 가까워요"
+            return L10n.tr("Localizable", "library.sectionList.playtimeRecommendation.genreMatch")
         default:
             return reason
         }
@@ -3083,9 +3087,9 @@ final class LibraryViewModel {
                             id: "friendRecommendations.error",
                             style: .error,
                             title: nil,
-                            message: "친구 기반 추천을 불러오지 못했어요",
-                            detailText: "잠시 후 다시 시도해 주세요.",
-                            buttonTitle: "다시 시도",
+                            message: L10n.tr("Localizable", "library.sectionList.error.friendRecommendations"),
+                            detailText: L10n.Common.Error.tryAgain,
+                            buttonTitle: L10n.Common.Button.retry,
                             action: .retryFriendRecommendations
                         )
                     )
@@ -3104,21 +3108,21 @@ final class LibraryViewModel {
 
         switch emptyState ?? .noFriendData {
         case .noFriendData:
-            title = "친구 추천을 불러올 수 없어요"
+            title = L10n.tr("Localizable", "library.sectionList.friendEmpty.noDataTitle")
             if state.isSteamConnected {
-                message = "아직 추천을 만들 친구 데이터가 없어요."
-                detailText = "친구를 추가하거나 친구 활동이 쌓이면 추천을 보여드릴게요."
+                message = L10n.tr("Localizable", "library.sectionList.friendEmpty.noDataMessage")
+                detailText = L10n.tr("Localizable", "library.sectionList.friendEmpty.noDataDetail.connected")
             } else {
-                message = "아직 추천을 만들 친구 데이터가 없어요."
-                detailText = "친구를 추가하거나 Steam 계정을 연동해보세요."
+                message = L10n.tr("Localizable", "library.sectionList.friendEmpty.noDataMessage")
+                detailText = L10n.tr("Localizable", "library.sectionList.friendEmpty.noDataDetail.disconnected")
             }
         case .insufficientActivity:
-            title = "아직 추천할 게임이 없어요"
-            message = "친구의 찜, 리뷰, 라이브러리 활동이 더 쌓이면 추천을 보여드릴게요."
+            title = L10n.tr("Localizable", "library.sectionList.friendEmpty.insufficientTitle")
+            message = L10n.tr("Localizable", "library.sectionList.friendEmpty.insufficientMessage")
             detailText = nil
         case .steamUnavailable:
-            title = "Steam 친구 데이터를 불러올 수 없어요"
-            message = "Steam 친구 정보가 없거나 공개 설정에 따라 추천을 불러올 수 없어요."
+            title = L10n.tr("Localizable", "library.sectionList.friendEmpty.steamUnavailableTitle")
+            message = L10n.tr("Localizable", "library.sectionList.friendEmpty.steamUnavailableMessage")
             detailText = nil
         }
 
@@ -3157,14 +3161,18 @@ final class LibraryViewModel {
     ) -> String {
         let friendCount = max(recommendation.friendCount, 0)
         if let reason = sanitized(recommendation.reason), reason.contains("플레이 중") {
-            return friendCount > 0 ? "친구 \(friendCount)명이 플레이 중" : "친구들이 플레이 중인 게임"
+            return friendCount > 0
+                ? L10n.tr("Localizable", "library.sectionList.friendRecommendation.playingCount", friendCount)
+                : L10n.tr("Localizable", "library.sectionList.friendRecommendation.playingFallback")
         }
 
         if let reason = sanitized(recommendation.reason), reason.contains("보유") {
-            return "친구들이 많이 보유한 게임"
+            return L10n.tr("Localizable", "library.sectionList.friendRecommendation.ownedFallback")
         }
 
-        return friendCount > 0 ? "친구 \(friendCount)명이 주목한 게임" : "친구들이 많이 보유한 게임"
+        return friendCount > 0
+            ? L10n.tr("Localizable", "library.sectionList.friendRecommendation.noticedCount", friendCount)
+            : L10n.tr("Localizable", "library.sectionList.friendRecommendation.noticedFallback")
     }
 
     private func makeReviewedSection(from result: Result<[ReviewedGame], Error>) -> LibrarySectionViewState {
@@ -3180,7 +3188,7 @@ final class LibraryViewModel {
                                 id: "reviewed.empty",
                                 style: .empty,
                                 title: nil,
-                                message: "작성한 리뷰가 아직 없어요.",
+                                message: L10n.tr("Localizable", "library.sectionList.empty.reviewed"),
                                 detailText: nil,
                                 buttonTitle: nil,
                                 action: nil
@@ -3201,7 +3209,7 @@ final class LibraryViewModel {
                         ),
                         detailDestination: .igdb(reviewedGame.gameId),
                         title: reviewedGame.game.displayTitle,
-                        subtitleText: "평가함",
+                        subtitleText: L10n.tr("Localizable", "library.reviewed.subtitle"),
                         metadataText: reviewedGame.game.genre,
                         coverImageURL: reviewedGame.game.coverImageURL,
                         ratingText: String(format: "%.1f", reviewedGame.rating),
@@ -3227,7 +3235,7 @@ final class LibraryViewModel {
                             id: "reviewed.error",
                             style: .error,
                             title: nil,
-                            message: "작성한 리뷰를 불러오지 못했어요.",
+                            message: L10n.tr("Localizable", "library.sectionList.error.reviewed"),
                             detailText: nil,
                             buttonTitle: nil,
                             action: nil
@@ -3256,7 +3264,7 @@ final class LibraryViewModel {
 
         guard !errors.isEmpty else { return nil }
         if errors.count > 1 {
-            return "일부 라이브러리 정보를 불러오지 못했어요."
+            return L10n.Common.Error.tryAgain
         }
 
         let error = errors[0]
@@ -3270,85 +3278,21 @@ final class LibraryViewModel {
     }
 
     private func translateLibraryGames(_ summaries: [LibraryGameSummary], context: String) async -> [LibraryGameSummary] {
-        guard !summaries.isEmpty else { return [] }
-
-        let translationItems = summaries.compactMap { summary -> TranslationRequestItem? in
-            guard summary.translatedTitle == nil else { return nil }
-            return TranslationRequestItem(
-                identifier: summary.identifier.uniqueKey,
-                field: "title",
-                text: summary.title
-            )
-        }
-
-        guard !translationItems.isEmpty else { return summaries }
-
-        let translatedTitles = Dictionary(
-            uniqueKeysWithValues: await translateTextUseCase.execute(
-                items: translationItems,
-                context: context,
-                sourceLanguage: "en"
-            ).map { ($0.identifier, $0.translatedText) }
-        )
-
-        return summaries.map { summary in
-            summary.replacingTranslatedTitle(translatedTitles[summary.identifier.uniqueKey])
-        }
+        _ = context
+        return summaries
     }
 
     private func translateFavoriteEntries(_ entries: [FavoriteGameEntry]) async -> [FavoriteGameEntry] {
-        let translatedGames = await translateGames(entries.map(\.game), context: "Library.wishlist")
-        let translatedGamesByID = Dictionary(uniqueKeysWithValues: translatedGames.map { ($0.id, $0) })
-
-        return entries.map { entry in
-            FavoriteGameEntry(
-                favorite: entry.favorite,
-                game: translatedGamesByID[entry.game.id] ?? entry.game
-            )
-        }
+        entries
     }
 
     private func translateReviewedGames(_ reviewedGames: [ReviewedGame]) async -> [ReviewedGame] {
-        let translatedGames = await translateGames(reviewedGames.map(\.game), context: "Library.reviewed")
-        let translatedGamesByID = Dictionary(uniqueKeysWithValues: translatedGames.map { ($0.id, $0) })
-
-        return reviewedGames.map { reviewedGame in
-            ReviewedGame(
-                reviewId: reviewedGame.reviewId,
-                gameId: reviewedGame.gameId,
-                rating: reviewedGame.rating,
-                content: reviewedGame.content,
-                createdAt: reviewedGame.createdAt,
-                game: translatedGamesByID[reviewedGame.game.id] ?? reviewedGame.game
-            )
-        }
+        reviewedGames
     }
 
     private func translateGames(_ games: [Game], context: String) async -> [Game] {
-        guard !games.isEmpty else { return games }
-
-        let titleItems = games.compactMap { game -> TranslationRequestItem? in
-            guard game.translatedTitle == nil else { return nil }
-            return TranslationRequestItem(
-                identifier: String(game.id),
-                field: "title",
-                text: game.title
-            )
-        }
-
-        guard !titleItems.isEmpty else { return games }
-
-        let translatedTitles = Dictionary(
-            uniqueKeysWithValues: await translateTextUseCase.execute(
-                items: titleItems,
-                context: "\(context).title",
-                sourceLanguage: "en"
-            ).map { ($0.identifier, $0.translatedText) }
-        )
-
-        return games.map { game in
-            game.replacingTranslated(translatedTitle: translatedTitles[String(game.id)])
-        }
+        _ = context
+        return games
     }
 
     private func releaseText(for summary: LibraryGameSummary) -> String {
@@ -3356,7 +3300,7 @@ final class LibraryViewModel {
     }
 
     private func releaseText(for year: Int) -> String {
-        year > 0 ? "\(year)" : "출시 예정"
+        year > 0 ? "\(year)" : L10n.tr("Localizable", "common.status.upcoming")
     }
 
     private func captureResult<T>(_ operation: @escaping () async throws -> T) async -> Result<T, Error> {
@@ -3560,7 +3504,7 @@ final class LibraryViewModel {
             apply(
                 .setError(
                     result.userFacingMessage
-                    ?? "Steam 연동을 완료하지 못했어요. 잠시 후 다시 시도해주세요."
+                    ?? L10n.tr("Localizable", "library.steam.callback.failed")
                 )
             )
         }
@@ -3599,9 +3543,9 @@ final class LibraryViewModel {
             apply(
                 .setSteamConnectionOnboarding(
                     LibraryOnboardingViewState(
-                        title: "Steam 연동 완료",
-                        message: "보유 게임과 최근 플레이 정보를 불러오는 중이에요.",
-                        helperText: "연동된 게임은 자동으로 업데이트돼요."
+                        title: L10n.tr("Localizable", "library.steam.onboarding.title"),
+                        message: L10n.tr("Localizable", "library.steam.onboarding.message"),
+                        helperText: L10n.tr("Localizable", "library.steam.onboarding.helper")
                     )
                 )
             )
@@ -3709,7 +3653,7 @@ final class LibraryViewModel {
     private func makeAddToPlayingRequest(from summary: LibraryGameSummary) -> LibraryGameStatusUpdateRequest? {
         guard let externalGameId = sanitized(summary.identifier.sourceID),
               let title = sanitized(summary.title),
-              title != "이름 없는 게임" else {
+              title != L10n.tr("Localizable", "common.label.untitledGame") else {
             return nil
         }
 
@@ -3857,27 +3801,27 @@ final class LibraryViewModel {
             let normalizedMessage = message.lowercased()
 
             if normalizedCode == "STEAM_ACCOUNT_NOT_LINKED" {
-                return "Steam 계정을 먼저 연결해주세요."
+                return L10n.tr("Localizable", "library.error.steamAccountNotLinked")
             }
 
             if normalizedCode == "STEAM_OWNED_GAMES_UNAVAILABLE" {
-                return "Steam 공개 설정 때문에 보관함 정보를 가져올 수 없어요."
+                return L10n.tr("Localizable", "library.owned.privacy.message")
             }
 
             if normalizedCode == "STEAM_API_NOT_CONFIGURED"
                 || normalizedCode == "CONFIGURATION_MISSING"
                 || normalizedMessage.contains("not configured")
                 || normalizedMessage.contains("configuration") {
-                return "현재 Steam 보관함 연동이 서버에 아직 설정되어 있지 않아요."
+                return L10n.tr("Localizable", "library.steam.notConfigured.owned")
             }
 
             return message
         case .network:
-            return "Steam 보관함을 가져오지 못했어요. 잠시 후 다시 시도해주세요."
+            return L10n.tr("Localizable", "library.steam.sync.owned.network")
         case .invalidResponse:
-            return "Steam 보관함 응답을 처리하지 못했어요. 잠시 후 다시 시도해주세요."
+            return L10n.tr("Localizable", "library.steam.sync.owned.invalidResponse")
         default:
-            return libraryError.errorDescription ?? "Steam 보관함을 가져오지 못했어요. 잠시 후 다시 시도해주세요."
+            return libraryError.errorDescription ?? L10n.tr("Localizable", "library.steam.sync.owned.generic")
         }
     }
 
@@ -3891,15 +3835,15 @@ final class LibraryViewModel {
                 || normalizedMessage.contains("not configured")
                 || normalizedMessage.contains("configuration")
                 || message.contains("설정") {
-                return "현재 Steam 연동이 서버에 아직 설정되어 있지 않아요."
+                return L10n.tr("Localizable", "library.steam.notConfigured.link")
             }
-            return "Steam 연동을 시작할 수 없어요. 잠시 후 다시 시도해주세요."
+            return L10n.tr("Localizable", "library.steam.link.generic")
         case .network:
-            return "Steam 서버와 통신하지 못했어요. 잠시 후 다시 시도해주세요."
+            return L10n.tr("Localizable", "library.steam.link.network")
         case .invalidResponse:
-            return "Steam 연동을 시작할 수 없어요. 잠시 후 다시 시도해주세요."
+            return L10n.tr("Localizable", "library.steam.link.invalidResponse")
         default:
-            return libraryError.errorDescription ?? "Steam 연동을 시작할 수 없어요. 잠시 후 다시 시도해주세요."
+            return libraryError.errorDescription ?? L10n.tr("Localizable", "library.steam.link.generic")
         }
     }
 
@@ -3908,13 +3852,13 @@ final class LibraryViewModel {
 
         switch libraryError {
         case .network:
-            return "Steam 연동을 해제하지 못했어요. 잠시 후 다시 시도해주세요."
+            return L10n.tr("Localizable", "library.steam.unlink.network")
         case .invalidResponse:
-            return "Steam 연동 해제 응답을 처리하지 못했어요. 잠시 후 다시 시도해주세요."
+            return L10n.tr("Localizable", "library.steam.unlink.invalidResponse")
         case .server(_, let message):
             return message
         default:
-            return libraryError.errorDescription ?? "Steam 연동을 해제하지 못했어요. 잠시 후 다시 시도해주세요."
+            return libraryError.errorDescription ?? L10n.tr("Localizable", "library.steam.unlink.generic")
         }
     }
 }

@@ -11,25 +11,17 @@ enum GameMapper {
             aggregatedRating: dto.aggregatedRating,
             totalRating: dto.totalRating
         )
-
-        // When the backend returns originalName, name is the localized display value
-        // and originalName is the English original.
-        let hasServerTranslation = dto.originalName != nil
-        let title = (hasServerTranslation ? dto.originalName : dto.name) ?? "이름 없는 게임"
-        let translatedTitle: String? = hasServerTranslation ? dto.name : nil
-
-        let hasServerSummary = dto.originalSummary != nil
-        let summary = sanitized(hasServerSummary ? dto.originalSummary : dto.summary)
-        let translatedSummary: String? = hasServerSummary ? sanitized(dto.summary) : nil
+        let title = sanitized(dto.originalName) ?? sanitized(dto.name) ?? L10n.tr("Localizable", "common.label.untitledGame")
+        let summary = sanitized(dto.originalSummary) ?? sanitized(dto.summary)
 
         return Game(
             id: dto.id,
             title: title,
-            translatedTitle: translatedTitle,
+            translatedTitle: nil,
             summary: summary,
-            translatedSummary: translatedSummary,
-            genre: dto.genres?.first ?? "기타",
-            category: dto.genres?.first ?? "기타",
+            translatedSummary: nil,
+            genre: dto.genres?.first ?? L10n.tr("Localizable", "common.label.other"),
+            category: dto.genres?.first ?? L10n.tr("Localizable", "common.label.other"),
             developer: "—",
             platform: dto.platforms?.first ?? "—",
             releaseDate: date(from: dto.releaseDate),
@@ -54,12 +46,12 @@ enum GameMapper {
 
         return Game(
             id: dto.id,
-            title: dto.name ?? "이름 없는 게임",
+            title: dto.name ?? L10n.tr("Localizable", "common.label.untitledGame"),
             translatedTitle: nil,
             summary: sanitized(dto.summary),
             translatedSummary: nil,
-            genre: dto.genres?.first ?? "기타",
-            category: dto.genres?.first ?? "기타",
+            genre: dto.genres?.first ?? L10n.tr("Localizable", "common.label.other"),
+            category: dto.genres?.first ?? L10n.tr("Localizable", "common.label.other"),
             developer: dto.developers?.first ?? dto.publishers?.first ?? "—",
             platform: dto.platforms?.first ?? "—",
             releaseDate: date(from: dto.releaseDate),
@@ -86,7 +78,7 @@ enum GameMapper {
         print(
             "[RatingMapping] " +
             "screen=Game.detailMapper " +
-            "title=\(dto.name ?? "게임") " +
+            "title=\(dto.name ?? L10n.tr("Localizable", "common.label.untitledGame")) " +
             "userRating=\(userRatingLogValue) " +
             "aggregatedRating=\(aggregatedRatingLogValue) " +
             "totalRating=\(totalRatingLogValue) " +
@@ -95,13 +87,13 @@ enum GameMapper {
         )
         let releaseYear = releaseYear(from: dto.releaseDate)
         let developerName = dto.developers?.first ?? dto.publishers?.first ?? "—"
-        let genre = dto.genres?.first ?? "기타"
-        let summary = sanitized(dto.summary) ?? "소개 정보가 없습니다."
+        let genre = dto.genres?.first ?? L10n.tr("Localizable", "common.label.other")
+        let summary = sanitized(dto.summary) ?? L10n.Common.Label.noDescription
         let storyline = sanitized(dto.storyline) ?? summary
 
         return GameDetail(
             id: dto.id,
-            title: dto.name ?? "이름 없는 게임",
+            title: dto.name ?? L10n.tr("Localizable", "common.label.untitledGame"),
             translatedTitle: nil,
             genre: genre,
             developer: developerName,

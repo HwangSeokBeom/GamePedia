@@ -52,7 +52,7 @@ final class FriendActivityCell: UITableViewCell {
         let label = UILabel()
         label.font = .systemFont(ofSize: 11, weight: .medium)
         label.textColor = .gpTextTertiary
-        label.textAlignment = .right
+        label.textAlignment = .natural
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()

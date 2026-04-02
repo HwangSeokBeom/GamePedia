@@ -207,7 +207,7 @@ private struct StoredLibraryGameSummary: Codable {
         sourceID = summary.identifier.sourceID
         canonicalGameID = summary.identifier.canonicalGameID
         title = summary.title
-        translatedTitle = summary.translatedTitle
+        translatedTitle = nil
         coverImageURL = summary.coverImageURL
         fallbackCoverImageURLs = summary.fallbackCoverImageURLs
         genre = summary.genre
@@ -237,7 +237,7 @@ private struct StoredLibraryGameSummary: Codable {
                 canonicalGameID: canonicalGameID
             ),
             title: title,
-            translatedTitle: translatedTitle,
+            translatedTitle: nil,
             coverImageURL: coverImageURL,
             fallbackCoverImageURLs: fallbackCoverImageURLs,
             genre: genre,

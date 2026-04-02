@@ -432,11 +432,11 @@ final class LibrarySectionListViewController: UIViewController {
 
     private func presentUnavailableDetailAlert() {
         let alert = UIAlertController(
-            title: "안내",
-            message: "게임 상세 정보를 아직 불러올 수 없어요.",
+            title: L10n.tr("Localizable", "common.alert.infoTitle"),
+            message: L10n.tr("Localizable", "common.alert.detailUnavailableMessage"),
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        alert.addAction(UIAlertAction(title: L10n.tr("Localizable", "common.button.ok"), style: .default))
         present(alert, animated: true)
     }
 
@@ -647,10 +647,12 @@ final class LibrarySectionListViewController: UIViewController {
 
     private func steamLibraryFallbackText(for summary: LibraryGameSummary) -> String {
         guard summary.identifier.source == .steam else {
-            return "정보 보강 중"
+            return L10n.tr("Localizable", "library.sectionList.fallback.enriching")
         }
 
-        return summary.shouldOpenFullGamePediaDetail ? "Steam" : "Steam · 정보 보강 중"
+        return summary.shouldOpenFullGamePediaDetail
+            ? "Steam"
+            : "Steam · \(L10n.tr("Localizable", "library.sectionList.fallback.enriching"))"
     }
 
     private func detailDestination(for summary: LibraryGameSummary) -> LibraryGameDetailDestination? {
@@ -701,7 +703,7 @@ final class LibrarySectionListViewController: UIViewController {
                 fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
                 sourceLabelText: "Steam",
                 metadataText: steamMetadataText(for: summary),
-                descriptionText: "Steam에서 가져온 게임입니다.",
+                descriptionText: L10n.tr("Localizable", "library.sectionList.fallback.importedFromSteam"),
                 playtimeValueText: SteamPlaytimeFormatter.expandedPlaytimeValue(
                     minutes: summary.playtimeMinutes ?? summary.recentPlaytimeMinutes
                 ),
@@ -719,19 +721,21 @@ final class LibrarySectionListViewController: UIViewController {
             return "Steam · \(genre)"
         }
 
-        return summary.shouldOpenFullGamePediaDetail ? "Steam" : "Steam · 정보 보강 중"
+        return summary.shouldOpenFullGamePediaDetail
+            ? "Steam"
+            : "Steam · \(L10n.tr("Localizable", "library.sectionList.fallback.enriching"))"
     }
 
     private func playtimeRecommendationSubtitleText(
         for recommendation: PlaytimeRecommendation
     ) -> String {
         guard let reason = sanitized(recommendation.reason) else {
-            return "플레이 성향과 잘 맞는 게임이에요"
+            return L10n.tr("Localizable", "library.sectionList.playtimeRecommendation.default")
         }
 
         switch reason {
         case "자주 즐기는 장르와 잘 맞아요":
-            return "자주 즐기는 장르에 가까워요"
+            return L10n.tr("Localizable", "library.sectionList.playtimeRecommendation.genreMatch")
         default:
             return reason
         }
@@ -742,14 +746,18 @@ final class LibrarySectionListViewController: UIViewController {
     ) -> String {
         let friendCount = max(recommendation.friendCount, 0)
         if let reason = sanitized(recommendation.reason), reason.contains("플레이 중") {
-            return friendCount > 0 ? "친구 \(friendCount)명이 플레이 중" : "친구들이 플레이 중인 게임"
+            return friendCount > 0
+                ? L10n.tr("Localizable", "library.sectionList.friendRecommendation.playingCount", friendCount)
+                : L10n.tr("Localizable", "library.sectionList.friendRecommendation.playingFallback")
         }
 
         if let reason = sanitized(recommendation.reason), reason.contains("보유") {
-            return "친구들이 많이 보유한 게임"
+            return L10n.tr("Localizable", "library.sectionList.friendRecommendation.ownedFallback")
         }
 
-        return friendCount > 0 ? "친구 \(friendCount)명이 주목한 게임" : "친구들이 많이 보유한 게임"
+        return friendCount > 0
+            ? L10n.tr("Localizable", "library.sectionList.friendRecommendation.noticedCount", friendCount)
+            : L10n.tr("Localizable", "library.sectionList.friendRecommendation.noticedFallback")
     }
 
     private func friendRecommendationsEmptyMessageViewState(
@@ -761,16 +769,16 @@ final class LibrarySectionListViewController: UIViewController {
 
         switch emptyState ?? .noFriendData {
         case .noFriendData:
-            title = "친구 추천을 불러올 수 없어요"
-            message = "아직 추천을 만들 친구 데이터가 없어요."
-            detailText = "친구를 추가하거나 Steam 계정을 연동해보세요."
+            title = L10n.tr("Localizable", "library.sectionList.friendEmpty.noDataTitle")
+            message = L10n.tr("Localizable", "library.sectionList.friendEmpty.noDataMessage")
+            detailText = L10n.tr("Localizable", "library.sectionList.friendEmpty.noDataDetail")
         case .insufficientActivity:
-            title = "아직 추천할 게임이 없어요"
-            message = "친구의 찜, 리뷰, 라이브러리 활동이 더 쌓이면 추천을 보여드릴게요."
+            title = L10n.tr("Localizable", "library.sectionList.friendEmpty.insufficientTitle")
+            message = L10n.tr("Localizable", "library.sectionList.friendEmpty.insufficientMessage")
             detailText = nil
         case .steamUnavailable:
-            title = "Steam 친구 데이터를 불러올 수 없어요"
-            message = "Steam 친구 정보가 없거나 공개 설정에 따라 추천을 불러올 수 없어요."
+            title = L10n.tr("Localizable", "library.sectionList.friendEmpty.steamUnavailableTitle")
+            message = L10n.tr("Localizable", "library.sectionList.friendEmpty.steamUnavailableMessage")
             detailText = nil
         }
 
@@ -786,7 +794,7 @@ final class LibrarySectionListViewController: UIViewController {
     }
 
     private func releaseText(for year: Int) -> String {
-        year > 0 ? "\(year)" : "출시 예정"
+        year > 0 ? "\(year)" : L10n.tr("Localizable", "common.status.upcoming")
     }
 
     private func sanitized(_ value: String?) -> String? {
@@ -816,19 +824,19 @@ final class LibrarySectionListViewController: UIViewController {
         let message: String
         switch kind {
         case .recentlyPlayed:
-            message = "최근 플레이한 게임을 불러오는 중..."
+            message = L10n.tr("Localizable", "library.sectionList.loading.recentlyPlayed")
         case .playing:
-            message = "플레이 중인 게임을 불러오는 중..."
+            message = L10n.tr("Localizable", "library.sectionList.loading.playing")
         case .owned:
-            message = "보유 게임을 불러오는 중..."
+            message = L10n.tr("Localizable", "library.sectionList.loading.owned")
         case .wishlist:
-            message = "찜한 게임을 불러오는 중..."
+            message = L10n.tr("Localizable", "library.sectionList.loading.wishlist")
         case .reviewed:
-            message = "작성한 리뷰를 불러오는 중..."
+            message = L10n.tr("Localizable", "library.sectionList.loading.reviewed")
         case .friendRecommendations:
-            message = "친구 기반 추천을 불러오는 중..."
+            message = L10n.tr("Localizable", "library.sectionList.loading.friendRecommendations")
         case .playtimeRecommendations:
-            message = "플레이 성향 기반 추천을 불러오는 중..."
+            message = L10n.tr("Localizable", "library.sectionList.loading.playtimeRecommendations")
         }
 
         return LibraryMessageViewState(
@@ -846,19 +854,19 @@ final class LibrarySectionListViewController: UIViewController {
         let message: String
         switch kind {
         case .recentlyPlayed:
-            message = "최근 플레이한 게임이 없어요"
+            message = L10n.tr("Localizable", "library.sectionList.empty.recentlyPlayed")
         case .playing:
-            message = "플레이 중인 게임이 없어요"
+            message = L10n.tr("Localizable", "library.sectionList.empty.playing")
         case .owned:
-            message = "보유 게임이 없어요"
+            message = L10n.tr("Localizable", "library.sectionList.empty.owned")
         case .wishlist:
-            message = "찜한 게임이 없어요"
+            message = L10n.tr("Localizable", "library.sectionList.empty.wishlist")
         case .reviewed:
-            message = "작성한 리뷰가 없어요"
+            message = L10n.tr("Localizable", "library.sectionList.empty.reviewed")
         case .friendRecommendations:
-            message = "친구 기반 추천이 없어요"
+            message = L10n.tr("Localizable", "library.sectionList.empty.friendRecommendations")
         case .playtimeRecommendations:
-            message = "플레이 성향 기반 추천이 없어요"
+            message = L10n.tr("Localizable", "library.sectionList.empty.playtimeRecommendations")
         }
 
         return LibraryMessageViewState(
@@ -876,19 +884,19 @@ final class LibrarySectionListViewController: UIViewController {
         let message: String
         switch kind {
         case .recentlyPlayed:
-            message = "최근 플레이한 게임을 불러오지 못했어요."
+            message = L10n.tr("Localizable", "library.sectionList.error.recentlyPlayed")
         case .playing:
-            message = "플레이 중인 게임을 불러오지 못했어요."
+            message = L10n.tr("Localizable", "library.sectionList.error.playing")
         case .owned:
-            message = "보유 게임을 불러오지 못했어요."
+            message = L10n.tr("Localizable", "library.sectionList.error.owned")
         case .wishlist:
-            message = "찜한 게임을 불러오지 못했어요."
+            message = L10n.tr("Localizable", "library.sectionList.error.wishlist")
         case .reviewed:
-            message = "작성한 리뷰를 불러오지 못했어요."
+            message = L10n.tr("Localizable", "library.sectionList.error.reviewed")
         case .friendRecommendations:
-            message = "친구 기반 추천을 불러오지 못했어요."
+            message = L10n.tr("Localizable", "library.sectionList.error.friendRecommendations")
         case .playtimeRecommendations:
-            message = "플레이 성향 기반 추천을 불러오지 못했어요."
+            message = L10n.tr("Localizable", "library.sectionList.error.playtimeRecommendations")
         }
 
         return LibraryMessageViewState(

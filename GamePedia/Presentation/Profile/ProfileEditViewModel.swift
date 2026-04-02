@@ -143,7 +143,7 @@ final class ProfileEditViewModel {
                             self.apply(
                                 .setError(
                                     error.errorDescription
-                                    ?? "프로필을 저장하지 못했습니다. 잠시 후 다시 시도해주세요."
+                                    ?? L10n.tr("Localizable", "profile.edit.saveFailed")
                                 )
                             )
                         }
@@ -171,7 +171,7 @@ final class ProfileEditViewModel {
                             ProfileChangeUserInfoKey.selectedTitle: selectedTitle as Any
                         ]
                     )
-                    self.apply(.setSuccessMessage("프로필을 저장했어요."))
+                    self.apply(.setSuccessMessage(L10n.Profile.Edit.saveSuccess))
                 }
             )
             .store(in: &cancellables)
@@ -185,9 +185,9 @@ final class ProfileEditViewModel {
 
     private func nicknameValidationMessage(for nickname: String) -> String? {
         let trimmedNickname = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedNickname.isEmpty else { return "닉네임을 입력해주세요." }
-        guard trimmedNickname.count >= 2 else { return "닉네임은 2자 이상이어야 해요." }
-        guard trimmedNickname.count <= 30 else { return "닉네임은 30자 이하로 입력해주세요." }
+        guard !trimmedNickname.isEmpty else { return L10n.tr("Localizable", "profile.edit.validation.nicknameRequired") }
+        guard trimmedNickname.count >= 2 else { return L10n.tr("Localizable", "profile.edit.validation.nicknameMin") }
+        guard trimmedNickname.count <= 30 else { return L10n.tr("Localizable", "profile.edit.validation.nicknameMax") }
         return nil
     }
 }

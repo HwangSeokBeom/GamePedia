@@ -11,17 +11,17 @@ enum ReportReason: String, CaseIterable, Equatable {
     var title: String {
         switch self {
         case .spam:
-            return "스팸"
+            return L10n.Review.Report.reasonSpam
         case .abusiveOrHateful:
-            return "욕설/혐오 표현"
+            return L10n.Review.Report.reasonAbusive
         case .sexualOrInappropriate:
-            return "성적/부적절한 콘텐츠"
+            return L10n.Review.Report.reasonSexual
         case .misinformation:
-            return "허위 정보"
+            return L10n.Review.Report.reasonMisinformation
         case .copyrightViolation:
-            return "저작권/권리 침해"
+            return L10n.Review.Report.reasonCopyright
         case .other:
-            return "기타"
+            return L10n.Review.Report.reasonOther
         }
     }
 

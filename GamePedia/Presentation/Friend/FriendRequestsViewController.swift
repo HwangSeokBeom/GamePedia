@@ -65,9 +65,9 @@ final class FriendRequestsViewModel {
                 await MainActor.run {
                     switch self.state.selectedTab {
                     case .received:
-                        self.state.receivedErrorMessage = "친구 요청을 처리하지 못했어요."
+                        self.state.receivedErrorMessage = L10n.Friend.Requests.actionFailed
                     case .sent:
-                        self.state.sentErrorMessage = "친구 요청을 처리하지 못했어요."
+                        self.state.sentErrorMessage = L10n.Friend.Requests.actionFailed
                     }
                 }
             }
@@ -101,7 +101,7 @@ final class FriendRequestsViewModel {
             } catch {
                 await MainActor.run {
                     self.state.isLoading = false
-                    let message = "친구 요청을 불러오지 못했어요."
+                    let message = L10n.Friend.Requests.loadFailed
                     switch kind {
                     case .received:
                         self.state.receivedErrorMessage = message
@@ -117,7 +117,7 @@ final class FriendRequestsViewModel {
 
 final class FriendRequestsViewController: BaseViewController<UIView, FriendRequestsState> {
     private let viewModel: FriendRequestsViewModel
-    private let segmentedControl = UISegmentedControl(items: ["받은 요청", "보낸 요청"])
+    private let segmentedControl = UISegmentedControl(items: [L10n.Friend.Requests.receivedTab, L10n.Friend.Requests.sentTab])
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let emptyLabel = UILabel()
     private let loadingIndicatorView = UIActivityIndicatorView(style: .medium)
@@ -127,7 +127,7 @@ final class FriendRequestsViewController: BaseViewController<UIView, FriendReque
     init(viewModel: FriendRequestsViewModel = FriendRequestsViewModel()) {
         self.viewModel = viewModel
         super.init(rootView: UIView())
-        navigationItem.title = "친구 요청"
+        navigationItem.title = L10n.Friend.Requests.title
         navigationItem.largeTitleDisplayMode = .never
     }
 
@@ -159,7 +159,7 @@ final class FriendRequestsViewController: BaseViewController<UIView, FriendReque
             emptyLabel.text = errorMessage
             emptyLabel.isHidden = false
         } else {
-            emptyLabel.text = state.selectedTab == .received ? "받은 친구 요청이 없어요" : "보낸 친구 요청이 없어요"
+            emptyLabel.text = state.selectedTab == .received ? L10n.Friend.Requests.emptyReceived : L10n.Friend.Requests.emptySent
         }
     }
 
@@ -242,16 +242,21 @@ extension FriendRequestsViewController: UITableViewDataSource, UITableViewDelega
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: FriendUserCell.reuseID, for: indexPath) as! FriendUserCell
         let request = requests[indexPath.row]
-        let subtitleText = request.createdAt.map {
-            RelativeDateTimeFormatter().localizedString(for: $0, relativeTo: Date())
-        } ?? request.user.bio ?? (segmentedControl.selectedSegmentIndex == 0 ? "받은 친구 요청" : "보낸 친구 요청")
+        let fallbackSubtitle = segmentedControl.selectedSegmentIndex == 0
+            ? L10n.Friend.Requests.subtitleReceived
+            : L10n.Friend.Requests.subtitleSent
+        let resolvedSubtitleText = request.createdAt.map {
+            let formatter = RelativeDateTimeFormatter()
+            formatter.locale = .autoupdatingCurrent
+            return formatter.localizedString(for: $0, relativeTo: Date())
+        } ?? request.user.bio ?? fallbackSubtitle
 
         if segmentedControl.selectedSegmentIndex == 0 {
             cell.configure(
                 user: request.user,
-                subtitle: subtitleText,
-                primaryAction: .init(title: "수락", style: .primary, isEnabled: true),
-                secondaryAction: .init(title: "거절", style: .secondary, isEnabled: true)
+                subtitle: resolvedSubtitleText,
+                primaryAction: .init(title: L10n.Friend.Action.accept, style: .primary, isEnabled: true),
+                secondaryAction: .init(title: L10n.Friend.Action.decline, style: .secondary, isEnabled: true)
             )
             cell.onPrimaryActionTapped = { [weak self] in
                 self?.viewModel.send(.didTapAccept(request.id))
@@ -262,9 +267,9 @@ extension FriendRequestsViewController: UITableViewDataSource, UITableViewDelega
         } else {
             cell.configure(
                 user: request.user,
-                subtitle: subtitleText,
-                primaryAction: .init(title: "요청됨", style: .secondary, isEnabled: false),
-                secondaryAction: .init(title: "취소", style: .secondary, isEnabled: true)
+                subtitle: resolvedSubtitleText,
+                primaryAction: .init(title: L10n.Friend.Action.requested, style: .secondary, isEnabled: false),
+                secondaryAction: .init(title: L10n.Friend.Action.cancel, style: .secondary, isEnabled: true)
             )
             cell.onPrimaryActionTapped = nil
             cell.onSecondaryActionTapped = { [weak self] in

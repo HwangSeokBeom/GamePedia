@@ -27,7 +27,7 @@ final class SteamReviewLinkageBannerView: UIView {
 
     private let ctaButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "GamePedia 리뷰 작성"
+        configuration.title = L10n.Detail.SteamReview.cta
         let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         configuration.image = UIImage(systemName: "pencil", withConfiguration: symbolConfiguration)
         configuration.imagePadding = 6
@@ -61,10 +61,10 @@ final class SteamReviewLinkageBannerView: UIView {
         layer.masksToBounds = true
 
         let badgePadding: CGFloat = 8
-        let badgeText = " Steam 리뷰 작성됨 "
+        let badgeText = " \(L10n.Detail.SteamReview.badge) "
         badgeLabel.text = badgeText
 
-        helperLabel.text = "Steam에서 리뷰한 게임이에요.\nGamePedia에도 감상을 남겨보세요."
+        helperLabel.text = L10n.Detail.SteamReview.helper
 
         ctaButton.addTarget(self, action: #selector(didTapCTA), for: .touchUpInside)
 

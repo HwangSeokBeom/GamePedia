@@ -13,7 +13,7 @@ final class SteamConnectView: UIView {
 
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "Steam 계정을 연결하세요"
+        label.text = L10n.tr("Localizable", "library.steam.connect.title")
         label.font = .systemFont(ofSize: 20, weight: .bold)
         label.textColor = .gpTextPrimary
         label.textAlignment = .center
@@ -23,7 +23,7 @@ final class SteamConnectView: UIView {
 
     private let descriptionLabel: UILabel = {
         let label = UILabel()
-        label.text = "Steam 계정을 연결하면 플레이 기록과 보유 게임을 자동으로 가져올 수 있어요."
+        label.text = L10n.tr("Localizable", "library.steam.connect.message")
         label.font = .systemFont(ofSize: 15)
         label.textColor = .gpTextSecondary
         label.textAlignment = .center
@@ -33,7 +33,7 @@ final class SteamConnectView: UIView {
 
     private let connectButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "Steam 계정 연동하기"
+        configuration.title = L10n.tr("Localizable", "library.steam.connect.cta")
         configuration.baseBackgroundColor = .gpPrimary
         configuration.baseForegroundColor = .gpOnPrimary
         configuration.cornerStyle = .large

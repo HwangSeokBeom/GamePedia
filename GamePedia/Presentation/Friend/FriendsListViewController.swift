@@ -44,7 +44,7 @@ final class FriendsListViewModel {
                 await MainActor.run {
                     self.state.isLoading = false
                     self.state.friends = []
-                    self.state.errorMessage = "친구 목록을 불러오지 못했어요."
+                    self.state.errorMessage = L10n.Friend.List.loadFailed
                     print("[FriendsList] response failure error=\(error.localizedDescription)")
                 }
             }
@@ -65,7 +65,7 @@ final class FriendsListViewController: BaseViewController<UIView, FriendsListSta
     init(viewModel: FriendsListViewModel = FriendsListViewModel()) {
         self.viewModel = viewModel
         super.init(rootView: UIView())
-        navigationItem.title = "친구 목록"
+        navigationItem.title = L10n.Friend.List.title
         navigationItem.largeTitleDisplayMode = .never
     }
 
@@ -89,7 +89,7 @@ final class FriendsListViewController: BaseViewController<UIView, FriendsListSta
         tableView.reloadData()
         state.isLoading ? loadingIndicatorView.startAnimating() : loadingIndicatorView.stopAnimating()
         emptyLabel.isHidden = state.isLoading || !friends.isEmpty
-        emptyLabel.text = state.errorMessage ?? "아직 친구가 없어요"
+        emptyLabel.text = state.errorMessage ?? L10n.Empty.noFriends
         if state.errorMessage != nil {
             emptyLabel.isHidden = false
         }
@@ -157,12 +157,12 @@ extension FriendsListViewController: UITableViewDataSource, UITableViewDelegate 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: FriendUserCell.reuseID, for: indexPath) as! FriendUserCell
         let user = friends[indexPath.row]
-        let subtitleParts = [user.recentPlayTitle.map { "최근 플레이: \($0)" }, user.bio].compactMap { $0 }
-        let subtitle = subtitleParts.isEmpty ? "친구" : subtitleParts.joined(separator: "\n")
+        let subtitleParts = [user.recentPlayTitle.map(L10n.Friend.List.recentPlay), user.bio].compactMap { $0 }
+        let subtitle = subtitleParts.isEmpty ? L10n.Friend.List.defaultSubtitle : subtitleParts.joined(separator: "\n")
         cell.configure(
             user: user,
             subtitle: subtitle,
-            primaryAction: .init(title: "친구", style: .secondary, isEnabled: false)
+            primaryAction: .init(title: L10n.Friend.Action.friend, style: .secondary, isEnabled: false)
         )
         return cell
     }

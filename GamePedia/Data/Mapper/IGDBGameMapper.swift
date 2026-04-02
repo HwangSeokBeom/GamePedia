@@ -14,9 +14,9 @@ enum IGDBGameMapper {
         return Game(
             id: dto.id,
             title: dto.name,
-            translatedTitle: dto.translatedTitle,
+            translatedTitle: nil,
             summary: dto.summary?.trimmingCharacters(in: .whitespacesAndNewlines),
-            translatedSummary: dto.translatedSummary?.trimmingCharacters(in: .whitespacesAndNewlines),
+            translatedSummary: nil,
             genre: dto.genres?.first?.name ?? "기타",
             category: dto.genres?.first?.name ?? "기타",
             developer: "—",         // not fetched in list query — populated in detail
@@ -48,7 +48,7 @@ enum IGDBGameMapper {
         return GameDetail(
             id: dto.id,
             title: dto.name,
-            translatedTitle: dto.translatedTitle,
+            translatedTitle: nil,
             genre: genreName,
             developer: developerName,
             releaseYear: year,
@@ -58,9 +58,9 @@ enum IGDBGameMapper {
             reviewCount: ratingCount,
             avgPlaytimeHours: 0,        // TODO: IGDB doesn't provide playtime — integrate HLTB API if needed
             summary: dto.summary ?? "소개 정보가 없습니다.",
-            translatedSummary: dto.translatedSummary,
+            translatedSummary: nil,
             storyline: dto.summary ?? "소개 정보가 없습니다.",
-            translatedStoryline: dto.translatedStoryline ?? dto.translatedSummary,
+            translatedStoryline: nil,
             formattedRating: formattedRating5(ratingOn5Scale, hasRating: dto.rating != nil),
             formattedReviewCount: ratingCount.abbreviated,
             formattedPlaytime: "—",
@@ -115,6 +115,6 @@ enum IGDBGameMapper {
     /// Formats a 0–5 scale rating. Returns "—" when IGDB provided no rating.
     private static func formattedRating5(_ ratingOn5: Double, hasRating: Bool) -> String {
         guard hasRating else { return "—" }
-        return String(format: "%.1f", ratingOn5)
+        return LocalizedNumberFormatter.oneFraction(ratingOn5)
     }
 }

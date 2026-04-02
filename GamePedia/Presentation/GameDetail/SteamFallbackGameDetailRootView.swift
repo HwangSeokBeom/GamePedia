@@ -63,7 +63,7 @@ final class SteamFallbackGameDetailRootView: UIView {
 
     private let playtimeLabel: UILabel = {
         let label = UILabel()
-        label.text = "플레이 시간"
+        label.text = L10n.Detail.Stats.playtime
         label.font = .systemFont(ofSize: 12, weight: .medium)
         label.textColor = .gpTextSecondary
         label.numberOfLines = 1
@@ -82,7 +82,7 @@ final class SteamFallbackGameDetailRootView: UIView {
 
     private let descriptionTitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "게임 소개"
+        label.text = L10n.Detail.Section.description
         label.font = .systemFont(ofSize: 18, weight: .bold)
         label.textColor = .gpTextPrimary
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -111,7 +111,7 @@ final class SteamFallbackGameDetailRootView: UIView {
         label.font = .systemFont(ofSize: 13)
         label.textColor = .gpTextSecondary
         label.numberOfLines = 0
-        label.text = "장르, 평점, 스토리 같은 세부 정보는 GamePedia에서 순차적으로 보강될 수 있어요."
+        label.text = L10n.Detail.Fallback.note
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
