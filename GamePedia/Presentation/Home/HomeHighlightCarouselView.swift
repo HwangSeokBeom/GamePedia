@@ -40,6 +40,10 @@ final class HomeHighlightCarouselView: UIView {
         return pageControl
     }()
 
+    private var expandedConstraints: [NSLayoutConstraint] = []
+    private var collapsedConstraints: [NSLayoutConstraint] = []
+    private var isCollapsed = false
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setup()
@@ -102,16 +106,53 @@ final class HomeHighlightCarouselView: UIView {
         addSubview(collectionView)
         addSubview(pageControl)
 
-        NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: topAnchor),
-            collectionView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            collectionView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            collectionView.heightAnchor.constraint(equalToConstant: 208),
+        let collectionTopConstraint = collectionView.topAnchor.constraint(equalTo: topAnchor)
+        let collectionLeadingConstraint = collectionView.leadingAnchor.constraint(equalTo: leadingAnchor)
+        let collectionTrailingConstraint = collectionView.trailingAnchor.constraint(equalTo: trailingAnchor)
+        let collectionExpandedHeightConstraint = collectionView.heightAnchor.constraint(equalToConstant: 208)
+        let collectionCollapsedHeightConstraint = collectionView.heightAnchor.constraint(equalToConstant: 0)
+        let pageControlExpandedTopConstraint = pageControl.topAnchor.constraint(equalTo: collectionView.bottomAnchor, constant: 10)
+        let pageControlCollapsedTopConstraint = pageControl.topAnchor.constraint(equalTo: collectionView.bottomAnchor)
+        let pageControlCenterConstraint = pageControl.centerXAnchor.constraint(equalTo: centerXAnchor)
+        let pageControlExpandedBottomConstraint = pageControl.bottomAnchor.constraint(equalTo: bottomAnchor)
+        let pageControlCollapsedBottomConstraint = pageControl.bottomAnchor.constraint(equalTo: bottomAnchor)
+        let pageControlCollapsedHeightConstraint = pageControl.heightAnchor.constraint(equalToConstant: 0)
 
-            pageControl.topAnchor.constraint(equalTo: collectionView.bottomAnchor, constant: 10),
-            pageControl.centerXAnchor.constraint(equalTo: centerXAnchor),
-            pageControl.bottomAnchor.constraint(equalTo: bottomAnchor)
+        NSLayoutConstraint.activate([
+            collectionTopConstraint,
+            collectionLeadingConstraint,
+            collectionTrailingConstraint,
+            pageControlCenterConstraint
         ])
+
+        expandedConstraints = [
+            collectionExpandedHeightConstraint,
+            pageControlExpandedTopConstraint,
+            pageControlExpandedBottomConstraint
+        ]
+
+        collapsedConstraints = [
+            collectionCollapsedHeightConstraint,
+            pageControlCollapsedTopConstraint,
+            pageControlCollapsedBottomConstraint,
+            pageControlCollapsedHeightConstraint
+        ]
+
+        NSLayoutConstraint.activate(expandedConstraints)
+    }
+
+    func setCollapsed(_ collapsed: Bool) {
+        guard isCollapsed != collapsed else { return }
+        isCollapsed = collapsed
+        collectionView.isHidden = collapsed
+        pageControl.isHidden = collapsed
+        if collapsed {
+            NSLayoutConstraint.deactivate(expandedConstraints)
+            NSLayoutConstraint.activate(collapsedConstraints)
+        } else {
+            NSLayoutConstraint.deactivate(collapsedConstraints)
+            NSLayoutConstraint.activate(expandedConstraints)
+        }
     }
 
     private func registerLifecycleObservers() {
