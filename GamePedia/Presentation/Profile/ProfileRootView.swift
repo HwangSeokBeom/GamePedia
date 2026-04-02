@@ -973,7 +973,7 @@ final class ProfileHeaderCardView: UIView {
         profileImageView.tintColor = .gpTextTertiary
         profileImageView.contentMode = profileImageURL == nil ? .center : .scaleAspectFill
         profileImageView.loadImage(url: profileImageURL, placeholder: placeholderImage)
-        nicknameLabel.text = nickname ?? "GamePedia"
+        nicknameLabel.text = nickname ?? L10n.App.name
         emailLabel.text = email ?? ""
         emailLabel.lineBreakMode = .byTruncatingTail
         descriptionLabel.text = descriptionText

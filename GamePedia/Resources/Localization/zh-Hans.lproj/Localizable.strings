@@ -1,3 +1,6 @@
+"app.name" = "游戏百科";
+"splash.subtitle" = "发现并记录游戏";
+
 "common.button.confirm" = "确认";
 "common.button.cancel" = "取消";
 "common.button.retry" = "重试";

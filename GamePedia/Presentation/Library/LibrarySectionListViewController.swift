@@ -489,7 +489,9 @@ final class LibrarySectionListViewController: UIViewController {
                 subtitleText: "\(entry.game.genre) · \(releaseText(for: entry.game.releaseYear))",
                 metadataText: entry.game.platform,
                 coverImageURL: entry.game.coverImageURL,
-                ratingText: entry.game.rating > 0 ? String(format: "%.1f", entry.game.rating) : nil,
+                ratingText: entry.game.rating.isFinite && entry.game.rating >= 0
+                    ? LocalizedNumberFormatter.oneFraction(entry.game.rating)
+                    : nil,
                 trailingAction: nil
             )
         )
@@ -509,7 +511,9 @@ final class LibrarySectionListViewController: UIViewController {
                 metadataText: "\(reviewedGame.game.genre) · \(releaseText(for: reviewedGame.game.releaseYear))",
                 coverImageURL: reviewedGame.game.coverImageURL,
                 fallbackCoverImageURLs: [],
-                ratingText: String(format: "%.1f", reviewedGame.rating),
+                ratingText: reviewedGame.rating.isFinite
+                    ? LocalizedNumberFormatter.oneFraction(reviewedGame.rating)
+                    : nil,
                 trailingAction: nil
             )
         )

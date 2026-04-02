@@ -3,6 +3,7 @@ import Foundation
 enum LibraryMutation {
     case setLoading(Bool)
     case setRefreshing(Bool)
+    case setSummaryLoading(Bool)
     case setSelectedTab(LibraryTab)
     case setSelectedHighlightChip(LibraryHighlightChip)
     case setSort(LibrarySortOption)

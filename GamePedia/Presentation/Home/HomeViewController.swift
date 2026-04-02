@@ -50,7 +50,7 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
             applyTitleAppearance()
             navigationItem.largeTitleDisplayMode = .never
             navigationItem.titleView = nil
-            navigationItem.title = "GamePedia"
+            navigationItem.title = L10n.App.name
             navigationItem.leftBarButtonItem = makeFilterItem()
             navigationItem.rightBarButtonItem = makeNotificationItem()
         }

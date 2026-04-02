@@ -1,3 +1,6 @@
+"app.name" = "GamePedia";
+"splash.subtitle" = "Discover and track games";
+
 "common.button.confirm" = "Confirm";
 "common.button.cancel" = "Cancel";
 "common.button.retry" = "Retry";

@@ -70,7 +70,7 @@ final class SignUpRootView: UIView {
         let baseDescriptor = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .title2)
         let descriptor = baseDescriptor.withDesign(.serif) ?? baseDescriptor
         label.font = UIFont(descriptor: descriptor, size: 28)
-        label.text = "GamePedia"
+        label.text = L10n.App.name
         label.textColor = .gpTextPrimary
         label.translatesAutoresizingMaskIntoConstraints = false
         return label

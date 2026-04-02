@@ -45,6 +45,7 @@ enum SteamLinkConnectionState: Hashable {
 
 enum SteamSyncStatus: String, Codable, Hashable {
     case idle
+    case notConnected = "not_connected"
     case syncing
     case failed
     case privateProfile = "private_profile"
@@ -128,7 +129,7 @@ struct LibraryGameSummary: Hashable {
     var externalGameId: String { identifier.sourceID }
     var igdbGameId: Int? { identifier.canonicalGameID }
     var formattedRatingText: String? {
-        guard let rating, rating.isFinite, rating > 0 else { return nil }
+        guard let rating, rating.isFinite, rating >= 0 else { return nil }
         return LocalizedNumberFormatter.oneFraction(rating)
     }
 
@@ -200,6 +201,33 @@ struct LibraryGameSummary: Hashable {
         hasReliableLastPlayedAt: Bool,
         recentPlayFallbackReason: String?
     ) -> LibraryGameSummary {
+        LibraryGameSummary(
+            identifier: identifier,
+            title: title,
+            translatedTitle: translatedTitle,
+            coverImageURL: coverImageURL,
+            fallbackCoverImageURLs: fallbackCoverImageURLs,
+            genre: genre,
+            genreSource: genreSource,
+            platform: platform,
+            releaseYear: releaseYear,
+            rating: rating,
+            recentPlaytimeMinutes: recentPlaytimeMinutes,
+            recentPlaytimeText: recentPlaytimeText,
+            lastPlayedAt: lastPlayedAt,
+            lastPlayedAtSource: lastPlayedAtSource,
+            hasReliableLastPlayedAt: hasReliableLastPlayedAt,
+            recentPlayFallbackReason: recentPlayFallbackReason,
+            playtimeMinutes: playtimeMinutes,
+            userStatus: userStatus,
+            enrichmentStatus: enrichmentStatus,
+            metadataEnriched: metadataEnriched,
+            detailAvailable: detailAvailable,
+            matchStatus: matchStatus
+        )
+    }
+
+    func replacingRating(_ rating: Double?) -> LibraryGameSummary {
         LibraryGameSummary(
             identifier: identifier,
             title: title,

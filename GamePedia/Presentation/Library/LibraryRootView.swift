@@ -3,8 +3,11 @@ import UIKit
 final class LibraryRootView: UIView {
     private struct LibrarySummaryMetrics {
         let primaryTitle: String
+        let averageRatingTitle: String
+        let gameCountTitle: String
         let totalPlaytimeText: String
         let averageRatingText: String
+        let averageRatingDisplaySource: String
         let gameCountText: String
         let rawReviewsCount: Int
         let rawAverageRating: Double?
@@ -279,12 +282,12 @@ final class LibraryRootView: UIView {
         )
         averageRatingSummaryView.configure(
             value: summaryMetrics.averageRatingText,
-            title: L10n.Library.Summary.averageRating,
+            title: summaryMetrics.averageRatingTitle,
             valueColor: .gpPrimaryLight
         )
         gameCountSummaryView.configure(
             value: summaryMetrics.gameCountText,
-            title: L10n.Library.Summary.gameCount,
+            title: summaryMetrics.gameCountTitle,
             valueColor: .gpCoral
         )
 
@@ -429,7 +432,7 @@ final class LibraryRootView: UIView {
         } else {
             steamCardTitleLabel.text = L10n.Library.Steam.Title.guide
             steamLastSyncLabel.text = L10n.Library.Steam.Message.guide
-            steamCardMessageLabel.text = L10n.Library.Steam.Message.connected
+            steamCardMessageLabel.text = L10n.Library.Steam.Message.guide
             var configuration = steamPrimaryButton.configuration
             configuration?.title = L10n.Library.Steam.Button.connect
             configuration?.showsActivityIndicator = false
@@ -475,13 +478,34 @@ final class LibraryRootView: UIView {
 
     private func summaryMetrics(for state: LibraryState) -> LibrarySummaryMetrics {
         let summaryState = state.summaryByTab[state.selectedTab] ?? .empty(for: state.selectedTab)
+        if state.isSummaryLoading {
+            print(
+                "[LibrarySummaryUI] " +
+                "selectedTab=\(state.selectedTab) " +
+                "averageRatingReset=- " +
+                "source=placeholder.summaryLoading"
+            )
+            return LibrarySummaryMetrics(
+                primaryTitle: summaryState.primaryTitle,
+                averageRatingTitle: L10n.Library.Summary.averageRating,
+                gameCountTitle: L10n.Library.Summary.gameCount,
+                totalPlaytimeText: formattedPrimaryValueText(summaryState),
+                averageRatingText: "-",
+                averageRatingDisplaySource: "placeholder.summaryLoading",
+                gameCountText: Self.numberFormatter.string(from: NSNumber(value: summaryState.gameCount)) ?? "\(summaryState.gameCount)",
+                rawReviewsCount: summaryState.reviewCount,
+                rawAverageRating: summaryState.averageRating,
+                sourceDescription: summaryState.sourceDescription
+            )
+        }
+        let averageRatingDisplay = averageRatingDisplay(for: summaryState.averageRating)
         return LibrarySummaryMetrics(
             primaryTitle: summaryState.primaryTitle,
+            averageRatingTitle: L10n.Library.Summary.averageRating,
+            gameCountTitle: L10n.Library.Summary.gameCount,
             totalPlaytimeText: formattedPrimaryValueText(summaryState),
-            averageRatingText: formattedAverageRatingText(
-                summaryState.averageRating,
-                reviewCount: summaryState.reviewCount
-            ),
+            averageRatingText: averageRatingDisplay.text,
+            averageRatingDisplaySource: averageRatingDisplay.source,
             gameCountText: Self.numberFormatter.string(from: NSNumber(value: summaryState.gameCount)) ?? "\(summaryState.gameCount)",
             rawReviewsCount: summaryState.reviewCount,
             rawAverageRating: summaryState.averageRating,
@@ -501,9 +525,16 @@ final class LibraryRootView: UIView {
         }
     }
 
-    private func formattedAverageRatingText(_ rating: Double?, reviewCount: Int) -> String {
-        guard reviewCount > 0, let rating, rating.isFinite else { return "—" }
-        return LocalizedNumberFormatter.oneFraction(rating)
+    private func averageRatingDisplay(for rawAverageRating: Double?) -> (text: String, source: String) {
+        let display = GameRatingDisplayFormatter.makeDisplay(
+            userRating: nil,
+            aggregatedRating: rawAverageRating,
+            totalRating: nil
+        )
+        return (
+            display.displayText ?? "-",
+            display.selectedDisplaySource
+        )
     }
 
     private func logSummaryMetrics(_ summaryMetrics: LibrarySummaryMetrics, for state: LibraryState) {
@@ -515,6 +546,7 @@ final class LibraryRootView: UIView {
             "rawReviewsCount=\(summaryMetrics.rawReviewsCount) " +
             "rawAverageRating=\(rawAverageRatingText) " +
             "mappedAverageRatingText=\(summaryMetrics.averageRatingText) " +
+            "averageRatingDisplaySource=\(summaryMetrics.averageRatingDisplaySource) " +
             "finalTotalPlaytime=\(summaryMetrics.totalPlaytimeText) " +
             "finalGameCount=\(summaryMetrics.gameCountText) " +
             "source=\(summaryMetrics.sourceDescription)"

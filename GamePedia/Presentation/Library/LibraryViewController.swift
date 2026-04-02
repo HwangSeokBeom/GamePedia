@@ -15,6 +15,9 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     private let refreshControl = UIRefreshControl()
     private var toastHideWorkItem: DispatchWorkItem?
     private weak var toastView: LibraryToastView?
+    private var summaryLoadStartedAt: CFTimeInterval?
+    private var didLogFirstSnapshotApplyForCurrentLoad = false
+    private var wasSummaryLoading = false
 
     var onGameSelected: ((Int) -> Void)?
     var onSteamDetailRequested: ((SteamFallbackGameDetailViewState) -> Void)?
@@ -48,7 +51,26 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     }
 
     override func render(_ state: LibraryState) {
+        if state.isSummaryLoading, !wasSummaryLoading {
+            summaryLoadStartedAt = CACurrentMediaTime()
+            didLogFirstSnapshotApplyForCurrentLoad = false
+        }
+
+        let summaryBecameReady = wasSummaryLoading && !state.isSummaryLoading
         rootView.render(state)
+
+        if summaryBecameReady, let summaryLoadStartedAt {
+            let elapsedMilliseconds = Int((CACurrentMediaTime() - summaryLoadStartedAt) * 1000)
+            let summarySource = state.summaryByTab[state.selectedTab]?.sourceDescription ?? "nil"
+            print(
+                "[LibraryPerformance] " +
+                "timeToFirstSummaryRenderMs=\(elapsedMilliseconds) " +
+                "selectedTab=\(state.selectedTab) " +
+                "summarySource=\(summarySource) " +
+                "waitedForSnapshot=false"
+            )
+        }
+
         applySnapshot(sections: state.sections, focusedSection: state.pendingFocusSection)
 
         if !state.isRefreshing {
@@ -83,6 +105,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         }
 
         updateNavigationItems(with: state)
+        wasSummaryLoading = state.isSummaryLoading
     }
 
     func retrySteamPrivacyGuidance() {
@@ -283,6 +306,16 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
             "[LibrarySnapshot] applyPerformed " +
             "sectionCounts=\(sanitizedSections.map { "\($0.kind)=\($0.items.count)" }.joined(separator: ","))"
         )
+
+        if let summaryLoadStartedAt, !didLogFirstSnapshotApplyForCurrentLoad {
+            let elapsedMilliseconds = Int((CACurrentMediaTime() - summaryLoadStartedAt) * 1000)
+            print(
+                "[LibraryPerformance] " +
+                "timeToFirstSnapshotApplyMs=\(elapsedMilliseconds) " +
+                "sectionCount=\(sanitizedSections.count)"
+            )
+            didLogFirstSnapshotApplyForCurrentLoad = true
+        }
 
         dataSource.apply(snapshot, animatingDifferences: false) { [weak self] in
             guard let self else { return }

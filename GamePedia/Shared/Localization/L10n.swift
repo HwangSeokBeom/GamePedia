@@ -9,6 +9,14 @@
 import Foundation
 
 enum L10n {
+  enum App {
+    static let name = L10n.tr("Localizable", "app.name")
+  }
+
+  enum Splash {
+    static let subtitle = L10n.tr("Localizable", "splash.subtitle")
+  }
+
   enum Common {
     enum Button {
       static let confirm = L10n.tr("Localizable", "common.button.confirm")
@@ -212,6 +220,7 @@ enum L10n {
     }
 
     enum Summary {
+      static let totalPlay = L10n.tr("Localizable", "library.summary.totalPlay")
       static let averageRating = L10n.tr("Localizable", "library.summary.averageRating")
       static let gameCount = L10n.tr("Localizable", "library.summary.gameCount")
       static let wishlist = L10n.tr("Localizable", "library.summary.wishlist")

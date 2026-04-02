@@ -200,6 +200,14 @@ struct SocialPrivacySettings: Hashable {
     let isReviewsPublic: Bool
     let isSteamFriendsFeatureAvailable: Bool
 
+    static let `default` = SocialPrivacySettings(
+        isFriendsListPublic: true,
+        isRecentPlayPublic: true,
+        isLikedGamesPublic: true,
+        isReviewsPublic: true,
+        isSteamFriendsFeatureAvailable: false
+    )
+
     func updated(
         isFriendsListPublic: Bool? = nil,
         isRecentPlayPublic: Bool? = nil,
