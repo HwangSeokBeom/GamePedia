@@ -32,6 +32,7 @@ struct SignUpRequestDTO: Encodable {
 
 struct UpdateCurrentUserProfileRequestDTO: Encodable {
     let nickname: String
+    let selectedTitleKeys: [String]
 }
 
 struct ProfileImageUploadRequestDTO {

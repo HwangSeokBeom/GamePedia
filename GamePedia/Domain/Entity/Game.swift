@@ -25,11 +25,11 @@ struct Game: Hashable {
     var displayTitle: String { resolvedTitle }
 
     var resolvedTitle: String {
-        Self.resolvedText(translatedTitle, fallback: title) ?? title
+        title
     }
 
     var resolvedSummary: String? {
-        Self.resolvedText(translatedSummary, fallback: summary)
+        summary
     }
 
     func replacingTranslated(
@@ -81,20 +81,21 @@ struct GameDetail {
     let formattedReviewCount: String
     let formattedPlaytime: String   // "60+ 시간"
     let developerLine: String       // "FromSoftware · 액션 RPG · 2024"
+    let hasSteamReview: Bool
 
     var displayTitle: String { resolvedTitle }
     var displayDescription: String { resolvedSummary }
 
     var resolvedTitle: String {
-        Self.resolvedText(translatedTitle, fallback: title) ?? title
+        title
     }
 
     var resolvedSummary: String {
-        Self.resolvedText(translatedSummary, fallback: summary) ?? summary
+        summary
     }
 
     var resolvedStoryline: String {
-        Self.resolvedText(translatedStoryline, fallback: storyline) ?? storyline
+        storyline
     }
 
     func replacingTranslated(
@@ -121,7 +122,8 @@ struct GameDetail {
             formattedRating: formattedRating,
             formattedReviewCount: formattedReviewCount,
             formattedPlaytime: formattedPlaytime,
-            developerLine: developerLine
+            developerLine: developerLine,
+            hasSteamReview: hasSteamReview
         )
     }
 }

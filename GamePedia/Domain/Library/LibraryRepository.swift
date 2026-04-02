@@ -1,0 +1,16 @@
+import Foundation
+
+protocol LibraryRepository {
+    func fetchLibraryOverview(sort: UserGameCollectionSortOption?) async throws -> LibraryOverview
+    func fetchOwnedLibrary() async throws -> OwnedLibraryCollection
+    func fetchPlayingLibrary() async throws -> [LibraryGameSummary]
+    func fetchRecentlyPlayedLibrary() async throws -> [LibraryGameSummary]
+    func fetchPlaytimeRecommendations() async throws -> [PlaytimeRecommendation]
+    func fetchInAppFriendRecommendations() async throws -> [SteamFriendRecommendation]
+    func fetchSteamFriendRecommendations() async throws -> [SteamFriendRecommendation]
+    func fetchSteamLinkStatus() async throws -> SteamLinkStatus
+    func startSteamLink() async throws -> URL
+    func unlinkSteamAccount() async throws -> SteamUnlinkResult
+    func syncOwnedSteamLibrary() async throws -> SteamOwnedLibrarySyncResult
+    func updateGameStatus(request: LibraryGameStatusUpdateRequest) async throws -> LibraryGameStatusMutationResult
+}

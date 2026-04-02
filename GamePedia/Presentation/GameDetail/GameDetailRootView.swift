@@ -66,7 +66,7 @@ final class GameDetailRootView: UIView {
 
     let haveItButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "찜하기"
+        configuration.title = L10n.Detail.Button.favorite
         let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         configuration.image = UIImage(systemName: "bookmark", withConfiguration: symbolConfiguration)
         configuration.imagePadding = 8
@@ -84,7 +84,7 @@ final class GameDetailRootView: UIView {
     let writeReviewButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
         let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
-        configuration.title = "리뷰 작성"
+        configuration.title = L10n.Detail.Button.writeReview
         configuration.image = UIImage(systemName: "pencil", withConfiguration: symbolConfiguration)
         configuration.imagePadding = 8
         configuration.baseForegroundColor = .gpTextPrimary
@@ -100,13 +100,50 @@ final class GameDetailRootView: UIView {
         return UIButton(configuration: configuration)
     }()
 
+    let steamReviewBannerView: SteamReviewLinkageBannerView = {
+        let view = SteamReviewLinkageBannerView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+
     let descriptionTitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "게임 소개"
+        label.text = L10n.Detail.Section.description
         label.font = .systemFont(ofSize: 18, weight: .bold)
         label.textColor = .gpTextPrimary
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
+    }()
+
+    let translationIndicatorLabel: UILabel = {
+        let label = UILabel()
+        label.text = L10n.Translation.Banner.machineTranslated
+        label.font = .systemFont(ofSize: 11, weight: .semibold)
+        label.textColor = .gpPrimary
+        label.backgroundColor = UIColor.gpPrimary.withAlphaComponent(0.12)
+        label.layer.cornerRadius = 10
+        label.layer.masksToBounds = true
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.isHidden = true
+        return label
+    }()
+
+    let translationToggleButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.title = L10n.Translation.Action.showOriginal
+        configuration.baseForegroundColor = .gpPrimary
+        configuration.contentInsets = .zero
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
+            var updated = attributes
+            updated.font = .systemFont(ofSize: 12, weight: .semibold)
+            return updated
+        }
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.isHidden = true
+        return button
     }()
 
     let descriptionLabel: UILabel = {
@@ -164,7 +201,7 @@ final class GameDetailRootView: UIView {
         reviewTableView.register(ReviewCardCell.self, forCellReuseIdentifier: ReviewCardCell.reuseId)
 
         reviewSectionHeader.translatesAutoresizingMaskIntoConstraints = false
-        reviewSectionHeader.configure(title: "유저 리뷰")
+        reviewSectionHeader.configure(title: L10n.Detail.Section.userReviews)
         reviewSectionHeader.titleLabel.font = .systemFont(ofSize: 18, weight: .bold)
 
         heroImageView.layer.addSublayer(heroGradientLayer)
@@ -186,11 +223,19 @@ final class GameDetailRootView: UIView {
         actionStackView.distribution = .fillEqually
         actionStackView.translatesAutoresizingMaskIntoConstraints = false
 
+        let translationMetaStackView = UIStackView(arrangedSubviews: [translationIndicatorLabel, translationToggleButton, UIView()])
+        translationMetaStackView.axis = .horizontal
+        translationMetaStackView.alignment = .center
+        translationMetaStackView.spacing = 8
+        translationMetaStackView.translatesAutoresizingMaskIntoConstraints = false
+
         let contentStackView = UIStackView(arrangedSubviews: [
             titleRowStackView,
             statsView,
             actionStackView,
+            steamReviewBannerView,
             descriptionTitleLabel,
+            translationMetaStackView,
             descriptionLabel,
             reviewSectionHeader,
             reviewSummaryLabel,
@@ -203,6 +248,7 @@ final class GameDetailRootView: UIView {
         contentStackView.translatesAutoresizingMaskIntoConstraints = false
 
         contentStackView.setCustomSpacing(10, after: descriptionTitleLabel)
+        contentStackView.setCustomSpacing(10, after: translationMetaStackView)
         contentStackView.setCustomSpacing(12, after: reviewSectionHeader)
         contentStackView.setCustomSpacing(12, after: reviewSummaryLabel)
 
@@ -231,6 +277,7 @@ final class GameDetailRootView: UIView {
             
             heartButton.widthAnchor.constraint(equalToConstant: 40),
             heartButton.heightAnchor.constraint(equalToConstant: 40),
+            translationIndicatorLabel.heightAnchor.constraint(equalToConstant: 20),
 
             statsView.heightAnchor.constraint(equalToConstant: 80),
 
@@ -251,10 +298,22 @@ final class GameDetailRootView: UIView {
         developerLabel.text = game.developerLine
         statsView.configure(game: game)
         descriptionLabel.text = state.summary
+        translationIndicatorLabel.isHidden = !state.isTranslated
+        translationToggleButton.isHidden = !state.hasTranslation
+        var translationToggleConfiguration = translationToggleButton.configuration
+        translationToggleConfiguration?.title = state.translationToggleTitle
+        translationToggleButton.configuration = translationToggleConfiguration
         reviewSummaryLabel.text = state.reviewSummaryText
         reviewSectionHeader.seeMoreButton.isHidden = !state.shouldShowReviewSeeMore
+        steamReviewBannerView.isHidden = !state.showSteamReviewLinkage
         print("[UI] rendered resolvedTitle:", state.title)
         print("[UI] rendered resolvedSummary:", state.summary)
+        print(
+            "[TranslationDisplay] " +
+            "isShowingTranslated=\(state.isShowingTranslated) " +
+            "hasTranslation=\(state.hasTranslation) " +
+            "isTranslationAvailable=\(state.isTranslationAvailable)"
+        )
     }
 
     func updateReviewTableHeight() {

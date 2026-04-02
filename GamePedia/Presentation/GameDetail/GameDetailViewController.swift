@@ -8,6 +8,9 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
     let gameId: Int
     private var previewReviews: [Review] = []
     private var lastPresentedErrorMessage: String?
+    private lazy var translationHostController = TranslationHostContainerViewController { [weak self] results in
+        self?.viewModel.send(.didReceiveTranslationResults(results))
+    }
 
     // Set by the owning Coordinator before push.
     var onWriteReview: ((GameDetail, Review?) -> Void)?
@@ -34,6 +37,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         super.viewDidLoad()
         setupActions()
         setupTableView()
+        setupTranslationHost()
         bindViewModel()
         viewModel.send(.viewDidLoad(gameId: gameId))
     }
@@ -60,11 +64,29 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         rootView.heartButton.addTarget(self, action: #selector(didTapHaveIt), for: .touchUpInside)
         rootView.writeReviewButton.addTarget(self, action: #selector(didTapWriteReview), for: .touchUpInside)
         rootView.reviewSectionHeader.seeMoreButton.addTarget(self, action: #selector(didTapSeeAllReviews), for: .touchUpInside)
+        rootView.translationToggleButton.addTarget(self, action: #selector(didTapTranslationToggle), for: .touchUpInside)
+        rootView.steamReviewBannerView.onWriteReviewTapped = { [weak self] in
+            self?.didTapWriteReview()
+        }
     }
 
     private func setupTableView() {
         rootView.reviewTableView.dataSource = self
         rootView.reviewTableView.delegate = self
+    }
+
+    private func setupTranslationHost() {
+        addChild(translationHostController)
+        view.addSubview(translationHostController.view)
+        translationHostController.view.translatesAutoresizingMaskIntoConstraints = false
+        translationHostController.view.isHidden = true
+        NSLayoutConstraint.activate([
+            translationHostController.view.topAnchor.constraint(equalTo: view.topAnchor),
+            translationHostController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            translationHostController.view.widthAnchor.constraint(equalToConstant: 0),
+            translationHostController.view.heightAnchor.constraint(equalToConstant: 0)
+        ])
+        translationHostController.didMove(toParent: self)
     }
 
     private func bindViewModel() {
@@ -92,6 +114,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
     override func render(_ state: GameDetailState) {
         rootView.render(state)
+        translationHostController.update(request: state.translationRequest)
 
         if previewReviews != state.previewReviews {
             previewReviews = state.previewReviews
@@ -101,7 +124,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
         let bookmarkSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         var haveItButtonConfiguration = rootView.haveItButton.configuration
-        haveItButtonConfiguration?.title = state.isFavorite ? "찜됨" : "찜하기"
+        haveItButtonConfiguration?.title = state.isFavorite ? L10n.Detail.Button.favorited : L10n.Detail.Button.favorite
         haveItButtonConfiguration?.image = UIImage(
             systemName: state.isFavorite ? "bookmark.fill" : "bookmark",
             withConfiguration: bookmarkSymbolConfiguration
@@ -122,8 +145,8 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         if let errorMessage = state.errorMessage,
            errorMessage != lastPresentedErrorMessage {
             lastPresentedErrorMessage = errorMessage
-            let alert = UIAlertController(title: "오류", message: errorMessage, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "확인", style: .default))
+            let alert = UIAlertController(title: L10n.Common.Error.title, message: errorMessage, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default))
             present(alert, animated: true)
         }
     }
@@ -169,6 +192,10 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
     @objc private func didTapShare() {
         viewModel.send(.didTapShare)
+    }
+
+    @objc private func didTapTranslationToggle() {
+        viewModel.send(.didTapTranslationToggle)
     }
 }
 

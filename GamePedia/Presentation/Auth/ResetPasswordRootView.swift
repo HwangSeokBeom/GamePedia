@@ -3,19 +3,19 @@ import UIKit
 final class ResetPasswordRootView: UIView {
 
     let tokenFieldView = AuthInputFieldView(
-        title: "재설정 토큰",
-        placeholder: "토큰 입력",
+        title: L10n.tr("Localizable", "auth.field.resetToken.title"),
+        placeholder: L10n.tr("Localizable", "auth.field.resetToken.placeholder"),
         systemImageName: "key"
     )
     let passwordFieldView = AuthInputFieldView(
-        title: "새 비밀번호",
-        placeholder: "새 비밀번호 입력",
+        title: L10n.tr("Localizable", "auth.field.newPassword.title"),
+        placeholder: L10n.tr("Localizable", "auth.field.newPassword.placeholder"),
         systemImageName: "lock",
         isSecureTextEntry: true
     )
     let confirmPasswordFieldView = AuthInputFieldView(
-        title: "새 비밀번호 확인",
-        placeholder: "비밀번호 다시 입력",
+        title: L10n.tr("Localizable", "auth.field.newPasswordConfirm.title"),
+        placeholder: L10n.tr("Localizable", "auth.field.newPasswordConfirm.placeholder"),
         systemImageName: "lock.shield",
         isSecureTextEntry: true
     )
@@ -39,7 +39,7 @@ final class ResetPasswordRootView: UIView {
         let baseDescriptor = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .title2)
         let descriptor = baseDescriptor.withDesign(.serif) ?? baseDescriptor
         label.font = UIFont(descriptor: descriptor, size: 26)
-        label.text = "비밀번호 재설정"
+        label.text = L10n.tr("Localizable", "auth.resetPassword.title")
         label.textColor = .gpTextPrimary
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -47,7 +47,7 @@ final class ResetPasswordRootView: UIView {
 
     private let subtitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "새 비밀번호를 설정하면 기존 로그인 세션이 모두 종료됩니다."
+        label.text = L10n.tr("Localizable", "auth.resetPassword.subtitle")
         label.font = .systemFont(ofSize: 13, weight: .medium)
         label.textColor = .gpTextSecondary
         label.numberOfLines = 0
@@ -150,12 +150,12 @@ final class ResetPasswordRootView: UIView {
 
     private func configureControls() {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = "비밀번호 재설정"
+        configuration.title = L10n.tr("Localizable", "auth.resetPassword.button")
         configuration.baseBackgroundColor = .gpPrimary
         configuration.baseForegroundColor = .gpOnPrimary
         configuration.cornerStyle = .capsule
         configuration.attributedTitle = AttributedString(
-            "비밀번호 재설정",
+            L10n.tr("Localizable", "auth.resetPassword.button"),
             attributes: AttributeContainer([
                 .font: UIFont.systemFont(ofSize: 16, weight: .semibold)
             ])

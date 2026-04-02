@@ -34,7 +34,7 @@ final class ProfileEditViewController: BaseViewController<ProfileEditRootView, P
 
     private func configureNavigationItem() {
         UIView.performWithoutAnimation {
-            navigationItem.title = "프로필 편집"
+            navigationItem.title = L10n.Profile.Edit.title
             navigationItem.largeTitleDisplayMode = .never
             navigationItem.backButtonDisplayMode = .minimal
         }
@@ -42,6 +42,9 @@ final class ProfileEditViewController: BaseViewController<ProfileEditRootView, P
 
     private func setupActions() {
         rootView.nicknameFieldView.textField.addTarget(self, action: #selector(nicknameDidChange), for: .editingChanged)
+        rootView.badgeButtons.forEach { button in
+            button.addTarget(self, action: #selector(didTapBadgeOption(_:)), for: .touchUpInside)
+        }
         rootView.photoActionButton.addTarget(self, action: #selector(didTapPhotoAction), for: .touchUpInside)
         rootView.removePhotoButton.addTarget(self, action: #selector(didTapRemovePhoto), for: .touchUpInside)
         rootView.saveButton.addTarget(self, action: #selector(didTapSave), for: .touchUpInside)
@@ -86,7 +89,7 @@ final class ProfileEditViewController: BaseViewController<ProfileEditRootView, P
         if let errorMessage = state.errorMessage,
            errorMessage != lastPresentedErrorMessage {
             lastPresentedErrorMessage = errorMessage
-            showAlert(title: "오류", message: errorMessage)
+            showAlert(title: L10n.Common.Error.title, message: errorMessage)
         } else if state.errorMessage == nil {
             lastPresentedErrorMessage = nil
         }
@@ -95,7 +98,7 @@ final class ProfileEditViewController: BaseViewController<ProfileEditRootView, P
            successMessage != lastPresentedSuccessMessage {
             lastPresentedSuccessMessage = successMessage
             let alert = UIAlertController(title: nil, message: successMessage, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "확인", style: .default) { [weak self] _ in
+            alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default) { [weak self] _ in
                 self?.viewModel.send(.didAcknowledgeSuccess)
             })
             present(alert, animated: true)
@@ -108,19 +111,23 @@ final class ProfileEditViewController: BaseViewController<ProfileEditRootView, P
         viewModel.send(.nicknameChanged(rootView.nicknameFieldView.textField.text ?? ""))
     }
 
+    @objc private func didTapBadgeOption(_ sender: ProfileBadgeOptionButton) {
+        viewModel.send(.badgeSelectionToggled(sender.badgeTitle))
+    }
+
     @objc private func didTapPhotoAction() {
         view.endEditing(true)
 
         let actionSheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-        actionSheet.addAction(UIAlertAction(title: "사진 보관함", style: .default) { [weak self] _ in
+        actionSheet.addAction(UIAlertAction(title: L10n.Profile.Action.photoLibrary, style: .default) { [weak self] _ in
             self?.presentPhotoPicker()
         })
         if viewModel.state.showsRemovePhotoButton {
-            actionSheet.addAction(UIAlertAction(title: "사진 제거", style: .destructive) { [weak self] _ in
+            actionSheet.addAction(UIAlertAction(title: L10n.Profile.Action.removePhoto, style: .destructive) { [weak self] _ in
                 self?.viewModel.send(.removePhotoTapped)
             })
         }
-        actionSheet.addAction(UIAlertAction(title: "취소", style: .cancel))
+        actionSheet.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
 
         if let popoverPresentationController = actionSheet.popoverPresentationController {
             popoverPresentationController.sourceView = rootView.photoActionButton
@@ -156,7 +163,7 @@ final class ProfileEditViewController: BaseViewController<ProfileEditRootView, P
 
     private func showAlert(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default))
         present(alert, animated: true)
     }
 }
@@ -173,7 +180,7 @@ extension ProfileEditViewController: PHPickerViewControllerDelegate {
 
             if let error {
                 DispatchQueue.main.async {
-                    self.showAlert(title: "오류", message: error.localizedDescription)
+                    self.showAlert(title: L10n.Common.Error.title, message: error.localizedDescription)
                 }
                 return
             }
@@ -181,7 +188,7 @@ extension ProfileEditViewController: PHPickerViewControllerDelegate {
             guard let image = object as? UIImage,
                   let imageDraft = Self.makeImageDraft(from: image) else {
                 DispatchQueue.main.async {
-                    self.showAlert(title: "오류", message: "이미지를 불러오지 못했습니다.")
+                    self.showAlert(title: L10n.Common.Error.title, message: L10n.Profile.Edit.imageLoadFailed)
                 }
                 return
             }

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 // MARK: - DefaultTranslationCache
@@ -26,6 +27,8 @@ final class DefaultTranslationCache: TranslationCaching {
 
     private func cacheKey(text: String, lang: AppLanguage) -> String {
         let normalizedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return "\(lang.rawValue)::\(normalizedText)"
+        let input = "\(lang.rawValue)::\(normalizedText)"
+        let digest = SHA256.hash(data: Data(input.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 }

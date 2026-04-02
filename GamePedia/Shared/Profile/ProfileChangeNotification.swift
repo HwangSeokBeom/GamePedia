@@ -6,4 +6,7 @@ extension Notification.Name {
 
 enum ProfileChangeUserInfoKey {
     static let userId = "userId"
+    static let selectedTitles = "selectedTitles"
+    static let selectedTitleKey = "selectedTitleKey"
+    static let selectedTitle = "selectedTitle"
 }

@@ -120,7 +120,7 @@ final class HomeRootView: UIView {
         icon.translatesAutoresizingMaskIntoConstraints = false
 
         let label = UILabel()
-        label.text = "게임을 검색하세요"
+        label.text = L10n.Home.searchHint
         label.font = .systemFont(ofSize: 15)
         label.textColor = .gpTextTertiary
         label.translatesAutoresizingMaskIntoConstraints = false

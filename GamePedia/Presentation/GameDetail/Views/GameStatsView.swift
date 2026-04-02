@@ -47,9 +47,9 @@ final class GameStatsView: UIView {
 
     // MARK: Configure
     func configure(game: GameDetail) {
-        ratingStack.configure(value: game.formattedRating, label: "평점")
-        playtimeStack.configure(value: game.formattedPlaytime, label: "플레이 시간")
-        reviewStack.configure(value: game.formattedReviewCount, label: "리뷰")
+        ratingStack.configure(value: game.formattedRating, label: L10n.Detail.Label.rating)
+        playtimeStack.configure(value: game.formattedPlaytime, label: L10n.Detail.Stats.playtime)
+        reviewStack.configure(value: game.formattedReviewCount, label: L10n.Detail.Stats.reviews)
     }
 }
 

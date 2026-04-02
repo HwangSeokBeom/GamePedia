@@ -4,24 +4,24 @@ final class SignUpRootView: UIView {
 
     let backButton = UIButton(type: .system)
     let emailFieldView = AuthInputFieldView(
-        title: "이메일",
-        placeholder: "이메일 입력",
+        title: L10n.tr("Localizable", "auth.field.email.title"),
+        placeholder: L10n.tr("Localizable", "auth.field.email.placeholder"),
         systemImageName: "envelope"
     )
     let nicknameFieldView = AuthInputFieldView(
-        title: "닉네임",
-        placeholder: "닉네임 입력",
+        title: L10n.tr("Localizable", "auth.field.nickname.title"),
+        placeholder: L10n.tr("Localizable", "auth.field.nickname.placeholder"),
         systemImageName: "person"
     )
     let passwordFieldView = AuthInputFieldView(
-        title: "비밀번호",
-        placeholder: "비밀번호 입력",
+        title: L10n.tr("Localizable", "auth.field.password.title"),
+        placeholder: L10n.tr("Localizable", "auth.field.password.placeholder"),
         systemImageName: "lock",
         isSecureTextEntry: true
     )
     let confirmPasswordFieldView = AuthInputFieldView(
-        title: "비밀번호 확인",
-        placeholder: "비밀번호 다시 입력",
+        title: L10n.tr("Localizable", "auth.field.passwordConfirm.title"),
+        placeholder: L10n.tr("Localizable", "auth.field.passwordConfirm.placeholder"),
         systemImageName: "lock.shield",
         isSecureTextEntry: true
     )
@@ -52,7 +52,7 @@ final class SignUpRootView: UIView {
         let baseDescriptor = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .headline)
         let descriptor = baseDescriptor.withDesign(.serif) ?? baseDescriptor
         label.font = UIFont(descriptor: descriptor, size: 20)
-        label.text = "회원가입"
+        label.text = L10n.tr("Localizable", "auth.signup.title")
         label.textColor = .gpTextPrimary
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -78,7 +78,7 @@ final class SignUpRootView: UIView {
 
     private let subtitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "새 계정을 만들고 게임 세계를 탐험하세요"
+        label.text = L10n.tr("Localizable", "auth.signup.subtitle")
         label.font = .systemFont(ofSize: 13, weight: .medium)
         label.textColor = .gpTextSecondary
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -176,7 +176,7 @@ final class SignUpRootView: UIView {
         formCardView.addSubview(formStack)
 
         let footerLabel = UILabel()
-        footerLabel.text = "이미 계정이 있나요?"
+        footerLabel.text = L10n.tr("Localizable", "auth.signup.footer")
         footerLabel.font = .systemFont(ofSize: 12, weight: .medium)
         footerLabel.textColor = .gpTextSecondary
 
@@ -244,16 +244,16 @@ final class SignUpRootView: UIView {
 
     private func configureControls() {
         var backConfiguration = UIButton.Configuration.plain()
-        backConfiguration.title = "뒤로"
+        backConfiguration.title = L10n.tr("Localizable", "common.button.back")
         backConfiguration.image = UIImage(
-            systemName: "chevron.left",
+            systemName: "chevron.backward",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
         )
         backConfiguration.imagePadding = 6
         backConfiguration.baseForegroundColor = .gpTextPrimary
         backConfiguration.contentInsets = .zero
         backConfiguration.attributedTitle = AttributedString(
-            "뒤로",
+            L10n.tr("Localizable", "common.button.back"),
             attributes: AttributeContainer([
                 .font: UIFont.systemFont(ofSize: 14, weight: .medium)
             ])
@@ -261,7 +261,7 @@ final class SignUpRootView: UIView {
         backButton.configuration = backConfiguration
 
         var signUpConfiguration = UIButton.Configuration.filled()
-        signUpConfiguration.title = "회원가입"
+        signUpConfiguration.title = L10n.tr("Localizable", "auth.signup.button")
         signUpConfiguration.image = UIImage(
             systemName: "person.badge.plus",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
@@ -271,7 +271,7 @@ final class SignUpRootView: UIView {
         signUpConfiguration.baseForegroundColor = .gpOnPrimary
         signUpConfiguration.cornerStyle = .capsule
         signUpConfiguration.attributedTitle = AttributedString(
-            "회원가입",
+            L10n.tr("Localizable", "auth.signup.button"),
             attributes: AttributeContainer([
                 .font: UIFont.systemFont(ofSize: 16, weight: .semibold)
             ])
@@ -279,11 +279,11 @@ final class SignUpRootView: UIView {
         signUpButton.configuration = signUpConfiguration
 
         var loginConfiguration = UIButton.Configuration.plain()
-        loginConfiguration.title = "로그인"
+        loginConfiguration.title = L10n.tr("Localizable", "auth.signup.login")
         loginConfiguration.baseForegroundColor = .gpPrimary
         loginConfiguration.contentInsets = .zero
         loginConfiguration.attributedTitle = AttributedString(
-            "로그인",
+            L10n.tr("Localizable", "auth.signup.login"),
             attributes: AttributeContainer([
                 .font: UIFont.systemFont(ofSize: 12, weight: .semibold)
             ])

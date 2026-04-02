@@ -23,9 +23,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         self.appCoordinator = coordinator
         coordinator.start()
 
-        if let url = connectionOptions.urlContexts.first?.url,
-           !GIDSignIn.sharedInstance.handle(url) {
-            coordinator.handleIncomingURL(url)
+        if let url = connectionOptions.urlContexts.first?.url {
+            _ = handleIncomingURL(url)
         }
     }
 
@@ -59,12 +58,16 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         guard let url = URLContexts.first?.url else { return }
-        if GIDSignIn.sharedInstance.handle(url) {
-            return
-        }
-
-        appCoordinator?.handleIncomingURL(url)
+        _ = handleIncomingURL(url)
     }
 
+    @discardableResult
+    func handleIncomingURL(_ url: URL) -> Bool {
+        if GIDSignIn.sharedInstance.handle(url) {
+            return true
+        }
+
+        return appCoordinator?.handleIncomingURL(url) ?? false
+    }
 
 }

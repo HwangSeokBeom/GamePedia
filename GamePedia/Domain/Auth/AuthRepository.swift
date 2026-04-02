@@ -16,7 +16,10 @@ protocol AuthRepository {
 
     func refreshSession() -> AnyPublisher<AuthSession, AuthError>
     func fetchCurrentUser() -> AnyPublisher<AuthUser, AuthError>
-    func updateCurrentUserProfile(nickname: String) -> AnyPublisher<AuthUser, AuthError>
+    func updateCurrentUserProfile(
+        nickname: String,
+        selectedTitleKeys: [String]
+    ) -> AnyPublisher<AuthUser, AuthError>
     func uploadCurrentUserProfileImage(data: Data, fileName: String, mimeType: String) -> AnyPublisher<AuthUser, AuthError>
     func removeCurrentUserProfileImage() -> AnyPublisher<AuthUser, AuthError>
     func logout()

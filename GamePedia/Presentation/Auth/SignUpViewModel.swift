@@ -143,6 +143,10 @@ final class SignUpViewModel {
         switch error {
         case .emailAlreadyExists:
             state.emailValidationMessage = error.errorDescription
+        case .nicknameAlreadyExists:
+            state.nicknameValidationMessage = error.errorDescription
+        case .server(let code, _) where code.uppercased() == "CONFLICT":
+            state.nicknameValidationMessage = AuthError.nicknameAlreadyExists.errorDescription
         default:
             state.errorMessage = error.errorDescription
         }

@@ -8,4 +8,6 @@ enum GameDetailIntent {
     case didTapWriteReview
     case didTapSeeAllReviews
     case didTapShare
+    case didTapTranslationToggle
+    case didReceiveTranslationResults([TranslationResultItem])
 }

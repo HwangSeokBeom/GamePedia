@@ -4,14 +4,14 @@ import UIKit
 final class LoginRootView: UIView {
 
     let emailFieldView = AuthInputFieldView(
-        title: "이메일",
-        placeholder: "이메일 입력",
+        title: L10n.tr("Localizable", "auth.field.email.title"),
+        placeholder: L10n.tr("Localizable", "auth.field.email.placeholder"),
         systemImageName: "envelope"
     )
 
     let passwordFieldView = AuthInputFieldView(
-        title: "비밀번호",
-        placeholder: "비밀번호 입력",
+        title: L10n.tr("Localizable", "auth.field.password.title"),
+        placeholder: L10n.tr("Localizable", "auth.field.password.placeholder"),
         systemImageName: "lock",
         isSecureTextEntry: true,
         trailingSystemImageName: "eye.slash"
@@ -80,7 +80,7 @@ final class LoginRootView: UIView {
         let baseDescriptor = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .title2)
         let descriptor = baseDescriptor.withDesign(.serif) ?? baseDescriptor
         label.font = UIFont(descriptor: descriptor, size: 28)
-        label.text = "로그인"
+        label.text = L10n.tr("Localizable", "auth.login.title")
         label.textColor = .gpTextPrimary
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -88,7 +88,7 @@ final class LoginRootView: UIView {
 
     private let subtitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "게임 취향을 기록하고 추천을 받아보세요"
+        label.text = L10n.tr("Localizable", "auth.login.subtitle")
         label.font = .systemFont(ofSize: 13, weight: .medium)
         label.textColor = .gpTextSecondary
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -240,12 +240,12 @@ final class LoginRootView: UIView {
     }
 
     private func configureControls() {
-        loginButton.configuration = makePrimaryButton(title: "로그인")
-        googleButton.configuration = makeSecondaryButton(title: "Google로 계속하기", systemImageName: "globe")
+        loginButton.configuration = makePrimaryButton(title: L10n.tr("Localizable", "auth.login.button"))
+        googleButton.configuration = makeSecondaryButton(title: L10n.tr("Localizable", "auth.login.google"), systemImageName: "globe")
         googleButton.contentHorizontalAlignment = .center
 
-        signUpButton.configuration = makeFooterButton(title: "회원가입", tintColor: .gpPrimary)
-        forgotPasswordButton.configuration = makeFooterButton(title: "비밀번호 찾기", tintColor: .gpTextSecondary)
+        signUpButton.configuration = makeFooterButton(title: L10n.tr("Localizable", "auth.login.signUp"), tintColor: .gpPrimary)
+        forgotPasswordButton.configuration = makeFooterButton(title: L10n.tr("Localizable", "auth.login.forgotPassword"), tintColor: .gpTextSecondary)
     }
 
     private func makePrimaryButton(title: String) -> UIButton.Configuration {
@@ -313,7 +313,7 @@ final class LoginRootView: UIView {
 
     private func makeDividerLabel() -> UILabel {
         let label = UILabel()
-        label.text = "또는"
+        label.text = L10n.tr("Localizable", "auth.login.or")
         label.font = .systemFont(ofSize: 11, weight: .medium)
         label.textColor = .gpTextTertiary
         return label

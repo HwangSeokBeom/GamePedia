@@ -76,7 +76,10 @@ final class SearchViewModel {
         print("[GameSearch] originalQuery=\"\(query)\"")
 
         do {
-            let endpoint = Endpoint.searchGames(query: query, genre: genre == "전체" ? nil : genre)
+            let endpoint = Endpoint.searchGames(
+                query: query,
+                genre: genre == L10n.Search.Filter.all ? nil : genre
+            )
             let response = try await apiClient.request(
                 endpoint,
                 as: GameResponseEnvelopeDTO<GameListResponseDataDTO>.self

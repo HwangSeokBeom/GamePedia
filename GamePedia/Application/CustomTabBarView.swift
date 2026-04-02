@@ -9,10 +9,10 @@ final class CustomTabBarView: UIView {
     private let stackView = UIStackView()
 
     private let tabItems: [(title: String, image: String, selectedImage: String)] = [
-        ("홈", "house", "house.fill"),
-        ("검색", "magnifyingglass", "magnifyingglass"),
-        ("라이브러리", "books.vertical", "books.vertical.fill"),
-        ("프로필", "person", "person.fill")
+        (L10n.Home.Tab.title, "house", "house.fill"),
+        (L10n.Search.Tab.title, "magnifyingglass", "magnifyingglass"),
+        (L10n.Library.Tab.title, "books.vertical", "books.vertical.fill"),
+        (L10n.Profile.Tab.title, "person", "person.fill")
     ]
 
     private var tabButtons: [UIButton] = []
