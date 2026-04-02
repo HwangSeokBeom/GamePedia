@@ -1,8 +1,8 @@
 #include? "Secrets.xcconfig"
 
 URL_SCHEME_SEPARATOR = /
-API_ENVIRONMENT = production
-CORE_BASE_URL = https:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)gamepedia-api.duckdns.org
+API_ENVIRONMENT = staging
+CORE_BASE_URL = https:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)staging-gamepedia-api.duckdns.org
 
 GOOGLE_CLIENT_ID =
 GOOGLE_REVERSED_CLIENT_ID =

@@ -594,7 +594,7 @@
 "library.sectionList.friendEmpty.noDataDetail.disconnected" = "친구를 추가하거나 Steam 계정을 연동해보세요.";
 
 "debug.environment.savedTitle" = "환경이 저장되었습니다";
-"debug.environment.savedMessage" = "다음 실행부터 %1$@ 환경이 적용됩니다.\n\nAPI: %2$@\nTranslation: %3$@";
+"debug.environment.savedMessage" = "다음 실행부터 %1$@ 환경이 적용됩니다.\n\nAPI: %2$@";
 "common.label.untitledGame" = "이름 없는 게임";
 "common.label.other" = "기타";
 

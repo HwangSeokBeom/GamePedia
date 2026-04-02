@@ -57,8 +57,6 @@
 	<string>$(SUPPORT_EMAIL)</string>
 	<key>TermsOfServiceURL</key>
 	<string>$(TERMS_OF_SERVICE_URL)</string>
-	<key>TranslationBaseURL</key>
-	<string>$(TRANSLATION_BASE_URL)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -594,7 +594,7 @@
 "library.sectionList.friendEmpty.noDataDetail.disconnected" = "Add friends or connect Steam to improve recommendations.";
 
 "debug.environment.savedTitle" = "Environment saved";
-"debug.environment.savedMessage" = "The %1$@ environment will be applied on next launch.\n\nAPI: %2$@\nTranslation: %3$@";
+"debug.environment.savedMessage" = "The %1$@ environment will be applied on next launch.\n\nAPI: %2$@";
 "common.label.untitledGame" = "Untitled Game";
 "common.label.other" = "Other";
 

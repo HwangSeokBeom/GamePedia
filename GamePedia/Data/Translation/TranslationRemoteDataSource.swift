@@ -22,7 +22,7 @@ final class DefaultTranslationRemoteDataSource: TranslationRemoteDataSource {
 
     init(
         session: URLSession = .shared,
-        baseURL: URL = AppConfig.translationBaseURL
+        baseURL: URL = AppConfig.coreBaseURL
     ) {
         self.session = session
         self.baseURL = baseURL

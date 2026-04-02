@@ -594,7 +594,7 @@
 "library.sectionList.friendEmpty.noDataDetail.disconnected" = "请添加好友或连接 Steam。";
 
 "debug.environment.savedTitle" = "环境已保存";
-"debug.environment.savedMessage" = "从下次启动开始，将应用 %1$@ 环境。\n\nAPI: %2$@\nTranslation: %3$@";
+"debug.environment.savedMessage" = "从下次启动开始，将应用 %1$@ 环境。\n\nAPI: %2$@";
 "common.label.untitledGame" = "未命名游戏";
 "common.label.other" = "其他";
 

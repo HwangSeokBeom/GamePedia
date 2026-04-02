@@ -594,7 +594,7 @@
 "library.sectionList.friendEmpty.noDataDetail.disconnected" = "フレンドを追加するか、Steamを連携してください。";
 
 "debug.environment.savedTitle" = "環境を保存しました";
-"debug.environment.savedMessage" = "次回起動時から %1$@ 環境が適用されます。\n\nAPI: %2$@\nTranslation: %3$@";
+"debug.environment.savedMessage" = "次回起動時から %1$@ 環境が適用されます。\n\nAPI: %2$@";
 "common.label.untitledGame" = "名前のないゲーム";
 "common.label.other" = "その他";
 

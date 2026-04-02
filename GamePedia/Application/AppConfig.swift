@@ -27,11 +27,6 @@ enum AppConfig {
         fallback: apiEnvironment.apiBaseURL
     )
     static let authBaseURL: URL = coreBaseURL
-    static let translationBaseURL: URL = configuredURL(
-        infoPlistKey: "TranslationBaseURL",
-        environmentKey: "TRANSLATION_BASE_URL",
-        fallback: apiEnvironment.translationBaseURL
-    )
     static let googleClientID = oauthConfig.googleClientID
     static let googleReverseClientID = oauthConfig.googleReverseClientID
     static let termsOfServiceURL = configuredStaticURL(
@@ -71,10 +66,8 @@ enum AppConfig {
     }()
 
     static func logRuntimeConfiguration() {
-        print("[AppConfig] runtime=\(networkRuntimeDescription)")
-        print("[AppConfig] APIEnvironment=\(apiEnvironment.rawValue)")
-        print("[AppConfig] CoreBaseURL=\(coreBaseURL.absoluteString)")
-        print("[AppConfig] TranslationBaseURL=\(translationBaseURL.absoluteString)")
+        print("[AppConfig] apiEnvironment = \(apiEnvironment.rawValue)")
+        print("[AppConfig] coreBaseURL = \(coreBaseURL.absoluteString)")
     }
 
     // MARK: - Private

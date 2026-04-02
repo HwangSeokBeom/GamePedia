@@ -470,30 +470,8 @@ final class AppCoordinator {
     private func presentDebugEnvironmentMenu(from presenter: UIViewController) {
         EnvironmentDebugMenuPresenter.present(
             from: presenter,
-            currentEnvironment: AppConfig.apiEnvironment,
-            selectedOverride: DebugEnvironmentSelectionStore.selectedEnvironment
-        ) { [weak presenter] selectedEnvironment in
-            DebugEnvironmentSelectionStore.selectedEnvironment = selectedEnvironment
-            let resolvedEnvironment = selectedEnvironment ?? AppEnvironmentResolver.current
-            let alertController = UIAlertController(
-                title: L10n.tr("Localizable", "debug.environment.savedTitle"),
-                message: L10n.tr(
-                    "Localizable",
-                    "debug.environment.savedMessage",
-                    resolvedEnvironment.rawValue,
-                    resolvedEnvironment.apiBaseURL.absoluteString,
-                    resolvedEnvironment.translationBaseURL.absoluteString
-                ),
-                preferredStyle: .alert
-            )
-            alertController.addAction(
-                UIAlertAction(
-                    title: L10n.tr("Localizable", "common.button.ok"),
-                    style: .default
-                )
-            )
-            presenter?.present(alertController, animated: true)
-        }
+            currentEnvironment: AppConfig.apiEnvironment
+        )
     }
 #endif
 }

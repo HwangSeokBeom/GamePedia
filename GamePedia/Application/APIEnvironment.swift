@@ -15,17 +15,6 @@ enum APIEnvironment: String, CaseIterable {
             return URL(string: "https://gamepedia-api.duckdns.org")!
         }
     }
-
-    var translationBaseURL: URL {
-        switch self {
-        case .dev:
-            return URL(string: "http://127.0.0.1:3000")!
-        case .staging:
-            return URL(string: "https://staging-gamepedia-translate.duckdns.org")!
-        case .production:
-            return URL(string: "https://gamepedia-translate.duckdns.org")!
-        }
-    }
 }
 
 enum AppEnvironmentResolver {
@@ -34,18 +23,12 @@ enum AppEnvironmentResolver {
             return override
         }
 
-#if DEBUG
-        if let selectedEnvironment = DebugEnvironmentSelectionStore.selectedEnvironment {
-            return selectedEnvironment
-        }
-#endif
-
         if isTestFlight {
             return .staging
         }
 
 #if DEBUG
-        return .staging
+        return .dev
 #else
         return .production
 #endif
@@ -79,24 +62,3 @@ enum AppEnvironmentResolver {
         return APIEnvironment(rawValue: normalizedValue)
     }
 }
-
-#if DEBUG
-enum DebugEnvironmentSelectionStore {
-    private static let userDefaultsKey = "debugSelectedAPIEnvironment"
-    private static let defaults = UserDefaults.standard
-
-    static var selectedEnvironment: APIEnvironment? {
-        get {
-            guard let rawValue = defaults.string(forKey: userDefaultsKey) else { return nil }
-            return APIEnvironment(rawValue: rawValue)
-        }
-        set {
-            if let newValue {
-                defaults.set(newValue.rawValue, forKey: userDefaultsKey)
-            } else {
-                defaults.removeObject(forKey: userDefaultsKey)
-            }
-        }
-    }
-}
-#endif

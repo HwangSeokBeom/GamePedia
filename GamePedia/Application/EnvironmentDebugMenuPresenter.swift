@@ -4,36 +4,20 @@ import UIKit
 enum EnvironmentDebugMenuPresenter {
     static func present(
         from presenter: UIViewController,
-        currentEnvironment: APIEnvironment,
-        selectedOverride: APIEnvironment?,
-        onSelectEnvironment: @escaping (APIEnvironment?) -> Void
+        currentEnvironment: APIEnvironment
     ) {
         let alertController = UIAlertController(
-            title: "서버 환경 전환",
+            title: "서버 환경 정보",
             message: """
             현재 환경: \(currentEnvironment.rawValue)
             API: \(currentEnvironment.apiBaseURL.absoluteString)
-            Translation: \(currentEnvironment.translationBaseURL.absoluteString)
 
-            변경 후 앱을 다시 실행하면 반영됩니다.
+            환경은 빌드 설정과 스킴으로 결정됩니다.
             """,
             preferredStyle: .actionSheet
         )
 
-        APIEnvironment.allCases.forEach { environment in
-            let titleSuffix = selectedOverride == environment ? " ✓" : ""
-            alertController.addAction(
-                UIAlertAction(title: environment.rawValue + titleSuffix, style: .default) { _ in
-                    onSelectEnvironment(environment)
-                }
-            )
-        }
-
-        alertController.addAction(
-            UIAlertAction(title: "빌드 기본값 사용", style: .default) { _ in
-                onSelectEnvironment(nil)
-            }
-        )
+        alertController.addAction(UIAlertAction(title: "확인", style: .default))
         alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
 
         if let popoverPresentationController = alertController.popoverPresentationController {
