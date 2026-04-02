@@ -359,7 +359,7 @@ final class ProfileViewModel {
     private func mergeRecentGames(
         current: [RecentGame],
         incoming: [RecentGame],
-        screen: String
+        screen _: String
     ) -> [RecentGame] {
         guard incoming.isEmpty == false else { return current }
 
@@ -654,11 +654,9 @@ final class ProfileViewModel {
         }
 
         guard nextBadgeTitles != state.selectedBadgeTitles else {
-            print("[ProfileRender] selectedBadgeSkipped reason=unchanged")
             return
         }
 
-        print("[ProfileRender] selectedBadgeUpdated reason=changed")
         apply(.setSelectedBadgeTitles(nextBadgeTitles))
     }
 }

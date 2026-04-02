@@ -642,7 +642,6 @@ final class ProfileRootView: UIView {
             isUnlinkingSteamAccount: state.isUnlinkingSteamAccount
         )
         if lastRootRenderSignature != rootRenderSignature {
-            print("[ProfileRender] headerUpdated reason=changed")
             headerCardView.render(
                 profileImageURL: state.profileImageURL,
                 nickname: state.displayName,
@@ -664,8 +663,6 @@ final class ProfileRootView: UIView {
             tasteSummaryRowView.setSecondaryText(rootRenderSignature.tasteSummaryText)
             updateAccountActionButtons(with: state)
             lastRootRenderSignature = rootRenderSignature
-        } else {
-            print("[ProfileRender] headerSkipped reason=unchanged")
         }
 
         let recentPlaySectionSignature = RecentPlaySectionSignature(
@@ -681,9 +678,6 @@ final class ProfileRootView: UIView {
                 hasMoreRecentPlayed: recentPlaySectionSignature.hasMoreRecentPlayed
             )
             lastRecentPlaySectionSignature = recentPlaySectionSignature
-            print("[ProfileRender] recentPlaySectionUpdated reason=changed")
-        } else {
-            print("[ProfileRender] recentPlaySectionSkipped reason=unchanged")
         }
     }
 
@@ -1054,7 +1048,6 @@ final class ProfileHeaderCardView: UIView {
             isLoading: isLoading
         )
         guard renderSignature != lastRenderSignature else {
-            print("[ProfileRender] headerCardSkipped reason=unchanged")
             return
         }
         lastRenderSignature = renderSignature
@@ -1069,11 +1062,6 @@ final class ProfileHeaderCardView: UIView {
         descriptionLabel.text = descriptionText
         primaryMetaLabel.text = primaryMetaText
         secondaryMetaLabel.text = secondaryMetaText
-        print(
-            "[ProfileHeader] configure " +
-            "selectedTitle=\(badgeTitles.first ?? "nil") " +
-            "beforeHidden=\(badgeContainerView.isHidden)"
-        )
         if lastBadgeTitles != badgeTitles {
             configureBadgeTitles(badgeTitles)
             lastBadgeTitles = badgeTitles
@@ -1095,18 +1083,6 @@ final class ProfileHeaderCardView: UIView {
         descriptionSkeletonView.isHidden = !isLoading
         badgeScrollView.isHidden = isLoading
         updateBadgeLoadingLayout(isLoading: isLoading)
-        print("[ProfileRender] skeletonVisible=\(isLoading)")
-
-        layoutIfNeeded()
-        let renderedChipTexts = badgeStackView.arrangedSubviews.compactMap { arrangedSubview in
-            (arrangedSubview as? UILabel)?.text
-        }
-        print(
-            "[ProfileHeader] rendered selectedTitle=\(renderedChipTexts.first ?? "nil") " +
-            "chipCount=\(renderedChipTexts.count) " +
-            "isHidden=\(badgeContainerView.isHidden) " +
-            "frame=\(NSCoder.string(for: badgeScrollView.frame))"
-        )
     }
 
     private func setup() {
@@ -1268,7 +1244,6 @@ final class ProfileHeaderCardView: UIView {
             badgeLabel.layer.masksToBounds = true
             badgeStackView.addArrangedSubview(badgeLabel)
         }
-        print("[ProfileHeader] rendered selectedTitle=\(badgeTitles.first ?? "nil")")
     }
 
     private func updateBadgeLoadingLayout(isLoading: Bool) {
@@ -1277,11 +1252,9 @@ final class ProfileHeaderCardView: UIView {
         if isLoading {
             NSLayoutConstraint.deactivate(badgeLoadedConstraints)
             NSLayoutConstraint.activate(badgeLoadingConstraints)
-            print("[ProfileRender] badgeSkeletonShown")
         } else {
             NSLayoutConstraint.deactivate(badgeLoadingConstraints)
             NSLayoutConstraint.activate(badgeLoadedConstraints)
-            print("[ProfileRender] badgeSkeletonHidden")
         }
 
         isBadgeLoadingLayoutActive = isLoading

@@ -443,7 +443,6 @@ final class LibrarySectionListViewController: UIViewController {
     }
 
     private func makeRecentlyPlayedCardItem(from summary: LibraryGameSummary) -> LibraryCollectionItem {
-        logRatingMapping(summary: summary, context: "LibrarySectionList.recentlyPlayed")
         return .recentCard(
             LibraryRecentGameCardViewState(
                 identifier: summary.identifier,
@@ -461,7 +460,6 @@ final class LibrarySectionListViewController: UIViewController {
     }
 
     private func makeLibraryRowItem(from summary: LibraryGameSummary) -> LibraryCollectionItem {
-        logRatingMapping(summary: summary, context: "LibrarySectionList.row")
         let subtitleText = librarySubtitleText(for: summary)
         return .row(
             LibraryGameRowViewState(
@@ -525,7 +523,6 @@ final class LibrarySectionListViewController: UIViewController {
         from recommendation: SteamFriendRecommendation
     ) -> LibraryCollectionItem {
         let summary = recommendation.game
-        logRatingMapping(summary: summary, context: "LibrarySectionList.friendRecommendation")
         return .row(
             LibraryGameRowViewState(
                 identifier: summary.identifier,
@@ -545,7 +542,6 @@ final class LibrarySectionListViewController: UIViewController {
         from recommendation: PlaytimeRecommendation
     ) -> LibraryCollectionItem {
         let summary = recommendation.game
-        logRatingMapping(summary: summary, context: "LibrarySectionList.playtimeRecommendation")
         return .row(
             LibraryGameRowViewState(
                 identifier: summary.identifier,
@@ -569,17 +565,6 @@ final class LibrarySectionListViewController: UIViewController {
             fallbackReason: summary.recentPlayFallbackReason
         )
         return display.finalText
-    }
-
-    private func logRatingMapping(summary: LibraryGameSummary, context: String) {
-        print(
-            "[LibraryRatingMapping] " +
-            "context=\(context) " +
-            "title=\(summary.displayTitle) " +
-            "igdbGameId=\(summary.igdbGameId.map(String.init) ?? "nil") " +
-            "aggregatedRating=nil totalRating=nil " +
-            "final ratingText=\(summary.formattedRatingText ?? "nil")"
-        )
     }
 
     private func librarySubtitleText(for summary: LibraryGameSummary) -> String {
