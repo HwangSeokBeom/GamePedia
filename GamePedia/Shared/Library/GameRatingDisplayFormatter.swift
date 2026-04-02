@@ -23,7 +23,7 @@ enum GameRatingDisplayFormatter {
             selected = (nil, "none")
         }
 
-        guard let rawValue = selected.value, rawValue.isFinite, rawValue > 0 else {
+        guard let rawValue = selected.value, rawValue.isFinite, rawValue >= 0 else {
             return GameRatingDisplayParts(
                 normalizedRating: nil,
                 displayText: nil,

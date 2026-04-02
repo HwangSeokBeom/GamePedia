@@ -131,8 +131,20 @@ final class DefaultFriendRepository: FriendRepository {
     }
 
     func fetchSocialPrivacySettings() async throws -> SocialPrivacySettings {
-        let data = try await remoteDataSource.fetchSocialPrivacySettings()
-        return mapSocialPrivacySettings(data)
+        do {
+            let data = try await remoteDataSource.fetchSocialPrivacySettings()
+            return mapSocialPrivacySettings(data)
+        } catch let error as NetworkError {
+            if shouldFallbackToDefaultPrivacySettings(for: error) {
+                print(
+                    "[FriendPrivacy] defaultFallback " +
+                    "status=\(privacyStatusCode(from: error) ?? -1) " +
+                    "code=\(error.serverCode ?? "nil")"
+                )
+                return .default
+            }
+            throw error
+        }
     }
 
     func updateSocialPrivacySettings(_ settings: SocialPrivacySettings) async throws -> SocialPrivacySettings {
@@ -410,5 +422,23 @@ final class DefaultFriendRepository: FriendRepository {
             isReviewsPublic: dto.isReviewsPublic ?? true,
             isSteamFriendsFeatureAvailable: dto.steamFriendsFeatureAvailable ?? false
         )
+    }
+
+    private func shouldFallbackToDefaultPrivacySettings(for error: NetworkError) -> Bool {
+        guard case .serverError(let statusCode, let code, let message) = error else { return false }
+        if statusCode == 404 {
+            return true
+        }
+
+        let normalizedCode = sanitized(code)?.uppercased() ?? ""
+        let normalizedMessage = sanitized(message)?.lowercased() ?? ""
+        return normalizedCode.contains("PRIVACY")
+            && normalizedCode.contains("NOT_FOUND")
+            || (normalizedMessage.contains("privacy") && normalizedMessage.contains("not found"))
+    }
+
+    private func privacyStatusCode(from error: NetworkError) -> Int? {
+        guard case .serverError(let statusCode, _, _) = error else { return nil }
+        return statusCode
     }
 }

@@ -513,12 +513,109 @@ struct SocialPrivacySettingsResponseDataDTO: Decodable {
     let isReviewsPublic: Bool?
     let steamFriendsFeatureAvailable: Bool?
 
-    enum CodingKeys: String, CodingKey {
+    init(from decoder: Decoder) throws {
+        if let singleValueContainer = try? decoder.singleValueContainer(),
+           singleValueContainer.decodeNil() {
+            isFriendsListPublic = nil
+            isRecentPlayPublic = nil
+            isLikedGamesPublic = nil
+            isReviewsPublic = nil
+            steamFriendsFeatureAvailable = nil
+            return
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let resolvedContainer = Self.nestedContainerIfPresent(from: container) ?? container
+
+        isFriendsListPublic = Self.decodeBool(
+            from: resolvedContainer,
+            keys: [.isFriendsListPublic, .friendsListPublic, .friends_list_public]
+        )
+        isRecentPlayPublic = Self.decodeBool(
+            from: resolvedContainer,
+            keys: [.isRecentPlayPublic, .recentPlayPublic, .recent_play_public]
+        )
+        isLikedGamesPublic = Self.decodeBool(
+            from: resolvedContainer,
+            keys: [.isLikedGamesPublic, .likedGamesPublic, .liked_games_public]
+        )
+        isReviewsPublic = Self.decodeBool(
+            from: resolvedContainer,
+            keys: [.isReviewsPublic, .reviewsPublic, .reviews_public]
+        )
+        steamFriendsFeatureAvailable = Self.decodeBool(
+            from: resolvedContainer,
+            keys: [.steamFriendsFeatureAvailable, .isSteamFriendsFeatureAvailable, .steam_friends_feature_available]
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
         case isFriendsListPublic
+        case friendsListPublic
+        case friends_list_public
         case isRecentPlayPublic
+        case recentPlayPublic
+        case recent_play_public
         case isLikedGamesPublic
+        case likedGamesPublic
+        case liked_games_public
         case isReviewsPublic
+        case reviewsPublic
+        case reviews_public
         case steamFriendsFeatureAvailable
+        case isSteamFriendsFeatureAvailable
+        case steam_friends_feature_available
+        case settings
+        case privacySettings
+        case socialPrivacySettings
+        case social_privacy_settings
+        case privacy
+    }
+
+    private static func nestedContainerIfPresent(
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) -> KeyedDecodingContainer<CodingKeys>? {
+        let nestedKeys: [CodingKeys] = [
+            .settings,
+            .privacySettings,
+            .socialPrivacySettings,
+            .social_privacy_settings,
+            .privacy
+        ]
+
+        for key in nestedKeys {
+            if let nestedContainer = try? container.nestedContainer(keyedBy: CodingKeys.self, forKey: key) {
+                return nestedContainer
+            }
+        }
+
+        return nil
+    }
+
+    private static func decodeBool(
+        from container: KeyedDecodingContainer<CodingKeys>,
+        keys: [CodingKeys]
+    ) -> Bool? {
+        for key in keys {
+            if let value = try? container.decodeIfPresent(Bool.self, forKey: key) {
+                return value
+            }
+            if let value = try? container.decodeIfPresent(Int.self, forKey: key) {
+                return value != 0
+            }
+            if let value = try? container.decodeIfPresent(String.self, forKey: key) {
+                switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+                case "true", "1", "yes", "y":
+                    return true
+                case "false", "0", "no", "n":
+                    return false
+                default:
+                    continue
+                }
+            }
+        }
+
+        return nil
     }
 }
 

@@ -11,6 +11,8 @@ struct GameDetailState {
     var isFavorite: Bool = false
     var isFavoriteLoading: Bool = false
     var errorMessage: String? = nil
+    var blockingLoadErrorMessage: String? = nil
+    var inlineNoticeMessage: String? = nil
     var translatedSummary: String? = nil
     var translatedStoryline: String? = nil
     var isTranslationLoading: Bool = false
@@ -18,6 +20,7 @@ struct GameDetailState {
     var translationRequest: TranslationBatchRequest? = nil
 
     var title: String { game?.title ?? "" }
+    var hasRenderableContent: Bool { game != nil }
 
     var originalSummary: String {
         let originalSummary = game?.summary.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""

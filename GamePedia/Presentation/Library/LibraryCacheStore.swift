@@ -5,6 +5,7 @@ struct LibraryCachedState {
     let steamSyncStatus: SteamSyncStatus
     let isSteamSyncAvailable: Bool
     let steamSyncErrorCode: String?
+    let summaryByTab: [LibraryTab: LibraryTabSummaryState]?
     let recentlyPlayed: [LibraryGameSummary]
     let playingGames: [LibraryGameSummary]
     let ownedGames: [LibraryGameSummary]
@@ -42,6 +43,29 @@ final class LibraryCacheStore {
             steamSyncStatus: SteamSyncStatus(rawValue: storedState.steamSyncStatus) ?? .idle,
             isSteamSyncAvailable: storedState.isSteamSyncAvailable,
             steamSyncErrorCode: storedState.steamSyncErrorCode,
+            summaryByTab: storedState.summaryByTab?
+                .compactMap { key, value -> (LibraryTab, LibraryTabSummaryState)? in
+                    guard let rawValue = Int(key),
+                          let tab = LibraryTab(rawValue: rawValue) else {
+                        return nil
+                    }
+
+                    return (
+                        tab,
+                        LibraryTabSummaryState(
+                            primaryTitle: LibraryTabSummaryState.empty(for: tab).primaryTitle,
+                            primaryValue: value.primaryValue,
+                            primaryValueKind: LibrarySummaryPrimaryValueKind(rawValue: value.primaryValueKind) ?? .count,
+                            averageRating: value.averageRating,
+                            gameCount: value.gameCount,
+                            reviewCount: value.reviewCount,
+                            sourceDescription: value.sourceDescription
+                        )
+                    )
+                }
+                .reduce(into: [LibraryTab: LibraryTabSummaryState]()) { partialResult, entry in
+                    partialResult[entry.0] = entry.1
+                },
             recentlyPlayed: storedState.recentlyPlayed.map(\.libraryGameSummary),
             playingGames: storedState.playingGames.map(\.libraryGameSummary),
             ownedGames: storedState.ownedGames.map(\.libraryGameSummary),
@@ -59,6 +83,7 @@ final class LibraryCacheStore {
         steamSyncStatus: SteamSyncStatus,
         isSteamSyncAvailable: Bool,
         steamSyncErrorCode: String?,
+        summaryByTab: [LibraryTab: LibraryTabSummaryState],
         recentlyPlayed: [LibraryGameSummary],
         playingGames: [LibraryGameSummary],
         ownedGames: [LibraryGameSummary],
@@ -74,6 +99,9 @@ final class LibraryCacheStore {
             steamSyncStatus: steamSyncStatus.rawValue,
             isSteamSyncAvailable: isSteamSyncAvailable,
             steamSyncErrorCode: steamSyncErrorCode,
+            summaryByTab: summaryByTab.reduce(into: [String: StoredLibraryTabSummary]()) { partialResult, entry in
+                partialResult[String(entry.key.rawValue)] = StoredLibraryTabSummary(entry.value)
+            },
             recentlyPlayed: recentlyPlayed.map(StoredLibraryGameSummary.init),
             playingGames: playingGames.map(StoredLibraryGameSummary.init),
             ownedGames: ownedGames.map(StoredLibraryGameSummary.init),
@@ -128,6 +156,7 @@ private struct StoredLibraryCachedState: Codable {
     let steamSyncStatus: String
     let isSteamSyncAvailable: Bool
     let steamSyncErrorCode: String?
+    let summaryByTab: [String: StoredLibraryTabSummary]?
     let recentlyPlayed: [StoredLibraryGameSummary]
     let playingGames: [StoredLibraryGameSummary]
     let ownedGames: [StoredLibraryGameSummary]
@@ -137,6 +166,24 @@ private struct StoredLibraryCachedState: Codable {
     let friendRecommendationsSource: String
     let friendRecommendationsEmptyState: String?
     let sections: [StoredLibrarySection]
+}
+
+private struct StoredLibraryTabSummary: Codable {
+    let primaryValue: Double
+    let primaryValueKind: String
+    let averageRating: Double?
+    let gameCount: Int
+    let reviewCount: Int
+    let sourceDescription: String
+
+    init(_ summary: LibraryTabSummaryState) {
+        primaryValue = summary.primaryValue
+        primaryValueKind = summary.primaryValueKind.rawValue
+        averageRating = summary.averageRating
+        gameCount = summary.gameCount
+        reviewCount = summary.reviewCount
+        sourceDescription = summary.sourceDescription
+    }
 }
 
 private struct StoredPlaytimeRecommendation: Codable {

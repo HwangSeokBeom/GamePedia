@@ -3,6 +3,28 @@ import UIKit
 // MARK: - ProfileViewController
 
 final class ProfileViewController: BaseViewController<ProfileRootView, ProfileState> {
+    private struct RootRenderSignature: Equatable {
+        let isLoading: Bool
+        let authenticatedUser: AuthUser?
+        let selectedTitle: String?
+        let selectedTitleKey: String?
+        let selectedTitles: [String]
+        let selectedBadgeTitles: [String]
+        let friendCount: Int
+        let friendActivityCount: Int
+        let wishlistCount: Int
+        let writtenReviewCount: Int
+        let steamLinkStatus: SteamLinkStatus
+        let recentPlayLoadState: ProfileRecentPlayLoadState
+        let recentPlayCount: Int
+        let hasMoreRecentPlayed: Bool
+        let profileTags: [String]
+    }
+
+    private struct RecentPlayRenderSignature: Equatable {
+        let games: [RecentGame]
+        let translatedRecentGameTitles: [Int: String]
+    }
 
     // MARK: Properties
     private let viewModel: ProfileViewModel
@@ -11,6 +33,8 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     private var lastPresentedSuccessMessage: String?
     private var toastHideWorkItem: DispatchWorkItem?
     private weak var toastView: ProfileToastView?
+    private var lastRootRenderSignature: RootRenderSignature?
+    private var lastRecentPlayRenderSignature: RecentPlayRenderSignature?
 
     // Set by ProfileCoordinator.
     var onGameSelected: ((Int) -> Void)?
@@ -143,6 +167,28 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     }
 
     override func render(_ state: ProfileState) {
+        let rootRenderSignature = RootRenderSignature(
+            isLoading: state.isLoading,
+            authenticatedUser: state.authenticatedUser,
+            selectedTitle: state.selectedTitle,
+            selectedTitleKey: state.selectedTitleKey,
+            selectedTitles: state.selectedTitles,
+            selectedBadgeTitles: state.selectedBadgeTitles,
+            friendCount: state.friendCount,
+            friendActivityCount: state.friendActivityCount,
+            wishlistCount: state.wishlistCount,
+            writtenReviewCount: state.writtenReviewCount,
+            steamLinkStatus: state.steamLinkStatus,
+            recentPlayLoadState: state.recentPlayLoadState,
+            recentPlayCount: state.recentlyPlayedGames.count,
+            hasMoreRecentPlayed: state.hasMoreRecentPlayed,
+            profileTags: state.profileTags
+        )
+        let recentPlayRenderSignature = RecentPlayRenderSignature(
+            games: state.recentlyPlayedGames,
+            translatedRecentGameTitles: state.translatedRecentGameTitles
+        )
+
         print(
             "[Profile] render " +
             "selectedTitle=\(state.selectedTitle ?? "nil") " +
@@ -151,11 +197,23 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
             "recentPlayCount=\(state.recentlyPlayedGames.count) " +
             "recentPlayState=\(String(describing: state.recentPlayLoadState))"
         )
-        rootView.render(state)
+        GameDetailSeedStore.shared.store(recentGames: state.recentlyPlayedGames, screen: "Profile.render")
+        if lastRootRenderSignature != rootRenderSignature {
+            print("[ProfileRender] rootUpdated reason=changed")
+            rootView.render(state)
+            lastRootRenderSignature = rootRenderSignature
+        } else {
+            print("[ProfileRender] renderSkipped reason=identicalViewState")
+        }
 
-        recentlyPlayedGames = state.recentlyPlayedGames
-        print("[Profile] recent-play render input count=\(recentlyPlayedGames.count)")
-        rootView.tableView.reloadData()
+        if lastRecentPlayRenderSignature != recentPlayRenderSignature {
+            recentlyPlayedGames = state.recentlyPlayedGames
+            print("[ProfileRender] recentPlayUpdated reason=changed count=\(recentlyPlayedGames.count)")
+            rootView.tableView.reloadData()
+            lastRecentPlayRenderSignature = recentPlayRenderSignature
+        } else {
+            print("[ProfileRender] recentPlaySkipped reason=unchanged")
+        }
 
         if let errorMessage = state.errorMessage,
            errorMessage != lastPresentedErrorMessage {
@@ -395,6 +453,7 @@ extension ProfileViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let game = recentlyPlayedGames[indexPath.row]
+        GameDetailSeedStore.shared.store(recentGames: [game], screen: "Profile.preview.tap")
         let resolvedGameId = game.resolvedDetailGameId
         let blockedReason: String?
         if game.detailAvailable == false {

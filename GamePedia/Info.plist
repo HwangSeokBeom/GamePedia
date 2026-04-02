@@ -4,6 +4,10 @@
 <dict>
 	<key>APIEnvironment</key>
 	<string>$(API_ENVIRONMENT)</string>
+	<key>CFBundleDisplayName</key>
+	<string>GamePedia</string>
+	<key>CFBundleName</key>
+	<string>GamePedia</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

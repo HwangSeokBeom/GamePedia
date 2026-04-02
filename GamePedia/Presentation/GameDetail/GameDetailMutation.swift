@@ -9,6 +9,9 @@ enum GameDetailMutation {
     case setFavorite(Bool)
     case setFavoriteLoading(Bool)
     case setError(String)
+    case clearError
+    case setBlockingLoadError(String?)
+    case setInlineNotice(String?)
     case setTranslatedFields(summary: String?, storyline: String?)
     case setTranslationLoading(Bool)
     case setTranslationRequest(TranslationBatchRequest?)
