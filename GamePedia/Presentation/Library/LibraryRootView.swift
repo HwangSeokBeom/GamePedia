@@ -509,10 +509,10 @@ final class LibraryRootView: UIView {
                 primaryTitle: summaryState.primaryTitle,
                 averageRatingTitle: L10n.Library.Summary.averageRating,
                 gameCountTitle: L10n.Library.Summary.gameCount,
-                totalPlaytimeText: formattedPrimaryValueText(summaryState),
+                totalPlaytimeText: "-",
                 averageRatingText: "-",
                 averageRatingDisplaySource: "placeholder.summaryLoading",
-                gameCountText: Self.numberFormatter.string(from: NSNumber(value: summaryState.gameCount)) ?? "\(summaryState.gameCount)",
+                gameCountText: "-",
                 rawReviewsCount: summaryState.reviewCount,
                 rawAverageRating: summaryState.averageRating,
                 sourceDescription: summaryState.sourceDescription

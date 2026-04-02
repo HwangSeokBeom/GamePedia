@@ -34,6 +34,7 @@ final class LibraryViewModel {
         case manual
         case retry
         case silentAutomatic
+        case postLinkAutomatic
 
         var logName: String {
             switch self {
@@ -43,6 +44,8 @@ final class LibraryViewModel {
                 return "retry"
             case .silentAutomatic:
                 return "silentAutomatic"
+            case .postLinkAutomatic:
+                return "postLinkAutomatic"
             }
         }
 
@@ -51,7 +54,7 @@ final class LibraryViewModel {
         }
 
         var showsSuccessToast: Bool {
-            self != .silentAutomatic
+            self == .manual || self == .retry
         }
     }
 
@@ -90,6 +93,7 @@ final class LibraryViewModel {
     private var shouldPresentSteamPrivacyGuidanceAfterSteamLink = false
     private var shouldPresentSteamConnectionOnboardingAfterSteamLink = false
     private var shouldEvaluateAutomaticSilentSteamSyncAfterNextOverviewLoad = false
+    private var isDeferringOverviewUntilPostLinkSyncCompletes = false
     private var didTriggerInitialLoad = false
 
     init(
@@ -535,6 +539,19 @@ final class LibraryViewModel {
         ),
         preserveCurrentSectionOnFailure: Bool
     ) {
+        if isDeferringOverviewUntilPostLinkSyncCompletes {
+            if case .success(let overview) = result {
+                print(
+                    "[Library] preSyncOverviewDeferred " +
+                    "steamConnected=\(overview.steamLinkStatus.isLinked) " +
+                    "steamSyncStatus=\(overview.steamSyncStatus.rawValue)"
+                )
+            } else {
+                print("[Library] preSyncOverviewDeferred reason=postLinkSyncPending")
+            }
+            return
+        }
+
         let baseSections = state.sections.isEmpty ? makeLoadingSections() : state.sections
         let steamState = resolvedMergedSteamState(from: result, fallback: previousSteamState)
         let shouldUpdateRecentlyPlayed =
@@ -1015,6 +1032,10 @@ final class LibraryViewModel {
         overview: LibraryOverview,
         trigger: LoadTrigger
     ) {
+        guard !isDeferringOverviewUntilPostLinkSyncCompletes else {
+            print("[Library] automaticSteamSync skipped reason=postLinkSyncPending trigger=\(trigger.logName)")
+            return
+        }
         guard shouldEvaluateAutomaticSilentSteamSyncAfterNextOverviewLoad else { return }
         shouldEvaluateAutomaticSilentSteamSyncAfterNextOverviewLoad = false
 
@@ -1557,20 +1578,50 @@ final class LibraryViewModel {
         let totalMinutes = summaries
             .compactMap { $0.playtimeMinutes ?? $0.recentPlaytimeMinutes }
             .reduce(0, +)
+        let playingRatings = state.playingGames.compactMap { summary -> Double? in
+            guard let rating = summary.rating, rating.isFinite, rating >= 0 else { return nil }
+            return rating
+        }
         let ratings = summaries.compactMap { summary -> Double? in
             guard let rating = summary.rating, rating.isFinite, rating >= 0 else { return nil }
             return rating
         }
         let derivedPrimaryValue = max(Double(totalMinutes) / 60, 0)
-        let derivedAverageRating = averageRating(from: ratings)
+        let playingFallbackAverageRating = averageRating(from: playingRatings)
+        let derivedAverageRating = playingFallbackAverageRating ?? averageRating(from: ratings)
         let derivedGameCount = summaries.count
-        let derivedReviewCount = ratings.count
+        let derivedReviewCount = playingFallbackAverageRating != nil ? playingRatings.count : ratings.count
 
         if let serverSummary = state.serverSummaryByTab[.playing], serverSummary.hasRenderableValues {
             let resolvedPrimaryValue = max(serverSummary.totalPlaytimeHours ?? 0, 0)
             let resolvedGameCount = max(serverSummary.gameCount ?? 0, 0)
-            let resolvedAverageRating = serverSummary.averageRating
-            let resolvedReviewCount = max(serverSummary.reviewCount ?? 0, 0)
+            let resolvedAverageRating: Double?
+            let resolvedAverageRatingSource: String
+            if let serverAverageRating = serverSummary.averageRating {
+                resolvedAverageRating = serverAverageRating
+                resolvedAverageRatingSource = "server.preview.summary"
+            } else if let fallbackAverageRating = playingFallbackAverageRating {
+                resolvedAverageRating = fallbackAverageRating
+                resolvedAverageRatingSource = "client.playingFallback"
+            } else {
+                resolvedAverageRating = nil
+                resolvedAverageRatingSource = "none"
+            }
+            let resolvedReviewCount = max(serverSummary.reviewCount ?? derivedReviewCount, 0)
+
+            print(
+                "[LibrarySummary] " +
+                "selectedTab=\(LibraryTab.playing) " +
+                "gameCount=\(resolvedGameCount) " +
+                "totalPlaytimeHours=\(resolvedPrimaryValue) " +
+                "source=server.preview.summary " +
+                "averageRatingSource=\(resolvedAverageRatingSource) " +
+                "serverAverageRating=\(serverSummary.averageRating.map { String(format: "%.2f", $0) } ?? "nil") " +
+                "clientFallbackAverageRating=\(playingFallbackAverageRating.map { String(format: "%.2f", $0) } ?? "nil") " +
+                "source.gameCount=\(serverSummary.gameCountSourceField ?? "server.nil") " +
+                "source.totalPlaytimeHours=\(serverSummary.totalPlaytimeHoursSourceField ?? "server.nil") " +
+                "fallbackTriggered=false"
+            )
 
             return LibraryTabSummaryState(
                 primaryTitle: L10n.Library.Summary.totalPlay,
@@ -1882,6 +1933,9 @@ final class LibraryViewModel {
         apply(.setSteamOwnedSyncErrorCode(nil))
         apply(.setSyncingOwnedSteamLibrary(true))
         libraryCacheStore.saveLastAttemptedSteamSyncDate(Date())
+        if trigger == .postLinkAutomatic {
+            print("[SteamLink] postLinkSyncStarted")
+        }
         print("[Library] syncOwnedSteamLibrary started trigger=\(trigger.logName)")
 
         Task {
@@ -1889,8 +1943,16 @@ final class LibraryViewModel {
                 let result = try await syncOwnedSteamLibraryUseCase.execute()
                 await MainActor.run {
                     self.apply(.setSyncingOwnedSteamLibrary(false))
+                    if trigger == .postLinkAutomatic {
+                        print(
+                            "[SteamLink] postLinkSyncCompleted " +
+                            "syncedCount=\(result.syncedCount) " +
+                            "warningCode=\(result.syncWarningCode ?? "nil")"
+                        )
+                    }
 
                     if self.isSteamOwnedLibraryUnavailable(errorCode: result.syncWarningCode) {
+                        self.isDeferringOverviewUntilPostLinkSyncCompletes = false
                         self.apply(.setSteamOwnedSyncErrorCode(result.syncWarningCode))
                         print(
                             "[SteamPrivacyGuide] " +
@@ -1928,6 +1990,8 @@ final class LibraryViewModel {
                         self.apply(.setSuccessMessage(L10n.tr("Localizable", "library.success.libraryUpdated")))
                     }
                     self.shouldForceOverviewReplacementAfterSteamSync = true
+                    self.isDeferringOverviewUntilPostLinkSyncCompletes = false
+                    print("[Library] authoritativeRefreshStarted source=postLinkSync")
                     self.refreshLibraryAfterSteamSync()
                 }
             } catch {
@@ -1940,6 +2004,7 @@ final class LibraryViewModel {
                     let isSteamAccountNotLinked = normalizedServerCode == "STEAM_ACCOUNT_NOT_LINKED"
 
                     self.apply(.setSyncingOwnedSteamLibrary(false))
+                    self.isDeferringOverviewUntilPostLinkSyncCompletes = false
                     self.apply(
                         .setSteamOwnedSyncErrorCode(
                             isSteamAccountNotLinked ? nil : resolveOwnedSyncInlineErrorCode(from: error)
@@ -2009,6 +2074,16 @@ final class LibraryViewModel {
                             self.replacingSection(section, in: sections)
                         }
                         self.apply(.setSections(updatedSections))
+                    } else {
+                        self.apply(
+                            .setSteamState(
+                                steamLinkStatus: self.state.steamLinkStatus,
+                                isConnected: self.state.isSteamConnected,
+                                syncStatus: .failed,
+                                isSyncAvailable: self.state.isSteamSyncAvailable,
+                                errorCode: self.resolveOwnedSyncInlineErrorCode(from: error)
+                            )
+                        )
                     }
                     if trigger != .silentAutomatic {
                         self.apply(.setError(self.resolveSyncOwnedSteamLibraryErrorMessage(error)))
@@ -3807,11 +3882,27 @@ final class LibraryViewModel {
     private func handleSteamLinkCallbackResult(_ result: SteamLinkCallbackResult) {
         switch result.status {
         case .success:
+            print("[SteamLink] callbackSuccess linked=\(result.linked.map(String.init) ?? "nil")")
             apply(.clearError)
             shouldPresentSteamPrivacyGuidanceAfterSteamLink = true
             shouldPresentSteamConnectionOnboardingAfterSteamLink = true
-            shouldEvaluateAutomaticSilentSteamSyncAfterNextOverviewLoad = true
-            refreshSteamLinkStatus()
+            shouldEvaluateAutomaticSilentSteamSyncAfterNextOverviewLoad = false
+            isDeferringOverviewUntilPostLinkSyncCompletes = true
+            loadTask?.cancel()
+            fetchSequence += 1
+            apply(.setLoading(false))
+            apply(.setRefreshing(false))
+            beginSummaryLoading(reason: "steamLinkSuccess")
+            apply(
+                .setSteamState(
+                    steamLinkStatus: provisionalLinkedSteamLinkStatus(),
+                    isConnected: true,
+                    syncStatus: .syncing,
+                    isSyncAvailable: false,
+                    errorCode: nil
+                )
+            )
+            syncOwnedSteamLibrary(trigger: .postLinkAutomatic)
         case .failed, .cancelled:
             apply(
                 .setError(
@@ -3820,6 +3911,19 @@ final class LibraryViewModel {
                 )
             )
         }
+    }
+
+    private func provisionalLinkedSteamLinkStatus() -> SteamLinkStatus {
+        SteamLinkStatus(
+            connectionState: .linked,
+            steamID: state.steamLinkStatus.steamID,
+            displayName: state.steamLinkStatus.displayName,
+            personaName: state.steamLinkStatus.personaName,
+            profileURL: state.steamLinkStatus.profileURL,
+            canSync: false,
+            canDisconnect: false,
+            lastSteamSyncAt: state.steamLinkStatus.lastSteamSyncAt
+        )
     }
 
     private func refreshSteamLinkStatus() {
