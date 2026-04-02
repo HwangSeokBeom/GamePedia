@@ -5,7 +5,7 @@ final class LibraryViewModel {
     private enum SectionLoadEvent {
         case overview(Result<LibraryOverview, Error>)
         case playtimeRecommendations(Result<[PlaytimeRecommendation], Error>)
-        case friendRecommendations(Result<[SteamFriendRecommendation], Error>)
+        case friendRecommendations(Result<LibraryFriendRecommendationsResult, Error>)
         case wishlist(Result<[FavoriteGameEntry], Error>)
         case reviewed(Result<[ReviewedGame], Error>)
     }
@@ -68,8 +68,10 @@ final class LibraryViewModel {
     var onRoute: ((LibraryRoute) -> Void)?
 
     private let fetchLibraryOverviewUseCase: FetchLibraryOverviewUseCase
+    private let fetchOwnedLibraryUseCase: FetchOwnedLibraryUseCase
+    private let fetchRecentlyPlayedLibraryUseCase: FetchRecentlyPlayedLibraryUseCase
     private let fetchPlaytimeRecommendationsUseCase: FetchPlaytimeRecommendationsUseCase
-    private let fetchSteamFriendRecommendationsUseCase: FetchSteamFriendRecommendationsUseCase
+    private let fetchLibraryFriendRecommendationsUseCase: FetchLibraryFriendRecommendationsUseCase
     private let fetchFavoriteGamesUseCase: FetchFavoriteGamesUseCase
     private let fetchMyReviewedGamesUseCase: FetchMyReviewedGamesUseCase
     private let startSteamLinkUseCase: StartSteamLinkUseCase
@@ -82,6 +84,7 @@ final class LibraryViewModel {
     private var cancellables = Set<AnyCancellable>()
     private var loadTask: Task<Void, Never>?
     private var fetchSequence = 0
+    private var shouldForceOverviewReplacementAfterSteamSync = false
     private var isRefreshingSteamLinkStatus = false
     private var needsSteamLinkStatusRefresh = false
     private var shouldPresentSteamPrivacyGuidanceAfterSteamLink = false
@@ -93,11 +96,18 @@ final class LibraryViewModel {
         fetchLibraryOverviewUseCase: FetchLibraryOverviewUseCase = FetchLibraryOverviewUseCase(
             libraryRepository: DefaultLibraryRepository()
         ),
+        fetchOwnedLibraryUseCase: FetchOwnedLibraryUseCase = FetchOwnedLibraryUseCase(
+            libraryRepository: DefaultLibraryRepository()
+        ),
+        fetchRecentlyPlayedLibraryUseCase: FetchRecentlyPlayedLibraryUseCase = FetchRecentlyPlayedLibraryUseCase(
+            libraryRepository: DefaultLibraryRepository()
+        ),
         fetchPlaytimeRecommendationsUseCase: FetchPlaytimeRecommendationsUseCase = FetchPlaytimeRecommendationsUseCase(
             libraryRepository: DefaultLibraryRepository()
         ),
-        fetchSteamFriendRecommendationsUseCase: FetchSteamFriendRecommendationsUseCase = FetchSteamFriendRecommendationsUseCase(
-            libraryRepository: DefaultLibraryRepository()
+        fetchLibraryFriendRecommendationsUseCase: FetchLibraryFriendRecommendationsUseCase = FetchLibraryFriendRecommendationsUseCase(
+            libraryRepository: DefaultLibraryRepository(),
+            friendRepository: DefaultFriendRepository()
         ),
         fetchFavoriteGamesUseCase: FetchFavoriteGamesUseCase = FetchFavoriteGamesUseCase(
             fetchMyFavoritesUseCase: FetchMyFavoritesUseCase(
@@ -123,7 +133,7 @@ final class LibraryViewModel {
         updateLibraryGameStatusUseCase: UpdateLibraryGameStatusUseCase = UpdateLibraryGameStatusUseCase(
             libraryRepository: DefaultLibraryRepository()
         ),
-        initialTab: LibraryTab = .favorites,
+        initialTab: LibraryTab = .playing,
         removeFavoriteUseCase: RemoveFavoriteUseCase = RemoveFavoriteUseCase(
             favoriteRepository: DefaultFavoriteRepository()
         ),
@@ -133,10 +143,12 @@ final class LibraryViewModel {
         ),
         libraryCacheStore: LibraryCacheStore = .shared
     ) {
-        self.state = LibraryState(pendingFocusSection: initialTab.focusedSection)
+        self.state = LibraryState(selectedTab: initialTab, pendingFocusSection: initialTab.focusedSection)
         self.fetchLibraryOverviewUseCase = fetchLibraryOverviewUseCase
+        self.fetchOwnedLibraryUseCase = fetchOwnedLibraryUseCase
+        self.fetchRecentlyPlayedLibraryUseCase = fetchRecentlyPlayedLibraryUseCase
         self.fetchPlaytimeRecommendationsUseCase = fetchPlaytimeRecommendationsUseCase
-        self.fetchSteamFriendRecommendationsUseCase = fetchSteamFriendRecommendationsUseCase
+        self.fetchLibraryFriendRecommendationsUseCase = fetchLibraryFriendRecommendationsUseCase
         self.fetchFavoriteGamesUseCase = fetchFavoriteGamesUseCase
         self.fetchMyReviewedGamesUseCase = fetchMyReviewedGamesUseCase
         self.startSteamLinkUseCase = startSteamLinkUseCase
@@ -168,6 +180,26 @@ final class LibraryViewModel {
 
         case .pullToRefresh:
             loadLibrary(trigger: .refresh)
+
+        case .didSelectPrimaryTab(let index):
+            guard let selectedTab = LibraryTab(rawValue: index) else { return }
+            guard selectedTab != state.selectedTab else {
+                apply(.setSelectedTab(selectedTab))
+                return
+            }
+            apply(.setSelectedTab(selectedTab))
+            loadTask?.cancel()
+            apply(.setLoading(false))
+            apply(.setRefreshing(false))
+            loadLibrary(trigger: .refresh)
+
+        case .didSelectHighlightChip(let index):
+            guard let selectedHighlightChip = LibraryHighlightChip(rawValue: index) else { return }
+            guard selectedHighlightChip != state.selectedHighlightChip else {
+                apply(.setSelectedHighlightChip(selectedHighlightChip))
+                return
+            }
+            apply(.setSelectedHighlightChip(selectedHighlightChip))
 
         case .didSelectSort(let index):
             let selectedSort: LibrarySortOption = index == 1 ? .oldest : .latest
@@ -279,12 +311,16 @@ final class LibraryViewModel {
 
         apply(
             .setSteamState(
+                steamLinkStatus: cachedSteamLinkStatus(from: cachedState),
                 isConnected: cachedState.isSteamConnected,
                 syncStatus: cachedState.steamSyncStatus,
                 isSyncAvailable: cachedState.isSteamSyncAvailable,
                 errorCode: cachedState.steamSyncErrorCode
             )
         )
+        let restoredAt = Date()
+        apply(.setPreviewGeneratedAt(restoredAt))
+        apply(.setMergedRecentlyPlayedState(.snapshot, restoredAt))
         apply(
             .setLibraryItems(
                 recentlyPlayed: cachedState.recentlyPlayed,
@@ -295,8 +331,15 @@ final class LibraryViewModel {
                 reviews: state.reviews
             )
         )
+        refreshSummaryState()
         apply(.setPlaytimeRecommendations(cachedState.playtimeRecommendations))
-        apply(.setFriendRecommendations(cachedState.friendRecommendations))
+        apply(
+            .setFriendRecommendations(
+                recommendations: cachedState.friendRecommendations,
+                source: cachedState.friendRecommendationsSource,
+                emptyState: cachedState.friendRecommendationsEmptyState
+            )
+        )
         apply(.setSections(cachedState.sections))
         return true
     }
@@ -315,12 +358,14 @@ final class LibraryViewModel {
             backlogGames: state.backlogGames,
             playtimeRecommendations: state.playtimeRecommendations,
             friendRecommendations: state.friendRecommendations,
+            friendRecommendationsSource: state.friendRecommendationsSource,
+            friendRecommendationsEmptyState: state.friendRecommendationsEmptyState,
             sections: state.sections
         )
     }
 
     private func makeLoadingSections() -> [LibrarySectionViewState] {
-        LibrarySectionKind.allCases.map(makeLoadingSection)
+        LibrarySectionKind.displayOrder.map(makeLoadingSection)
     }
 
     private func makeLoadingSection(for kind: LibrarySectionKind) -> LibrarySectionViewState {
@@ -377,7 +422,7 @@ final class LibraryViewModel {
     ) -> [LibrarySectionViewState] {
         var sectionsByKind = Dictionary(uniqueKeysWithValues: currentSections.map { ($0.kind, $0) })
         sectionsByKind[section.kind] = section
-        return LibrarySectionKind.allCases.compactMap { sectionsByKind[$0] }
+        return LibrarySectionKind.displayOrder.compactMap { sectionsByKind[$0] }
     }
 
     private func shouldPreserveCurrentSection(
@@ -394,14 +439,22 @@ final class LibraryViewModel {
     private func applyOverviewResult(
         _ result: Result<LibraryOverview, Error>,
         trigger: LoadTrigger,
-        previousSteamState: (isConnected: Bool, syncStatus: SteamSyncStatus, isSyncAvailable: Bool, errorCode: String?),
+        previousSteamState: (
+            steamLinkStatus: SteamLinkStatus,
+            isConnected: Bool,
+            syncStatus: SteamSyncStatus,
+            isSyncAvailable: Bool,
+            errorCode: String?
+        ),
         preserveCurrentSectionOnFailure: Bool
     ) {
         let baseSections = state.sections.isEmpty ? makeLoadingSections() : state.sections
-        let steamState = resolveSteamState(from: result, fallback: previousSteamState)
+        let steamState = resolvedMergedSteamState(from: result, fallback: previousSteamState)
+        let shouldUpdateRecentlyPlayed = state.selectedTab == .playing || shouldForceOverviewReplacementAfterSteamSync
 
         apply(
             .setSteamState(
+                steamLinkStatus: steamState.steamLinkStatus,
                 isConnected: steamState.isConnected,
                 syncStatus: steamState.syncStatus,
                 isSyncAvailable: steamState.isSyncAvailable,
@@ -411,37 +464,80 @@ final class LibraryViewModel {
 
         switch result {
         case .success(let overview):
+            var serverSummaryByTab = state.serverSummaryByTab
+            if let playingSummary = overview.playingSummary {
+                serverSummaryByTab[.playing] = playingSummary
+            }
+            if let favoritesSummary = overview.favoritesSummary {
+                serverSummaryByTab[.favorites] = favoritesSummary
+            }
+            if let reviewedSummary = overview.reviewedSummary {
+                serverSummaryByTab[.reviewed] = reviewedSummary
+            }
+            apply(.setServerSummaryByTab(serverSummaryByTab))
+
+            let mergedRecentlyPlayed = shouldUpdateRecentlyPlayed
+                ? mergeRecentlyPlayed(current: state.recentlyPlayed, incoming: overview.recentlyPlayed)
+                : state.recentlyPlayed
+            let mergedOwnedCollection = mergeOwnedCollection(
+                currentOwned: state.ownedGames,
+                currentBacklog: state.backlogGames,
+                incomingOwned: overview.owned,
+                incomingBacklog: overview.backlog
+            )
+            let resolvedOverview = LibraryOverview(
+                steamLinkStatus: steamState.steamLinkStatus,
+                steamSyncStatus: overview.steamSyncStatus,
+                isSteamSyncAvailable: overview.isSteamSyncAvailable,
+                steamSyncErrorCode: overview.steamSyncErrorCode,
+                recentlyPlayed: mergedRecentlyPlayed,
+                playing: overview.playing,
+                owned: mergedOwnedCollection.owned,
+                backlog: mergedOwnedCollection.backlog,
+                playingSummary: overview.playingSummary,
+                favoritesSummary: overview.favoritesSummary,
+                reviewedSummary: overview.reviewedSummary
+            )
+
             if !overview.owned.isEmpty || !overview.steamLinkStatus.isLinked {
                 apply(.setSteamOwnedSyncErrorCode(nil))
             }
-            if !overview.steamLinkStatus.isLinked {
-                apply(.setFriendRecommendations([]))
-            }
             apply(
                 .setLibraryItems(
-                    recentlyPlayed: overview.recentlyPlayed,
-                    playingGames: overview.playing,
-                    ownedGames: overview.owned,
-                    backlogGames: overview.backlog,
+                    recentlyPlayed: resolvedOverview.recentlyPlayed,
+                    playingGames: resolvedOverview.playing,
+                    ownedGames: resolvedOverview.owned,
+                    backlogGames: resolvedOverview.backlog,
                     likedGames: state.likedGames,
                     reviews: state.reviews
                 )
             )
-
-            let playingIdentifiers = Set(overview.playing.map(\.identifier))
-            var updatedSections = [
-                makeRecentlyPlayedSection(from: result, playingIdentifiers: playingIdentifiers),
-                makePlayingSection(from: result),
-                makeOwnedSection(from: result)
-            ].reduce(baseSections) { sections, section in
-                replacingSection(section, in: sections)
+            let fullGeneratedAt = Date()
+            if shouldReplaceWithIncomingFullState(generatedAt: fullGeneratedAt) {
+                apply(.setFullGeneratedAt(fullGeneratedAt))
+                if shouldUpdateRecentlyPlayed {
+                    apply(.setMergedRecentlyPlayedState(.full, fullGeneratedAt))
+                }
             }
+            refreshSummaryState(for: .playing)
 
-            if !overview.steamLinkStatus.isLinked {
-                updatedSections = replacingSection(
-                    makeFriendRecommendationsSection(from: .success([])),
-                    in: updatedSections
-                )
+            let playingIdentifiers = Set(resolvedOverview.playing.map(\.identifier))
+            let sectionsToUpdate: [LibrarySectionViewState] = {
+                if shouldUpdateRecentlyPlayed {
+                    return [
+                        makeRecentlyPlayedSection(from: .success(resolvedOverview), playingIdentifiers: playingIdentifiers),
+                        makePlayingSection(from: .success(resolvedOverview)),
+                        makeOwnedSection(from: .success(resolvedOverview))
+                    ]
+                }
+                return [
+                    makePlayingSection(from: .success(resolvedOverview)),
+                    makeOwnedSection(from: .success(resolvedOverview))
+                ]
+            }()
+
+            let updatedSections = sectionsToUpdate.reduce(baseSections) { sections, section in
+                replacingSection(section, in: sections)
             }
 
             apply(.setSections(updatedSections))
@@ -449,25 +545,45 @@ final class LibraryViewModel {
                 overview: overview,
                 trigger: trigger
             )
+            shouldForceOverviewReplacementAfterSteamSync = false
 
         case .failure:
-            guard shouldPreserveCurrentSection(
+            guard shouldUpdateRecentlyPlayed || shouldPreserveCurrentSection(
                 kind: .recentlyPlayed,
                 trigger: trigger,
                 preserveCurrentSectionOnFailure: preserveCurrentSectionOnFailure
             ) == false else {
+                let updatedSections = [
+                    makePlayingSection(from: result),
+                    makeOwnedSection(from: result)
+                ].reduce(baseSections) { sections, section in
+                    replacingSection(section, in: sections)
+                }
+
+                apply(.setSections(updatedSections))
                 return
             }
 
-            let updatedSections = [
-                makeRecentlyPlayedSection(from: result, playingIdentifiers: []),
-                makePlayingSection(from: result),
-                makeOwnedSection(from: result)
-            ].reduce(baseSections) { sections, section in
+            let sectionsToUpdate: [LibrarySectionViewState] = {
+                if shouldUpdateRecentlyPlayed {
+                    return [
+                        makeRecentlyPlayedSection(from: result, playingIdentifiers: []),
+                        makePlayingSection(from: result),
+                        makeOwnedSection(from: result)
+                    ]
+                }
+                return [
+                    makePlayingSection(from: result),
+                    makeOwnedSection(from: result)
+                ]
+            }()
+
+            let updatedSections = sectionsToUpdate.reduce(baseSections) { sections, section in
                 replacingSection(section, in: sections)
             }
 
             apply(.setSections(updatedSections))
+            shouldForceOverviewReplacementAfterSteamSync = false
         }
     }
 
@@ -488,6 +604,7 @@ final class LibraryViewModel {
                     reviews: state.reviews
                 )
             )
+            refreshSummaryState(for: .favorites)
         } else if shouldPreserveCurrentSection(
             kind: .wishlist,
             trigger: trigger,
@@ -503,12 +620,18 @@ final class LibraryViewModel {
 
     @MainActor
     private func applyFriendRecommendationsResult(
-        _ result: Result<[SteamFriendRecommendation], Error>,
+        _ result: Result<LibraryFriendRecommendationsResult, Error>,
         trigger: LoadTrigger,
         preserveCurrentSectionOnFailure: Bool
     ) {
         if case .success(let recommendations) = result {
-            apply(.setFriendRecommendations(recommendations))
+            apply(
+                .setFriendRecommendations(
+                    recommendations: recommendations.recommendations,
+                    source: recommendations.source,
+                    emptyState: recommendations.emptyState
+                )
+            )
         } else if shouldPreserveCurrentSection(
             kind: .friendRecommendations,
             trigger: trigger,
@@ -560,6 +683,7 @@ final class LibraryViewModel {
                     reviews: reviewedGames
                 )
             )
+            refreshSummaryState(for: .reviewed)
         } else if shouldPreserveCurrentSection(
             kind: .reviewed,
             trigger: trigger,
@@ -571,6 +695,85 @@ final class LibraryViewModel {
         let baseSections = state.sections.isEmpty ? makeLoadingSections() : state.sections
         let updatedSection = makeReviewedSection(from: result)
         apply(.setSections(replacingSection(updatedSection, in: baseSections)))
+    }
+
+    @MainActor
+    private func applyOwnedCollectionRefreshResult(
+        _ result: Result<OwnedLibraryCollection, Error>
+    ) {
+        guard case .success(let collection) = result else { return }
+
+        let mergedCollection = mergeOwnedCollection(
+            currentOwned: state.ownedGames,
+            currentBacklog: state.backlogGames,
+            incomingOwned: collection.owned,
+            incomingBacklog: collection.backlog
+        )
+        apply(
+            .setLibraryItems(
+                recentlyPlayed: state.recentlyPlayed,
+                playingGames: state.playingGames,
+                ownedGames: mergedCollection.owned,
+                backlogGames: mergedCollection.backlog,
+                likedGames: state.likedGames,
+                reviews: state.reviews
+            )
+        )
+        refreshSummaryState(for: .playing)
+
+        let overview = currentOverview(
+            recentlyPlayed: state.recentlyPlayed,
+            playingGames: state.playingGames,
+            ownedGames: mergedCollection.owned,
+            backlogGames: mergedCollection.backlog
+        )
+        let updatedSections = [
+            makeOwnedSection(from: .success(overview))
+        ].reduce(state.sections.isEmpty ? makeLoadingSections() : state.sections) { sections, section in
+            replacingSection(section, in: sections)
+        }
+        apply(.setSections(updatedSections))
+    }
+
+    @MainActor
+    private func applyRecentlyPlayedRefreshResult(
+        _ result: Result<[LibraryGameSummary], Error>
+    ) {
+        guard case .success(let summaries) = result else { return }
+
+        let mergedRecentlyPlayed = mergeRecentlyPlayed(current: state.recentlyPlayed, incoming: summaries)
+        let generatedAt = Date()
+        guard shouldReplaceWithIncomingFullState(generatedAt: generatedAt) else { return }
+
+        apply(
+            .setLibraryItems(
+                recentlyPlayed: mergedRecentlyPlayed,
+                playingGames: state.playingGames,
+                ownedGames: state.ownedGames,
+                backlogGames: state.backlogGames,
+                likedGames: state.likedGames,
+                reviews: state.reviews
+            )
+        )
+        apply(.setFullGeneratedAt(generatedAt))
+        apply(.setMergedRecentlyPlayedState(.full, generatedAt))
+        refreshSummaryState(for: .playing)
+
+        let overview = currentOverview(
+            recentlyPlayed: mergedRecentlyPlayed,
+            playingGames: state.playingGames,
+            ownedGames: state.ownedGames,
+            backlogGames: state.backlogGames
+        )
+        let updatedSections = [
+            makeRecentlyPlayedSection(
+                from: .success(overview),
+                playingIdentifiers: Set(state.playingGames.map(\.identifier))
+            )
+        ].reduce(state.sections.isEmpty ? makeLoadingSections() : state.sections) { sections, section in
+            replacingSection(section, in: sections)
+        }
+        apply(.setSections(updatedSections))
     }
 
     private func maybeTriggerAutomaticSilentSteamSyncIfNeeded(
@@ -624,10 +827,16 @@ final class LibraryViewModel {
         }
 
         let selectedSort = state.selectedSort
+        let requestedTab = state.selectedTab
+        let isSteamConnected = state.isSteamConnected
         fetchSequence += 1
         let fetchID = fetchSequence
-        print("[Library] fetchStarted id=\(fetchID) trigger=\(trigger.logName) sort=\(selectedSort)")
+        print(
+            "[Library] fetchStarted id=\(fetchID) trigger=\(trigger.logName) " +
+            "sort=\(selectedSort) tab=\(requestedTab)"
+        )
         let previousSteamState = (
+            steamLinkStatus: state.steamLinkStatus,
             isConnected: state.isSteamConnected,
             syncStatus: state.steamSyncStatus,
             isSyncAvailable: state.isSteamSyncAvailable,
@@ -639,7 +848,7 @@ final class LibraryViewModel {
 
             var overviewResult: Result<LibraryOverview, Error>?
             var playtimeRecommendationsResult: Result<[PlaytimeRecommendation], Error>?
-            var friendRecommendationsResult: Result<[SteamFriendRecommendation], Error>?
+            var friendRecommendationsResult: Result<LibraryFriendRecommendationsResult, Error>?
             var wishlistResult: Result<[FavoriteGameEntry], Error>?
             var reviewedResult: Result<[ReviewedGame], Error>?
 
@@ -654,8 +863,13 @@ final class LibraryViewModel {
 
                 group.addTask { [weak self] in
                     guard let self else { return .playtimeRecommendations(.failure(CancellationError())) }
-                    let rawResult = await self.captureResult {
-                        try await self.fetchPlaytimeRecommendationsUseCase.execute()
+                    let rawResult: Result<[PlaytimeRecommendation], Error>
+                    if isSteamConnected {
+                        rawResult = await self.captureResult {
+                            try await self.fetchPlaytimeRecommendationsUseCase.execute()
+                        }
+                    } else {
+                        rawResult = .success([])
                     }
                     return .playtimeRecommendations(
                         await self.translatedPlaytimeRecommendations(from: rawResult)
@@ -665,7 +879,9 @@ final class LibraryViewModel {
                 group.addTask { [weak self] in
                     guard let self else { return .friendRecommendations(.failure(CancellationError())) }
                     let rawResult = await self.captureResult {
-                        try await self.fetchSteamFriendRecommendationsUseCase.execute()
+                        try await self.fetchLibraryFriendRecommendationsUseCase.execute(
+                            isSteamConnected: isSteamConnected
+                        )
                     }
                     return .friendRecommendations(
                         await self.translatedFriendRecommendations(from: rawResult)
@@ -701,6 +917,7 @@ final class LibraryViewModel {
                         )
 
                         await MainActor.run {
+                            guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "overview") else { return }
                             self.applyOverviewResult(
                                 result,
                                 trigger: trigger,
@@ -718,6 +935,7 @@ final class LibraryViewModel {
                         )
 
                         await MainActor.run {
+                            guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "playtimeRecommendations") else { return }
                             self.applyPlaytimeRecommendationsResult(
                                 result,
                                 trigger: trigger,
@@ -734,6 +952,7 @@ final class LibraryViewModel {
                         )
 
                         await MainActor.run {
+                            guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "friendRecommendations") else { return }
                             self.applyFriendRecommendationsResult(
                                 result,
                                 trigger: trigger,
@@ -750,6 +969,7 @@ final class LibraryViewModel {
                         )
 
                         await MainActor.run {
+                            guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "wishlist") else { return }
                             self.applyWishlistResult(
                                 result,
                                 trigger: trigger,
@@ -766,6 +986,7 @@ final class LibraryViewModel {
                         )
 
                         await MainActor.run {
+                            guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "reviewed") else { return }
                             self.applyReviewedResult(
                                 result,
                                 trigger: trigger,
@@ -814,6 +1035,7 @@ final class LibraryViewModel {
             ].contains(true)
 
             await MainActor.run {
+                guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "finalize") else { return }
                 self.logCurrentMappedState(id: fetchID)
                 self.apply(.clearAddingToPlaying)
                 self.apply(.setLoading(false))
@@ -845,10 +1067,332 @@ final class LibraryViewModel {
         }
     }
 
+    @MainActor
+    private func shouldAcceptResponse(fetchID: Int, requestedTab: LibraryTab, section: String) -> Bool {
+        guard fetchID == fetchSequence else {
+            print("[Library] responseIgnored id=\(fetchID) section=\(section) reason=staleFetch latest=\(fetchSequence)")
+            return false
+        }
+
+        guard requestedTab == state.selectedTab else {
+            print(
+                "[Library] responseIgnored id=\(fetchID) section=\(section) " +
+                "reason=tabMismatch requested=\(requestedTab) current=\(state.selectedTab)"
+            )
+            return false
+        }
+
+        return true
+    }
+
+    private func refreshSummaryState() {
+        apply(.setSummaryByTab(makeSummaryByTab(for: state)))
+    }
+
+    private func refreshSummaryState(for tab: LibraryTab) {
+        var summaryByTab = state.summaryByTab
+        summaryByTab[tab] = makeSummaryState(for: tab, from: state)
+        apply(.setSummaryByTab(summaryByTab))
+    }
+
+    private func shouldReplaceWithIncomingFullState(generatedAt: Date) -> Bool {
+        if let currentGeneratedAt = state.mergedGeneratedAt, generatedAt < currentGeneratedAt {
+            print("[Library] mergedStateIgnored reason=olderGeneratedAt incoming=\(generatedAt.timeIntervalSince1970) current=\(currentGeneratedAt.timeIntervalSince1970)")
+            return false
+        }
+        return true
+    }
+
+    private func mergeRecentlyPlayed(
+        current: [LibraryGameSummary],
+        incoming: [LibraryGameSummary]
+    ) -> [LibraryGameSummary] {
+        guard !(incoming.isEmpty && !current.isEmpty) else {
+            print(
+                "[Library] recentlyPlayedMerge keptCurrent " +
+                "reason=incomingEmpty currentCount=\(current.count)"
+            )
+            return current
+        }
+
+        guard incoming.count >= current.count else {
+            print(
+                "[Library] recentlyPlayedMerge keptCurrent " +
+                "reason=currentHasMoreItems currentCount=\(current.count) incomingCount=\(incoming.count)"
+            )
+            return current
+        }
+
+        let currentByIdentifier = Dictionary(uniqueKeysWithValues: current.map { ($0.identifier, $0) })
+        return incoming.map { incomingSummary in
+            guard let currentSummary = currentByIdentifier[incomingSummary.identifier] else { return incomingSummary }
+
+            let resolvedLastPlayedAt: Date?
+            let resolvedLastPlayedAtSource: String?
+            let resolvedHasReliableLastPlayedAt: Bool
+            if incomingSummary.hasReliableLastPlayedAt, let incomingLastPlayedAt = incomingSummary.lastPlayedAt {
+                resolvedLastPlayedAt = incomingLastPlayedAt
+                resolvedLastPlayedAtSource = incomingSummary.lastPlayedAtSource
+                resolvedHasReliableLastPlayedAt = true
+            } else {
+                resolvedLastPlayedAt = currentSummary.lastPlayedAt
+                resolvedLastPlayedAtSource = currentSummary.lastPlayedAtSource
+                resolvedHasReliableLastPlayedAt = currentSummary.hasReliableLastPlayedAt
+            }
+
+            let resolvedRecentPlaytimeMinutes = incomingSummary.recentPlaytimeMinutes ?? currentSummary.recentPlaytimeMinutes
+            let resolvedRecentPlaytimeText = incomingSummary.recentPlaytimeText ?? currentSummary.recentPlaytimeText
+            let resolvedFallbackReason = incomingSummary.recentPlayFallbackReason ?? currentSummary.recentPlayFallbackReason
+
+            return incomingSummary.replacingRecentPlayMetadata(
+                recentPlaytimeMinutes: resolvedRecentPlaytimeMinutes,
+                recentPlaytimeText: resolvedRecentPlaytimeText,
+                lastPlayedAt: resolvedLastPlayedAt,
+                lastPlayedAtSource: resolvedLastPlayedAtSource,
+                hasReliableLastPlayedAt: resolvedHasReliableLastPlayedAt,
+                recentPlayFallbackReason: resolvedFallbackReason
+            )
+        }
+    }
+
+    private func mergeOwnedCollection(
+        currentOwned: [LibraryGameSummary],
+        currentBacklog: [LibraryGameSummary],
+        incomingOwned: [LibraryGameSummary],
+        incomingBacklog: [LibraryGameSummary]
+    ) -> (owned: [LibraryGameSummary], backlog: [LibraryGameSummary]) {
+        let owned = incomingOwned.isEmpty && !currentOwned.isEmpty ? currentOwned : incomingOwned
+        let backlog = incomingBacklog.isEmpty && !currentBacklog.isEmpty ? currentBacklog : incomingBacklog
+        return (owned, backlog)
+    }
+
+    private func resolvedMergedSteamState(
+        from result: Result<LibraryOverview, Error>,
+        fallback: (
+            steamLinkStatus: SteamLinkStatus,
+            isConnected: Bool,
+            syncStatus: SteamSyncStatus,
+            isSyncAvailable: Bool,
+            errorCode: String?
+        )
+    ) -> (
+        steamLinkStatus: SteamLinkStatus,
+        isConnected: Bool,
+        syncStatus: SteamSyncStatus,
+        isSyncAvailable: Bool,
+        errorCode: String?
+    ) {
+        let resolvedSteamState = resolveSteamState(from: result, fallback: fallback)
+        guard case .success(let overview) = result else { return resolvedSteamState }
+
+        let shouldPreserveConnectedState =
+            fallback.isConnected
+            && !state.isUnlinkingSteamAccount
+            && !resolvedSteamState.isConnected
+            && overview.recentlyPlayed.isEmpty
+            && overview.owned.isEmpty
+            && overview.backlog.isEmpty
+
+        guard shouldPreserveConnectedState else { return resolvedSteamState }
+
+        print("[Library] steamStateMerge keptConnectedState reason=emptyIncomingOverview")
+        return fallback
+    }
+
+    private func cachedSteamLinkStatus(from cachedState: LibraryCachedState) -> SteamLinkStatus {
+        guard cachedState.isSteamConnected else { return .notLinked }
+        return SteamLinkStatus(
+            connectionState: .linked,
+            steamID: state.steamLinkStatus.steamID,
+            displayName: state.steamLinkStatus.displayName,
+            personaName: state.steamLinkStatus.personaName,
+            profileURL: state.steamLinkStatus.profileURL,
+            canSync: cachedState.isSteamSyncAvailable,
+            canDisconnect: state.steamLinkStatus.canDisconnect,
+            lastSteamSyncAt: state.steamLinkStatus.lastSteamSyncAt
+        )
+    }
+
+    private func currentOverview(
+        recentlyPlayed: [LibraryGameSummary],
+        playingGames: [LibraryGameSummary],
+        ownedGames: [LibraryGameSummary],
+        backlogGames: [LibraryGameSummary]
+    ) -> LibraryOverview {
+        LibraryOverview(
+            steamLinkStatus: state.steamLinkStatus,
+            steamSyncStatus: state.steamSyncStatus,
+            isSteamSyncAvailable: state.isSteamSyncAvailable,
+            steamSyncErrorCode: state.steamSyncErrorCode,
+            recentlyPlayed: recentlyPlayed,
+            playing: playingGames,
+            owned: ownedGames,
+            backlog: backlogGames,
+            playingSummary: state.serverSummaryByTab[.playing],
+            favoritesSummary: state.serverSummaryByTab[.favorites],
+            reviewedSummary: state.serverSummaryByTab[.reviewed]
+        )
+    }
+
+    private func makeSummaryByTab(for state: LibraryState) -> [LibraryTab: LibraryTabSummaryState] {
+        [
+            .playing: makePlayingSummaryState(from: state),
+            .favorites: makeFavoritesSummaryState(from: state),
+            .reviewed: makeReviewedSummaryState(from: state)
+        ]
+    }
+
+    private func makeSummaryState(
+        for tab: LibraryTab,
+        from state: LibraryState
+    ) -> LibraryTabSummaryState {
+        switch tab {
+        case .playing:
+            return makePlayingSummaryState(from: state)
+        case .favorites:
+            return makeFavoritesSummaryState(from: state)
+        case .reviewed:
+            return makeReviewedSummaryState(from: state)
+        }
+    }
+
+    private func makePlayingSummaryState(from state: LibraryState) -> LibraryTabSummaryState {
+        let summaries = uniqueSummaries(
+            state.recentlyPlayed + state.playingGames + state.ownedGames
+        )
+        let totalMinutes = summaries
+            .compactMap { $0.playtimeMinutes ?? $0.recentPlaytimeMinutes }
+            .reduce(0, +)
+        let ratings = summaries.compactMap { summary -> Double? in
+            guard let rating = summary.rating, rating.isFinite, rating > 0 else { return nil }
+            return rating
+        }
+        let derivedPrimaryValue = max(Double(totalMinutes) / 60, 0)
+        let derivedAverageRating = averageRating(from: ratings)
+        let derivedGameCount = summaries.count
+        let derivedReviewCount = ratings.count
+
+        if let serverSummary = state.serverSummaryByTab[.playing], serverSummary.hasRenderableValues {
+            let resolvedPrimaryValue = serverSummary.totalPlaytimeHours ?? derivedPrimaryValue
+            let resolvedGameCount = serverSummary.gameCount ?? derivedGameCount
+            let resolvedAverageRating = serverSummary.averageRating ?? derivedAverageRating
+            let resolvedReviewCount = serverSummary.reviewCount ?? derivedReviewCount
+            let fallbackTriggered = serverSummary.totalPlaytimeHours == nil || serverSummary.gameCount == nil
+
+            print(
+                "[LibrarySummary] " +
+                "selectedTab=\(LibraryTab.playing) " +
+                "gameCount=\(resolvedGameCount) " +
+                "totalPlaytimeHours=\(resolvedPrimaryValue) " +
+                "source=server.preview.summary " +
+                "source.gameCount=\(serverSummary.gameCountSourceField ?? "server.nil") " +
+                "source.totalPlaytimeHours=\(serverSummary.totalPlaytimeHoursSourceField ?? "server.nil") " +
+                "fallbackTriggered=\(fallbackTriggered)"
+            )
+
+            return LibraryTabSummaryState(
+                primaryTitle: "총 플레이",
+                primaryValue: resolvedPrimaryValue,
+                primaryValueKind: .hours,
+                averageRating: resolvedAverageRating,
+                gameCount: resolvedGameCount,
+                reviewCount: resolvedReviewCount,
+                sourceDescription: "server.preview.summary"
+            )
+        }
+
+        print(
+            "[LibrarySummary] " +
+            "selectedTab=\(LibraryTab.playing) " +
+            "gameCount=\(derivedGameCount) " +
+            "totalPlaytimeHours=\(derivedPrimaryValue) " +
+            "source.gameCount=derived.uniqueSummaries " +
+            "source.totalPlaytimeHours=derived.playtimeMinutes " +
+            "fallbackTriggered=true"
+        )
+
+        return LibraryTabSummaryState(
+            primaryTitle: "총 플레이",
+            primaryValue: derivedPrimaryValue,
+            primaryValueKind: .hours,
+            averageRating: derivedAverageRating,
+            gameCount: derivedGameCount,
+            reviewCount: derivedReviewCount,
+            sourceDescription: "derived.playingCollections"
+        )
+    }
+
+    private func makeFavoritesSummaryState(from state: LibraryState) -> LibraryTabSummaryState {
+        let uniqueLikedGames = uniqueGames(state.likedGames)
+        let ratings = uniqueLikedGames.compactMap { game -> Double? in
+            guard game.rating.isFinite, game.rating > 0 else { return nil }
+            return game.rating
+        }
+
+        return LibraryTabSummaryState(
+            primaryTitle: "찜한 게임",
+            primaryValue: Double(uniqueLikedGames.count),
+            primaryValueKind: .count,
+            averageRating: averageRating(from: ratings),
+            gameCount: uniqueLikedGames.count,
+            reviewCount: ratings.count,
+            sourceDescription: "derived.likedGames"
+        )
+    }
+
+    private func makeReviewedSummaryState(from state: LibraryState) -> LibraryTabSummaryState {
+        let reviewCount = state.reviews.count
+        let ratings = state.reviews.compactMap { review -> Double? in
+            guard review.rating.isFinite, review.rating > 0 else { return nil }
+            return review.rating
+        }
+        let uniqueReviewedGameCount = Set(state.reviews.map(\.gameId)).count
+
+        return LibraryTabSummaryState(
+            primaryTitle: "작성한 리뷰",
+            primaryValue: Double(reviewCount),
+            primaryValueKind: .count,
+            averageRating: reviewCount == 0 ? nil : averageRating(from: ratings),
+            gameCount: uniqueReviewedGameCount,
+            reviewCount: reviewCount,
+            sourceDescription: "derived.reviews"
+        )
+    }
+
+    private func averageRating(from ratings: [Double]) -> Double? {
+        let finiteRatings = ratings.filter(\.isFinite)
+        guard !finiteRatings.isEmpty else { return nil }
+        return finiteRatings.reduce(0, +) / Double(finiteRatings.count)
+    }
+
+    private func uniqueSummaries(_ summaries: [LibraryGameSummary]) -> [LibraryGameSummary] {
+        var seenKeys = Set<String>()
+        return summaries.filter { summary in
+            seenKeys.insert(summary.identifier.uniqueKey).inserted
+        }
+    }
+
+    private func uniqueGames(_ games: [Game]) -> [Game] {
+        var seenIDs = Set<Int>()
+        return games.filter { game in
+            seenIDs.insert(game.id).inserted
+        }
+    }
+
     private func routeToGameDetailIfPossible(_ identifier: LibraryGameIdentifier) {
-        if let summary = libraryGameSummary(for: identifier),
-           let destination = detailDestination(for: summary) {
-            route(to: destination)
+        if let summary = libraryGameSummary(for: identifier) {
+            if let destination = detailDestination(for: summary) {
+                route(to: destination)
+                return
+            }
+
+            print(
+                "[Library] detailUnavailable " +
+                "identifier=\(identifier.uniqueKey) " +
+                "enrichmentStatus=\(summary.enrichmentStatus.rawValue)"
+            )
+            apply(.clearError)
+            apply(.setError("게임 상세 정보를 아직 불러올 수 없어요."))
             return
         }
 
@@ -872,7 +1416,8 @@ final class LibraryViewModel {
             print(
                 "[Library] detailRoute source=steam " +
                 "externalGameId=\(viewState.externalGameId) " +
-                "matchStatus=\(viewState.matchStatus.rawValue)"
+                "matchStatus=\(viewState.matchStatus.rawValue) " +
+                "enrichmentStatus=\(viewState.enrichmentStatus.rawValue)"
             )
             onRoute?(.showSteamDetail(viewState))
         }
@@ -931,10 +1476,14 @@ final class LibraryViewModel {
             do {
                 let result = try await unlinkSteamAccountUseCase.execute()
                 await MainActor.run {
+                    let retainedPlayingGames = self.state.playingGames.filter { $0.gameSource != .steam }
+                    let baseSections = self.state.sections.isEmpty ? self.makeLoadingSections() : self.state.sections
+
                     self.apply(.setUnlinkingSteamAccount(false))
                     self.libraryCacheStore.clear()
                     self.apply(
                         .setSteamState(
+                            steamLinkStatus: result.steamLinkStatus,
                             isConnected: result.steamLinkStatus.isLinked,
                             syncStatus: .idle,
                             isSyncAvailable: false,
@@ -945,11 +1494,20 @@ final class LibraryViewModel {
                     self.apply(
                         .setLibraryItems(
                             recentlyPlayed: [],
-                            playingGames: self.state.playingGames,
-                            ownedGames: self.state.ownedGames,
-                            backlogGames: self.state.backlogGames,
+                            playingGames: retainedPlayingGames,
+                            ownedGames: [],
+                            backlogGames: [],
                             likedGames: self.state.likedGames,
                             reviews: self.state.reviews
+                        )
+                    )
+                    self.refreshSummaryState()
+                    self.apply(.setPlaytimeRecommendations([]))
+                    self.apply(
+                        .setFriendRecommendations(
+                            recommendations: [],
+                            source: .none,
+                            emptyState: .noFriendData
                         )
                     )
                     let disconnectedOverview = LibraryOverview(
@@ -958,22 +1516,35 @@ final class LibraryViewModel {
                         isSteamSyncAvailable: false,
                         steamSyncErrorCode: nil,
                         recentlyPlayed: [],
-                        playing: self.state.playingGames,
-                        owned: self.state.ownedGames,
-                        backlog: self.state.backlogGames
+                        playing: retainedPlayingGames,
+                        owned: [],
+                        backlog: [],
+                        playingSummary: state.serverSummaryByTab[.playing],
+                        favoritesSummary: state.serverSummaryByTab[.favorites],
+                        reviewedSummary: state.serverSummaryByTab[.reviewed]
                     )
-                    let disconnectedRecentSection = self.makeRecentlyPlayedSection(
-                        from: .success(disconnectedOverview),
-                        playingIdentifiers: Set(self.state.playingGames.map(\.identifier))
-                    )
-                    self.apply(
-                        .setSections(
-                            self.replacingSection(
-                                disconnectedRecentSection,
-                                in: self.state.sections
+                    let playingIdentifiers = Set(retainedPlayingGames.map(\.identifier))
+                    let clearedSteamSections = [
+                        self.makeRecentlyPlayedSection(
+                            from: .success(disconnectedOverview),
+                            playingIdentifiers: playingIdentifiers
+                        ),
+                        self.makePlayingSection(from: .success(disconnectedOverview)),
+                        self.makeOwnedSection(from: .success(disconnectedOverview)),
+                        self.makePlaytimeRecommendationsSection(from: .success([])),
+                        self.makeFriendRecommendationsSection(
+                            from: .success(
+                                LibraryFriendRecommendationsResult(
+                                    recommendations: [],
+                                    source: .none,
+                                    emptyState: .noFriendData
+                                )
                             )
                         )
-                    )
+                    ].reduce(baseSections) { sections, section in
+                        self.replacingSection(section, in: sections)
+                    }
+                    self.apply(.setSections(clearedSteamSections))
                     self.apply(.setSuccessMessage("Steam 연동이 해제되었어요"))
                     NotificationCenter.default.post(
                         name: .steamLinkStateDidChange,
@@ -1049,24 +1620,155 @@ final class LibraryViewModel {
                     }
 
                     self.libraryCacheStore.saveLastSuccessfulSteamSyncDate(Date())
-                    let successMessage: String
-                    if result.isRateLimitedIGDBEnrichmentPartialSuccess {
-                        successMessage = "Steam 보관함을 가져왔어요\n일부 게임 정보는 잠시 후 반영될 수 있어요."
-                    } else {
-                        successMessage = "Steam 보관함을 가져왔어요"
-                    }
-
+                    let lastSyncedAt = Date()
+                    let refreshedSteamLinkStatus = SteamLinkStatus(
+                        connectionState: self.state.steamLinkStatus.connectionState,
+                        steamID: self.state.steamLinkStatus.steamID,
+                        displayName: self.state.steamLinkStatus.displayName,
+                        personaName: self.state.steamLinkStatus.personaName,
+                        profileURL: self.state.steamLinkStatus.profileURL,
+                        canSync: self.state.steamLinkStatus.canSync,
+                        canDisconnect: self.state.steamLinkStatus.canDisconnect,
+                        lastSteamSyncAt: lastSyncedAt
+                    )
+                    self.apply(
+                        .setSteamState(
+                            steamLinkStatus: refreshedSteamLinkStatus,
+                            isConnected: self.state.isSteamConnected,
+                            syncStatus: .success,
+                            isSyncAvailable: self.state.isSteamSyncAvailable,
+                            errorCode: nil
+                        )
+                    )
                     self.apply(.setSteamOwnedSyncErrorCode(nil))
-                    if trigger.showsSuccessToast {
-                        self.apply(.setSuccessMessage(successMessage))
+                    if trigger.showsSuccessToast, !result.isRateLimitedIGDBEnrichmentPartialSuccess {
+                        self.apply(.setSuccessMessage("보관함이 최신 상태로 업데이트됨"))
                     }
-                    self.loadLibrary(trigger: .refresh)
+                    self.shouldForceOverviewReplacementAfterSteamSync = true
+                    self.refreshLibraryAfterSteamSync()
                 }
             } catch {
                 await MainActor.run {
                     self.apply(.setSyncingOwnedSteamLibrary(false))
                     self.apply(.setSteamOwnedSyncErrorCode(resolveOwnedSyncInlineErrorCode(from: error)))
+                    if trigger != .silentAutomatic {
+                        self.apply(.setError(self.resolveSyncOwnedSteamLibraryErrorMessage(error)))
+                    }
                 }
+            }
+        }
+    }
+
+    private func refreshLibraryAfterSteamSync() {
+        loadTask?.cancel()
+        apply(.clearError)
+        apply(.setRefreshing(true))
+        apply(.setLoading(false))
+
+        let selectedSort = state.selectedSort
+        let requestedTab = state.selectedTab
+        let previousSteamState = (
+            steamLinkStatus: state.steamLinkStatus,
+            isConnected: state.isSteamConnected,
+            syncStatus: state.steamSyncStatus,
+            isSyncAvailable: state.isSteamSyncAvailable,
+            errorCode: state.steamSyncErrorCode
+        )
+        let hadVisibleSectionsBeforeLoad = state.sections.contains(where: { !isLoadingSection($0) })
+
+        fetchSequence += 1
+        let fetchID = fetchSequence
+        print("[Library] postSyncRefresh started id=\(fetchID)")
+
+        loadTask = Task { [weak self] in
+            guard let self else { return }
+
+            let overviewRawResult = await self.captureResult {
+                try await self.fetchLibraryOverviewUseCase.execute(sort: selectedSort.userGameSort)
+            }
+            let overviewResult = await self.translatedOverview(from: overviewRawResult)
+
+            await MainActor.run {
+                guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncOverview") else { return }
+                self.applyOverviewResult(
+                    overviewResult,
+                    trigger: .refresh,
+                    previousSteamState: previousSteamState,
+                    preserveCurrentSectionOnFailure: hadVisibleSectionsBeforeLoad
+                )
+            }
+
+            let isSteamConnected = await MainActor.run { self.state.isSteamConnected }
+
+            let playtimeResult: Result<[PlaytimeRecommendation], Error>
+            if isSteamConnected {
+                playtimeResult = await self.translatedPlaytimeRecommendations(
+                    from: await self.captureResult {
+                        try await self.fetchPlaytimeRecommendationsUseCase.execute()
+                    }
+                )
+            } else {
+                playtimeResult = .success([])
+            }
+
+            await MainActor.run {
+                guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncPlaytimeRecommendations") else { return }
+                self.applyPlaytimeRecommendationsResult(
+                    playtimeResult,
+                    trigger: .refresh,
+                    preserveCurrentSectionOnFailure: true
+                )
+            }
+
+            let friendRecommendationsResult = await self.translatedFriendRecommendations(
+                from: await self.captureResult {
+                    try await self.fetchLibraryFriendRecommendationsUseCase.execute(
+                        isSteamConnected: isSteamConnected
+                    )
+                }
+            )
+
+            await MainActor.run {
+                guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncFriendRecommendations") else { return }
+                self.applyFriendRecommendationsResult(
+                    friendRecommendationsResult,
+                    trigger: .refresh,
+                    preserveCurrentSectionOnFailure: true
+                )
+            }
+
+            if isSteamConnected {
+                let ownedCollectionResult = await self.translatedOwnedCollection(
+                    from: await self.captureResult {
+                        try await self.fetchOwnedLibraryUseCase.execute()
+                    }
+                )
+
+                await MainActor.run {
+                    guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncOwned") else { return }
+                    self.applyOwnedCollectionRefreshResult(ownedCollectionResult)
+                }
+
+                let recentlyPlayedResult = await self.translatedRecentlyPlayedCollection(
+                    from: await self.captureResult {
+                        try await self.fetchRecentlyPlayedLibraryUseCase.execute()
+                    }
+                )
+
+                await MainActor.run {
+                    guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncRecentlyPlayed") else { return }
+                    self.applyRecentlyPlayedRefreshResult(recentlyPlayedResult)
+                }
+            }
+
+            await MainActor.run {
+                guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncFinalize") else { return }
+                self.shouldForceOverviewReplacementAfterSteamSync = false
+                self.apply(.setLoading(false))
+                self.apply(.setRefreshing(false))
+                self.apply(.clearAddingToPlaying)
+                self.apply(.clearError)
+                self.persistCurrentLibraryCache()
             }
         }
     }
@@ -1227,7 +1929,10 @@ final class LibraryViewModel {
                     backlog: await translateLibraryGames(
                         overview.backlog,
                         context: "Library.backlog"
-                    )
+                    ),
+                    playingSummary: overview.playingSummary,
+                    favoritesSummary: overview.favoritesSummary,
+                    reviewedSummary: overview.reviewedSummary
                 )
             )
         case .failure(let error):
@@ -1246,13 +1951,40 @@ final class LibraryViewModel {
         }
     }
 
-    private func translatedFriendRecommendations(
-        from result: Result<[SteamFriendRecommendation], Error>
-    ) async -> Result<[SteamFriendRecommendation], Error> {
+    private func translatedOwnedCollection(
+        from result: Result<OwnedLibraryCollection, Error>
+    ) async -> Result<OwnedLibraryCollection, Error> {
         switch result {
-        case .success(let recommendations):
+        case .success(let collection):
+            return .success(
+                OwnedLibraryCollection(
+                    owned: await translateLibraryGames(collection.owned, context: "Library.owned.full"),
+                    backlog: await translateLibraryGames(collection.backlog, context: "Library.backlog.full")
+                )
+            )
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    private func translatedRecentlyPlayedCollection(
+        from result: Result<[LibraryGameSummary], Error>
+    ) async -> Result<[LibraryGameSummary], Error> {
+        switch result {
+        case .success(let summaries):
+            return .success(await translateLibraryGames(summaries, context: "Library.recentlyPlayed.full"))
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    private func translatedFriendRecommendations(
+        from result: Result<LibraryFriendRecommendationsResult, Error>
+    ) async -> Result<LibraryFriendRecommendationsResult, Error> {
+        switch result {
+        case .success(let payload):
             let translatedGames = await translateLibraryGames(
-                recommendations.map(\.game),
+                payload.recommendations.map(\.game),
                 context: "Library.friendRecommendations"
             )
             let translatedGamesByKey = Dictionary(
@@ -1260,13 +1992,17 @@ final class LibraryViewModel {
             )
 
             return .success(
-                recommendations.map { recommendation in
-                    SteamFriendRecommendation(
-                        game: translatedGamesByKey[recommendation.game.identifier.uniqueKey] ?? recommendation.game,
-                        friendCount: recommendation.friendCount,
-                        reason: recommendation.reason
-                    )
-                }
+                LibraryFriendRecommendationsResult(
+                    recommendations: payload.recommendations.map { recommendation in
+                        SteamFriendRecommendation(
+                            game: translatedGamesByKey[recommendation.game.identifier.uniqueKey] ?? recommendation.game,
+                            friendCount: recommendation.friendCount,
+                            reason: recommendation.reason
+                        )
+                    },
+                    source: payload.source,
+                    emptyState: payload.emptyState
+                )
             )
         case .failure(let error):
             return .failure(error)
@@ -1313,7 +2049,7 @@ final class LibraryViewModel {
     private func makeSections(
         overviewResult: Result<LibraryOverview, Error>,
         playtimeRecommendationsResult: Result<[PlaytimeRecommendation], Error>,
-        friendRecommendationsResult: Result<[SteamFriendRecommendation], Error>,
+        friendRecommendationsResult: Result<LibraryFriendRecommendationsResult, Error>,
         wishlistResult: Result<[FavoriteGameEntry], Error>,
         reviewedResult: Result<[ReviewedGame], Error>
     ) -> [LibrarySectionViewState] {
@@ -1321,12 +2057,12 @@ final class LibraryViewModel {
 
         return [
             makeRecentlyPlayedSection(from: overviewResult, playingIdentifiers: playingIdentifiers),
+            makePlaytimeRecommendationsSection(from: playtimeRecommendationsResult),
+            makeReviewedSection(from: reviewedResult),
             makePlayingSection(from: overviewResult),
             makeOwnedSection(from: overviewResult),
-            makePlaytimeRecommendationsSection(from: playtimeRecommendationsResult),
             makeFriendRecommendationsSection(from: friendRecommendationsResult),
-            makeWishlistSection(from: wishlistResult),
-            makeReviewedSection(from: reviewedResult)
+            makeWishlistSection(from: wishlistResult)
         ]
     }
 
@@ -1443,6 +2179,7 @@ final class LibraryViewModel {
         let limitedSummaries = limitedLibrarySummaries(summaries, limit: limit)
 
         return limitedSummaries.map { summary in
+            logRatingMapping(summary: summary, context: "Library.preview.recentCard")
             let isAddingToPlaying = state.addingToPlayingIdentifiers.contains(summary.identifier)
             let actionTitle: String?
             if showsAddToPlayingAction, !playingIdentifiers.contains(summary.identifier) {
@@ -1457,10 +2194,10 @@ final class LibraryViewModel {
                     detailDestination: detailDestination(for: summary),
                     title: summary.displayTitle,
                     metadataText: recentlyPlayedMetadataText(for: summary),
-                    ratingText: summary.rating.map { String(format: "%.1f", $0) },
+                    ratingText: summary.formattedRatingText,
                     coverImageURL: summary.coverImageURL,
                     fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
-                    badgeText: "Steam",
+                    badgeText: "",
                     actionTitle: actionTitle,
                     isActionEnabled: showsAddToPlayingAction ? !isAddingToPlaying : true
                 )
@@ -1475,6 +2212,7 @@ final class LibraryViewModel {
         let limitedSummaries = limitedLibrarySummaries(summaries, limit: limit)
 
         return limitedSummaries.map { summary in
+            logRatingMapping(summary: summary, context: "Library.preview.row")
             let subtitleText = librarySubtitleText(for: summary)
             return LibraryCollectionItem.row(
                 LibraryGameRowViewState(
@@ -1485,7 +2223,7 @@ final class LibraryViewModel {
                     metadataText: libraryRowMetadataText(for: summary, subtitleText: subtitleText),
                     coverImageURL: summary.coverImageURL,
                     fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
-                    ratingText: summary.rating.map { String(format: "%.1f", $0) },
+                    ratingText: summary.formattedRatingText,
                     trailingAction: nil
                 )
             )
@@ -1500,28 +2238,42 @@ final class LibraryViewModel {
         return Array(summaries.prefix(limit))
     }
 
+    private func logRatingMapping(summary: LibraryGameSummary, context: String) {
+        print(
+            "[LibraryRatingMapping] " +
+            "context=\(context) " +
+            "title=\(summary.displayTitle) " +
+            "igdbGameId=\(summary.igdbGameId.map(String.init) ?? "nil") " +
+            "aggregatedRating=nil totalRating=nil " +
+            "final ratingText=\(summary.formattedRatingText ?? "nil")"
+        )
+    }
+
     private func recentlyPlayedMetadataText(for summary: LibraryGameSummary) -> String {
-        if summary.gameSource == .steam,
-           let playtimeText = SteamPlaytimeFormatter.recentPlaytimeText(
-                recentPlaytimeMinutes: summary.recentPlaytimeMinutes,
-                fallbackPlaytimeMinutes: summary.playtimeMinutes
-           ) {
-            return playtimeText
-        }
+        let display = RecentPlayMetadataFormatter.makeDisplay(
+            lastPlayedAt: summary.lastPlayedAt,
+            hasReliableLastPlayedAt: summary.hasReliableLastPlayedAt,
+            recentPlaytimeMinutes: summary.recentPlaytimeMinutes,
+            fallbackReason: summary.recentPlayFallbackReason
+        )
+        let recentPlayMetadataText = display.finalText
+        let timestampUsedForRelativeText = display.relativeTimeText == nil
+            ? "nil"
+            : (summary.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")
+        print(
+            "[RecentPlayDisplay] " +
+            "screen=Library.preview " +
+            "title=\(summary.displayTitle) " +
+            "lastPlayedAt=\(summary.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
+            "recentPlaytimeMinutes=\(summary.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
+            "hasReliableLastPlayedAt=\(summary.hasReliableLastPlayedAt) " +
+            "timestampUsedForRelativeText=\(timestampUsedForRelativeText) " +
+            "relativeTime=\(display.relativeTimeText ?? "nil") " +
+            "fallbackReason=\(summary.recentPlayFallbackReason ?? "nil") " +
+            "finalText=\(recentPlayMetadataText)"
+        )
+        return recentPlayMetadataText
 
-        if let recentPlaytimeText = sanitized(summary.recentPlaytimeText) {
-            return recentPlaytimeText
-        }
-
-        if summary.gameSource == .steam, summary.matchStatus != .confirmed {
-            return steamLibraryFallbackText(for: summary)
-        }
-
-        if let subtitleText = conciseLibraryMetadataText(for: summary) {
-            return subtitleText
-        }
-
-        return steamLibraryFallbackText(for: summary)
     }
 
     private func librarySubtitleText(for summary: LibraryGameSummary) -> String {
@@ -1586,7 +2338,7 @@ final class LibraryViewModel {
             return "정보 보강 중"
         }
 
-        return summary.matchStatus == .confirmed ? "Steam" : "Steam · 정보 보강 중"
+        return summary.shouldOpenFullGamePediaDetail ? "Steam" : "Steam · 정보 보강 중"
     }
 
     private func steamMetadataText(for summary: LibraryGameSummary) -> String {
@@ -1598,36 +2350,93 @@ final class LibraryViewModel {
     }
 
     private func detailDestination(for summary: LibraryGameSummary) -> LibraryGameDetailDestination? {
-        if summary.matchStatus == .confirmed,
-           let igdbGameId = summary.igdbGameId {
+        if summary.shouldOpenFullGamePediaDetail,
+           let igdbGameId = summary.igdbGameId,
+           igdbGameId > 0 {
+            print(
+                "[DetailRouteMapping] " +
+                "screen=Library.viewModel " +
+                "title=\(summary.displayTitle) " +
+                "externalGameId=\(summary.externalGameId) " +
+                "igdbGameId=\(summary.igdbGameId.map(String.init) ?? "nil") " +
+                "detailAvailable=\(summary.detailAvailable) " +
+                "createdDestination=igdb:\(igdbGameId) " +
+                "blockedReason=nil"
+            )
             return .igdb(igdbGameId)
         }
 
-        guard summary.gameSource == .steam,
-              summary.detailAvailable else {
+        guard summary.shouldOpenSteamFallbackDetail else {
+            print(
+                "[DetailRouteMapping] " +
+                "screen=Library.viewModel " +
+                "title=\(summary.displayTitle) " +
+                "externalGameId=\(summary.externalGameId) " +
+                "igdbGameId=\(summary.igdbGameId.map(String.init) ?? "nil") " +
+                "detailAvailable=\(summary.detailAvailable) " +
+                "createdDestination=nil " +
+                "blockedReason=\(summary.detailAvailable ? "missingPositiveIgdbGameId" : "detailUnavailable")"
+            )
             return nil
         }
 
+        print(
+            "[DetailRouteMapping] " +
+            "screen=Library.viewModel " +
+            "title=\(summary.displayTitle) " +
+            "externalGameId=\(summary.externalGameId) " +
+            "igdbGameId=\(summary.igdbGameId.map(String.init) ?? "nil") " +
+            "detailAvailable=\(summary.detailAvailable) " +
+            "createdDestination=steamFallback " +
+            "blockedReason=nil"
+        )
         return .steamFallback(makeSteamFallbackDetailViewState(from: summary))
     }
 
     private func makeSteamFallbackDetailViewState(
         from summary: LibraryGameSummary
     ) -> SteamFallbackGameDetailViewState {
-        SteamFallbackGameDetailViewState(
+        let recentPlayDisplay = RecentPlayMetadataFormatter.makeDisplay(
+            lastPlayedAt: summary.lastPlayedAt,
+            hasReliableLastPlayedAt: summary.hasReliableLastPlayedAt,
+            recentPlaytimeMinutes: summary.recentPlaytimeMinutes,
+            fallbackReason: summary.recentPlayFallbackReason
+        )
+        let playtimeValueText: String? = {
+            if summary.hasReliableLastPlayedAt || (summary.recentPlaytimeMinutes ?? 0) > 0 {
+                return recentPlayDisplay.finalText
+            }
+            return SteamPlaytimeFormatter.expandedPlaytimeValue(
+                minutes: summary.playtimeMinutes ?? summary.recentPlaytimeMinutes
+            )
+        }()
+        let timestampUsedForRelativeText = recentPlayDisplay.relativeTimeText == nil
+            ? "nil"
+            : (summary.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")
+        print(
+            "[RecentPlayDisplay] " +
+            "screen=GameDetail.steamFallback " +
+            "title=\(summary.displayTitle) " +
+            "lastPlayedAt=\(summary.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
+            "recentPlaytimeMinutes=\(summary.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
+            "hasReliableLastPlayedAt=\(summary.hasReliableLastPlayedAt) " +
+            "timestampUsedForRelativeText=\(timestampUsedForRelativeText) " +
+            "relativeTime=\(recentPlayDisplay.relativeTimeText ?? "nil") " +
+            "finalText=\(playtimeValueText ?? "nil")"
+        )
+        return SteamFallbackGameDetailViewState(
             title: summary.displayTitle,
             coverImageURL: summary.coverImageURL,
             fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
             sourceLabelText: "Steam",
             metadataText: steamMetadataText(for: summary),
             descriptionText: "Steam에서 가져온 게임입니다.",
-            playtimeValueText: SteamPlaytimeFormatter.expandedPlaytimeValue(
-                minutes: summary.playtimeMinutes ?? summary.recentPlaytimeMinutes
-            ),
+            playtimeValueText: playtimeValueText,
             externalGameId: summary.externalGameId,
             gameSource: summary.gameSource,
             metadataEnriched: summary.metadataEnriched,
-            matchStatus: summary.matchStatus
+            matchStatus: summary.matchStatus,
+            enrichmentStatus: summary.enrichmentStatus
         )
     }
 
@@ -1642,6 +2451,11 @@ final class LibraryViewModel {
     ) -> LibrarySectionViewState {
         switch result {
         case .success(let overview):
+            let displaySummaries = resolvedRecentlyPlayedDisplaySummaries(from: overview)
+            let hasNonBlockingMetadataIssue = isNonBlockingSteamMetadataIssue(
+                errorCode: overview.steamSyncErrorCode
+            )
+
             if !overview.steamLinkStatus.isLinked {
                 return LibrarySectionViewState(
                     kind: .recentlyPlayed,
@@ -1712,7 +2526,8 @@ final class LibraryViewModel {
             }
 
             if (overview.steamSyncStatus == .idle || isSteamSyncInProgress(syncStatus: overview.steamSyncStatus)),
-               overview.recentlyPlayed.isEmpty {
+               displaySummaries.isEmpty,
+               state.recentlyPlayedSource == .none {
                 return LibrarySectionViewState(
                     kind: .recentlyPlayed,
                     layoutStyle: .message,
@@ -1758,7 +2573,7 @@ final class LibraryViewModel {
                 )
             }
 
-            if overview.recentlyPlayed.isEmpty {
+            if displaySummaries.isEmpty {
                 return LibrarySectionViewState(
                     kind: .recentlyPlayed,
                     layoutStyle: .message,
@@ -1770,8 +2585,8 @@ final class LibraryViewModel {
                                 title: "최근 플레이한 Steam 게임이 아직 없어요",
                                 message: "최근 2주 내 플레이한 Steam 게임이 있으면 여기에 표시돼요.",
                                 detailText: nil,
-                                buttonTitle: "라이브러리 새로고침",
-                                action: .retrySteamSync
+                                buttonTitle: hasNonBlockingMetadataIssue ? nil : "라이브러리 새로고침",
+                                action: hasNonBlockingMetadataIssue ? nil : .retrySteamSync
                             )
                         )
                     ],
@@ -1783,12 +2598,12 @@ final class LibraryViewModel {
                 kind: .recentlyPlayed,
                 layoutStyle: .recentCards,
                 items: makeRecentlyPlayedItems(
-                    summaries: overview.recentlyPlayed,
+                    summaries: displaySummaries,
                     playingIdentifiers: playingIdentifiers,
                     limit: PreviewLimit.recentCards,
-                    showsAddToPlayingAction: true
+                    showsAddToPlayingAction: false
                 ),
-                showsSeeAll: overview.recentlyPlayed.count >= PreviewLimit.recentCards
+                showsSeeAll: displaySummaries.count >= PreviewLimit.recentCards
             )
 
         case .failure:
@@ -1811,6 +2626,19 @@ final class LibraryViewModel {
                 showsSeeAll: false
             )
         }
+    }
+
+    private func resolvedRecentlyPlayedDisplaySummaries(from overview: LibraryOverview) -> [LibraryGameSummary] {
+        if !overview.recentlyPlayed.isEmpty {
+            return overview.recentlyPlayed
+        }
+
+        if state.recentlyPlayedSource == .snapshot,
+           !state.recentlyPlayed.isEmpty {
+            return state.recentlyPlayed
+        }
+
+        return overview.recentlyPlayed
     }
 
     private func makePlayingSection(from result: Result<LibraryOverview, Error>) -> LibrarySectionViewState {
@@ -1944,6 +2772,9 @@ final class LibraryViewModel {
     private func makeOwnedSection(from result: Result<LibraryOverview, Error>) -> LibrarySectionViewState {
         switch result {
         case .success(let overview):
+            let hasNonBlockingMetadataIssue = isNonBlockingSteamMetadataIssue(
+                errorCode: state.steamOwnedSyncErrorCode ?? overview.steamSyncErrorCode
+            )
             if !overview.steamLinkStatus.isLinked {
                 return LibrarySectionViewState(
                     kind: .owned,
@@ -2062,6 +2893,7 @@ final class LibraryViewModel {
             }
 
             if overview.owned.isEmpty {
+                print("[LibraryOwnedPreview] sourceCount=0 renderedCount=0 state=empty")
                 return LibrarySectionViewState(
                     kind: .owned,
                     layoutStyle: .message,
@@ -2073,8 +2905,8 @@ final class LibraryViewModel {
                                 title: "가져온 보유 게임이 아직 없어요",
                                 message: "Steam 보관함을 다시 동기화해 보세요.",
                                 detailText: nil,
-                                buttonTitle: "다시 동기화",
-                                action: .retryOwnedSteamSync
+                                buttonTitle: hasNonBlockingMetadataIssue ? nil : "다시 동기화",
+                                action: hasNonBlockingMetadataIssue ? nil : .retryOwnedSteamSync
                             )
                         )
                     ],
@@ -2082,13 +2914,19 @@ final class LibraryViewModel {
                 )
             }
 
+            let previewItems = makeLibraryRowItems(
+                summaries: overview.owned,
+                limit: PreviewLimit.listRows
+            )
+            print(
+                "[LibraryOwnedPreview] " +
+                "sourceCount=\(overview.owned.count) " +
+                "renderedCount=\(previewItems.count)"
+            )
             return LibrarySectionViewState(
                 kind: .owned,
                 layoutStyle: .list,
-                items: makeLibraryRowItems(
-                    summaries: overview.owned,
-                    limit: PreviewLimit.listRows
-                ),
+                items: previewItems,
                 showsSeeAll: overview.owned.count >= PreviewLimit.listRows
             )
 
@@ -2140,10 +2978,10 @@ final class LibraryViewModel {
                 )
             }
 
-            let items = recommendations.prefix(PreviewLimit.recommendationRows).map(makePlaytimeRecommendationRowItem)
+            let items = recommendations.prefix(PreviewLimit.recommendationRows).map(makePlaytimeRecommendationCardItem)
             return LibrarySectionViewState(
                 kind: .playtimeRecommendations,
-                layoutStyle: .list,
+                layoutStyle: .recentCards,
                 items: items,
                 showsSeeAll: recommendations.count > PreviewLimit.recommendationRows
             )
@@ -2173,18 +3011,25 @@ final class LibraryViewModel {
     private func makePlaytimeRecommendationRowItem(
         from recommendation: PlaytimeRecommendation
     ) -> LibraryCollectionItem {
+        makePlaytimeRecommendationCardItem(from: recommendation)
+    }
+
+    private func makePlaytimeRecommendationCardItem(
+        from recommendation: PlaytimeRecommendation
+    ) -> LibraryCollectionItem {
         let summary = recommendation.game
-        return .row(
-            LibraryGameRowViewState(
+        return .recentCard(
+            LibraryRecentGameCardViewState(
                 identifier: summary.identifier,
                 detailDestination: detailDestination(for: summary),
                 title: summary.displayTitle,
-                subtitleText: playtimeRecommendationSubtitleText(for: recommendation),
-                metadataText: librarySubtitleText(for: summary),
+                metadataText: displayableGenreText(for: summary) ?? librarySubtitleText(for: summary),
+                ratingText: summary.formattedRatingText,
                 coverImageURL: summary.coverImageURL,
                 fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
-                ratingText: summary.rating.map { String(format: "%.1f", $0) },
-                trailingAction: nil
+                badgeText: "",
+                actionTitle: nil,
+                isActionEnabled: true
             )
         )
     }
@@ -2205,37 +3050,27 @@ final class LibraryViewModel {
     }
 
     private func makeFriendRecommendationsSection(
-        from result: Result<[SteamFriendRecommendation], Error>
+        from result: Result<LibraryFriendRecommendationsResult, Error>
     ) -> LibrarySectionViewState {
         switch result {
-        case .success(let recommendations):
-            guard !recommendations.isEmpty else {
+        case .success(let payload):
+            guard !payload.recommendations.isEmpty else {
                 return LibrarySectionViewState(
                     kind: .friendRecommendations,
                     layoutStyle: .message,
                     items: [
-                        .message(
-                            LibraryMessageViewState(
-                                id: "friendRecommendations.empty",
-                                style: .empty,
-                                title: nil,
-                                message: "친구 데이터를 불러올 수 없어요",
-                                detailText: "Steam 친구 정보가 없거나 공개 설정에 따라 추천을 불러올 수 없어요.",
-                                buttonTitle: nil,
-                                action: nil
-                            )
-                        )
+                        .message(friendRecommendationsEmptyMessageViewState(for: payload.emptyState))
                     ],
                     showsSeeAll: false
                 )
             }
 
-            let items = recommendations.prefix(PreviewLimit.recommendationRows).map(makeFriendRecommendationRowItem)
+            let items = payload.recommendations.prefix(PreviewLimit.recommendationRows).map(makeFriendRecommendationRowItem)
             return LibrarySectionViewState(
                 kind: .friendRecommendations,
                 layoutStyle: .list,
                 items: items,
-                showsSeeAll: recommendations.count > PreviewLimit.recommendationRows
+                showsSeeAll: payload.recommendations.count > PreviewLimit.recommendationRows
             )
 
         case .failure:
@@ -2260,6 +3095,44 @@ final class LibraryViewModel {
         }
     }
 
+    private func friendRecommendationsEmptyMessageViewState(
+        for emptyState: LibraryFriendRecommendationsEmptyState?
+    ) -> LibraryMessageViewState {
+        let title: String?
+        let message: String
+        let detailText: String?
+
+        switch emptyState ?? .noFriendData {
+        case .noFriendData:
+            title = "친구 추천을 불러올 수 없어요"
+            if state.isSteamConnected {
+                message = "아직 추천을 만들 친구 데이터가 없어요."
+                detailText = "친구를 추가하거나 친구 활동이 쌓이면 추천을 보여드릴게요."
+            } else {
+                message = "아직 추천을 만들 친구 데이터가 없어요."
+                detailText = "친구를 추가하거나 Steam 계정을 연동해보세요."
+            }
+        case .insufficientActivity:
+            title = "아직 추천할 게임이 없어요"
+            message = "친구의 찜, 리뷰, 라이브러리 활동이 더 쌓이면 추천을 보여드릴게요."
+            detailText = nil
+        case .steamUnavailable:
+            title = "Steam 친구 데이터를 불러올 수 없어요"
+            message = "Steam 친구 정보가 없거나 공개 설정에 따라 추천을 불러올 수 없어요."
+            detailText = nil
+        }
+
+        return LibraryMessageViewState(
+            id: "friendRecommendations.empty.\((emptyState ?? .noFriendData).rawValue)",
+            style: .empty,
+            title: title,
+            message: message,
+            detailText: detailText,
+            buttonTitle: nil,
+            action: nil
+        )
+    }
+
     private func makeFriendRecommendationRowItem(
         from recommendation: SteamFriendRecommendation
     ) -> LibraryCollectionItem {
@@ -2273,7 +3146,7 @@ final class LibraryViewModel {
                 metadataText: librarySubtitleText(for: summary),
                 coverImageURL: summary.coverImageURL,
                 fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
-                ratingText: summary.rating.map { String(format: "%.1f", $0) },
+                ratingText: summary.formattedRatingText,
                 trailingAction: nil
             )
         )
@@ -2328,8 +3201,8 @@ final class LibraryViewModel {
                         ),
                         detailDestination: .igdb(reviewedGame.gameId),
                         title: reviewedGame.game.displayTitle,
-                        subtitleText: reviewedGame.contentPreview,
-                        metadataText: "\(reviewedGame.game.genre) · \(releaseText(for: reviewedGame.game.releaseYear))",
+                        subtitleText: "평가함",
+                        metadataText: reviewedGame.game.genre,
                         coverImageURL: reviewedGame.game.coverImageURL,
                         ratingText: String(format: "%.1f", reviewedGame.rating),
                         trailingAction: nil
@@ -2369,7 +3242,7 @@ final class LibraryViewModel {
     private func resolveErrorMessage(
         overviewResult: Result<LibraryOverview, Error>,
         playtimeRecommendationsResult: Result<[PlaytimeRecommendation], Error>,
-        friendRecommendationsResult: Result<[SteamFriendRecommendation], Error>,
+        friendRecommendationsResult: Result<LibraryFriendRecommendationsResult, Error>,
         wishlistResult: Result<[FavoriteGameEntry], Error>,
         reviewedResult: Result<[ReviewedGame], Error>
     ) -> String? {
@@ -2520,10 +3393,12 @@ final class LibraryViewModel {
                 return
             }
 
-            if let recommendations = value as? [SteamFriendRecommendation] {
+            if let recommendations = value as? LibraryFriendRecommendationsResult {
                 print(
                     "[Library] responseArrived id=\(id) section=\(section) " +
-                    "friendRecommendationsCount=\(recommendations.count)"
+                    "friendRecommendationsCount=\(recommendations.recommendations.count) " +
+                    "friendRecommendationsSource=\(recommendations.source.rawValue) " +
+                    "friendRecommendationsEmptyState=\(recommendations.emptyState?.rawValue ?? "nil")"
                 )
                 return
             }
@@ -2555,7 +3430,7 @@ final class LibraryViewModel {
         id: Int,
         overviewResult: Result<LibraryOverview, Error>,
         playtimeRecommendationsResult: Result<[PlaytimeRecommendation], Error>,
-        friendRecommendationsResult: Result<[SteamFriendRecommendation], Error>,
+        friendRecommendationsResult: Result<LibraryFriendRecommendationsResult, Error>,
         wishlistResult: Result<[FavoriteGameEntry], Error>,
         reviewedResult: Result<[ReviewedGame], Error>
     ) {
@@ -2593,7 +3468,10 @@ final class LibraryViewModel {
         let friendRecommendationsSummary: String
         switch friendRecommendationsResult {
         case .success(let recommendations):
-            friendRecommendationsSummary = "friendRecommendationsCount=\(recommendations.count)"
+            friendRecommendationsSummary =
+                "friendRecommendationsCount=\(recommendations.recommendations.count) " +
+                "friendRecommendationsSource=\(recommendations.source.rawValue) " +
+                "friendRecommendationsEmptyState=\(recommendations.emptyState?.rawValue ?? "nil")"
         case .failure(let error):
             friendRecommendationsSummary = "friendRecommendationsError=\(LibraryError.from(error: error).errorDescription ?? error.localizedDescription)"
         }
@@ -2625,6 +3503,8 @@ final class LibraryViewModel {
             backlogGames: [LibraryGameSummary],
             playtimeRecommendations: [PlaytimeRecommendation],
             friendRecommendations: [SteamFriendRecommendation],
+            friendRecommendationsSource: LibraryFriendRecommendationSource,
+            friendRecommendationsEmptyState: LibraryFriendRecommendationsEmptyState?,
             likedGames: [Game],
             reviews: [ReviewedGame]
         ),
@@ -2638,6 +3518,8 @@ final class LibraryViewModel {
             "backlogGamesCount=\(libraryItems.backlogGames.count) " +
             "playtimeRecommendationsCount=\(libraryItems.playtimeRecommendations.count) " +
             "friendRecommendationsCount=\(libraryItems.friendRecommendations.count) " +
+            "friendRecommendationsSource=\(libraryItems.friendRecommendationsSource.rawValue) " +
+            "friendRecommendationsEmptyState=\(libraryItems.friendRecommendationsEmptyState?.rawValue ?? "nil") " +
             "likedGamesCount=\(libraryItems.likedGames.count) " +
             "reviewsCount=\(libraryItems.reviews.count) " +
             "isSteamConnected=\(steamState.isConnected) " +
@@ -2656,6 +3538,8 @@ final class LibraryViewModel {
             "backlogGamesCount=\(state.backlogGames.count) " +
             "playtimeRecommendationsCount=\(state.playtimeRecommendations.count) " +
             "friendRecommendationsCount=\(state.friendRecommendations.count) " +
+            "friendRecommendationsSource=\(state.friendRecommendationsSource.rawValue) " +
+            "friendRecommendationsEmptyState=\(state.friendRecommendationsEmptyState?.rawValue ?? "nil") " +
             "likedGamesCount=\(state.likedGames.count) " +
             "reviewsCount=\(state.reviews.count) " +
             "isSteamConnected=\(state.isSteamConnected) " +
@@ -2694,7 +3578,13 @@ final class LibraryViewModel {
     }
 
     private func maybePresentSteamPrivacyGuidanceAfterSteamLink(
-        steamState: (isConnected: Bool, syncStatus: SteamSyncStatus, isSyncAvailable: Bool, errorCode: String?)
+        steamState: (
+            steamLinkStatus: SteamLinkStatus,
+            isConnected: Bool,
+            syncStatus: SteamSyncStatus,
+            isSyncAvailable: Bool,
+            errorCode: String?
+        )
     ) {
         if shouldPresentSteamConnectionOnboardingAfterSteamLink,
            steamState.isConnected,
@@ -2740,10 +3630,23 @@ final class LibraryViewModel {
 
     private func resolveSteamState(
         from result: Result<LibraryOverview, Error>,
-        fallback: (isConnected: Bool, syncStatus: SteamSyncStatus, isSyncAvailable: Bool, errorCode: String?)
-    ) -> (isConnected: Bool, syncStatus: SteamSyncStatus, isSyncAvailable: Bool, errorCode: String?) {
+        fallback: (
+            steamLinkStatus: SteamLinkStatus,
+            isConnected: Bool,
+            syncStatus: SteamSyncStatus,
+            isSyncAvailable: Bool,
+            errorCode: String?
+        )
+    ) -> (
+        steamLinkStatus: SteamLinkStatus,
+        isConnected: Bool,
+        syncStatus: SteamSyncStatus,
+        isSyncAvailable: Bool,
+        errorCode: String?
+    ) {
         guard case .success(let overview) = result else { return fallback }
         return (
+            steamLinkStatus: overview.steamLinkStatus,
             isConnected: overview.steamLinkStatus.isLinked,
             syncStatus: overview.steamSyncStatus,
             isSyncAvailable: overview.isSteamSyncAvailable,
@@ -2872,6 +3775,10 @@ final class LibraryViewModel {
             return false
         }
 
+        if isNonBlockingSteamMetadataIssue(errorCode: errorCode) {
+            return false
+        }
+
         if syncStatus == .failed {
             return true
         }
@@ -2899,7 +3806,19 @@ final class LibraryViewModel {
 
     private func isSteamOwnedLibrarySyncFailed(errorCode: String?) -> Bool {
         guard let errorCode = sanitized(errorCode)?.uppercased() else { return false }
+        if isNonBlockingSteamMetadataIssue(errorCode: errorCode) {
+            return false
+        }
         return errorCode == "STEAM_SYNC_FAILED"
+    }
+
+    private func isNonBlockingSteamMetadataIssue(errorCode: String?) -> Bool {
+        guard let normalizedCode = sanitized(errorCode)?.uppercased() else { return false }
+
+        return normalizedCode.contains("IGDB")
+            || normalizedCode.contains("RATE_LIMIT")
+            || normalizedCode.contains("TIMEOUT")
+            || normalizedCode.contains("ENRICHMENT_PENDING")
     }
 
     private func resolveOwnedSyncInlineErrorCode(from error: Error) -> String {

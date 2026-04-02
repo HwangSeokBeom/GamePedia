@@ -50,23 +50,16 @@ final class LibraryGameRowCell: UICollectionViewCell {
     }()
 
     private let trailingButton: UIButton = {
-        var configuration = UIButton.Configuration.filled()
-        configuration.baseBackgroundColor = UIColor.gpPrimary.withAlphaComponent(0.12)
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseBackgroundColor = .clear
         configuration.baseForegroundColor = .gpPrimaryLight
-        configuration.cornerStyle = .capsule
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10)
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
         configuration.image = UIImage(
-            systemName: "heart.fill",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+            systemName: "heart",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
         )
-        configuration.title = "찜됨"
-        configuration.imagePadding = 4
-        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
-            var attributes = attributes
-            attributes.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
-            return attributes
-        }
         let button = UIButton(configuration: configuration)
+        button.tintColor = .gpPrimaryLight
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -111,16 +104,23 @@ final class LibraryGameRowCell: UICollectionViewCell {
         if let ratingText = viewState.ratingText {
             ratingLabel.text = "★ \(ratingText)"
             ratingLabel.isHidden = false
+            ratingLabel.textColor = .gpStar
         } else {
-            ratingLabel.isHidden = true
+            ratingLabel.text = "평가 없음"
+            ratingLabel.isHidden = false
+            ratingLabel.textColor = .gpTextTertiary
         }
 
+        updateTrailingButtonAppearance(isFilled: viewState.trailingAction == .removeWishlist)
         applyTrailingActionVisibility(viewState.trailingAction != nil)
     }
 
     private func setup() {
         contentView.backgroundColor = .gpCardBackground
-        contentView.layer.cornerRadius = 16
+        contentView.layer.cornerRadius = 18
+        contentView.layer.cornerCurve = .continuous
+        contentView.layer.borderWidth = 1
+        contentView.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.24).cgColor
         contentView.layer.masksToBounds = true
 
         let textStack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel, metadataLabel])
@@ -137,12 +137,13 @@ final class LibraryGameRowCell: UICollectionViewCell {
         NSLayoutConstraint.activate([
             thumbnailView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
             thumbnailView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            thumbnailView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+            thumbnailView.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -12),
             thumbnailView.widthAnchor.constraint(equalToConstant: 60),
             thumbnailView.heightAnchor.constraint(equalToConstant: 60),
 
             trailingButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-            trailingButton.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            trailingButton.centerYAnchor.constraint(equalTo: contentView.centerYAnchor, constant: 2),
+            trailingButton.heightAnchor.constraint(equalToConstant: 44),
 
             ratingLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
             ratingLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
@@ -152,7 +153,7 @@ final class LibraryGameRowCell: UICollectionViewCell {
             textStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
         ])
 
-        let trailingButtonWidthConstraint = trailingButton.widthAnchor.constraint(equalToConstant: 68)
+        let trailingButtonWidthConstraint = trailingButton.widthAnchor.constraint(equalToConstant: 44)
         let textStackTrailingToButtonConstraint = textStack.trailingAnchor.constraint(
             equalTo: trailingButton.leadingAnchor,
             constant: -12
@@ -181,8 +182,21 @@ final class LibraryGameRowCell: UICollectionViewCell {
 
     private func applyTrailingActionVisibility(_ isVisible: Bool) {
         trailingButton.isHidden = !isVisible
-        trailingButtonWidthConstraint?.constant = isVisible ? 68 : 0
+        trailingButtonWidthConstraint?.constant = isVisible ? 44 : 0
         textStackTrailingToButtonConstraint?.isActive = isVisible
         textStackTrailingToContentConstraint?.isActive = !isVisible
+    }
+
+    private func updateTrailingButtonAppearance(isFilled: Bool) {
+        var configuration = trailingButton.configuration
+        configuration?.title = nil
+        configuration?.image = UIImage(
+            systemName: isFilled ? "heart.fill" : "heart",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+        )
+        configuration?.baseForegroundColor = isFilled ? .gpPrimaryLight : .gpTextTertiary
+        configuration?.baseBackgroundColor = .clear
+        trailingButton.configuration = configuration
+        trailingButton.tintColor = isFilled ? .gpPrimaryLight : .gpTextTertiary
     }
 }

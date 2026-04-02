@@ -7,6 +7,8 @@ enum ProfileEditReducer {
         switch mutation {
         case .setNickname(let nickname):
             state.nickname = nickname
+        case .setSelectedTitleKey(let selectedTitleKey):
+            state.selectedTitleKey = selectedTitleKey
         case .setNicknameValidationMessage(let message):
             state.nicknameValidationMessage = message
         case .setSelectedImage(let imageDraft):
@@ -16,7 +18,10 @@ enum ProfileEditReducer {
         case .setSaving(let isSaving):
             state.isSaving = isSaving
         case .setAuthenticatedUser(let authenticatedUser):
-            state = ProfileEditState(authenticatedUser: authenticatedUser)
+            state = ProfileEditState(
+                authenticatedUser: authenticatedUser,
+                selectedTitleKey: state.selectedTitleKey
+            )
         case .setError(let message):
             state.errorMessage = message
         case .setSuccessMessage(let message):

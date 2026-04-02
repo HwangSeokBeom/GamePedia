@@ -85,17 +85,31 @@ final class DefaultFriendRepository: FriendRepository {
         )
     }
 
-    func fetchFriendActivityFeed() async throws -> [FriendActivityItem] {
-        let data = try await remoteDataSource.fetchFriendActivityFeed()
-        return data.activities.map { dto in
+    func fetchFriendActivityFeed(cursor: String?) async throws -> FriendActivityFeedPage {
+        let data = try await remoteDataSource.fetchFriendActivityFeed(cursor: cursor)
+        let items = data.activities.map { dto in
             FriendActivityItem(
                 id: dto.id,
                 actor: mapUser(dto.actor),
                 type: resolvedActivityType(dto.activityType),
-                game: GameMapper.toEntity(dto.game),
-                createdAt: dto.createdAt
+                game: mapFriendActivityGame(dto.game),
+                createdAt: dto.createdAt,
+                messageOverride: sanitized(dto.message),
+                metadata: FriendActivityMetadata(
+                    reviewID: sanitized(dto.reviewId),
+                    previousRating: dto.previousRating,
+                    updatedRating: dto.updatedRating,
+                    previousPlayStatus: sanitized(dto.previousPlayStatus).flatMap(UserGameStatus.init(rawValue:)),
+                    updatedPlayStatus: sanitized(dto.updatedPlayStatus).flatMap(UserGameStatus.init(rawValue:)),
+                    note: sanitized(dto.message)
+                )
             )
         }
+        print("[FriendActivity] mappedCount=\(items.count) nextCursor=\(data.nextCursor ?? "nil")")
+        return FriendActivityFeedPage(
+            activities: items,
+            nextCursor: sanitized(data.nextCursor)
+        )
     }
 
     func fetchFriendRecommendations(userID: String) async throws -> [FriendRecommendation] {
@@ -151,7 +165,8 @@ final class DefaultFriendRepository: FriendRepository {
             bio: sanitized(dto.bio),
             profileImageURL: dto.profileImageUrl.flatMap(URL.init(string:)),
             relationshipStatus: relationshipStatus,
-            recentPlayTitle: sanitized(dto.recentPlayTitle)
+            recentPlayTitle: sanitized(dto.recentPlayTitle),
+            presence: mapPresence(dto)
         )
     }
 
@@ -283,20 +298,94 @@ final class DefaultFriendRepository: FriendRepository {
         )
     }
 
+    private func mapPresence(_ dto: FriendUserDTO) -> UserPresence? {
+        let normalizedStatus = sanitized(dto.presenceStatus)?.lowercased()
+        let state: UserPresenceState
+
+        switch normalizedStatus {
+        case "online":
+            state = .online
+        case "playing":
+            state = .playing
+        case "recently_active", "recentlyactive", "recent":
+            state = .recentlyActive
+        case "last_played", "lastplayed":
+            state = .lastPlayed
+        case nil:
+            if dto.currentGameTitle != nil {
+                state = .playing
+            } else if dto.lastActiveAt != nil {
+                state = .recentlyActive
+            } else if dto.lastPlayedAt != nil {
+                state = .lastPlayed
+            } else {
+                state = .unknown
+            }
+        default:
+            state = .unknown
+        }
+
+        guard state != .unknown || dto.currentGameTitle != nil || dto.lastActiveAt != nil || dto.lastPlayedAt != nil else {
+            return nil
+        }
+
+        return UserPresence(
+            state: state,
+            gameTitle: sanitized(dto.currentGameTitle),
+            lastActiveAt: dto.lastActiveAt,
+            lastPlayedAt: dto.lastPlayedAt,
+            isSteamSupplemented: dto.steamPresenceSupplemented == true
+        )
+    }
+
     private func resolvedActivityType(_ rawValue: String?) -> FriendActivityItem.ActivityType {
         let normalized = sanitized(rawValue)?.lowercased() ?? ""
         switch normalized {
-        case "started_playing", "startedplaying", "playing_started":
-            return .startedPlaying
-        case "wrote_review", "review", "writereview":
-            return .wroteReview
-        case "wishlisted", "liked", "favorite":
-            return .wishlisted
-        case "rated_high", "high_rating", "ratedhigh":
-            return .ratedHigh
+        case "review_created", "created_review", "wrote_review":
+            return .reviewCreated
+        case "review_updated", "updated_review":
+            return .reviewUpdated
+        case "liked_game_added", "liked_added", "wishlisted", "liked_game":
+            return .likedGameAdded
+        case "liked_game_removed", "liked_removed", "unwishlisted":
+            return .likedGameRemoved
+        case "rating_changed", "rated_high", "high_rating", "ratedhigh", "high_rated_game":
+            return .ratingChanged
+        case "play_status_changed", "status_changed":
+            return .playStatusChanged
+        case "friend_started_playing", "started_playing", "startedplaying", "playing_started":
+            return .friendStartedPlaying
+        case "friend_recently_played", "recently_played", "played_game":
+            return .friendRecentlyPlayed
         default:
-            return .startedPlaying
+            return .friendRecentlyPlayed
         }
+    }
+
+    private func mapFriendActivityGame(_ dto: FriendActivityGamePreviewDTO) -> Game {
+        let title = sanitized(dto.title) ?? sanitized(dto.gameName) ?? "이름 없는 게임"
+        let identifier = Int(dto.igdbGameId ?? "") ?? Int(dto.externalGameId ?? "") ?? 0
+        let isSteam = sanitized(dto.gameSource)?.lowercased() == "steam"
+        return Game(
+            id: identifier,
+            title: title,
+            translatedTitle: nil,
+            summary: nil,
+            translatedSummary: nil,
+            genre: "—",
+            category: "—",
+            developer: "—",
+            platform: isSteam ? "Steam" : "—",
+            releaseDate: nil,
+            releaseYear: 0,
+            coverImageURL: sanitized(dto.coverUrl).flatMap(URL.init(string:)),
+            rating: 0,
+            reviewCount: 0,
+            popularity: 0,
+            isTrending: false,
+            formattedRating: "—",
+            formattedReviewCount: "—"
+        )
     }
 
     private func sanitized(_ value: String?) -> String? {

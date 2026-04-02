@@ -3,6 +3,8 @@ import Foundation
 enum LibraryIntent {
     case viewDidLoad
     case pullToRefresh
+    case didSelectPrimaryTab(Int)
+    case didSelectHighlightChip(Int)
     case didSelectSort(Int)
     case syncOwnedSteamLibraryButtonTapped
     case connectSteamButtonTapped

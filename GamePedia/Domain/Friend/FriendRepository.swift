@@ -11,7 +11,7 @@ protocol FriendRepository {
     func fetchFriends() async throws -> [FriendUserSummary]
     func fetchSteamFriends() async throws -> (friends: [SteamFriend], isAvailable: Bool, isLimitedByPrivacy: Bool, syncWarningCode: String?)
     func fetchFriendProfile(userID: String) async throws -> FriendProfile
-    func fetchFriendActivityFeed() async throws -> [FriendActivityItem]
+    func fetchFriendActivityFeed(cursor: String?) async throws -> FriendActivityFeedPage
     func fetchFriendRecommendations(userID: String) async throws -> [FriendRecommendation]
     func removeFriend(userID: String) async throws
     func blockUser(userID: String) async throws

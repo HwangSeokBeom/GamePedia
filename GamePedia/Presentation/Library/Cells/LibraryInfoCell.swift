@@ -108,7 +108,10 @@ final class LibraryInfoCell: UICollectionViewCell {
     }
 
     private func setup() {
-        contentView.layer.cornerRadius = 16
+        contentView.layer.cornerRadius = 18
+        contentView.layer.cornerCurve = .continuous
+        contentView.layer.borderWidth = 1
+        contentView.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.2).cgColor
         contentView.layer.masksToBounds = true
 
         let textStack = UIStackView(arrangedSubviews: [titleLabel, messageLabel, detailLabel])

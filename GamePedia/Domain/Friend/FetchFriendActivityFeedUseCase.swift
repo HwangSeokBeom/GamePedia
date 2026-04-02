@@ -7,7 +7,7 @@ final class FetchFriendActivityFeedUseCase {
         self.repository = repository
     }
 
-    func execute() async throws -> [FriendActivityItem] {
-        try await repository.fetchFriendActivityFeed()
+    func execute(cursor: String? = nil) async throws -> FriendActivityFeedPage {
+        try await repository.fetchFriendActivityFeed(cursor: cursor)
     }
 }

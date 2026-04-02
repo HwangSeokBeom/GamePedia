@@ -6,6 +6,7 @@ final class NotificationsViewController: BaseViewController<NotificationsRootVie
     var onGameSelected: ((Int) -> Void)?
     var onFriendRequestsSelected: (() -> Void)?
     var onFriendSelected: ((String) -> Void)?
+    var onSocialRoute: ((SocialActivityRoute) -> Void)?
 
     init(
         rootView: NotificationsRootView,
@@ -62,6 +63,10 @@ extension NotificationsViewController: UITableViewDataSource, UITableViewDelegat
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         let notification = notifications[indexPath.row]
+        if let route = notification.socialRoute {
+            onSocialRoute?(route)
+            return
+        }
         switch notification.kind {
         case .friendRequestReceived:
             onFriendRequestsSelected?()
@@ -70,10 +75,14 @@ extension NotificationsViewController: UITableViewDataSource, UITableViewDelegat
                 onFriendSelected?(relatedUserID)
             }
         case .friendReviewReaction,
+             .friendReviewCreated,
+             .friendReviewUpdated,
+             .friendLikedGameAdded,
+             .friendLikedGameRemoved,
+             .friendRatingChanged,
+             .friendPlayStatusChanged,
              .friendStartedPlaying,
-             .friendWroteReview,
-             .friendWishlistedGame,
-             .friendRatedHigh:
+             .friendRecentlyPlayed:
             if let relatedGameID = notification.relatedGameID {
                 onGameSelected?(relatedGameID)
             } else if let relatedUserID = notification.relatedUserID {

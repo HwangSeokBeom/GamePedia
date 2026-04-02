@@ -45,22 +45,51 @@ enum LibrarySectionKind: Int, CaseIterable, Hashable {
     case wishlist
     case reviewed
 
+    static let displayOrder: [LibrarySectionKind] = [
+        .recentlyPlayed,
+        .playtimeRecommendations,
+        .reviewed,
+        .playing,
+        .owned,
+        .friendRecommendations,
+        .wishlist
+    ]
+
     var title: String {
         switch self {
         case .recentlyPlayed:
             return "최근 플레이한 게임"
         case .playing:
-            return "플레이 중"
+            return "플레이 중인 게임"
         case .owned:
             return "보유 게임"
         case .playtimeRecommendations:
-            return "플레이 성향 기반 추천"
+            return "플레이 시간 기반 추천"
         case .friendRecommendations:
             return "친구 기반 추천"
         case .wishlist:
             return "찜한 게임"
         case .reviewed:
-            return "리뷰 작성함"
+            return "최근 평가한 게임"
+        }
+    }
+
+    var subtitle: String? {
+        switch self {
+        case .recentlyPlayed:
+            return "플레이 기록과 취향이 드러나는 타이틀을 중심으로 정리했어요."
+        case .playtimeRecommendations:
+            return "오래 몰입한 패턴과 비슷한 좋아할 만한 작품을 골랐어요."
+        case .reviewed:
+            return nil
+        case .playing:
+            return nil
+        case .owned:
+            return nil
+        case .friendRecommendations:
+            return nil
+        case .wishlist:
+            return nil
         }
     }
 

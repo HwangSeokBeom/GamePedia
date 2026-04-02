@@ -12,7 +12,7 @@ final class LibrarySectionListViewController: UIViewController {
     private let fetchOwnedLibraryUseCase: FetchOwnedLibraryUseCase
     private let fetchFavoriteGamesUseCase: FetchFavoriteGamesUseCase
     private let fetchMyReviewedGamesUseCase: FetchMyReviewedGamesUseCase
-    private let fetchSteamFriendRecommendationsUseCase: FetchSteamFriendRecommendationsUseCase
+    private let fetchLibraryFriendRecommendationsUseCase: FetchLibraryFriendRecommendationsUseCase
     private let fetchPlaytimeRecommendationsUseCase: FetchPlaytimeRecommendationsUseCase
     private lazy var collectionView: UICollectionView = {
         let collectionView = UICollectionView(
@@ -57,8 +57,9 @@ final class LibrarySectionListViewController: UIViewController {
             ),
             gameRepository: DefaultGameRepository()
         ),
-        fetchSteamFriendRecommendationsUseCase: FetchSteamFriendRecommendationsUseCase = FetchSteamFriendRecommendationsUseCase(
-            libraryRepository: DefaultLibraryRepository()
+        fetchLibraryFriendRecommendationsUseCase: FetchLibraryFriendRecommendationsUseCase = FetchLibraryFriendRecommendationsUseCase(
+            libraryRepository: DefaultLibraryRepository(),
+            friendRepository: DefaultFriendRepository()
         ),
         fetchPlaytimeRecommendationsUseCase: FetchPlaytimeRecommendationsUseCase = FetchPlaytimeRecommendationsUseCase(
             libraryRepository: DefaultLibraryRepository()
@@ -70,7 +71,7 @@ final class LibrarySectionListViewController: UIViewController {
         self.fetchOwnedLibraryUseCase = fetchOwnedLibraryUseCase
         self.fetchFavoriteGamesUseCase = fetchFavoriteGamesUseCase
         self.fetchMyReviewedGamesUseCase = fetchMyReviewedGamesUseCase
-        self.fetchSteamFriendRecommendationsUseCase = fetchSteamFriendRecommendationsUseCase
+        self.fetchLibraryFriendRecommendationsUseCase = fetchLibraryFriendRecommendationsUseCase
         self.fetchPlaytimeRecommendationsUseCase = fetchPlaytimeRecommendationsUseCase
 
         let initialState = Self.initialState(for: route)
@@ -163,7 +164,7 @@ final class LibrarySectionListViewController: UIViewController {
     private func applySnapshot() {
         var snapshot = NSDiffableDataSourceSnapshot<Section, LibraryCollectionItem>()
         snapshot.appendSections([.main])
-        snapshot.appendItems(currentItems, toSection: .main)
+        snapshot.appendItems(deduplicatedItems(currentItems), toSection: .main)
         dataSource.apply(snapshot, animatingDifferences: false)
     }
 
@@ -178,6 +179,25 @@ final class LibrarySectionListViewController: UIViewController {
             collectionView.setCollectionViewLayout(makeLayout(), animated: animated)
         }
         applySnapshot()
+    }
+
+    private func deduplicatedItems(_ items: [LibraryCollectionItem]) -> [LibraryCollectionItem] {
+        var seenItems = Set<LibraryCollectionItem>()
+        let deduplicatedItems = items.filter { item in
+            let inserted = seenItems.insert(item).inserted
+            if !inserted {
+                print("[LibrarySectionListSnapshot] droppedDuplicateItem route=\(route.kind) item=\(item)")
+            }
+            return inserted
+        }
+        print(
+            "[LibrarySectionListSnapshot] " +
+            "section=\(route.kind) " +
+            "itemCountBeforeDedupe=\(items.count) " +
+            "itemCountAfterDedupe=\(deduplicatedItems.count) " +
+            "duplicatesRemoved=\(items.count - deduplicatedItems.count > 0)"
+        )
+        return deduplicatedItems
     }
 
     private func loadFullContentIfNeeded() {
@@ -241,15 +261,7 @@ final class LibrarySectionListViewController: UIViewController {
             }
 
         case .friendRecommendations:
-            loadContent(
-                logLabel: "friendRecommendations",
-                layoutStyle: .list,
-                emptyMessage: emptyMessageViewState(for: .friendRecommendations)
-            ) { [weak self] in
-                guard let self else { return [] }
-                let recommendations = try await self.fetchSteamFriendRecommendationsUseCase.execute()
-                return recommendations.map(self.makeFriendRecommendationRowItem)
-            }
+            loadFriendRecommendationsContent()
 
         case .playtimeRecommendations:
             loadContent(
@@ -285,6 +297,9 @@ final class LibrarySectionListViewController: UIViewController {
                     if items.isEmpty {
                         self.render(items: [.message(emptyMessage)], layoutStyle: .message)
                     } else {
+                        if self.route.kind == .owned {
+                            print("[LibraryOwnedFullList] responseCount=\(items.count) renderedCount=\(items.count)")
+                        }
                         self.render(items: items, layoutStyle: layoutStyle)
                     }
                 }
@@ -296,6 +311,54 @@ final class LibrarySectionListViewController: UIViewController {
                         "[LibrarySectionList] loadFailed " +
                         "kind=\(self.route.kind.title) " +
                         "label=\(logLabel) " +
+                        "error=\(error.localizedDescription)"
+                    )
+                    self.render(
+                        items: [.message(Self.errorMessageViewState(for: self.route.kind))],
+                        layoutStyle: .message
+                    )
+                }
+            }
+        }
+    }
+
+    private func loadFriendRecommendationsContent() {
+        loadTask?.cancel()
+        render(items: [.message(Self.loadingMessageViewState(for: route.kind))], layoutStyle: .message)
+
+        loadTask = Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let result = try await self.fetchLibraryFriendRecommendationsUseCase.execute()
+                if Task.isCancelled { return }
+
+                await MainActor.run {
+                    print(
+                        "[LibrarySectionList] loadSucceeded kind=\(self.route.kind.title) " +
+                        "itemCount=\(result.recommendations.count) source=\(result.source.rawValue) " +
+                        "emptyState=\(result.emptyState?.rawValue ?? "nil")"
+                    )
+                    if result.recommendations.isEmpty {
+                        self.render(
+                            items: [.message(self.friendRecommendationsEmptyMessageViewState(for: result.emptyState))],
+                            layoutStyle: .message
+                        )
+                    } else {
+                        self.render(
+                            items: result.recommendations.map(self.makeFriendRecommendationRowItem),
+                            layoutStyle: .list
+                        )
+                    }
+                }
+            } catch {
+                if Task.isCancelled { return }
+
+                await MainActor.run {
+                    print(
+                        "[LibrarySectionList] loadFailed " +
+                        "kind=\(self.route.kind.title) " +
+                        "label=friendRecommendations " +
                         "error=\(error.localizedDescription)"
                     )
                     self.render(
@@ -378,13 +441,14 @@ final class LibrarySectionListViewController: UIViewController {
     }
 
     private func makeRecentlyPlayedCardItem(from summary: LibraryGameSummary) -> LibraryCollectionItem {
-        .recentCard(
+        logRatingMapping(summary: summary, context: "LibrarySectionList.recentlyPlayed")
+        return .recentCard(
             LibraryRecentGameCardViewState(
                 identifier: summary.identifier,
                 detailDestination: detailDestination(for: summary),
                 title: summary.displayTitle,
                 metadataText: recentlyPlayedMetadataText(for: summary),
-                ratingText: summary.rating.map { String(format: "%.1f", $0) },
+                ratingText: summary.formattedRatingText,
                 coverImageURL: summary.coverImageURL,
                 fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
                 badgeText: "Steam",
@@ -395,6 +459,7 @@ final class LibrarySectionListViewController: UIViewController {
     }
 
     private func makeLibraryRowItem(from summary: LibraryGameSummary) -> LibraryCollectionItem {
+        logRatingMapping(summary: summary, context: "LibrarySectionList.row")
         let subtitleText = librarySubtitleText(for: summary)
         return .row(
             LibraryGameRowViewState(
@@ -405,7 +470,7 @@ final class LibrarySectionListViewController: UIViewController {
                 metadataText: libraryRowMetadataText(for: summary, subtitleText: subtitleText),
                 coverImageURL: summary.coverImageURL,
                 fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
-                ratingText: summary.rating.map { String(format: "%.1f", $0) },
+                ratingText: summary.formattedRatingText,
                 trailingAction: nil
             )
         )
@@ -454,6 +519,7 @@ final class LibrarySectionListViewController: UIViewController {
         from recommendation: SteamFriendRecommendation
     ) -> LibraryCollectionItem {
         let summary = recommendation.game
+        logRatingMapping(summary: summary, context: "LibrarySectionList.friendRecommendation")
         return .row(
             LibraryGameRowViewState(
                 identifier: summary.identifier,
@@ -463,7 +529,7 @@ final class LibrarySectionListViewController: UIViewController {
                 metadataText: librarySubtitleText(for: summary),
                 coverImageURL: summary.coverImageURL,
                 fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
-                ratingText: summary.rating.map { String(format: "%.1f", $0) },
+                ratingText: summary.formattedRatingText,
                 trailingAction: nil
             )
         )
@@ -473,6 +539,7 @@ final class LibrarySectionListViewController: UIViewController {
         from recommendation: PlaytimeRecommendation
     ) -> LibraryCollectionItem {
         let summary = recommendation.game
+        logRatingMapping(summary: summary, context: "LibrarySectionList.playtimeRecommendation")
         return .row(
             LibraryGameRowViewState(
                 identifier: summary.identifier,
@@ -482,35 +549,47 @@ final class LibrarySectionListViewController: UIViewController {
                 metadataText: librarySubtitleText(for: summary),
                 coverImageURL: summary.coverImageURL,
                 fallbackCoverImageURLs: summary.fallbackCoverImageURLs,
-                ratingText: summary.rating.map { String(format: "%.1f", $0) },
+                ratingText: summary.formattedRatingText,
                 trailingAction: nil
             )
         )
     }
 
     private func recentlyPlayedMetadataText(for summary: LibraryGameSummary) -> String {
-        if summary.gameSource == .steam,
-           let playtimeText = SteamPlaytimeFormatter.recentPlaytimeText(
-                recentPlaytimeMinutes: summary.recentPlaytimeMinutes,
-                fallbackPlaytimeMinutes: summary.playtimeMinutes
-           ) {
-            return playtimeText
-        }
+        let display = RecentPlayMetadataFormatter.makeDisplay(
+            lastPlayedAt: summary.lastPlayedAt,
+            hasReliableLastPlayedAt: summary.hasReliableLastPlayedAt,
+            recentPlaytimeMinutes: summary.recentPlaytimeMinutes,
+            fallbackReason: summary.recentPlayFallbackReason
+        )
+        let recentPlayMetadataText = display.finalText
+        let timestampUsedForRelativeText = display.relativeTimeText == nil
+            ? "nil"
+            : (summary.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")
+        print(
+            "[RecentPlayDisplay] " +
+            "screen=Library.fullList.\(route.kind.title) " +
+            "title=\(summary.displayTitle) " +
+            "lastPlayedAt=\(summary.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
+            "recentPlaytimeMinutes=\(summary.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
+            "hasReliableLastPlayedAt=\(summary.hasReliableLastPlayedAt) " +
+            "timestampUsedForRelativeText=\(timestampUsedForRelativeText) " +
+            "relativeTime=\(display.relativeTimeText ?? "nil") " +
+            "fallbackReason=\(summary.recentPlayFallbackReason ?? "nil") " +
+            "finalText=\(recentPlayMetadataText)"
+        )
+        return recentPlayMetadataText
+    }
 
-        if let recentPlaytimeText = sanitized(summary.recentPlaytimeText) {
-            return recentPlaytimeText
-        }
-
-        if summary.gameSource == .steam,
-           summary.matchStatus != .confirmed {
-            return steamLibraryFallbackText(for: summary)
-        }
-
-        if let subtitleText = conciseLibraryMetadataText(for: summary) {
-            return subtitleText
-        }
-
-        return steamLibraryFallbackText(for: summary)
+    private func logRatingMapping(summary: LibraryGameSummary, context: String) {
+        print(
+            "[LibraryRatingMapping] " +
+            "context=\(context) " +
+            "title=\(summary.displayTitle) " +
+            "igdbGameId=\(summary.igdbGameId.map(String.init) ?? "nil") " +
+            "aggregatedRating=nil totalRating=nil " +
+            "final ratingText=\(summary.formattedRatingText ?? "nil")"
+        )
     }
 
     private func librarySubtitleText(for summary: LibraryGameSummary) -> String {
@@ -571,20 +650,50 @@ final class LibrarySectionListViewController: UIViewController {
             return "정보 보강 중"
         }
 
-        return summary.matchStatus == .confirmed ? "Steam" : "Steam · 정보 보강 중"
+        return summary.shouldOpenFullGamePediaDetail ? "Steam" : "Steam · 정보 보강 중"
     }
 
     private func detailDestination(for summary: LibraryGameSummary) -> LibraryGameDetailDestination? {
-        if summary.matchStatus == .confirmed,
-           let igdbGameID = summary.igdbGameId {
+        if summary.shouldOpenFullGamePediaDetail,
+           let igdbGameID = summary.igdbGameId,
+           igdbGameID > 0 {
+            print(
+                "[DetailRouteMapping] " +
+                "screen=Library.sectionList.\(route.kind.title) " +
+                "title=\(summary.displayTitle) " +
+                "externalGameId=\(summary.externalGameId) " +
+                "igdbGameId=\(summary.igdbGameId.map(String.init) ?? "nil") " +
+                "detailAvailable=\(summary.detailAvailable) " +
+                "createdDestination=igdb:\(igdbGameID) " +
+                "blockedReason=nil"
+            )
             return .igdb(igdbGameID)
         }
 
-        guard summary.gameSource == .steam,
-              summary.detailAvailable else {
+        guard summary.shouldOpenSteamFallbackDetail else {
+            print(
+                "[DetailRouteMapping] " +
+                "screen=Library.sectionList.\(route.kind.title) " +
+                "title=\(summary.displayTitle) " +
+                "externalGameId=\(summary.externalGameId) " +
+                "igdbGameId=\(summary.igdbGameId.map(String.init) ?? "nil") " +
+                "detailAvailable=\(summary.detailAvailable) " +
+                "createdDestination=nil " +
+                "blockedReason=\(summary.detailAvailable ? "missingPositiveIgdbGameId" : "detailUnavailable")"
+            )
             return nil
         }
 
+        print(
+            "[DetailRouteMapping] " +
+            "screen=Library.sectionList.\(route.kind.title) " +
+            "title=\(summary.displayTitle) " +
+            "externalGameId=\(summary.externalGameId) " +
+            "igdbGameId=\(summary.igdbGameId.map(String.init) ?? "nil") " +
+            "detailAvailable=\(summary.detailAvailable) " +
+            "createdDestination=steamFallback " +
+            "blockedReason=nil"
+        )
         return .steamFallback(
             SteamFallbackGameDetailViewState(
                 title: summary.displayTitle,
@@ -599,7 +708,8 @@ final class LibrarySectionListViewController: UIViewController {
                 externalGameId: summary.externalGameId,
                 gameSource: summary.gameSource,
                 metadataEnriched: summary.metadataEnriched,
-                matchStatus: summary.matchStatus
+                matchStatus: summary.matchStatus,
+                enrichmentStatus: summary.enrichmentStatus
             )
         )
     }
@@ -609,7 +719,7 @@ final class LibrarySectionListViewController: UIViewController {
             return "Steam · \(genre)"
         }
 
-        return summary.matchStatus == .confirmed ? "Steam" : "Steam · 정보 보강 중"
+        return summary.shouldOpenFullGamePediaDetail ? "Steam" : "Steam · 정보 보강 중"
     }
 
     private func playtimeRecommendationSubtitleText(
@@ -640,6 +750,39 @@ final class LibrarySectionListViewController: UIViewController {
         }
 
         return friendCount > 0 ? "친구 \(friendCount)명이 주목한 게임" : "친구들이 많이 보유한 게임"
+    }
+
+    private func friendRecommendationsEmptyMessageViewState(
+        for emptyState: LibraryFriendRecommendationsEmptyState?
+    ) -> LibraryMessageViewState {
+        let title: String?
+        let message: String
+        let detailText: String?
+
+        switch emptyState ?? .noFriendData {
+        case .noFriendData:
+            title = "친구 추천을 불러올 수 없어요"
+            message = "아직 추천을 만들 친구 데이터가 없어요."
+            detailText = "친구를 추가하거나 Steam 계정을 연동해보세요."
+        case .insufficientActivity:
+            title = "아직 추천할 게임이 없어요"
+            message = "친구의 찜, 리뷰, 라이브러리 활동이 더 쌓이면 추천을 보여드릴게요."
+            detailText = nil
+        case .steamUnavailable:
+            title = "Steam 친구 데이터를 불러올 수 없어요"
+            message = "Steam 친구 정보가 없거나 공개 설정에 따라 추천을 불러올 수 없어요."
+            detailText = nil
+        }
+
+        return LibraryMessageViewState(
+            id: "sectionList.empty.friendRecommendations.\((emptyState ?? .noFriendData).rawValue)",
+            style: .empty,
+            title: title,
+            message: message,
+            detailText: detailText,
+            buttonTitle: nil,
+            action: nil
+        )
     }
 
     private func releaseText(for year: Int) -> String {
@@ -768,8 +911,22 @@ extension LibrarySectionListViewController: UICollectionViewDelegate {
         case .recentCard(let viewState):
             switch viewState.detailDestination {
             case .igdb(let gameID):
+                print(
+                    "[GameTap] screen=Library.sectionList.\(route.kind.title) " +
+                    "title=\(viewState.title) " +
+                    "destination=igdb:\(gameID) " +
+                    "igdbGameId=\(gameID) " +
+                    "externalGameId=\(viewState.identifier.sourceID)"
+                )
                 onGameSelected?(gameID)
             case .steamFallback(let steamViewState):
+                print(
+                    "[GameTap] screen=Library.sectionList.\(route.kind.title) " +
+                    "title=\(viewState.title) " +
+                    "destination=steamFallback " +
+                    "igdbGameId=nil " +
+                    "externalGameId=\(steamViewState.externalGameId)"
+                )
                 onSteamDetailRequested?(steamViewState)
             case .none:
                 presentUnavailableDetailAlert()
@@ -778,8 +935,22 @@ extension LibrarySectionListViewController: UICollectionViewDelegate {
         case .row(let viewState):
             switch viewState.detailDestination {
             case .igdb(let gameID):
+                print(
+                    "[GameTap] screen=Library.sectionList.\(route.kind.title) " +
+                    "title=\(viewState.title) " +
+                    "destination=igdb:\(gameID) " +
+                    "igdbGameId=\(gameID) " +
+                    "externalGameId=\(viewState.identifier.sourceID)"
+                )
                 onGameSelected?(gameID)
             case .steamFallback(let steamViewState):
+                print(
+                    "[GameTap] screen=Library.sectionList.\(route.kind.title) " +
+                    "title=\(viewState.title) " +
+                    "destination=steamFallback " +
+                    "igdbGameId=nil " +
+                    "externalGameId=\(steamViewState.externalGameId)"
+                )
                 onSteamDetailRequested?(steamViewState)
             case .none:
                 presentUnavailableDetailAlert()

@@ -42,6 +42,9 @@ final class ProfileEditViewController: BaseViewController<ProfileEditRootView, P
 
     private func setupActions() {
         rootView.nicknameFieldView.textField.addTarget(self, action: #selector(nicknameDidChange), for: .editingChanged)
+        rootView.badgeButtons.forEach { button in
+            button.addTarget(self, action: #selector(didTapBadgeOption(_:)), for: .touchUpInside)
+        }
         rootView.photoActionButton.addTarget(self, action: #selector(didTapPhotoAction), for: .touchUpInside)
         rootView.removePhotoButton.addTarget(self, action: #selector(didTapRemovePhoto), for: .touchUpInside)
         rootView.saveButton.addTarget(self, action: #selector(didTapSave), for: .touchUpInside)
@@ -106,6 +109,10 @@ final class ProfileEditViewController: BaseViewController<ProfileEditRootView, P
 
     @objc private func nicknameDidChange() {
         viewModel.send(.nicknameChanged(rootView.nicknameFieldView.textField.text ?? ""))
+    }
+
+    @objc private func didTapBadgeOption(_ sender: ProfileBadgeOptionButton) {
+        viewModel.send(.badgeSelectionToggled(sender.badgeTitle))
     }
 
     @objc private func didTapPhotoAction() {

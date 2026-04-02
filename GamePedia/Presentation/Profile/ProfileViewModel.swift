@@ -15,6 +15,7 @@ final class ProfileViewModel {
 
     // MARK: Dependencies
     private let fetchCurrentUserUseCase: FetchCurrentUserUseCase
+    private let fetchFriendsListUseCase: FetchFriendsListUseCase
     private let fetchMyReviewsUseCase: FetchMyReviewsUseCase
     private let fetchMyFavoritesUseCase: FetchMyFavoritesUseCase
     private let fetchSteamLinkStatusUseCase: FetchSteamLinkStatusUseCase
@@ -24,11 +25,15 @@ final class ProfileViewModel {
     private let userSessionStore: any UserSessionStore
     private let apiClient: APIClient
     private let translateTextUseCase: TranslateTextUseCase
+    private let profileBadgeSelectionStore: ProfileBadgeSelectionStore
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: Init
     init(
         fetchCurrentUserUseCase: FetchCurrentUserUseCase,
+        fetchFriendsListUseCase: FetchFriendsListUseCase = FetchFriendsListUseCase(
+            repository: DefaultFriendRepository()
+        ),
         fetchMyReviewsUseCase: FetchMyReviewsUseCase = FetchMyReviewsUseCase(
             reviewRepository: DefaultReviewRepository()
         ),
@@ -45,9 +50,11 @@ final class ProfileViewModel {
         ),
         userSessionStore: any UserSessionStore,
         apiClient: APIClient = .shared,
-        translateTextUseCase: TranslateTextUseCase? = nil
+        translateTextUseCase: TranslateTextUseCase? = nil,
+        profileBadgeSelectionStore: ProfileBadgeSelectionStore = .shared
     ) {
         self.fetchCurrentUserUseCase = fetchCurrentUserUseCase
+        self.fetchFriendsListUseCase = fetchFriendsListUseCase
         self.fetchMyReviewsUseCase = fetchMyReviewsUseCase
         self.fetchMyFavoritesUseCase = fetchMyFavoritesUseCase
         self.fetchSteamLinkStatusUseCase = fetchSteamLinkStatusUseCase
@@ -56,6 +63,7 @@ final class ProfileViewModel {
         self.unlinkSteamAccountUseCase = unlinkSteamAccountUseCase
         self.userSessionStore = userSessionStore
         self.apiClient = apiClient
+        self.profileBadgeSelectionStore = profileBadgeSelectionStore
         self.translateTextUseCase = translateTextUseCase ?? DefaultTranslateTextUseCase(
             repository: DefaultTranslationRepository(),
             languageProvider: DefaultLanguageProvider.shared
@@ -69,6 +77,8 @@ final class ProfileViewModel {
         switch intent {
         case .viewDidLoad:
             loadProfileData()
+        case .didTapSettings:
+            onRoute?(.showSettings)
         case .didTapEditProfile:
             onRoute?(.showEditProfile)
         case .didTapSteamUnlink:
@@ -77,10 +87,16 @@ final class ProfileViewModel {
             logout()
         case .didTapDeleteAccount:
             deleteAccount()
+        case .didTapPlayedGamesStat:
+            print("[Profile] playedStat intent received")
+            print("[Profile] route emitted route=showPlayedGames")
+            onRoute?(.showPlayedGames)
         case .didTapWrittenReviews:
             onRoute?(.showWrittenReviews)
         case .didTapFavoriteGames:
             onRoute?(.showFavoriteGames)
+        case .didTapGame:
+            break
         case .didTapFriendsList:
             onRoute?(.showFriendsList)
         case .didTapSteamFriends:
@@ -103,8 +119,10 @@ final class ProfileViewModel {
             onRoute?(.contactSupport)
         case .didConsumeSuccessMessage:
             apply(.clearSuccessMessage)
-        case .didTapSettings, .didTapGame, .didTapSeeMoreRecentPlay:
-            break
+        case .didTapSeeMoreRecentPlay:
+            print("[Profile] recentPlay seeMore intent received count=\(state.recentlyPlayedGames.count)")
+            print("[Profile] route emitted route=showRecentPlayList")
+            onRoute?(.showRecentPlayList)
         }
     }
 
@@ -117,15 +135,17 @@ final class ProfileViewModel {
     private func loadProfileData() {
         apply(.setLoading(true))
         apply(.clearError)
+        apply(.setRecentPlayLoadState(.loading))
 
         if let authenticatedUser = userSessionStore.fetchUser() {
             apply(.setAuthenticatedUser(authenticatedUser))
+            refreshSelectedBadges()
         }
 
         fetchAuthenticatedUser()
 
         Task {
-            await fetchRecentGames()
+            await fetchProfileSummary()
         }
 
         Task {
@@ -134,6 +154,10 @@ final class ProfileViewModel {
 
         Task {
             await fetchWishlistCount()
+        }
+
+        Task {
+            await fetchFriendCount()
         }
 
         Task {
@@ -160,21 +184,216 @@ final class ProfileViewModel {
                 },
                 receiveValue: { [weak self] authenticatedUser in
                     self?.apply(.setAuthenticatedUser(authenticatedUser))
+                    self?.refreshSelectedBadges()
                 }
             )
             .store(in: &cancellables)
     }
 
-    private func fetchRecentGames() async {
+    private func fetchProfileSummary() async {
         do {
-            let response = try await apiClient.request(.recentPlays(), as: RecentGameListResponseDTO.self)
-            let games = response.recentGames.map { UserProfileMapper.toRecentGameEntity($0) }
-            let translatedGames = await translateRecentGames(games)
+            let response = try await apiClient.request(.myProfile, as: CurrentUserProfileResponseDTO.self)
+            print(
+                "[Profile] dto received " +
+                "selectedTitle=\(response.profile.selectedTitle ?? "nil") " +
+                "selectedTitles=\(response.profile.selectedTitles) " +
+                "explicitSelected=\(response.profile.explicitSelected.map(String.init(describing:)) ?? "nil") " +
+                "availableTitles=\(response.profile.availableTitles.count) " +
+                "recentPlayedPreview=\(response.profile.recentPlayedPreview.count) " +
+                "recentPlayedCount=\(response.profile.recentPlayedCount) " +
+                "recentPlayedSource=\(response.profile.recentPlayedSource ?? "nil")"
+            )
+            response.profile.recentPlayedPreview.forEach { game in
+                print(
+                    "[RecentPlayDecode] " +
+                    "screen=Profile.summary " +
+                    "title=\(game.title) " +
+                    "recentPlaytimeMinutes=\(game.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
+                    "lastPlayedAt=\(game.lastPlayedAt) " +
+                    "hasReliableLastPlayedAt=\(game.hasReliableLastPlayedAt.map(String.init) ?? "nil") " +
+                    "lastPlayedAtSource=\(game.lastPlayedAtSource ?? "nil") " +
+                    "fallbackReason=\(game.fallbackReason ?? "nil")"
+                )
+            }
+            let profileSummary = UserProfileMapper.toEntity(response.profile)
+            let selectedTitleKey = self.profileBadgeSelectionStore.selectedTitleKey(for: profileSummary.resolvedBadgeTitle)
+            print(
+                "[Profile] entity mapped " +
+                "selectedTitle=\(profileSummary.selectedTitle ?? "nil") " +
+                "selectedTitleKey=\(selectedTitleKey ?? "nil") " +
+                "selectedTitles=\(profileSummary.selectedTitles) " +
+                "explicitSelected=\(profileSummary.explicitSelected.map(String.init(describing:)) ?? "nil") " +
+                "availableTitles=\(profileSummary.availableTitles.count) " +
+                "profileTags=\(profileSummary.profileTags.count) " +
+                "recentPlayedPreview=\(profileSummary.recentPlayedPreview.count) " +
+                "recentPlayedCount=\(profileSummary.recentPlayedCount) " +
+                "recentPlayedSource=\(profileSummary.recentPlayedSource ?? "nil") " +
+                "friendCount=\(profileSummary.friendCount)"
+            )
+
             await MainActor.run {
-                self.apply(.setRecentGames(translatedGames))
+                self.apply(.setProfileSummary(profileSummary))
+                self.apply(.setFriendActivityCount(0))
+                if profileSummary.recentPlayedPreview.isEmpty == false {
+                    let mergedPreviewGames = self.mergeRecentGames(
+                        current: self.state.recentlyPlayedGames,
+                        incoming: Array(profileSummary.recentPlayedPreview.prefix(5)),
+                        screen: "Profile.summaryPreview"
+                    )
+                    self.apply(.setRecentlyPlayedGames(mergedPreviewGames))
+                    self.apply(.setHasMoreRecentPlayed(profileSummary.hasMoreRecentPlayed))
+                    self.apply(.setRecentPlayLoadState(.loaded))
+                }
+                self.refreshSelectedBadges()
+                print(
+                    "[Profile] current selectedTitleKey from server = \(self.state.selectedTitleKey ?? "nil")"
+                )
+                print(
+                    "[Profile] state emitted " +
+                    "selectedTitle=\(self.state.selectedTitle ?? "nil") " +
+                    "selectedTitleKey=\(self.state.selectedTitleKey ?? "nil") " +
+                    "selectedTitles=\(self.state.selectedTitles) " +
+                    "explicitSelected=\(self.state.hasExplicitSelectedTitles.map(String.init(describing:)) ?? "nil") " +
+                    "recentPlayed=\(self.state.recentlyPlayedGames.count) " +
+                    "friendCount=\(self.state.friendCount) " +
+                    "friendActivityCount=\(self.state.friendActivityCount)"
+                )
+            }
+
+            if profileSummary.recentPlayedPreview.isEmpty || profileSummary.hasMoreRecentPlayed {
+                await fetchRecentGames(source: "dedicated")
             }
         } catch {
-            // Recent games failing silently — basic auth profile still shows
+            print("[Profile] summary failed error=\(error.localizedDescription)")
+            await fetchRecentGames(source: "fallback")
+        }
+    }
+
+    private func fetchRecentGames(source: String) async {
+        do {
+            let response = try await apiClient.request(.recentPlays(), as: RecentGameListResponseDTO.self)
+            print(
+                "[Profile] recent dto received " +
+                "source=\(source) " +
+                "count=\(response.recentGames.count) " +
+                "hasMore=\(response.hasMoreRecentPlayed ?? false)"
+            )
+            response.recentGames.forEach { game in
+                print(
+                    "[RecentPlayDecode] " +
+                    "screen=Profile.\(source).dto " +
+                    "title=\(game.title) " +
+                    "recentPlaytimeMinutes=\(game.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
+                    "lastPlayedAt=\(game.lastPlayedAt) " +
+                    "hasReliableLastPlayedAt=\(game.hasReliableLastPlayedAt.map(String.init) ?? "nil") " +
+                    "lastPlayedAtSource=\(game.lastPlayedAtSource ?? "nil") " +
+                    "fallbackReason=\(game.fallbackReason ?? "nil")"
+                )
+            }
+            let games = response.recentGames
+                .map { UserProfileMapper.toRecentGameEntity($0) }
+                .sorted { lhs, rhs in
+                    switch (lhs.lastPlayedAt, rhs.lastPlayedAt) {
+                    case let (lhsDate?, rhsDate?):
+                        return lhsDate > rhsDate
+                    case (.some, .none):
+                        return true
+                    case (.none, .some):
+                        return false
+                    case (.none, .none):
+                        return lhs.gameId > rhs.gameId
+                    }
+                }
+            let translatedGames = await translateRecentGames(
+                mergeRecentGames(
+                    current: self.state.recentlyPlayedGames,
+                    incoming: Array(games.prefix(5)),
+                    screen: "Profile.\(source)"
+                )
+            )
+            print("[Profile] recentPlayedPreview mapped source=\(source) count=\(translatedGames.count)")
+            await MainActor.run {
+                if translatedGames.isEmpty, self.state.recentlyPlayedGames.isEmpty == false {
+                    self.apply(.setRecentPlayLoadState(.loaded))
+                    print(
+                        "[Profile] recentPlayed empty response ignored " +
+                        "existingCount=\(self.state.recentlyPlayedGames.count)"
+                    )
+                    return
+                }
+
+                self.apply(.setRecentlyPlayedGames(translatedGames))
+                self.apply(.setHasMoreRecentPlayed(response.hasMoreRecentPlayed ?? false))
+                self.apply(.setRecentPlayLoadState(translatedGames.isEmpty ? .empty : .loaded))
+                self.refreshSelectedBadges()
+            }
+        } catch {
+            print("[Profile] recentPlayed failed source=\(source) error=\(error.localizedDescription)")
+            await MainActor.run {
+                let loadState: ProfileRecentPlayLoadState = self.state.authenticatedUser == nil ? .failed : .partialFailure
+                self.apply(.setRecentPlayLoadState(loadState))
+            }
+        }
+    }
+
+    private func mergeRecentGames(
+        current: [RecentGame],
+        incoming: [RecentGame],
+        screen: String
+    ) -> [RecentGame] {
+        guard incoming.isEmpty == false else { return current }
+
+        let currentByGameID = Dictionary(uniqueKeysWithValues: current.map { ($0.gameId, $0) })
+        return incoming.map { incomingGame in
+            guard let currentGame = currentByGameID[incomingGame.gameId] else { return incomingGame }
+
+            let resolvedLastPlayedAt: Date?
+            let resolvedLastPlayedAtSource: String?
+            let resolvedHasReliableLastPlayedAt: Bool
+            if incomingGame.hasReliableLastPlayedAt, let incomingLastPlayedAt = incomingGame.lastPlayedAt {
+                resolvedLastPlayedAt = incomingLastPlayedAt
+                resolvedLastPlayedAtSource = incomingGame.lastPlayedAtSource
+                resolvedHasReliableLastPlayedAt = true
+            } else {
+                resolvedLastPlayedAt = currentGame.lastPlayedAt
+                resolvedLastPlayedAtSource = currentGame.lastPlayedAtSource
+                resolvedHasReliableLastPlayedAt = currentGame.hasReliableLastPlayedAt
+            }
+
+            let resolvedRecentPlaytimeMinutes = incomingGame.recentPlaytimeMinutes ?? currentGame.recentPlaytimeMinutes
+            let resolvedFallbackReason = incomingGame.fallbackReason ?? currentGame.fallbackReason
+            let display = RecentPlayMetadataFormatter.makeDisplay(
+                lastPlayedAt: resolvedLastPlayedAt,
+                hasReliableLastPlayedAt: resolvedHasReliableLastPlayedAt,
+                recentPlaytimeMinutes: resolvedRecentPlaytimeMinutes,
+                fallbackReason: resolvedFallbackReason
+            )
+            let resolvedFormattedLastPlayed = display.finalText
+            let timestampUsedForRelativeText = resolvedHasReliableLastPlayedAt
+                ? (resolvedLastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")
+                : "nil"
+
+            print(
+                "[RecentPlayDisplay] " +
+                "screen=\(screen) " +
+                "title=\(incomingGame.resolvedTitle) " +
+                "lastPlayedAt=\(resolvedLastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
+                "recentPlaytimeMinutes=\(resolvedRecentPlaytimeMinutes.map(String.init) ?? "nil") " +
+                "hasReliableLastPlayedAt=\(resolvedHasReliableLastPlayedAt) " +
+                "timestampUsedForRelativeText=\(timestampUsedForRelativeText) " +
+                "relativeTime=\(display.relativeTimeText ?? "nil") " +
+                "fallbackReason=\(resolvedFallbackReason ?? "nil") " +
+                "finalText=\(resolvedFormattedLastPlayed)"
+            )
+
+            return incomingGame.replacingRecentPlayMetadata(
+                formattedLastPlayed: resolvedFormattedLastPlayed,
+                lastPlayedAt: resolvedLastPlayedAt,
+                lastPlayedAtSource: resolvedLastPlayedAtSource,
+                hasReliableLastPlayedAt: resolvedHasReliableLastPlayedAt,
+                recentPlaytimeMinutes: resolvedRecentPlaytimeMinutes,
+                fallbackReason: resolvedFallbackReason
+            )
         }
     }
 
@@ -183,6 +402,7 @@ final class ProfileViewModel {
             let reviews = try await fetchMyReviewsUseCase.execute(sort: .latest)
             await MainActor.run {
                 self.apply(.setWrittenReviewCount(reviews.count))
+                self.refreshSelectedBadges()
             }
         } catch {
             let reviewError = ReviewError.from(error: error)
@@ -191,6 +411,18 @@ final class ProfileViewModel {
                     _ = self.handleProtectedSessionFailure(.unauthorized)
                 }
             }
+        }
+    }
+
+    private func fetchFriendCount() async {
+        do {
+            let friends = try await fetchFriendsListUseCase.execute()
+            await MainActor.run {
+                self.apply(.setFriendCount(friends.count))
+                self.refreshSelectedBadges()
+            }
+        } catch {
+            // Friend count failing silently — profile still renders.
         }
     }
 
@@ -215,11 +447,29 @@ final class ProfileViewModel {
             }
             .store(in: &cancellables)
 
-        NotificationCenter.default.publisher(for: .currentUserProfileDidChange)
+        NotificationCenter.default.publisher(for: .friendRelationshipDidChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
+                guard let self, self.userSessionStore.fetchUser() != nil else { return }
+                Task {
+                    await self.fetchFriendCount()
+                }
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .currentUserProfileDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
                 guard let self, let user = self.userSessionStore.fetchUser() else { return }
                 self.apply(.setAuthenticatedUser(user))
+                let selectedTitleKey = notification.userInfo?[ProfileChangeUserInfoKey.selectedTitleKey] as? String
+                let selectedTitle = notification.userInfo?[ProfileChangeUserInfoKey.selectedTitle] as? String
+                print("[Profile] profileChanged selectedTitleKey=\(selectedTitleKey ?? "nil") selectedTitle=\(selectedTitle ?? "nil")")
+                self.apply(.setSelectedTitleSelection(title: selectedTitle, key: selectedTitleKey))
+                self.refreshSelectedBadges()
+                Task {
+                    await self.fetchProfileSummary()
+                }
             }
             .store(in: &cancellables)
 
@@ -240,6 +490,7 @@ final class ProfileViewModel {
                 if let isLinked = notification.userInfo?[SteamLinkStateChangeUserInfoKey.isLinked] as? Bool,
                    isLinked == false {
                     self.apply(.setSteamLinkStatus(.notLinked))
+                    self.refreshSelectedBadges()
                 }
 
                 guard self.userSessionStore.fetchUser() != nil else { return }
@@ -307,6 +558,7 @@ final class ProfileViewModel {
             let favorites = try await fetchMyFavoritesUseCase.execute(sort: .latest)
             await MainActor.run {
                 self.apply(.setWishlistCount(favorites.count))
+                self.refreshSelectedBadges()
             }
         } catch {
             let favoriteError = FavoriteError.from(error: error)
@@ -356,6 +608,8 @@ final class ProfileViewModel {
                 let result = try await unlinkSteamAccountUseCase.execute()
                 await MainActor.run {
                     self.apply(.setUnlinkingSteamAccount(false))
+                    LibraryCacheStore.shared.clear()
+                    LibraryCacheStore.shared.clearSteamSyncDates()
                     self.apply(.setSteamLinkStatus(result.steamLinkStatus))
                     self.apply(.setSuccessMessage("Steam 연동이 해제되었어요"))
                     NotificationCenter.default.post(
@@ -410,5 +664,14 @@ final class ProfileViewModel {
         return games.map { game in
             game.replacingTranslated(translatedTitle: translatedTitles[game.gameId])
         }
+    }
+
+    private func refreshSelectedBadges() {
+        if let selectedTitle = state.selectedTitle,
+           selectedTitle.isEmpty == false {
+            apply(.setSelectedBadgeTitles([selectedTitle]))
+            return
+        }
+        apply(.setSelectedBadgeTitles([]))
     }
 }

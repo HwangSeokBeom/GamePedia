@@ -43,6 +43,22 @@ final class HomeCoordinator {
         navigationController.setViewControllers([homeVC], animated: false)
     }
 
+    func navigateToGameDetail(gameID: Int) {
+        showDetail(gameId: gameID)
+    }
+
+    func navigateToNotifications() {
+        showNotifications()
+    }
+
+    func navigateToFriendRequests() {
+        showFriendRequests()
+    }
+
+    func navigateToFriendProfile(userID: String) {
+        showFriendProfile(userID: userID)
+    }
+
     // MARK: - Navigation
 
     private func showDetail(gameId: Int) {
@@ -117,6 +133,9 @@ final class HomeCoordinator {
         viewController.onFriendSelected = { [weak self] userID in
             self?.showFriendProfile(userID: userID)
         }
+        viewController.onSocialRoute = { [weak self] route in
+            self?.handleSocialActivityRoute(route)
+        }
         navigationController.pushViewController(viewController, animated: true)
     }
 
@@ -134,6 +153,29 @@ final class HomeCoordinator {
             self?.showDetail(gameId: gameID)
         }
         navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showFriendActivity() {
+        let viewController = FriendActivityFeedViewController()
+        viewController.onRoute = { [weak self] route in
+            self?.handleSocialActivityRoute(route)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func handleSocialActivityRoute(_ route: SocialActivityRoute) {
+        switch route {
+        case .friendActivityFeed:
+            showFriendActivity()
+        case .friendRequests:
+            showFriendRequests()
+        case .friendProfile(let userID):
+            showFriendProfile(userID: userID)
+        case .gameDetail(let gameID):
+            showDetail(gameId: gameID)
+        case .review(let gameID, _):
+            showDetail(gameId: gameID)
+        }
     }
 
     private func showReview(

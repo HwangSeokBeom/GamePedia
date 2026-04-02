@@ -178,10 +178,20 @@ final class DefaultAuthRepository: AuthRepository {
             .eraseToAnyPublisher()
     }
 
-    func updateCurrentUserProfile(nickname: String) -> AnyPublisher<AuthUser, AuthError> {
-        print("[ProfileEdit] updateProfile nicknameLength=\(nickname.count)")
+    func updateCurrentUserProfile(
+        nickname: String,
+        selectedTitleKeys: [String]
+    ) -> AnyPublisher<AuthUser, AuthError> {
+        print(
+            "[ProfileEdit] updateProfile " +
+            "nicknameLength=\(nickname.count) " +
+            "selectedTitleKeys=\(selectedTitleKeys)"
+        )
         return authRemoteDataSource.updateCurrentUserProfile(
-            requestDTO: UpdateCurrentUserProfileRequestDTO(nickname: nickname)
+            requestDTO: UpdateCurrentUserProfileRequestDTO(
+                nickname: nickname,
+                selectedTitleKeys: selectedTitleKeys
+            )
         )
         .handleEvents(receiveOutput: { [weak self] user in
             self?.saveCurrentUser(user)

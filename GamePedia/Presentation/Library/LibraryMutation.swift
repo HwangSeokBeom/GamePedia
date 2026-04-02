@@ -3,8 +3,21 @@ import Foundation
 enum LibraryMutation {
     case setLoading(Bool)
     case setRefreshing(Bool)
+    case setSelectedTab(LibraryTab)
+    case setSelectedHighlightChip(LibraryHighlightChip)
     case setSort(LibrarySortOption)
-    case setSteamState(isConnected: Bool, syncStatus: SteamSyncStatus, isSyncAvailable: Bool, errorCode: String?)
+    case setSummaryByTab([LibraryTab: LibraryTabSummaryState])
+    case setServerSummaryByTab([LibraryTab: LibraryServerSummary])
+    case setPreviewGeneratedAt(Date?)
+    case setFullGeneratedAt(Date?)
+    case setMergedRecentlyPlayedState(LibraryRecentlyPlayedSource, Date?)
+    case setSteamState(
+        steamLinkStatus: SteamLinkStatus,
+        isConnected: Bool,
+        syncStatus: SteamSyncStatus,
+        isSyncAvailable: Bool,
+        errorCode: String?
+    )
     case setLibraryItems(
         recentlyPlayed: [LibraryGameSummary],
         playingGames: [LibraryGameSummary],
@@ -14,7 +27,11 @@ enum LibraryMutation {
         reviews: [ReviewedGame]
     )
     case setPlaytimeRecommendations([PlaytimeRecommendation])
-    case setFriendRecommendations([SteamFriendRecommendation])
+    case setFriendRecommendations(
+        recommendations: [SteamFriendRecommendation],
+        source: LibraryFriendRecommendationSource,
+        emptyState: LibraryFriendRecommendationsEmptyState?
+    )
     case setSteamOwnedSyncErrorCode(String?)
     case setAddingToPlaying(LibraryGameIdentifier, isUpdating: Bool)
     case clearAddingToPlaying

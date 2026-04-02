@@ -53,6 +53,10 @@ enum AppConfig {
         infoPlistKey: "SupportEmail",
         environmentKey: "SUPPORT_EMAIL"
     ) ?? "tjrqja0714@gmail.com"
+    static let widgetAppGroupIdentifier = configuredString(
+        infoPlistKey: "WidgetAppGroupIdentifier",
+        environmentKey: "WIDGET_APP_GROUP_IDENTIFIER"
+    )
 
     // MARK: - Presentation
 

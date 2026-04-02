@@ -62,6 +62,8 @@ final class FriendUserCell: UITableViewCell {
         return label
     }()
 
+    private let presenceBadgeView = FriendPresenceBadgeView()
+
     private let primaryActionButton = FriendUserCell.makeActionButton()
     private let secondaryActionButton = FriendUserCell.makeActionButton()
 
@@ -75,7 +77,7 @@ final class FriendUserCell: UITableViewCell {
     }()
 
     private lazy var textStackView: UIStackView = {
-        let stackView = UIStackView(arrangedSubviews: [nameLabel, subtitleLabel])
+        let stackView = UIStackView(arrangedSubviews: [nameLabel, subtitleLabel, presenceBadgeView])
         stackView.axis = .vertical
         stackView.alignment = .leading
         stackView.spacing = 4
@@ -106,6 +108,7 @@ final class FriendUserCell: UITableViewCell {
         nameLabel.text = user.nickname
         subtitleLabel.text = subtitle
         subtitleLabel.isHidden = subtitle == nil
+        presenceBadgeView.configure(with: UserPresenceDisplayFormatter.makeDisplayModel(from: user.presence))
         applyActionConfiguration(primaryAction, to: primaryActionButton)
         applyActionConfiguration(secondaryAction, to: secondaryActionButton)
     }

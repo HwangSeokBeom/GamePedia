@@ -3,7 +3,9 @@ import UIKit
 
 struct ProfileEditState {
     let originalUser: AuthUser
+    let originalSelectedTitleKey: String?
     var nickname: String
+    var selectedTitleKey: String?
     var nicknameValidationMessage: String?
     var selectedImageDraft: ProfileImageDraft?
     var isPhotoRemoved: Bool = false
@@ -11,9 +13,15 @@ struct ProfileEditState {
     var successMessage: String?
     var errorMessage: String?
 
-    init(authenticatedUser: AuthUser) {
+    init(authenticatedUser: AuthUser, selectedTitleKey: String? = nil) {
         self.originalUser = authenticatedUser
+        self.originalSelectedTitleKey = selectedTitleKey
         self.nickname = authenticatedUser.nickname
+        self.selectedTitleKey = selectedTitleKey
+    }
+
+    var availableBadgeTitles: [String] {
+        ProfileBadgeSelectionStore.availableBadgeTitles
     }
 
     var profileImageURL: URL? {
@@ -42,7 +50,10 @@ struct ProfileEditState {
     }
 
     var hasPendingChanges: Bool {
-        trimmedNickname != originalUser.nickname || selectedImageDraft != nil || isPhotoRemoved
+        trimmedNickname != originalUser.nickname
+            || selectedImageDraft != nil
+            || isPhotoRemoved
+            || selectedTitleKey != originalSelectedTitleKey
     }
 
     var isSaveEnabled: Bool {

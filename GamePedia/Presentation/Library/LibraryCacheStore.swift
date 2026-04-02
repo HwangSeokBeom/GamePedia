@@ -11,6 +11,8 @@ struct LibraryCachedState {
     let backlogGames: [LibraryGameSummary]
     let playtimeRecommendations: [PlaytimeRecommendation]
     let friendRecommendations: [SteamFriendRecommendation]
+    let friendRecommendationsSource: LibraryFriendRecommendationSource
+    let friendRecommendationsEmptyState: LibraryFriendRecommendationsEmptyState?
     let sections: [LibrarySectionViewState]
 }
 
@@ -20,7 +22,7 @@ final class LibraryCacheStore {
     private let userDefaults: UserDefaults
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
-    private let cacheKey = "gamepedia.library.cached_state.v4"
+    private let cacheKey = "gamepedia.library.cached_state.v5"
     private let steamConnectionOnboardingKey = "gamepedia.library.steam_connection_onboarding_shown.v1"
     private let lastSuccessfulSteamSyncDateKey = "gamepedia.library.last_successful_steam_sync_date.v1"
     private let lastAttemptedSteamSyncDateKey = "gamepedia.library.last_attempted_steam_sync_date.v1"
@@ -46,6 +48,8 @@ final class LibraryCacheStore {
             backlogGames: storedState.backlogGames.map(\.libraryGameSummary),
             playtimeRecommendations: storedState.playtimeRecommendations.map(\.recommendation),
             friendRecommendations: storedState.friendRecommendations.map(\.recommendation),
+            friendRecommendationsSource: LibraryFriendRecommendationSource(rawValue: storedState.friendRecommendationsSource) ?? .none,
+            friendRecommendationsEmptyState: storedState.friendRecommendationsEmptyState.flatMap(LibraryFriendRecommendationsEmptyState.init(rawValue:)),
             sections: storedState.sections.compactMap(\.sectionViewState)
         )
     }
@@ -61,6 +65,8 @@ final class LibraryCacheStore {
         backlogGames: [LibraryGameSummary],
         playtimeRecommendations: [PlaytimeRecommendation],
         friendRecommendations: [SteamFriendRecommendation],
+        friendRecommendationsSource: LibraryFriendRecommendationSource,
+        friendRecommendationsEmptyState: LibraryFriendRecommendationsEmptyState?,
         sections: [LibrarySectionViewState]
     ) {
         let storedState = StoredLibraryCachedState(
@@ -74,6 +80,8 @@ final class LibraryCacheStore {
             backlogGames: backlogGames.map(StoredLibraryGameSummary.init),
             playtimeRecommendations: playtimeRecommendations.map(StoredPlaytimeRecommendation.init),
             friendRecommendations: friendRecommendations.map(StoredSteamFriendRecommendation.init),
+            friendRecommendationsSource: friendRecommendationsSource.rawValue,
+            friendRecommendationsEmptyState: friendRecommendationsEmptyState?.rawValue,
             sections: sections.map(StoredLibrarySection.init)
         )
 
@@ -126,6 +134,8 @@ private struct StoredLibraryCachedState: Codable {
     let backlogGames: [StoredLibraryGameSummary]
     let playtimeRecommendations: [StoredPlaytimeRecommendation]
     let friendRecommendations: [StoredSteamFriendRecommendation]
+    let friendRecommendationsSource: String
+    let friendRecommendationsEmptyState: String?
     let sections: [StoredLibrarySection]
 }
 
@@ -181,8 +191,13 @@ private struct StoredLibraryGameSummary: Codable {
     let rating: Double?
     let recentPlaytimeMinutes: Int?
     let recentPlaytimeText: String?
+    let lastPlayedAt: Date?
+    let lastPlayedAtSource: String?
+    let hasReliableLastPlayedAt: Bool
+    let recentPlayFallbackReason: String?
     let playtimeMinutes: Int?
     let userStatus: String?
+    let enrichmentStatus: String?
     let metadataEnriched: Bool
     let detailAvailable: Bool
     let matchStatus: String
@@ -202,8 +217,13 @@ private struct StoredLibraryGameSummary: Codable {
         rating = summary.rating
         recentPlaytimeMinutes = summary.recentPlaytimeMinutes
         recentPlaytimeText = summary.recentPlaytimeText
+        lastPlayedAt = summary.lastPlayedAt
+        lastPlayedAtSource = summary.lastPlayedAtSource
+        hasReliableLastPlayedAt = summary.hasReliableLastPlayedAt
+        recentPlayFallbackReason = summary.recentPlayFallbackReason
         playtimeMinutes = summary.playtimeMinutes
         userStatus = summary.userStatus?.rawValue
+        enrichmentStatus = summary.enrichmentStatus.rawValue
         metadataEnriched = summary.metadataEnriched
         detailAvailable = summary.detailAvailable
         matchStatus = summary.matchStatus.rawValue
@@ -227,8 +247,14 @@ private struct StoredLibraryGameSummary: Codable {
             rating: rating,
             recentPlaytimeMinutes: recentPlaytimeMinutes,
             recentPlaytimeText: recentPlaytimeText,
+            lastPlayedAt: lastPlayedAt,
+            lastPlayedAtSource: lastPlayedAtSource,
+            hasReliableLastPlayedAt: hasReliableLastPlayedAt,
+            recentPlayFallbackReason: recentPlayFallbackReason,
             playtimeMinutes: playtimeMinutes,
             userStatus: userStatus.flatMap(UserGameStatus.init(rawValue:)),
+            enrichmentStatus: enrichmentStatus
+                .flatMap(LibraryGameEnrichmentStatus.init(rawValue:)) ?? .unknown,
             metadataEnriched: metadataEnriched,
             detailAvailable: detailAvailable,
             matchStatus: LibraryGameMatchStatus(rawValue: matchStatus) ?? .unknown

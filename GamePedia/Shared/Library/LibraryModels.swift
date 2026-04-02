@@ -25,6 +25,14 @@ enum LibraryGameMatchStatus: String, Codable, Hashable {
     case unknown
 }
 
+enum LibraryGameEnrichmentStatus: String, Codable, Hashable {
+    case steamOnly = "steam_only"
+    case steamPlusIGDBEnriched = "steam_plus_igdb_enriched"
+    case enrichmentFailed = "enrichment_failed"
+    case enrichmentPending = "enrichment_pending"
+    case unknown
+}
+
 enum LibraryGenreSource: String, Codable, Hashable {
     case igdb
     case steamTag = "steam_tag"
@@ -70,7 +78,11 @@ struct SteamLinkStatus: Hashable {
     let connectionState: SteamLinkConnectionState
     let steamID: String?
     let displayName: String?
+    let personaName: String?
     let profileURL: URL?
+    let canSync: Bool
+    let canDisconnect: Bool
+    let lastSteamSyncAt: Date?
 
     var isLinked: Bool {
         connectionState == .linked
@@ -80,7 +92,11 @@ struct SteamLinkStatus: Hashable {
         connectionState: .notLinked,
         steamID: nil,
         displayName: nil,
-        profileURL: nil
+        personaName: nil,
+        profileURL: nil,
+        canSync: false,
+        canDisconnect: false,
+        lastSteamSyncAt: nil
     )
 }
 
@@ -97,8 +113,13 @@ struct LibraryGameSummary: Hashable {
     let rating: Double?
     let recentPlaytimeMinutes: Int?
     let recentPlaytimeText: String?
+    let lastPlayedAt: Date?
+    let lastPlayedAtSource: String?
+    let hasReliableLastPlayedAt: Bool
+    let recentPlayFallbackReason: String?
     let playtimeMinutes: Int?
     let userStatus: UserGameStatus?
+    let enrichmentStatus: LibraryGameEnrichmentStatus
     let metadataEnriched: Bool
     let detailAvailable: Bool
     let matchStatus: LibraryGameMatchStatus
@@ -106,6 +127,10 @@ struct LibraryGameSummary: Hashable {
     var gameSource: GameSource { identifier.source }
     var externalGameId: String { identifier.sourceID }
     var igdbGameId: Int? { identifier.canonicalGameID }
+    var formattedRatingText: String? {
+        guard let rating, rating.isFinite, rating > 0 else { return nil }
+        return String(format: "%.1f", rating)
+    }
 
     var displayTitle: String { resolvedTitle }
 
@@ -118,6 +143,26 @@ struct LibraryGameSummary: Hashable {
         let trimmedGenre = genre.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedGenre.isEmpty, trimmedGenre != "기타" else { return nil }
         return trimmedGenre
+    }
+
+    var shouldOpenFullGamePediaDetail: Bool {
+        switch gameSource {
+        case .igdb:
+            return igdbGameId != nil
+        case .steam:
+            return enrichmentStatus == .steamPlusIGDBEnriched && igdbGameId != nil
+        }
+    }
+
+    var shouldOpenSteamFallbackDetail: Bool {
+        guard gameSource == .steam else { return false }
+
+        switch enrichmentStatus {
+        case .steamOnly, .enrichmentFailed, .enrichmentPending, .unknown:
+            return detailAvailable
+        case .steamPlusIGDBEnriched:
+            return false
+        }
     }
 
     func replacingTranslatedTitle(_ translatedTitle: String?) -> LibraryGameSummary {
@@ -134,8 +179,47 @@ struct LibraryGameSummary: Hashable {
             rating: rating,
             recentPlaytimeMinutes: recentPlaytimeMinutes,
             recentPlaytimeText: recentPlaytimeText,
+            lastPlayedAt: lastPlayedAt,
+            lastPlayedAtSource: lastPlayedAtSource,
+            hasReliableLastPlayedAt: hasReliableLastPlayedAt,
+            recentPlayFallbackReason: recentPlayFallbackReason,
             playtimeMinutes: playtimeMinutes,
             userStatus: userStatus,
+            enrichmentStatus: enrichmentStatus,
+            metadataEnriched: metadataEnriched,
+            detailAvailable: detailAvailable,
+            matchStatus: matchStatus
+        )
+    }
+
+    func replacingRecentPlayMetadata(
+        recentPlaytimeMinutes: Int?,
+        recentPlaytimeText: String?,
+        lastPlayedAt: Date?,
+        lastPlayedAtSource: String?,
+        hasReliableLastPlayedAt: Bool,
+        recentPlayFallbackReason: String?
+    ) -> LibraryGameSummary {
+        LibraryGameSummary(
+            identifier: identifier,
+            title: title,
+            translatedTitle: translatedTitle,
+            coverImageURL: coverImageURL,
+            fallbackCoverImageURLs: fallbackCoverImageURLs,
+            genre: genre,
+            genreSource: genreSource,
+            platform: platform,
+            releaseYear: releaseYear,
+            rating: rating,
+            recentPlaytimeMinutes: recentPlaytimeMinutes,
+            recentPlaytimeText: recentPlaytimeText,
+            lastPlayedAt: lastPlayedAt,
+            lastPlayedAtSource: lastPlayedAtSource,
+            hasReliableLastPlayedAt: hasReliableLastPlayedAt,
+            recentPlayFallbackReason: recentPlayFallbackReason,
+            playtimeMinutes: playtimeMinutes,
+            userStatus: userStatus,
+            enrichmentStatus: enrichmentStatus,
             metadataEnriched: metadataEnriched,
             detailAvailable: detailAvailable,
             matchStatus: matchStatus
@@ -152,11 +236,45 @@ struct LibraryOverview: Hashable {
     let playing: [LibraryGameSummary]
     let owned: [LibraryGameSummary]
     let backlog: [LibraryGameSummary]
+    let playingSummary: LibraryServerSummary?
+    let favoritesSummary: LibraryServerSummary?
+    let reviewedSummary: LibraryServerSummary?
+}
+
+struct LibraryServerSummary: Hashable {
+    let totalPlaytimeHours: Double?
+    let gameCount: Int?
+    let averageRating: Double?
+    let reviewCount: Int?
+    let totalPlaytimeHoursSourceField: String?
+    let gameCountSourceField: String?
+
+    var hasRenderableValues: Bool {
+        totalPlaytimeHours != nil || gameCount != nil || averageRating != nil || reviewCount != nil
+    }
 }
 
 struct OwnedLibraryCollection: Hashable {
     let owned: [LibraryGameSummary]
     let backlog: [LibraryGameSummary]
+}
+
+enum LibraryFriendRecommendationSource: String, Codable, Hashable {
+    case inAppFriends
+    case steamFriends
+    case none
+}
+
+enum LibraryFriendRecommendationsEmptyState: String, Codable, Hashable {
+    case noFriendData
+    case insufficientActivity
+    case steamUnavailable
+}
+
+struct LibraryFriendRecommendationsResult: Hashable {
+    let recommendations: [SteamFriendRecommendation]
+    let source: LibraryFriendRecommendationSource
+    let emptyState: LibraryFriendRecommendationsEmptyState?
 }
 
 struct SteamFriendRecommendation: Hashable {

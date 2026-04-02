@@ -12,9 +12,15 @@ final class DefaultLibraryRepository: LibraryRepository {
             let data = try await libraryRemoteDataSource.fetchLibraryOverview(sort: sort)
             print(
                 "[Library] mapping overview " +
-                "steamConnected=\(data.steamConnected.map(String.init) ?? "nil") " +
+                "selectedTab=playing " +
+                "steamConnected=\(data.steamConnected.map { String($0) } ?? "nil") " +
                 "steamSyncStatus=\(data.steamSyncStatus ?? "nil") " +
-                "steamSyncAvailable=\(data.steamSyncAvailable.map(String.init) ?? "nil") " +
+                "steamSyncAvailable=\(data.steamSyncAvailable.map { String($0) } ?? "nil") " +
+                "playingSummary.gameCount=\(data.playingSummary?.gameCount.map { String($0) } ?? "nil") " +
+                "playingSummary.totalPlaytimeHours=\(data.playingSummary?.totalPlaytimeHours.map { String($0) } ?? "nil") " +
+                "playingSummary.totalPlaytimeMinutes=\(data.playingSummary?.totalPlaytimeMinutes.map { String($0) } ?? "nil") " +
+                "playingSummary.gameCountField=\(data.playingSummary?.gameCountSourceField ?? "nil") " +
+                "playingSummary.totalPlaytimeHoursField=\(data.playingSummary?.totalPlaytimeHoursSourceField ?? "nil") " +
                 "recentlyPlayedCount=\(data.recentlyPlayed?.count ?? 0) " +
                 "playingCount=\(data.playing?.count ?? 0) " +
                 "ownedCount=\(data.owned?.count ?? 0) " +
@@ -37,10 +43,18 @@ final class DefaultLibraryRepository: LibraryRepository {
                 recentlyPlayed: recentlyPlayed,
                 playing: playing,
                 owned: owned,
-                backlog: backlog
+                backlog: backlog,
+                playingSummary: mapServerSummary(data.playingSummary),
+                favoritesSummary: mapServerSummary(data.favoritesSummary),
+                reviewedSummary: mapServerSummary(data.reviewedSummary)
             )
             print(
                 "[Library] mapped overview " +
+                "selectedTab=playing " +
+                "playingSummary.gameCount=\(overview.playingSummary?.gameCount.map { String($0) } ?? "nil") " +
+                "playingSummary.totalPlaytimeHours=\(overview.playingSummary?.totalPlaytimeHours.map { String($0) } ?? "nil") " +
+                "playingSummary.gameCountField=\(overview.playingSummary?.gameCountSourceField ?? "nil") " +
+                "playingSummary.totalPlaytimeHoursField=\(overview.playingSummary?.totalPlaytimeHoursSourceField ?? "nil") " +
                 "recentlyPlayedCount=\(overview.recentlyPlayed.count) " +
                 "playingCount=\(overview.playing.count) " +
                 "ownedCount=\(overview.owned.count) " +
@@ -100,17 +114,19 @@ final class DefaultLibraryRepository: LibraryRepository {
         }
     }
 
+    func fetchInAppFriendRecommendations() async throws -> [SteamFriendRecommendation] {
+        do {
+            let data = try await libraryRemoteDataSource.fetchInAppFriendRecommendations()
+            return try mapFriendRecommendations(from: data)
+        } catch {
+            throw LibraryError.from(error: error)
+        }
+    }
+
     func fetchSteamFriendRecommendations() async throws -> [SteamFriendRecommendation] {
         do {
             let data = try await libraryRemoteDataSource.fetchSteamFriendRecommendations()
-            let recommendations = try (data.recommendations ?? []).map { dto in
-                SteamFriendRecommendation(
-                    game: try LibraryMapper.toGameSummary(dto),
-                    friendCount: max(dto.friendCount ?? 0, 0),
-                    reason: sanitized(dto.reason)
-                )
-            }
-            return recommendations
+            return try mapFriendRecommendations(from: data)
         } catch {
             throw LibraryError.from(error: error)
         }
@@ -200,7 +216,11 @@ final class DefaultLibraryRepository: LibraryRepository {
                 connectionState: isConnected ? .linked : .notLinked,
                 steamID: nil,
                 displayName: nil,
-                profileURL: nil
+                personaName: nil,
+                profileURL: nil,
+                canSync: isConnected,
+                canDisconnect: isConnected,
+                lastSteamSyncAt: nil
             )
         }
 
@@ -226,6 +246,30 @@ final class DefaultLibraryRepository: LibraryRepository {
         guard let value else { return nil }
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedValue.isEmpty ? nil : trimmedValue
+    }
+
+    private func mapFriendRecommendations(
+        from data: LibraryFriendRecommendationsResponseDataDTO
+    ) throws -> [SteamFriendRecommendation] {
+        try (data.recommendations ?? []).map { dto in
+            SteamFriendRecommendation(
+                game: try LibraryMapper.toGameSummary(dto),
+                friendCount: max(dto.friendCount ?? 0, 0),
+                reason: sanitized(dto.reason)
+            )
+        }
+    }
+
+    private func mapServerSummary(_ dto: LibraryTabSummaryDTO?) -> LibraryServerSummary? {
+        guard let dto else { return nil }
+        return LibraryServerSummary(
+            totalPlaytimeHours: dto.totalPlaytimeHours,
+            gameCount: dto.gameCount,
+            averageRating: dto.averageRating,
+            reviewCount: dto.reviewCount,
+            totalPlaytimeHoursSourceField: dto.totalPlaytimeHoursSourceField,
+            gameCountSourceField: dto.gameCountSourceField
+        )
     }
 
     private func resolvedSteamSyncStatus(from rawValue: String?) -> SteamSyncStatus {

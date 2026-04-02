@@ -44,6 +44,35 @@ final class LibraryGameCardCell: UICollectionViewCell {
         return label
     }()
 
+    private let favoriteIconView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.image = UIImage(
+            systemName: "heart",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+        )
+        imageView.tintColor = .systemRed
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let favoriteContainerView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.layer.cornerRadius = 11
+        view.layer.cornerCurve = .continuous
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let bottomInfoRow: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .horizontal
+        stackView.alignment = .center
+        stackView.spacing = 8
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+
     private let actionButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
         configuration.baseBackgroundColor = .gpPrimary
@@ -59,6 +88,11 @@ final class LibraryGameCardCell: UICollectionViewCell {
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
+
+    private var actionButtonHeightConstraint: NSLayoutConstraint?
+    private var actionButtonTopConstraint: NSLayoutConstraint?
+    private var actionButtonBottomConstraint: NSLayoutConstraint?
+    private var ratingBottomConstraint: NSLayoutConstraint?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -80,6 +114,10 @@ final class LibraryGameCardCell: UICollectionViewCell {
         actionButton.isHidden = true
         actionButton.isEnabled = true
         actionButton.alpha = 1
+        badgeLabel.isHidden = false
+        favoriteIconView.isHidden = false
+        ratingLabel.textColor = .gpStar
+        applyActionVisibility(false)
         onActionButtonTapped = nil
     }
 
@@ -91,13 +129,17 @@ final class LibraryGameCardCell: UICollectionViewCell {
             fallbackImageURLs: viewState.fallbackCoverImageURLs
         )
         badgeLabel.text = viewState.badgeText
+        badgeLabel.isHidden = viewState.badgeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         titleLabel.text = viewState.title
         metadataLabel.text = viewState.metadataText
         if let ratingText = viewState.ratingText {
             ratingLabel.text = "★ \(ratingText)"
             ratingLabel.isHidden = false
+            ratingLabel.textColor = .gpStar
         } else {
-            ratingLabel.isHidden = true
+            ratingLabel.text = "평가 없음"
+            ratingLabel.isHidden = false
+            ratingLabel.textColor = .gpTextTertiary
         }
 
         var configuration = actionButton.configuration
@@ -106,52 +148,86 @@ final class LibraryGameCardCell: UICollectionViewCell {
         actionButton.isHidden = viewState.actionTitle == nil
         actionButton.isEnabled = viewState.isActionEnabled
         actionButton.alpha = viewState.isActionEnabled ? 1 : 0.6
+        applyActionVisibility(viewState.actionTitle != nil)
     }
 
     private func setup() {
         backgroundColor = .clear
         contentView.backgroundColor = .gpCardBackground
-        contentView.layer.cornerRadius = 18
+        contentView.layer.cornerRadius = 20
+        contentView.layer.cornerCurve = .continuous
+        contentView.layer.borderWidth = 1
+        contentView.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.28).cgColor
         contentView.layer.masksToBounds = true
 
-        [artworkView, badgeLabel, titleLabel, metadataLabel, ratingLabel, actionButton].forEach {
+        favoriteContainerView.addSubview(favoriteIconView)
+        [ratingLabel, UIView(), favoriteContainerView].forEach { bottomInfoRow.addArrangedSubview($0) }
+
+        [artworkView, badgeLabel, titleLabel, metadataLabel, bottomInfoRow, actionButton].forEach {
             contentView.addSubview($0)
         }
 
         actionButton.addTarget(self, action: #selector(didTapActionButton), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
-            artworkView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
-            artworkView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
-            artworkView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
-            artworkView.heightAnchor.constraint(equalTo: artworkView.widthAnchor),
+            artworkView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+            artworkView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+            artworkView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+            artworkView.heightAnchor.constraint(equalTo: artworkView.widthAnchor, multiplier: 1.1),
 
             badgeLabel.topAnchor.constraint(equalTo: artworkView.topAnchor, constant: 10),
             badgeLabel.leadingAnchor.constraint(equalTo: artworkView.leadingAnchor, constant: 10),
 
-            titleLabel.topAnchor.constraint(equalTo: artworkView.bottomAnchor, constant: 12),
+            titleLabel.topAnchor.constraint(equalTo: artworkView.bottomAnchor, constant: 10),
             titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
             titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
 
-            metadataLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 6),
+            metadataLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
             metadataLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
             metadataLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
 
-            ratingLabel.topAnchor.constraint(equalTo: metadataLabel.bottomAnchor, constant: 8),
-            ratingLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            ratingLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -12),
+            bottomInfoRow.topAnchor.constraint(equalTo: metadataLabel.bottomAnchor, constant: 6),
+            bottomInfoRow.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+            bottomInfoRow.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
 
-            actionButton.topAnchor.constraint(equalTo: ratingLabel.bottomAnchor, constant: 10),
+            favoriteContainerView.widthAnchor.constraint(equalToConstant: 22),
+            favoriteContainerView.heightAnchor.constraint(equalToConstant: 22),
+            favoriteIconView.centerXAnchor.constraint(equalTo: favoriteContainerView.centerXAnchor),
+            favoriteIconView.centerYAnchor.constraint(equalTo: favoriteContainerView.centerYAnchor)
+        ])
+
+        let actionButtonTopConstraint = actionButton.topAnchor.constraint(equalTo: bottomInfoRow.bottomAnchor, constant: 8)
+        let actionButtonBottomConstraint = actionButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
+        let actionButtonHeightConstraint = actionButton.heightAnchor.constraint(equalToConstant: 32)
+        let ratingBottomConstraint = bottomInfoRow.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
+
+        self.actionButtonTopConstraint = actionButtonTopConstraint
+        self.actionButtonBottomConstraint = actionButtonBottomConstraint
+        self.actionButtonHeightConstraint = actionButtonHeightConstraint
+        self.ratingBottomConstraint = ratingBottomConstraint
+
+        NSLayoutConstraint.activate([
+            actionButtonTopConstraint,
             actionButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
             actionButton.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -12),
-            actionButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
-            actionButton.heightAnchor.constraint(equalToConstant: 32)
+            actionButtonBottomConstraint,
+            actionButtonHeightConstraint
         ])
+
+        applyActionVisibility(false)
     }
 
     @objc
     private func didTapActionButton() {
         onActionButtonTapped?()
+    }
+
+    private func applyActionVisibility(_ isVisible: Bool) {
+        actionButtonHeightConstraint?.constant = isVisible ? 32 : 0
+        actionButtonTopConstraint?.isActive = isVisible
+        actionButtonBottomConstraint?.isActive = isVisible
+        ratingBottomConstraint?.isActive = !isVisible
+        favoriteIconView.isHidden = isVisible
     }
 }
 

@@ -6,6 +6,7 @@ protocol LibraryRepository {
     func fetchPlayingLibrary() async throws -> [LibraryGameSummary]
     func fetchRecentlyPlayedLibrary() async throws -> [LibraryGameSummary]
     func fetchPlaytimeRecommendations() async throws -> [PlaytimeRecommendation]
+    func fetchInAppFriendRecommendations() async throws -> [SteamFriendRecommendation]
     func fetchSteamFriendRecommendations() async throws -> [SteamFriendRecommendation]
     func fetchSteamLinkStatus() async throws -> SteamLinkStatus
     func startSteamLink() async throws -> URL

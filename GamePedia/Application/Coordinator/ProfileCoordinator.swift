@@ -68,8 +68,19 @@ final class ProfileCoordinator: NSObject {
         profileVC.onLoggedOut = { [weak self] in
             self?.onLoggedOut?()
         }
-        profileVC.onShowEditProfile = { [weak self] in
-            self?.showEditProfile()
+        profileVC.onShowEditProfile = { [weak self] selectedTitleKey in
+            self?.showEditProfile(selectedTitleKey: selectedTitleKey)
+        }
+        profileVC.onShowSettings = { [weak self, weak profileVC] in
+            guard let self, let profileVC else { return }
+            self.showSettings(profileViewController: profileVC)
+        }
+        profileVC.onShowPlayedGames = { [weak self] in
+            print("[Profile] coordinator push playedGames")
+            self?.showLibrary(tab: .playing)
+        }
+        profileVC.onShowRecentPlayList = { [weak self] games, translatedTitles in
+            self?.showRecentPlayList(games: games, translatedTitles: translatedTitles)
         }
         profileVC.onShowFavoriteGames = { [weak self] in
             self?.showLibrary(tab: .favorites)
@@ -108,6 +119,18 @@ final class ProfileCoordinator: NSObject {
             self?.contactSupport()
         }
         navigationController.setViewControllers([profileVC], animated: false)
+    }
+
+    func navigateToFriendProfile(userID: String) {
+        showFriendProfile(userID: userID)
+    }
+
+    func navigateToFriendActivityFeed() {
+        showFriendActivity()
+    }
+
+    func navigateToFriendRequests() {
+        showFriendRequests()
     }
 
     // MARK: - Navigation
@@ -268,6 +291,18 @@ final class ProfileCoordinator: NSObject {
 
     private func showFriendActivity() {
         let viewController = FriendActivityFeedViewController()
+        viewController.onRoute = { [weak self] route in
+            self?.handleSocialActivityRoute(route)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showRecentPlayList(games: [RecentGame], translatedTitles: [Int: String]) {
+        print("[Profile] coordinator push recentPlayList count=\(games.count)")
+        let viewController = ProfileRecentPlayListViewController(
+            games: games,
+            translatedTitles: translatedTitles
+        )
         viewController.onGameSelected = { [weak self] gameID in
             self?.showDetail(gameId: gameID)
         }
@@ -279,16 +314,46 @@ final class ProfileCoordinator: NSObject {
         navigationController.pushViewController(viewController, animated: true)
     }
 
+    private func showSettings(profileViewController: ProfileViewController) {
+        let viewController = ProfileSettingsViewController()
+        viewController.onShowSocialPrivacySettings = { [weak self] in
+            self?.showSocialPrivacySettings()
+        }
+        viewController.onLogoutConfirmed = { [weak profileViewController] in
+            profileViewController?.performLogoutFromSettings()
+        }
+        viewController.onDeleteAccountConfirmed = { [weak profileViewController] in
+            profileViewController?.performDeleteAccountFromSettings()
+        }
+        viewController.onShowTermsOfService = { [weak self] in
+            self?.showWebPage(url: AppConfig.termsOfServiceURL)
+        }
+        viewController.onShowPrivacyPolicy = { [weak self] in
+            self?.showWebPage(url: AppConfig.privacyPolicyURL)
+        }
+        viewController.onShowCommunityGuidelines = { [weak self] in
+            self?.showWebPage(url: AppConfig.communityGuidelinesURL)
+        }
+        viewController.onContactSupport = { [weak self] in
+            self?.contactSupport()
+        }
+        viewController.onShowNotificationSettings = { [weak self] in
+            self?.showNotificationSettings()
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
     private func showSteamDetail(viewState: SteamFallbackGameDetailViewState) {
         let viewController = SteamFallbackGameDetailViewController(viewState: viewState)
         navigationController.pushViewController(viewController, animated: true)
     }
 
-    private func showEditProfile() {
+    private func showEditProfile(selectedTitleKey: String?) {
         guard let authenticatedUser = userSessionStore.fetchUser() else { return }
 
         let profileEditViewModel = ProfileEditViewModel(
             authenticatedUser: authenticatedUser,
+            initialSelectedTitleKey: selectedTitleKey,
             updateCurrentUserProfileUseCase: updateCurrentUserProfileUseCase,
             uploadCurrentUserProfileImageUseCase: uploadCurrentUserProfileImageUseCase,
             removeCurrentUserProfileImageUseCase: removeCurrentUserProfileImageUseCase
@@ -365,6 +430,26 @@ final class ProfileCoordinator: NSObject {
         }
 
         UIApplication.shared.open(mailURL)
+    }
+
+    private func showNotificationSettings() {
+        guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(settingsURL)
+    }
+
+    private func handleSocialActivityRoute(_ route: SocialActivityRoute) {
+        switch route {
+        case .friendActivityFeed:
+            showFriendActivity()
+        case .friendRequests:
+            showFriendRequests()
+        case .friendProfile(let userID):
+            showFriendProfile(userID: userID)
+        case .gameDetail(let gameID):
+            showDetail(gameId: gameID)
+        case .review(let gameID, _):
+            showDetail(gameId: gameID)
+        }
     }
 
     private func showSteamLink(url: URL, presenter: UIViewController?) {

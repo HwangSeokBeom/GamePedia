@@ -12,4 +12,5 @@ struct SteamFallbackGameDetailViewState: Hashable {
     let gameSource: GameSource
     let metadataEnriched: Bool
     let matchStatus: LibraryGameMatchStatus
+    let enrichmentStatus: LibraryGameEnrichmentStatus
 }

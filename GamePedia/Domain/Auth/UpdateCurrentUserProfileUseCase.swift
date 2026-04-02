@@ -8,7 +8,13 @@ final class UpdateCurrentUserProfileUseCase {
         self.authRepository = authRepository
     }
 
-    func execute(nickname: String) -> AnyPublisher<AuthUser, AuthError> {
-        authRepository.updateCurrentUserProfile(nickname: nickname)
+    func execute(
+        nickname: String,
+        selectedTitleKeys: [String] = []
+    ) -> AnyPublisher<AuthUser, AuthError> {
+        authRepository.updateCurrentUserProfile(
+            nickname: nickname,
+            selectedTitleKeys: selectedTitleKeys
+        )
     }
 }

@@ -99,7 +99,8 @@ final class FriendSearchViewModel {
                 bio: user.bio,
                 profileImageURL: user.profileImageURL,
                 relationshipStatus: status,
-                recentPlayTitle: user.recentPlayTitle
+                recentPlayTitle: user.recentPlayTitle,
+                presence: user.presence
             )
         }
     }

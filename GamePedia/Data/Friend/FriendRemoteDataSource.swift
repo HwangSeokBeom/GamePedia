@@ -10,7 +10,7 @@ protocol FriendRemoteDataSource {
     func fetchFriends() async throws -> FriendsListResponseDataDTO
     func fetchSteamFriends() async throws -> SteamFriendsResponseDataDTO
     func fetchFriendProfile(userID: String) async throws -> FriendProfileResponseDataDTO
-    func fetchFriendActivityFeed() async throws -> FriendActivityFeedResponseDataDTO
+    func fetchFriendActivityFeed(cursor: String?) async throws -> FriendActivityFeedResponseDataDTO
     func fetchFriendRecommendations(userID: String) async throws -> FriendRecommendationsResponseDataDTO
     func removeFriend(userID: String) async throws
     func blockUser(userID: String) async throws
@@ -98,11 +98,15 @@ final class DefaultFriendRemoteDataSource: FriendRemoteDataSource {
         return response.data
     }
 
-    func fetchFriendActivityFeed() async throws -> FriendActivityFeedResponseDataDTO {
-        print("[Friend] request endpoint=GET /users/me/friends/activity")
+    func fetchFriendActivityFeed(cursor: String?) async throws -> FriendActivityFeedResponseDataDTO {
+        print("[Friend] request endpoint=GET /users/me/friends/activity cursor=\(cursor ?? "nil")")
         let response = try await apiClient.request(
-            .friendActivityFeed,
+            .friendActivityFeed(cursor: cursor),
             as: FriendResponseEnvelopeDTO<FriendActivityFeedResponseDataDTO>.self
+        )
+        print(
+            "[Friend] response endpoint=GET /users/me/friends/activity success " +
+            "count=\(response.data.activities.count) nextCursor=\(response.data.nextCursor ?? "nil")"
         )
         return response.data
     }

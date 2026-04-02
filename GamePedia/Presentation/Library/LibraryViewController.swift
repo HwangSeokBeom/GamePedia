@@ -1,9 +1,13 @@
 import UIKit
 
 final class LibraryViewController: BaseViewController<LibraryRootView, LibraryState> {
+    private struct SectionScopedItem: Hashable {
+        let section: LibrarySectionKind
+        let item: LibraryCollectionItem
+    }
 
     private let viewModel: LibraryViewModel
-    private var dataSource: UICollectionViewDiffableDataSource<LibrarySectionKind, LibraryCollectionItem>!
+    private var dataSource: UICollectionViewDiffableDataSource<LibrarySectionKind, SectionScopedItem>!
     private var currentSections: [LibrarySectionViewState] = []
     private var lastPresentedErrorMessage: String?
     private var lastPresentedSuccessMessage: String?
@@ -11,18 +15,6 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     private let refreshControl = UIRefreshControl()
     private var toastHideWorkItem: DispatchWorkItem?
     private weak var toastView: LibraryToastView?
-    private lazy var syncOwnedLibraryBarButtonItem = UIBarButtonItem(
-        title: "Steam 보관함 가져오기",
-        style: .plain,
-        target: self,
-        action: #selector(didTapSyncOwnedSteamLibrary)
-    )
-    private lazy var steamManagementBarButtonItem = UIBarButtonItem(
-        image: UIImage(systemName: "ellipsis.circle"),
-        style: .plain,
-        target: nil,
-        action: nil
-    )
 
     var onGameSelected: ((Int) -> Void)?
     var onSteamDetailRequested: ((SteamFallbackGameDetailViewState) -> Void)?
@@ -51,7 +43,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        print("[Library] viewWillAppear")
+        print("[Library] viewWillAppear refreshExecuted=false snapshotReapplyPending=false")
         navigationController?.setNavigationBarHidden(false, animated: false)
     }
 
@@ -107,8 +99,8 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     private func setupCollectionView() {
         rootView.setCollectionViewLayout(makeLayout())
         rootView.collectionView.delegate = self
-        rootView.collectionView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 120, right: 0)
-        rootView.collectionView.scrollIndicatorInsets = UIEdgeInsets(top: 0, left: 0, bottom: 120, right: 0)
+        rootView.collectionView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 100, right: 0)
+        rootView.collectionView.scrollIndicatorInsets = UIEdgeInsets(top: 0, left: 0, bottom: 100, right: 0)
         rootView.collectionView.refreshControl = refreshControl
         refreshControl.addTarget(self, action: #selector(didPullToRefresh), for: .valueChanged)
 
@@ -121,10 +113,11 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
             withReuseIdentifier: LibrarySectionHeaderReusableView.reuseId
         )
 
-        dataSource = UICollectionViewDiffableDataSource<LibrarySectionKind, LibraryCollectionItem>(
+        dataSource = UICollectionViewDiffableDataSource<LibrarySectionKind, SectionScopedItem>(
             collectionView: rootView.collectionView
-        ) { [weak self] collectionView, indexPath, item in
+        ) { [weak self] collectionView, indexPath, scopedItem in
             guard let self else { return UICollectionViewCell() }
+            let item = scopedItem.item
 
             switch item {
             case .recentCard(let viewState):
@@ -221,8 +214,22 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     }
 
     private func setupBindings() {
+        rootView.onPrimaryTabSelected = { [weak self] index in
+            self?.viewModel.send(.didSelectPrimaryTab(index))
+        }
         rootView.onFilterSelected = { [weak self] index in
-            self?.viewModel.send(.didSelectSort(index))
+            self?.viewModel.send(.didSelectHighlightChip(index))
+        }
+        rootView.onSteamPrimaryActionTapped = { [weak self] in
+            guard let self else { return }
+            if self.viewModel.state.isSteamConnected {
+                self.viewModel.send(.syncOwnedSteamLibraryButtonTapped)
+            } else {
+                self.viewModel.send(.connectSteamButtonTapped)
+            }
+        }
+        rootView.onSteamSecondaryActionTapped = { [weak self] in
+            self?.presentSteamUnlinkConfirmationAlert()
         }
     }
 
@@ -252,15 +259,30 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     }
 
     private func applySnapshot(sections: [LibrarySectionViewState], focusedSection: LibrarySectionKind?) {
-        currentSections = sections
+        let sanitizedSections = sanitizeSectionsForSnapshot(sections)
+        if sanitizedSections == currentSections {
+            print(
+                "[LibrarySnapshot] applySkipped reason=unchanged " +
+                "sectionCounts=\(sanitizedSections.map { "\($0.kind)=\($0.items.count)" }.joined(separator: ","))"
+            )
+            scrollToFocusedSectionIfNeeded(focusedSection)
+            return
+        }
+        currentSections = sanitizedSections
 
-        var snapshot = NSDiffableDataSourceSnapshot<LibrarySectionKind, LibraryCollectionItem>()
-        let sectionKinds = sections.map(\.kind)
+        var snapshot = NSDiffableDataSourceSnapshot<LibrarySectionKind, SectionScopedItem>()
+        let sectionKinds = sanitizedSections.map(\.kind)
         snapshot.appendSections(sectionKinds)
 
-        for section in sections {
-            snapshot.appendItems(section.items, toSection: section.kind)
+        for section in sanitizedSections {
+            let scopedItems = section.items.map { SectionScopedItem(section: section.kind, item: $0) }
+            snapshot.appendItems(scopedItems, toSection: section.kind)
         }
+
+        print(
+            "[LibrarySnapshot] applyPerformed " +
+            "sectionCounts=\(sanitizedSections.map { "\($0.kind)=\($0.items.count)" }.joined(separator: ","))"
+        )
 
         dataSource.apply(snapshot, animatingDifferences: false) { [weak self] in
             guard let self else { return }
@@ -277,7 +299,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         }
 
         let indexPath = IndexPath(item: 0, section: sectionIndex)
-        guard dataSource.itemIdentifier(for: indexPath) == firstItem else { return }
+        guard dataSource.itemIdentifier(for: indexPath)?.item == firstItem else { return }
         rootView.collectionView.scrollToItem(at: indexPath, at: .top, animated: false)
         viewModel.send(.didConsumeInitialFocus)
     }
@@ -301,34 +323,43 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         viewModel.send(.pullToRefresh)
     }
 
-    @objc
-    private func didTapSyncOwnedSteamLibrary() {
-        viewModel.send(.syncOwnedSteamLibraryButtonTapped)
-    }
-
     private func updateNavigationItems(with state: LibraryState) {
-        guard state.isSteamConnected else {
-            navigationItem.rightBarButtonItems = nil
-            return
-        }
-
-        syncOwnedLibraryBarButtonItem.title = state.isSyncingOwnedSteamLibrary ? "가져오는 중..." : "Steam 보관함 가져오기"
-        syncOwnedLibraryBarButtonItem.isEnabled = !state.isSyncingOwnedSteamLibrary && !state.isUnlinkingSteamAccount
-        steamManagementBarButtonItem.isEnabled = !state.isSyncingOwnedSteamLibrary && !state.isUnlinkingSteamAccount
-        steamManagementBarButtonItem.menu = makeSteamManagementMenu()
-        navigationItem.rightBarButtonItems = [steamManagementBarButtonItem, syncOwnedLibraryBarButtonItem]
+        navigationItem.rightBarButtonItems = nil
     }
 
-    private func makeSteamManagementMenu() -> UIMenu {
-        let unlinkAction = UIAction(
-            title: "Steam 연동 해제",
-            image: UIImage(systemName: "link.badge.minus"),
-            attributes: .destructive
-        ) { [weak self] _ in
-            self?.presentSteamUnlinkConfirmationAlert()
-        }
+    private func sanitizeSectionsForSnapshot(_ sections: [LibrarySectionViewState]) -> [LibrarySectionViewState] {
+        var seenKinds = Set<LibrarySectionKind>()
+        return sections.compactMap { section in
+            guard seenKinds.insert(section.kind).inserted else {
+                print("[LibrarySnapshot] droppedDuplicateSection kind=\(section.kind)")
+                return nil
+            }
 
-        return UIMenu(title: "", children: [unlinkAction])
+            let beforeCount = section.items.count
+            var seenItems = Set<LibraryCollectionItem>()
+            let deduplicatedItems = section.items.filter { item in
+                let inserted = seenItems.insert(item).inserted
+                if !inserted {
+                    print("[LibrarySnapshot] droppedDuplicateItem section=\(section.kind) item=\(item)")
+                }
+                return inserted
+            }
+            print(
+                "[LibrarySnapshot] " +
+                "section=\(section.kind) " +
+                "itemCountBeforeDedupe=\(beforeCount) " +
+                "itemCountAfterDedupe=\(deduplicatedItems.count) " +
+                "duplicatesRemoved=\(beforeCount - deduplicatedItems.count > 0) " +
+                "dedupeScope=sectionLocal"
+            )
+
+            return LibrarySectionViewState(
+                kind: section.kind,
+                layoutStyle: section.layoutStyle,
+                items: deduplicatedItems,
+                showsSeeAll: section.showsSeeAll
+            )
+        }
     }
 
     private func presentSteamUnlinkConfirmationAlert() {
@@ -413,16 +444,22 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     }
 
     private func makeRecentCardsSection() -> NSCollectionLayoutSection {
+        let itemInsets = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
         let itemSize = NSCollectionLayoutSize(
-            widthDimension: .absolute(176),
-            heightDimension: .estimated(286)
+            widthDimension: .fractionalWidth(0.5),
+            heightDimension: .estimated(250)
         )
         let item = NSCollectionLayoutItem(layoutSize: itemSize)
-        let group = NSCollectionLayoutGroup.horizontal(layoutSize: itemSize, subitems: [item])
+        item.contentInsets = itemInsets
+        let groupSize = NSCollectionLayoutSize(
+            widthDimension: .fractionalWidth(1.0),
+            heightDimension: .estimated(250)
+        )
+        let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, repeatingSubitem: item, count: 2)
+        group.interItemSpacing = .fixed(12)
         let section = NSCollectionLayoutSection(group: group)
-        section.orthogonalScrollingBehavior = .continuousGroupLeadingBoundary
-        section.interGroupSpacing = 12
-        section.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 28, trailing: 16)
+        section.interGroupSpacing = 10
+        section.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 20, trailing: 16)
         return section
     }
 
@@ -438,8 +475,8 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         )
         let group = NSCollectionLayoutGroup.vertical(layoutSize: groupSize, subitems: [item])
         let section = NSCollectionLayoutSection(group: group)
-        section.interGroupSpacing = 12
-        section.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 28, trailing: 16)
+        section.interGroupSpacing = 10
+        section.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 20, trailing: 16)
         return section
     }
 
@@ -455,7 +492,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         )
         let group = NSCollectionLayoutGroup.vertical(layoutSize: groupSize, subitems: [item])
         let section = NSCollectionLayoutSection(group: group)
-        section.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 28, trailing: 16)
+        section.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 18, trailing: 16)
         return section
     }
 
@@ -463,7 +500,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         NSCollectionLayoutBoundarySupplementaryItem(
             layoutSize: NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1.0),
-                heightDimension: .estimated(36)
+                heightDimension: .estimated(54)
             ),
             elementKind: UICollectionView.elementKindSectionHeader,
             alignment: .top
@@ -474,7 +511,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
 extension LibraryViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard indexPath.section < currentSections.count,
-              let item = dataSource.itemIdentifier(for: indexPath) else {
+              let item = dataSource.itemIdentifier(for: indexPath)?.item else {
             return
         }
 
@@ -482,8 +519,60 @@ extension LibraryViewController: UICollectionViewDelegate {
 
         switch item {
         case .recentCard(let viewState):
+            switch viewState.detailDestination {
+            case .igdb(let gameID):
+                print(
+                    "[GameTap] screen=Library.overview.\(section.kind.title) " +
+                    "title=\(viewState.title) " +
+                    "destination=igdb:\(gameID) " +
+                    "igdbGameId=\(gameID) " +
+                    "externalGameId=\(viewState.identifier.sourceID)"
+                )
+            case .steamFallback(let steamViewState):
+                print(
+                    "[GameTap] screen=Library.overview.\(section.kind.title) " +
+                    "title=\(viewState.title) " +
+                    "destination=steamFallback " +
+                    "igdbGameId=nil " +
+                    "externalGameId=\(steamViewState.externalGameId)"
+                )
+            case .none:
+                print(
+                    "[GameTap] screen=Library.overview.\(section.kind.title) " +
+                    "title=\(viewState.title) " +
+                    "destination=nil " +
+                    "igdbGameId=nil " +
+                    "externalGameId=\(viewState.identifier.sourceID)"
+                )
+            }
             viewModel.send(.didTapRecentlyPlayedGame(viewState.identifier))
         case .row(let viewState):
+            switch viewState.detailDestination {
+            case .igdb(let gameID):
+                print(
+                    "[GameTap] screen=Library.overview.\(section.kind.title) " +
+                    "title=\(viewState.title) " +
+                    "destination=igdb:\(gameID) " +
+                    "igdbGameId=\(gameID) " +
+                    "externalGameId=\(viewState.identifier.sourceID)"
+                )
+            case .steamFallback(let steamViewState):
+                print(
+                    "[GameTap] screen=Library.overview.\(section.kind.title) " +
+                    "title=\(viewState.title) " +
+                    "destination=steamFallback " +
+                    "igdbGameId=nil " +
+                    "externalGameId=\(steamViewState.externalGameId)"
+                )
+            case .none:
+                print(
+                    "[GameTap] screen=Library.overview.\(section.kind.title) " +
+                    "title=\(viewState.title) " +
+                    "destination=nil " +
+                    "igdbGameId=nil " +
+                    "externalGameId=\(viewState.identifier.sourceID)"
+                )
+            }
             switch section.kind {
             case .playing:
                 viewModel.send(.didTapPlayingGame(viewState.identifier))
@@ -511,10 +600,38 @@ private final class LibrarySectionHeaderReusableView: UICollectionReusableView {
 
     var onSeeMoreTapped: (() -> Void)?
 
-    private let headerView: SectionHeaderView = {
-        let view = SectionHeaderView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 20, weight: .bold)
+        label.textColor = .gpTextPrimary
+        return label
+    }()
+
+    private let subtitleLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextSecondary
+        label.numberOfLines = 0
+        return label
+    }()
+
+    private let seeMoreButton: UIButton = {
+        var config = UIButton.Configuration.plain()
+        config.title = "더보기"
+        config.baseForegroundColor = .gpPrimary
+        config.contentInsets = .zero
+        let button = UIButton(configuration: config)
+        button.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        return button
+    }()
+
+    private let titleStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.spacing = 4
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
     }()
 
     override init(frame: CGRect) {
@@ -528,23 +645,27 @@ private final class LibrarySectionHeaderReusableView: UICollectionReusableView {
     }
 
     func configure(sectionKind: LibrarySectionKind, showsSeeMore: Bool) {
-        headerView.configure(
-            title: sectionKind.title,
-            systemImageName: sectionKind.systemImageName,
-            tintColor: .gpPrimaryLight,
-            showSeeMore: showsSeeMore
-        )
+        titleLabel.text = sectionKind.title
+        subtitleLabel.text = sectionKind.subtitle
+        subtitleLabel.isHidden = sectionKind.subtitle == nil
+        seeMoreButton.isHidden = !showsSeeMore
     }
 
     private func setup() {
-        addSubview(headerView)
-        headerView.seeMoreButton.addTarget(self, action: #selector(didTapSeeMore), for: .touchUpInside)
+        [titleLabel, subtitleLabel].forEach { titleStackView.addArrangedSubview($0) }
+        let containerStackView = UIStackView(arrangedSubviews: [titleStackView, UIView(), seeMoreButton])
+        containerStackView.axis = .horizontal
+        containerStackView.alignment = .top
+        containerStackView.translatesAutoresizingMaskIntoConstraints = false
+
+        addSubview(containerStackView)
+        seeMoreButton.addTarget(self, action: #selector(didTapSeeMore), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
-            headerView.topAnchor.constraint(equalTo: topAnchor),
-            headerView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
-            headerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-            headerView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            containerStackView.topAnchor.constraint(equalTo: topAnchor),
+            containerStackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            containerStackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+            containerStackView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
 

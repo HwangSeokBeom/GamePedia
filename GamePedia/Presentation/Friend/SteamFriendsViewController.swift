@@ -199,7 +199,8 @@ final class SteamFriendsViewController: BaseViewController<UIView, SteamFriendsS
             bio: nil,
             profileImageURL: friend.resolvedAvatarURL,
             relationshipStatus: .none,
-            recentPlayTitle: nil
+            recentPlayTitle: nil,
+            presence: nil
         )
     }
 }

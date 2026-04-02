@@ -262,12 +262,17 @@ extension Endpoint {
         .get("/users/me/steam-friends", userAuth: true)
     }
 
+    static var myInAppFriendRecommendations: Endpoint {
+        .get("/users/me/recommendations/friends", userAuth: true)
+    }
+
     static func friendProfile(userID: String) -> Endpoint {
         .get("/users/\(userID)/profile", userAuth: true)
     }
 
-    static var friendActivityFeed: Endpoint {
-        .get("/users/me/friends/activity", userAuth: true)
+    static func friendActivityFeed(cursor: String? = nil) -> Endpoint {
+        let queryItems = cursor.map { [URLQueryItem(name: "cursor", value: $0)] } ?? []
+        return .get("/users/me/friends/activity", query: queryItems, userAuth: true)
     }
 
     static func friendRecommendations(userID: String) -> Endpoint {

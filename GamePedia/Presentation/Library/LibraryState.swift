@@ -34,8 +34,98 @@ enum LibrarySortOption: Int {
     }
 }
 
+enum LibraryHighlightChip: Int {
+    case recentlyPlayed = 0
+    case reviewed = 1
+    case playtimeRecommendations = 2
+
+    var focusedSection: LibrarySectionKind {
+        switch self {
+        case .recentlyPlayed:
+            return .recentlyPlayed
+        case .reviewed:
+            return .reviewed
+        case .playtimeRecommendations:
+            return .playtimeRecommendations
+        }
+    }
+}
+
+enum LibraryRecentlyPlayedSource: Hashable {
+    case none
+    case snapshot
+    case full
+}
+
+enum LibrarySummaryPrimaryValueKind: Hashable {
+    case hours
+    case count
+}
+
+struct LibraryTabSummaryState: Hashable {
+    let primaryTitle: String
+    let primaryValue: Double
+    let primaryValueKind: LibrarySummaryPrimaryValueKind
+    let averageRating: Double?
+    let gameCount: Int
+    let reviewCount: Int
+    let sourceDescription: String
+
+    static func empty(for tab: LibraryTab) -> LibraryTabSummaryState {
+        switch tab {
+        case .playing:
+            return LibraryTabSummaryState(
+                primaryTitle: "총 플레이",
+                primaryValue: 0,
+                primaryValueKind: .hours,
+                averageRating: nil,
+                gameCount: 0,
+                reviewCount: 0,
+                sourceDescription: "empty"
+            )
+        case .favorites:
+            return LibraryTabSummaryState(
+                primaryTitle: "찜한 게임",
+                primaryValue: 0,
+                primaryValueKind: .count,
+                averageRating: nil,
+                gameCount: 0,
+                reviewCount: 0,
+                sourceDescription: "empty"
+            )
+        case .reviewed:
+            return LibraryTabSummaryState(
+                primaryTitle: "작성한 리뷰",
+                primaryValue: 0,
+                primaryValueKind: .count,
+                averageRating: nil,
+                gameCount: 0,
+                reviewCount: 0,
+                sourceDescription: "empty"
+            )
+        }
+    }
+
+    static var defaultsByTab: [LibraryTab: LibraryTabSummaryState] {
+        [
+            .playing: .empty(for: .playing),
+            .favorites: .empty(for: .favorites),
+            .reviewed: .empty(for: .reviewed)
+        ]
+    }
+}
+
 struct LibraryState {
+    var selectedTab: LibraryTab = .playing
+    var selectedHighlightChip: LibraryHighlightChip = .recentlyPlayed
     var selectedSort: LibrarySortOption = .latest
+    var summaryByTab: [LibraryTab: LibraryTabSummaryState] = LibraryTabSummaryState.defaultsByTab
+    var serverSummaryByTab: [LibraryTab: LibraryServerSummary] = [:]
+    var previewGeneratedAt: Date? = nil
+    var fullGeneratedAt: Date? = nil
+    var mergedGeneratedAt: Date? = nil
+    var recentlyPlayedSource: LibraryRecentlyPlayedSource = .none
+    var steamLinkStatus: SteamLinkStatus = .notLinked
     var isSteamConnected: Bool = false
     var steamSyncStatus: SteamSyncStatus = .idle
     var isSteamSyncAvailable: Bool = true
@@ -46,6 +136,8 @@ struct LibraryState {
     var backlogGames: [LibraryGameSummary] = []
     var playtimeRecommendations: [PlaytimeRecommendation] = []
     var friendRecommendations: [SteamFriendRecommendation] = []
+    var friendRecommendationsSource: LibraryFriendRecommendationSource = .none
+    var friendRecommendationsEmptyState: LibraryFriendRecommendationsEmptyState? = nil
     var likedGames: [Game] = []
     var reviews: [ReviewedGame] = []
     var steamOwnedSyncErrorCode: String? = nil

@@ -8,6 +8,32 @@ enum FriendRelationshipStatus: String, Hashable {
     case `self`
 }
 
+enum UserPresenceState: String, Hashable {
+    case online
+    case recentlyActive
+    case playing
+    case lastPlayed
+    case unknown
+}
+
+struct UserPresence: Hashable {
+    let state: UserPresenceState
+    let gameTitle: String?
+    let lastActiveAt: Date?
+    let lastPlayedAt: Date?
+    let isSteamSupplemented: Bool
+
+    var stableIdentity: String {
+        [
+            state.rawValue,
+            gameTitle ?? "",
+            lastActiveAt.map { String($0.timeIntervalSince1970) } ?? "",
+            lastPlayedAt.map { String($0.timeIntervalSince1970) } ?? "",
+            isSteamSupplemented ? "steam" : "app"
+        ].joined(separator: "|")
+    }
+}
+
 struct FriendUserSummary: Hashable {
     let id: String
     let nickname: String
@@ -15,6 +41,7 @@ struct FriendUserSummary: Hashable {
     let profileImageURL: URL?
     let relationshipStatus: FriendRelationshipStatus
     let recentPlayTitle: String?
+    let presence: UserPresence?
 }
 
 struct FriendRequest: Hashable {
@@ -103,12 +130,25 @@ struct SteamFriend: Hashable {
     }
 }
 
+struct FriendActivityMetadata: Hashable {
+    let reviewID: String?
+    let previousRating: Double?
+    let updatedRating: Double?
+    let previousPlayStatus: UserGameStatus?
+    let updatedPlayStatus: UserGameStatus?
+    let note: String?
+}
+
 struct FriendActivityItem: Hashable {
     enum ActivityType: String, Hashable {
-        case startedPlaying
-        case wroteReview
-        case wishlisted
-        case ratedHigh
+        case reviewCreated
+        case reviewUpdated
+        case likedGameAdded
+        case likedGameRemoved
+        case ratingChanged
+        case playStatusChanged
+        case friendStartedPlaying
+        case friendRecentlyPlayed
     }
 
     let id: String
@@ -116,26 +156,26 @@ struct FriendActivityItem: Hashable {
     let type: ActivityType
     let game: Game
     let createdAt: Date?
+    let messageOverride: String?
+    let metadata: FriendActivityMetadata?
 
-    var actionText: String {
-        switch type {
-        case .startedPlaying:
-            return "새 게임을 플레이 시작했어요"
-        case .wroteReview:
-            return "리뷰를 작성했어요"
-        case .wishlisted:
-            return "게임을 찜했어요"
-        case .ratedHigh:
-            return "높은 평점을 남겼어요"
+    var stableIdentity: String {
+        if !id.isEmpty {
+            return id
         }
-    }
 
-    var relativeDateText: String? {
-        guard let createdAt else { return nil }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: createdAt, relativeTo: Date())
+        return [
+            actor.id,
+            type.rawValue,
+            String(game.id),
+            createdAt.map { String($0.timeIntervalSince1970) } ?? "0"
+        ].joined(separator: ":")
     }
+}
+
+struct FriendActivityFeedPage: Hashable {
+    let activities: [FriendActivityItem]
+    let nextCursor: String?
 }
 
 struct FriendProfile {

@@ -7,14 +7,16 @@
 
 import UIKit
 import GoogleSignIn
+import UserNotifications
 
 @main
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
 
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         AppConfig.logRuntimeConfiguration()
+        UNUserNotificationCenter.current().delegate = self
         return true
     }
 
@@ -52,4 +54,34 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
 
+}
+
+extension AppDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        let userInfo = notification.request.content.userInfo
+        if let payload = SocialActivityPushPayload.parse(userInfo: userInfo),
+           SocialActivityDeduplicator.shared.shouldProcess("push:\(payload.stableIdentity)", timeToLive: 60 * 5) {
+            SocialActivityEventDispatcher.shared.send(.showBanner(payload.bannerPayload))
+            completionHandler([])
+            return
+        }
+
+        completionHandler([.badge, .sound, .banner, .list])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        if let payload = SocialActivityPushPayload.parse(userInfo: userInfo) {
+            SocialActivityEventDispatcher.shared.send(.route(payload.route))
+        }
+        completionHandler()
+    }
 }

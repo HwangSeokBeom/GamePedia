@@ -7,6 +7,7 @@ final class ProfileEditRootView: UIView {
         placeholder: "닉네임 입력",
         systemImageName: "person"
     )
+    private(set) var badgeButtons: [ProfileBadgeOptionButton] = []
     let photoActionButton = UIButton(type: .system)
     let removePhotoButton = UIButton(type: .system)
     let saveButton = UIButton(type: .system)
@@ -82,6 +83,42 @@ final class ProfileEditRootView: UIView {
         return stackView
     }()
 
+    private let badgeSelectionTitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "칭호"
+        label.font = .systemFont(ofSize: 14, weight: .semibold)
+        label.textColor = .gpTextPrimary
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let badgeSelectionHelperLabel: UILabel = {
+        let label = UILabel()
+        label.text = "대표 칭호 1개를 선택할 수 있어요."
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextSecondary
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let badgeSelectionStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .horizontal
+        stackView.spacing = 8
+        stackView.alignment = .leading
+        stackView.distribution = .fillProportionally
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+
+    private let badgeSelectionSectionStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.spacing = 10
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupView()
@@ -124,6 +161,7 @@ final class ProfileEditRootView: UIView {
         )
         photoActionButton.configuration = photoActionConfiguration
         removePhotoButton.isHidden = !state.showsRemovePhotoButton
+        updateBadgeButtons(selectedTitleKey: state.selectedTitleKey)
 
         saveButton.isEnabled = state.isSaveEnabled
         saveButton.alpha = state.isSaveEnabled ? 1 : 0.6
@@ -144,7 +182,17 @@ final class ProfileEditRootView: UIView {
         [avatarView, photoActionButton, removePhotoButton, photoHelperLabel].forEach {
             photoSectionStackView.addArrangedSubview($0)
         }
-        [photoSectionStackView, nicknameFieldView, saveButton].forEach {
+        [badgeSelectionTitleLabel, badgeSelectionHelperLabel, badgeSelectionStackView].forEach {
+            badgeSelectionSectionStackView.addArrangedSubview($0)
+        }
+
+        ProfileBadgeSelectionStore.availableBadgeTitles.forEach { badgeTitle in
+            let button = ProfileBadgeOptionButton(title: badgeTitle)
+            badgeButtons.append(button)
+            badgeSelectionStackView.addArrangedSubview(button)
+        }
+
+        [photoSectionStackView, nicknameFieldView, badgeSelectionSectionStackView, saveButton].forEach {
             formStackView.addArrangedSubview($0)
         }
     }
@@ -236,5 +284,48 @@ final class ProfileEditRootView: UIView {
 
     private func applyDynamicLayerColors() {
         formCardView.layer.borderColor = UIColor.gpBorder.resolvedCGColor(with: traitCollection)
+    }
+
+    private func updateBadgeButtons(selectedTitleKey: String?) {
+        badgeButtons.forEach { button in
+            button.applySelectionStyle(isSelected: button.titleKey == selectedTitleKey)
+        }
+    }
+}
+
+final class ProfileBadgeOptionButton: UIButton {
+    let badgeTitle: String
+    let titleKey: String?
+
+    init(title: String) {
+        self.badgeTitle = title
+        self.titleKey = ProfileBadgeSelectionStore.shared.selectedTitleKey(for: title)
+        super.init(frame: .zero)
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = title
+        configuration.cornerStyle = .capsule
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var attributes = incoming
+            attributes.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+            return attributes
+        }
+        self.configuration = configuration
+        translatesAutoresizingMaskIntoConstraints = false
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func applySelectionStyle(isSelected: Bool) {
+        var configuration = configuration
+        configuration?.baseBackgroundColor = isSelected ? UIColor.gpPrimary.withAlphaComponent(0.18) : UIColor.gpSurfaceElevated
+        configuration?.baseForegroundColor = isSelected ? .gpPrimaryLight : .gpTextSecondary
+        self.configuration = configuration
+        layer.cornerRadius = 10
+        layer.cornerCurve = .continuous
+        layer.borderWidth = 1
+        layer.borderColor = (isSelected ? UIColor.gpPrimary.withAlphaComponent(0.32) : UIColor.gpSeparator.withAlphaComponent(0.22)).cgColor
     }
 }

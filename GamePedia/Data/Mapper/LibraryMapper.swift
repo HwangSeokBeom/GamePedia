@@ -9,7 +9,11 @@ enum LibraryMapper {
             connectionState: dto.isLinked ? .linked : .notLinked,
             steamID: sanitized(dto.steamId),
             displayName: sanitized(dto.displayName),
-            profileURL: makeURL(from: dto.profileUrl)
+            personaName: sanitized(dto.personaName),
+            profileURL: makeURL(from: dto.profileUrl),
+            canSync: dto.canSync ?? dto.isLinked,
+            canDisconnect: dto.canDisconnect ?? dto.isLinked,
+            lastSteamSyncAt: parseDate(dto.lastSteamSyncAt)
         )
     }
 
@@ -33,7 +37,16 @@ enum LibraryMapper {
         let genre = resolvedGenre(from: dto) ?? ""
         let platform = sanitized(dto.platform) ?? dto.platforms?.first ?? defaultPlatform(for: source)
         let releaseYear = resolvedReleaseYear(from: dto)
-        let metadataEnriched = dto.metadataEnriched ?? (canonicalGameID != nil)
+        let enrichmentStatus = resolvedEnrichmentStatus(
+            from: dto.enrichmentStatus,
+            source: source
+        )
+        let metadataEnriched = resolvedMetadataEnriched(
+            from: dto.metadataEnriched,
+            source: source,
+            enrichmentStatus: enrichmentStatus,
+            igdbGameID: canonicalGameID
+        )
         let genreSource = resolvedGenreSource(
             from: dto,
             source: source,
@@ -65,7 +78,12 @@ enum LibraryMapper {
                 fallbackURLs: []
             )
 
-        return LibraryGameSummary(
+        let ratingDisplay = GameRatingDisplayFormatter.makeDisplay(
+            userRating: dto.rating,
+            aggregatedRating: dto.aggregatedRating,
+            totalRating: dto.totalRating
+        )
+        let summary = LibraryGameSummary(
             identifier: LibraryGameIdentifier(
                 source: source,
                 sourceID: resolvedSourceID,
@@ -79,15 +97,42 @@ enum LibraryMapper {
             genreSource: genreSource,
             platform: platform,
             releaseYear: releaseYear,
-            rating: normalizedRating(from: dto),
+            rating: ratingDisplay.normalizedRating,
             recentPlaytimeMinutes: dto.recentPlaytimeMinutes,
             recentPlaytimeText: resolvedRecentPlaytimeText(from: dto),
+            lastPlayedAt: parseDate(dto.lastPlayedAt),
+            lastPlayedAtSource: sanitized(dto.lastPlayedAtSource),
+            hasReliableLastPlayedAt: resolvedReliableLastPlayedAt(from: dto),
+            recentPlayFallbackReason: sanitized(dto.fallbackReason),
             playtimeMinutes: dto.playtimeMinutes,
             userStatus: resolvedStatus(from: dto.userStatus ?? dto.status),
+            enrichmentStatus: enrichmentStatus,
             metadataEnriched: metadataEnriched,
             detailAvailable: detailAvailable,
             matchStatus: matchStatus
         )
+        let userRatingLogValue = dto.rating.map { String($0) } ?? "nil"
+        let aggregatedRatingLogValue = dto.aggregatedRating.map { String($0) } ?? "nil"
+        let totalRatingLogValue = dto.totalRating.map { String($0) } ?? "nil"
+        print(
+            "[RatingMapping] " +
+            "screen=Library.mapper " +
+            "title=\(summary.displayTitle) " +
+            "userRating=\(userRatingLogValue) " +
+            "aggregatedRating=\(aggregatedRatingLogValue) " +
+            "totalRating=\(totalRatingLogValue) " +
+            "selectedDisplaySource=\(ratingDisplay.selectedDisplaySource) " +
+            "finalDisplayText=\(ratingDisplay.displayText ?? "nil")"
+        )
+        print(
+            "[RecentPlayMapping] " +
+            "screen=Library.mapper " +
+            "title=\(summary.displayTitle) " +
+            "viewState.lastPlayedAt=\(summary.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
+            "viewState.recentPlaytimeMinutes=\(summary.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
+            "viewState.hasReliableLastPlayedAt=\(summary.hasReliableLastPlayedAt)"
+        )
+        return summary
     }
 
     static func toStatusMutationResult(_ dto: LibraryStatusMutationResponseDataDTO) throws -> LibraryGameStatusMutationResult {
@@ -168,6 +213,41 @@ enum LibraryMapper {
         return UserGameStatus(rawValue: rawValue)
     }
 
+    private static func resolvedEnrichmentStatus(
+        from rawValue: String?,
+        source: GameSource
+    ) -> LibraryGameEnrichmentStatus {
+        if let rawValue = sanitized(rawValue)?.lowercased(),
+           let enrichmentStatus = LibraryGameEnrichmentStatus(rawValue: rawValue) {
+            return enrichmentStatus
+        }
+
+        switch source {
+        case .igdb:
+            return .steamPlusIGDBEnriched
+        case .steam:
+            return .unknown
+        }
+    }
+
+    private static func resolvedMetadataEnriched(
+        from rawValue: Bool?,
+        source: GameSource,
+        enrichmentStatus: LibraryGameEnrichmentStatus,
+        igdbGameID: Int?
+    ) -> Bool {
+        if source == .igdb {
+            return rawValue ?? (igdbGameID != nil)
+        }
+
+        switch enrichmentStatus {
+        case .steamPlusIGDBEnriched:
+            return true
+        case .steamOnly, .enrichmentFailed, .enrichmentPending, .unknown:
+            return false
+        }
+    }
+
     private static func resolvedMatchStatus(
         from rawValue: String?,
         source: GameSource,
@@ -217,12 +297,6 @@ enum LibraryMapper {
         return nil
     }
 
-    private static func normalizedRating(from dto: LibraryGameItemDTO) -> Double? {
-        let rawRating = dto.totalRating ?? dto.aggregatedRating ?? dto.rating
-        guard let rawRating else { return nil }
-        return rawRating > 5 ? rawRating / 20.0 : rawRating
-    }
-
     private static func resolvedGenre(from dto: LibraryGameItemDTO) -> String? {
         sanitized(dto.genreDisplayName)
             ?? sanitized(dto.genre)
@@ -270,6 +344,26 @@ enum LibraryMapper {
             return "\(hours)시간 플레이"
         }
         return "\(hours)시간 \(minutes)분 플레이"
+    }
+
+    private static func resolvedReliableLastPlayedAt(from dto: LibraryGameItemDTO) -> Bool {
+        if let explicitValue = dto.hasReliableLastPlayedAt {
+            return explicitValue
+        }
+
+        guard let normalizedSource = sanitized(dto.lastPlayedAtSource)?.lowercased() else {
+            return false
+        }
+
+        let trustedSources: Set<String> = [
+            "reliable",
+            "trusted",
+            "play_history",
+            "recent_play_history",
+            "session_history",
+            "activity_event"
+        ]
+        return trustedSources.contains(normalizedSource)
     }
 
     private static func defaultPlatform(for source: GameSource) -> String {
@@ -339,5 +433,19 @@ enum LibraryMapper {
         guard let value else { return nil }
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedValue.isEmpty ? nil : trimmedValue
+    }
+
+    private static func parseDate(_ rawValue: String?) -> Date? {
+        guard let rawValue = sanitized(rawValue) else { return nil }
+
+        let iso8601Formatter = ISO8601DateFormatter()
+        iso8601Formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = iso8601Formatter.date(from: rawValue) {
+            return date
+        }
+
+        let fallbackFormatter = ISO8601DateFormatter()
+        fallbackFormatter.formatOptions = [.withInternetDateTime]
+        return fallbackFormatter.date(from: rawValue)
     }
 }

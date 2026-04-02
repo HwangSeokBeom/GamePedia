@@ -73,6 +73,7 @@ final class AppCoordinator {
     private var pendingSteamLinkCallbackURL: URL?
     private var cancellables = Set<AnyCancellable>()
     private let steamLinkFlowController = SteamLinkFlowController()
+    private lazy var socialActivityBannerPresenter = SocialActivityBannerPresenter(window: window)
 
     private lazy var authRemoteDataSource = AuthRemoteDataSource(tokenStore: tokenStore)
     private lazy var authRepository: any AuthRepository = DefaultAuthRepository(
@@ -105,6 +106,7 @@ final class AppCoordinator {
     // MARK: Start
 
     func start() {
+        bindSocialActivityEvents()
         showSplash()
     }
 
@@ -139,6 +141,54 @@ final class AppCoordinator {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + Metrics.splashDuration) { [weak self] in
             self?.resolveInitialInterface()
+        }
+    }
+
+    private func bindSocialActivityEvents() {
+        SocialActivityEventDispatcher.shared.publisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                self?.handleSocialActivityEvent(event)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handleSocialActivityEvent(_ event: SocialActivityAppEvent) {
+        switch event {
+        case .showBanner(let payload):
+            socialActivityBannerPresenter.enqueue(payload: payload) { [weak self] in
+                self?.handleSocialActivityRoute(payload.route)
+            }
+        case .route(let route):
+            handleSocialActivityRoute(route)
+        }
+    }
+
+    private func handleSocialActivityRoute(_ route: SocialActivityRoute) {
+        switch route {
+        case .friendActivityFeed:
+            ensureMainInterface(selectedIndex: 3)
+            profileCoordinator?.navigateToFriendActivityFeed()
+        case .friendRequests:
+            ensureMainInterface(selectedIndex: 3)
+            profileCoordinator?.navigateToFriendRequests()
+        case .friendProfile(let userID):
+            ensureMainInterface(selectedIndex: 3)
+            profileCoordinator?.navigateToFriendProfile(userID: userID)
+        case .gameDetail(let gameID):
+            ensureMainInterface(selectedIndex: 0)
+            homeCoordinator?.navigateToGameDetail(gameID: gameID)
+        case .review(let gameID, _):
+            ensureMainInterface(selectedIndex: 0)
+            homeCoordinator?.navigateToGameDetail(gameID: gameID)
+        }
+    }
+
+    private func ensureMainInterface(selectedIndex: Int) {
+        if mainTabBarController == nil {
+            showMainInterface(selectedIndex: selectedIndex)
+        } else {
+            mainTabBarController?.selectTab(index: selectedIndex)
         }
     }
 

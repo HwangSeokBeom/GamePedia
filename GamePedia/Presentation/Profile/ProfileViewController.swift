@@ -6,7 +6,7 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
 
     // MARK: Properties
     private let viewModel: ProfileViewModel
-    private var recentGames: [RecentGame] = []
+    private var recentlyPlayedGames: [RecentGame] = []
     private var lastPresentedErrorMessage: String?
     private var lastPresentedSuccessMessage: String?
     private var toastHideWorkItem: DispatchWorkItem?
@@ -15,7 +15,10 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     // Set by ProfileCoordinator.
     var onGameSelected: ((Int) -> Void)?
     var onLoggedOut: (() -> Void)?
-    var onShowEditProfile: (() -> Void)?
+    var onShowEditProfile: ((String?) -> Void)?
+    var onShowSettings: (() -> Void)?
+    var onShowPlayedGames: (() -> Void)?
+    var onShowRecentPlayList: (([RecentGame], [Int: String]) -> Void)?
     var onShowFavoriteGames: (() -> Void)?
     var onShowWrittenReviews: (() -> Void)?
     var onShowFriendsList: (() -> Void)?
@@ -55,10 +58,10 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
             navigationItem.title = "프로필"
             navigationItem.largeTitleDisplayMode = .never
             navigationItem.rightBarButtonItem = UIBarButtonItem(
-                title: "편집",
+                image: UIImage(systemName: "gearshape.fill"),
                 style: .plain,
                 target: self,
-                action: #selector(didTapEditProfile)
+                action: #selector(didTapSettings)
             )
         }
     }
@@ -66,28 +69,25 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     private func setupTableView() {
         rootView.tableView.dataSource = self
         rootView.tableView.delegate = self
+        rootView.headerCardView.editProfileButton.addTarget(self, action: #selector(didTapEditProfile), for: .touchUpInside)
         rootView.logoutButton.addTarget(self, action: #selector(didTapLogout), for: .touchUpInside)
         rootView.deleteAccountButton.addTarget(self, action: #selector(didTapDeleteAccount), for: .touchUpInside)
         rootView.steamUnlinkButton.addTarget(self, action: #selector(didTapSteamUnlink), for: .touchUpInside)
         rootView.friendsListButton.addTarget(self, action: #selector(didTapFriendsList), for: .touchUpInside)
-        rootView.steamFriendsButton.addTarget(self, action: #selector(didTapSteamFriends), for: .touchUpInside)
-        rootView.friendRequestsButton.addTarget(self, action: #selector(didTapFriendRequests), for: .touchUpInside)
-        rootView.friendSearchButton.addTarget(self, action: #selector(didTapFriendSearch), for: .touchUpInside)
         rootView.friendActivityButton.addTarget(self, action: #selector(didTapFriendActivity), for: .touchUpInside)
-        rootView.socialPrivacySettingsButton.addTarget(self, action: #selector(didTapSocialPrivacySettings), for: .touchUpInside)
         rootView.sectionHeader.seeMoreButton.addTarget(
             self, action: #selector(didTapSeeMoreRecentPlay), for: .touchUpInside
         )
-        rootView.termsOfServiceButton.addTarget(self, action: #selector(didTapTermsOfService), for: .touchUpInside)
-        rootView.privacyPolicyButton.addTarget(self, action: #selector(didTapPrivacyPolicy), for: .touchUpInside)
-        rootView.communityGuidelinesButton.addTarget(self, action: #selector(didTapCommunityGuidelines), for: .touchUpInside)
-        rootView.contactSupportButton.addTarget(self, action: #selector(didTapContactSupport), for: .touchUpInside)
         let reviewTapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(didTapWrittenReviews))
         let favoriteTapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(didTapFavoriteGames))
         rootView.reviewStatView.addGestureRecognizer(reviewTapGestureRecognizer)
         rootView.wishlistStatView.addGestureRecognizer(favoriteTapGestureRecognizer)
+        let playedTapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(didTapPlayedGames))
+        rootView.playedStatView.addGestureRecognizer(playedTapGestureRecognizer)
+        rootView.playedStatView.accessibilityTraits.insert(.button)
         rootView.reviewStatView.accessibilityTraits.insert(.button)
         rootView.wishlistStatView.accessibilityTraits.insert(.button)
+        rootView.playedStatView.accessibilityLabel = "플레이한 게임"
         rootView.reviewStatView.accessibilityLabel = "작성한 리뷰"
         rootView.wishlistStatView.accessibilityLabel = "찜한 게임"
     }
@@ -104,7 +104,16 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
             case .loggedOut:
                 self?.onLoggedOut?()
             case .showEditProfile:
-                self?.onShowEditProfile?()
+                self?.onShowEditProfile?(self?.viewModel.state.selectedTitleKey)
+            case .showSettings:
+                self?.onShowSettings?()
+            case .showPlayedGames:
+                print("[Profile] route handled route=showPlayedGames")
+                self?.onShowPlayedGames?()
+            case .showRecentPlayList:
+                guard let self else { return }
+                print("[Profile] route handled route=showRecentPlayList count=\(self.recentlyPlayedGames.count)")
+                self.onShowRecentPlayList?(self.recentlyPlayedGames, self.viewModel.state.translatedRecentGameTitles)
             case .showWrittenReviews:
                 self?.onShowWrittenReviews?()
             case .showFavoriteGames:
@@ -134,9 +143,18 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     }
 
     override func render(_ state: ProfileState) {
+        print(
+            "[Profile] render " +
+            "selectedTitle=\(state.selectedTitle ?? "nil") " +
+            "selectedTitleKey=\(state.selectedTitleKey ?? "nil") " +
+            "selectedTitles=\(state.selectedTitles) " +
+            "recentPlayCount=\(state.recentlyPlayedGames.count) " +
+            "recentPlayState=\(String(describing: state.recentPlayLoadState))"
+        )
         rootView.render(state)
 
-        recentGames = state.recentGames
+        recentlyPlayedGames = state.recentlyPlayedGames
+        print("[Profile] recent-play render input count=\(recentlyPlayedGames.count)")
         rootView.tableView.reloadData()
 
         if let errorMessage = state.errorMessage,
@@ -160,8 +178,25 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     // MARK: Actions
 
     @objc private func didTapSeeMoreRecentPlay() {
+        print("[Profile] recentPlay seeMore tapped")
         viewModel.send(.didTapSeeMoreRecentPlay)
-        // TODO: navigate to full recent play list
+    }
+
+    @objc private func didTapPlayedGames() {
+        print("[Profile] playedStat tapped")
+        UIView.animate(withDuration: 0.12, animations: {
+            self.rootView.playedStatView.alpha = 0.72
+        }, completion: { _ in
+            UIView.animate(withDuration: 0.12) {
+                self.rootView.playedStatView.alpha = 1.0
+            }
+        })
+        print("[Profile] playedStat intent sent")
+        viewModel.send(.didTapPlayedGamesStat)
+    }
+
+    @objc private func didTapSettings() {
+        viewModel.send(.didTapSettings)
     }
 
     @objc private func didTapEditProfile() {
@@ -177,7 +212,40 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     }
 
     @objc private func didTapFriendsList() {
-        viewModel.send(.didTapFriendsList)
+        let alertController = UIAlertController(title: "친구 관리", message: nil, preferredStyle: .actionSheet)
+        alertController.addAction(
+            UIAlertAction(title: "친구 목록", style: .default) { [weak self] _ in
+                self?.viewModel.send(.didTapFriendsList)
+            }
+        )
+        alertController.addAction(
+            UIAlertAction(title: "Steam 친구", style: .default) { [weak self] _ in
+                self?.viewModel.send(.didTapSteamFriends)
+            }
+        )
+        alertController.addAction(
+            UIAlertAction(title: "친구 요청", style: .default) { [weak self] _ in
+                self?.viewModel.send(.didTapFriendRequests)
+            }
+        )
+        alertController.addAction(
+            UIAlertAction(title: "친구 찾기", style: .default) { [weak self] _ in
+                self?.viewModel.send(.didTapFriendSearch)
+            }
+        )
+        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
+
+        if let popoverPresentationController = alertController.popoverPresentationController {
+            popoverPresentationController.sourceView = rootView
+            popoverPresentationController.sourceRect = CGRect(
+                x: rootView.bounds.midX,
+                y: rootView.bounds.midY,
+                width: 1,
+                height: 1
+            )
+        }
+
+        present(alertController, animated: true)
     }
 
     @objc private func didTapSteamFriends() {
@@ -261,6 +329,14 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
         present(alertController, animated: true)
     }
 
+    func performLogoutFromSettings() {
+        viewModel.send(.didTapLogout)
+    }
+
+    func performDeleteAccountFromSettings() {
+        viewModel.send(.didTapDeleteAccount)
+    }
+
     private func showErrorAlert(message: String) {
         let alert = UIAlertController(title: "오류", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "확인", style: .default))
@@ -304,23 +380,66 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
 
 extension ProfileViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        recentGames.count
+        recentlyPlayedGames.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(
             withIdentifier: RecentPlayCell.reuseId, for: indexPath
         ) as! RecentPlayCell
-        let game = recentGames[indexPath.row]
+        let game = recentlyPlayedGames[indexPath.row]
         let resolvedTitle = viewModel.state.resolvedTitle(for: game)
         cell.configure(with: game, resolvedTitle: resolvedTitle)
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        let game = recentGames[indexPath.row]
-        viewModel.send(.didTapGame(id: game.gameId))
-        onGameSelected?(game.gameId)
+        let game = recentlyPlayedGames[indexPath.row]
+        let resolvedGameId = game.resolvedDetailGameId
+        let blockedReason: String?
+        if game.detailAvailable == false {
+            blockedReason = "detailUnavailable"
+        } else if resolvedGameId == nil {
+            blockedReason = "invalidGameId"
+        } else {
+            blockedReason = nil
+        }
+        print(
+            "[DetailRouteMapping] " +
+            "screen=Profile.preview " +
+            "title=\(viewModel.state.resolvedTitle(for: game)) " +
+            "externalGameId=\(game.externalGameId ?? "nil") " +
+            "igdbGameId=\(game.igdbGameId.map(String.init) ?? "nil") " +
+            "detailAvailable=\(game.detailAvailable) " +
+            "createdDestination=\(resolvedGameId.map(String.init) ?? "nil") " +
+            "blockedReason=\(blockedReason ?? "nil")"
+        )
+        guard let resolvedGameId, resolvedGameId > 0, game.detailAvailable else {
+            presentUnavailableDetailAlert()
+            return
+        }
+        print(
+            "[GameTap] " +
+            "screen=Profile.preview " +
+            "title=\(viewModel.state.resolvedTitle(for: game)) " +
+            "destination=igdb:\(resolvedGameId) " +
+            "igdbGameId=\(game.igdbGameId.map(String.init) ?? "nil") " +
+            "externalGameId=\(game.externalGameId ?? "nil")"
+        )
+        viewModel.send(.didTapGame(id: resolvedGameId))
+        onGameSelected?(resolvedGameId)
+    }
+}
+
+private extension ProfileViewController {
+    func presentUnavailableDetailAlert() {
+        let alert = UIAlertController(
+            title: "안내",
+            message: "게임 상세 정보를 아직 불러올 수 없어요.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "확인", style: .default))
+        present(alert, animated: true)
     }
 }
 

@@ -131,18 +131,30 @@ final class NotificationCell: UITableViewCell {
         case .friendReviewReaction:
             iconName = "bubble.left.and.text.bubble.right.fill"
             tintColor = .gpCoral
+        case .friendReviewCreated:
+            iconName = "square.and.pencil"
+            tintColor = .gpPrimary
+        case .friendReviewUpdated:
+            iconName = "pencil.line"
+            tintColor = .gpPrimaryLight
+        case .friendLikedGameAdded:
+            iconName = "heart.fill"
+            tintColor = .gpRed
+        case .friendLikedGameRemoved:
+            iconName = "heart.slash.fill"
+            tintColor = .gpTextSecondary
+        case .friendRatingChanged:
+            iconName = "star.fill"
+            tintColor = .gpStar
+        case .friendPlayStatusChanged:
+            iconName = "arrow.triangle.2.circlepath.circle.fill"
+            tintColor = .gpPrimaryLight
         case .friendStartedPlaying:
             iconName = "play.circle.fill"
             tintColor = .gpPrimaryLight
-        case .friendWroteReview:
-            iconName = "square.and.pencil"
-            tintColor = .gpPrimary
-        case .friendWishlistedGame:
-            iconName = "heart.fill"
-            tintColor = .gpRed
-        case .friendRatedHigh:
-            iconName = "star.fill"
-            tintColor = .gpPrimary
+        case .friendRecentlyPlayed:
+            iconName = "clock.fill"
+            tintColor = .gpTeal
         case .generic:
             iconName = "bell.fill"
             tintColor = .gpTextSecondary

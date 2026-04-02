@@ -58,7 +58,11 @@ final class APIClient {
         let urlRequest = try await buildRequest(from: endpoint)
         let isGameRequest = endpoint.path.hasPrefix("/games")
         let isLibraryStatusRequest = endpoint.path == "/users/me/library/status"
+        let isLibraryPreviewRequest = endpoint.path == "/users/me/library"
         let isNotificationsRequest = endpoint.path == "/users/me/notifications"
+        let isFriendActivityRequest = endpoint.path == "/users/me/friends/activity"
+        let isProfileSummaryRequest = endpoint.path == "/users/me"
+        let isProfileRecentPlaysRequest = endpoint.path == "/users/me/recent-plays"
         if isGameRequest {
             print("[GameAPI] request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil")")
         }
@@ -74,9 +78,25 @@ final class APIClient {
             let responseBody = String(data: data, encoding: .utf8) ?? ""
             print("[Notifications] rawResponse endpoint=/users/me/notifications status=\(httpResponse.statusCode) body=\(responseBody)")
         }
+        if isFriendActivityRequest, let httpResponse = response as? HTTPURLResponse {
+            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            print("[FriendActivity] rawResponse endpoint=/users/me/friends/activity status=\(httpResponse.statusCode) body=\(responseBody)")
+        }
         if isLibraryStatusRequest, let httpResponse = response as? HTTPURLResponse {
             let responseBody = String(data: data, encoding: .utf8) ?? ""
             print("[Library] rawResponse endpoint=/users/me/library/status status=\(httpResponse.statusCode) body=\(responseBody)")
+        }
+        if isLibraryPreviewRequest, let httpResponse = response as? HTTPURLResponse {
+            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            print("[Library] rawResponse endpoint=/users/me/library status=\(httpResponse.statusCode) body=\(responseBody)")
+        }
+        if isProfileSummaryRequest, let httpResponse = response as? HTTPURLResponse {
+            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            print("[Profile] rawResponse endpoint=/users/me status=\(httpResponse.statusCode) body=\(responseBody)")
+        }
+        if isProfileRecentPlaysRequest, let httpResponse = response as? HTTPURLResponse {
+            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            print("[Profile] rawResponse endpoint=/users/me/recent-plays status=\(httpResponse.statusCode) body=\(responseBody)")
         }
         if endpoint.path.contains("/reviews"), let httpResponse = response as? HTTPURLResponse {
             let responseBody = String(data: data, encoding: .utf8) ?? ""
@@ -98,9 +118,25 @@ final class APIClient {
                 let responseBody = String(data: data, encoding: .utf8) ?? ""
                 print("[Notifications] decodeFailure endpoint=/users/me/notifications type=\(String(describing: type)) error=\(error) body=\(responseBody)")
             }
+            if isFriendActivityRequest {
+                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                print("[FriendActivity] decodeFailure endpoint=/users/me/friends/activity type=\(String(describing: type)) error=\(error) body=\(responseBody)")
+            }
             if isLibraryStatusRequest {
                 let responseBody = String(data: data, encoding: .utf8) ?? ""
                 print("[Library] decodeFailure endpoint=/users/me/library/status type=\(String(describing: type)) error=\(error) body=\(responseBody)")
+            }
+            if isLibraryPreviewRequest {
+                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                print("[Library] decodeFailure endpoint=/users/me/library type=\(String(describing: type)) error=\(error) body=\(responseBody)")
+            }
+            if isProfileSummaryRequest {
+                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                print("[Profile] decodeFailure endpoint=/users/me type=\(String(describing: type)) error=\(error) body=\(responseBody)")
+            }
+            if isProfileRecentPlaysRequest {
+                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                print("[Profile] decodeFailure endpoint=/users/me/recent-plays type=\(String(describing: type)) error=\(error) body=\(responseBody)")
             }
             throw error
         }
