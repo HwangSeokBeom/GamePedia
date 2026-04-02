@@ -11,7 +11,7 @@ enum ProfileRecentPlayLoadState: Equatable {
 
 // MARK: - ProfileState
 
-struct ProfileState {
+struct ProfileState: Equatable {
     var isLoading: Bool = false
     var isLoggingOut: Bool = false
     var isDeletingAccount: Bool = false

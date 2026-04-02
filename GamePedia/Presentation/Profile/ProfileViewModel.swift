@@ -27,6 +27,7 @@ final class ProfileViewModel {
     private let translateTextUseCase: TranslateTextUseCase
     private let profileBadgeSelectionStore: ProfileBadgeSelectionStore
     private var cancellables = Set<AnyCancellable>()
+    private var didTriggerInitialLoad = false
 
     // MARK: Init
     init(
@@ -76,6 +77,12 @@ final class ProfileViewModel {
     func send(_ intent: ProfileIntent) {
         switch intent {
         case .viewDidLoad:
+            print("[ProfileAction] intent=viewDidLoad")
+            guard !didTriggerInitialLoad else {
+                print("[ProfileAction] intent=viewDidLoad skipped reason=alreadyTriggered")
+                return
+            }
+            didTriggerInitialLoad = true
             loadProfileData()
         case .didTapSettings:
             onRoute?(.showSettings)
@@ -129,13 +136,25 @@ final class ProfileViewModel {
     // MARK: - Private
 
     private func apply(_ mutation: ProfileMutation) {
-        state = ProfileReducer.reduce(state, mutation)
+        let reducedState = ProfileReducer.reduce(state, mutation)
+        guard reducedState != state else {
+            print("[ProfileState] reducedSkipped mutation=\(mutation.logName) reason=unchanged")
+            return
+        }
+
+        print("[ProfileState] reduced mutation=\(mutation.logName)")
+        state = reducedState
     }
 
     private func loadProfileData() {
+        print("[Profile] fetchStarted source=initial")
         apply(.setLoading(true))
         apply(.clearError)
-        apply(.setRecentPlayLoadState(.loading))
+        if state.recentlyPlayedGames.isEmpty {
+            apply(.setRecentPlayLoadState(.loading))
+        } else {
+            print("[Profile] recentPlay loading skipped reason=existingVisibleData")
+        }
 
         if let authenticatedUser = userSessionStore.fetchUser() {
             apply(.setAuthenticatedUser(authenticatedUser))
@@ -270,6 +289,7 @@ final class ProfileViewModel {
     }
 
     private func fetchRecentGames(source: String) async {
+        print("[Profile] recentPlay fetchStarted source=\(source)")
         do {
             let response = try await apiClient.request(.recentPlays(), as: RecentGameListResponseDTO.self)
             print(
@@ -372,21 +392,7 @@ final class ProfileViewModel {
             let timestampUsedForRelativeText = resolvedHasReliableLastPlayedAt
                 ? (resolvedLastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")
                 : "nil"
-
-            print(
-                "[RecentPlayDisplay] " +
-                "screen=\(screen) " +
-                "title=\(incomingGame.resolvedTitle) " +
-                "lastPlayedAt=\(resolvedLastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
-                "recentPlaytimeMinutes=\(resolvedRecentPlaytimeMinutes.map(String.init) ?? "nil") " +
-                "hasReliableLastPlayedAt=\(resolvedHasReliableLastPlayedAt) " +
-                "timestampUsedForRelativeText=\(timestampUsedForRelativeText) " +
-                "relativeTime=\(display.relativeTimeText ?? "nil") " +
-                "fallbackReason=\(resolvedFallbackReason ?? "nil") " +
-                "finalText=\(resolvedFormattedLastPlayed)"
-            )
-
-            return incomingGame.replacingRecentPlayMetadata(
+            let mergedGame = incomingGame.replacingRecentPlayMetadata(
                 formattedLastPlayed: resolvedFormattedLastPlayed,
                 lastPlayedAt: resolvedLastPlayedAt,
                 lastPlayedAtSource: resolvedLastPlayedAtSource,
@@ -394,6 +400,22 @@ final class ProfileViewModel {
                 recentPlaytimeMinutes: resolvedRecentPlaytimeMinutes,
                 fallbackReason: resolvedFallbackReason
             )
+            if mergedGame != currentGame {
+                print(
+                    "[RecentPlayDisplay] " +
+                    "screen=\(screen) " +
+                    "title=\(incomingGame.resolvedTitle) " +
+                    "lastPlayedAt=\(resolvedLastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
+                    "recentPlaytimeMinutes=\(resolvedRecentPlaytimeMinutes.map(String.init) ?? "nil") " +
+                    "hasReliableLastPlayedAt=\(resolvedHasReliableLastPlayedAt) " +
+                    "timestampUsedForRelativeText=\(timestampUsedForRelativeText) " +
+                    "relativeTime=\(display.relativeTimeText ?? "nil") " +
+                    "fallbackReason=\(resolvedFallbackReason ?? "nil") " +
+                    "finalText=\(resolvedFormattedLastPlayed)"
+                )
+            }
+
+            return mergedGame
         }
     }
 
@@ -431,6 +453,7 @@ final class ProfileViewModel {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self, self.userSessionStore.fetchUser() != nil else { return }
+                print("[ProfileAction] notification=reviewDidChange")
                 Task {
                     await self.fetchWrittenReviewCount()
                 }
@@ -441,6 +464,7 @@ final class ProfileViewModel {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self, self.userSessionStore.fetchUser() != nil else { return }
+                print("[ProfileAction] notification=favoriteDidChange")
                 Task {
                     await self.fetchWishlistCount()
                 }
@@ -451,6 +475,7 @@ final class ProfileViewModel {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self, self.userSessionStore.fetchUser() != nil else { return }
+                print("[ProfileAction] notification=friendRelationshipDidChange")
                 Task {
                     await self.fetchFriendCount()
                 }
@@ -571,6 +596,7 @@ final class ProfileViewModel {
     }
 
     private func fetchSteamLinkStatus() async {
+        print("[Profile] steamLinkStatus fetchStarted")
         await MainActor.run {
             self.apply(.setLoadingSteamLinkStatus(true))
         }
@@ -637,11 +663,20 @@ final class ProfileViewModel {
     }
 
     private func refreshSelectedBadges() {
+        let nextBadgeTitles: [String]
         if let selectedTitle = state.selectedTitle,
            selectedTitle.isEmpty == false {
-            apply(.setSelectedBadgeTitles([selectedTitle]))
+            nextBadgeTitles = [selectedTitle]
+        } else {
+            nextBadgeTitles = []
+        }
+
+        guard nextBadgeTitles != state.selectedBadgeTitles else {
+            print("[ProfileRender] selectedBadgeSkipped reason=unchanged")
             return
         }
-        apply(.setSelectedBadgeTitles([]))
+
+        print("[ProfileRender] selectedBadgeUpdated reason=changed")
+        apply(.setSelectedBadgeTitles(nextBadgeTitles))
     }
 }
