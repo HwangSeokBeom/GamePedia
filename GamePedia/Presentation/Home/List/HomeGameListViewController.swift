@@ -25,6 +25,7 @@ final class HomeGameListViewController: BaseViewController<HomeGameListRootView,
     }
 
     override func render(_ state: HomeGameListState) {
+        GameDetailSeedStore.shared.store(games: state.games, screen: "Home.list.render")
         rootView.render(state)
         applySnapshot(state.games)
     }
@@ -74,6 +75,7 @@ final class HomeGameListViewController: BaseViewController<HomeGameListRootView,
 extension HomeGameListViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard let game = dataSource.itemIdentifier(for: indexPath) else { return }
+        GameDetailSeedStore.shared.store(games: [game], screen: "Home.list.tap")
         onGameSelected?(game.id)
     }
 }

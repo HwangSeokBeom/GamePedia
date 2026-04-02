@@ -178,6 +178,10 @@ enum L10n {
       static let userReviews = L10n.tr("Localizable", "detail.review.userReviews")
     }
 
+    enum Notice {
+      static let partialUnavailable = L10n.tr("Localizable", "detail.notice.partialUnavailable")
+    }
+
     enum Fallback {
       static let note = L10n.tr("Localizable", "detail.fallback.note")
     }

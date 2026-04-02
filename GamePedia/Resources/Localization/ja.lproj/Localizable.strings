@@ -72,6 +72,7 @@
 "detail.button.editReview" = "レビューを編集";
 "detail.review.none" = "まだレビューがありません";
 "detail.review.userReviews" = "ユーザーレビュー";
+"detail.notice.partialUnavailable" = "一部のゲーム情報を一時的に読み込めません。";
 "detail.fallback.note" = "ジャンル、評価、ストーリーなどの詳細情報は GamePedia で順次補完される場合があります。";
 "detail.steamReview.badge" = "Steam レビュー済み";
 "detail.steamReview.helper" = "Steam でレビューしたゲームです。\nGamePedia にも感想を残してみましょう。";

@@ -151,6 +151,7 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
             "recentPlayCount=\(state.recentlyPlayedGames.count) " +
             "recentPlayState=\(String(describing: state.recentPlayLoadState))"
         )
+        GameDetailSeedStore.shared.store(recentGames: state.recentlyPlayedGames, screen: "Profile.render")
         rootView.render(state)
 
         recentlyPlayedGames = state.recentlyPlayedGames
@@ -395,6 +396,7 @@ extension ProfileViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let game = recentlyPlayedGames[indexPath.row]
+        GameDetailSeedStore.shared.store(recentGames: [game], screen: "Profile.preview.tap")
         let resolvedGameId = game.resolvedDetailGameId
         let blockedReason: String?
         if game.detailAvailable == false {

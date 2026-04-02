@@ -25,6 +25,7 @@ final class GameDetailViewModel {
     private let languageProvider: any LanguageProviding
     private let translationProvider: any TranslationProviding
     private let translationCache: any TranslationCaching
+    private let seedStore: GameDetailSeedStore
 
     // MARK: Init
     init(
@@ -41,7 +42,8 @@ final class GameDetailViewModel {
         moderationRepository: any ModerationRepository = DefaultModerationRepository(),
         languageProvider: any LanguageProviding = DefaultLanguageProvider.shared,
         translationProvider: any TranslationProviding = makeTranslationProvider(),
-        translationCache: any TranslationCaching = DefaultTranslationCache.shared
+        translationCache: any TranslationCaching = DefaultTranslationCache.shared,
+        seedStore: GameDetailSeedStore = .shared
     ) {
         self.apiClient = apiClient
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
@@ -51,6 +53,7 @@ final class GameDetailViewModel {
         self.languageProvider = languageProvider
         self.translationProvider = translationProvider
         self.translationCache = translationCache
+        self.seedStore = seedStore
     }
 
     // MARK: - Intent Processing
@@ -85,6 +88,21 @@ final class GameDetailViewModel {
     }
 
     private func loadDetail(gameId: Int) {
+        apply(.clearError)
+        apply(.setBlockingLoadError(nil))
+        apply(.setInlineNotice(nil))
+
+        if let seed = seedStore.seed(for: gameId) {
+            let partialGame = seed.makePartialDetail()
+            print(
+                "[GameDetailSeed] " +
+                "id=\(gameId) " +
+                "source=\(seed.sourceDescription) " +
+                "hasSummary=\(seed.summary?.isEmpty == false)"
+            )
+            apply(.setGame(partialGame))
+        }
+
         apply(.setLoading(true))
 
         Task {
@@ -110,7 +128,28 @@ final class GameDetailViewModel {
             await prepareTranslation(for: entity)
         } catch {
             print("[GameDetail] failed id=\(id) error=\(error.localizedDescription)")
-            await MainActor.run { self.apply(.setError(error.localizedDescription)) }
+            let degradedMessage = temporaryDegradedMessage(for: error)
+            let hasRenderableContent = await MainActor.run { self.state.hasRenderableContent }
+
+            if let degradedMessage, hasRenderableContent {
+                print(
+                    "[GameDetailDegraded] " +
+                    "id=\(id) " +
+                    "temporary=true " +
+                    "hasRenderableContent=true " +
+                    "message=\(degradedMessage)"
+                )
+                await MainActor.run {
+                    self.apply(.setInlineNotice(degradedMessage))
+                    self.apply(.setBlockingLoadError(nil))
+                    self.apply(.setLoading(false))
+                }
+                return
+            }
+
+            await MainActor.run {
+                self.apply(.setBlockingLoadError(error.localizedDescription))
+            }
         }
     }
 
@@ -305,6 +344,20 @@ final class GameDetailViewModel {
     private func currentOSVersionString() -> String {
         let version = ProcessInfo.processInfo.operatingSystemVersion
         return "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
+    }
+
+    private func temporaryDegradedMessage(for error: Error) -> String? {
+        guard let networkError = error as? NetworkError else { return nil }
+        guard case let .serverError(statusCode, code, message) = networkError else { return nil }
+
+        let normalizedCode = code?.uppercased() ?? ""
+        let normalizedMessage = message?.lowercased() ?? ""
+        let isIGDBTemporaryLimit = statusCode == 429
+            || normalizedCode.contains("IGDB")
+            || (normalizedMessage.contains("igdb") && normalizedMessage.contains("rate"))
+
+        guard isIGDBTemporaryLimit else { return nil }
+        return L10n.Detail.Notice.partialUnavailable
     }
 
     private func visibleReviews(from reviews: [Review]) -> [Review] {

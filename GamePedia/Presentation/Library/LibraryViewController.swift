@@ -51,6 +51,16 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     }
 
     override func render(_ state: LibraryState) {
+        GameDetailSeedStore.shared.store(
+            librarySummaries: state.recentlyPlayed
+                + state.playingGames
+                + state.ownedGames
+                + state.backlogGames
+                + state.playtimeRecommendations.map(\.game)
+                + state.friendRecommendations.map(\.game),
+            screen: "Library.render"
+        )
+
         if state.isSummaryLoading, !wasSummaryLoading {
             summaryLoadStartedAt = CACurrentMediaTime()
             didLogFirstSnapshotApplyForCurrentLoad = false
@@ -554,6 +564,7 @@ extension LibraryViewController: UICollectionViewDelegate {
         case .recentCard(let viewState):
             switch viewState.detailDestination {
             case .igdb(let gameID):
+                GameDetailSeedStore.shared.store(items: [item], screen: "Library.overview.tap")
                 print(
                     "[GameTap] screen=Library.overview.\(section.kind.title) " +
                     "title=\(viewState.title) " +
@@ -582,6 +593,7 @@ extension LibraryViewController: UICollectionViewDelegate {
         case .row(let viewState):
             switch viewState.detailDestination {
             case .igdb(let gameID):
+                GameDetailSeedStore.shared.store(items: [item], screen: "Library.overview.tap")
                 print(
                     "[GameTap] screen=Library.overview.\(section.kind.title) " +
                     "title=\(viewState.title) " +

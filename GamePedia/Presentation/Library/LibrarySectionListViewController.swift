@@ -90,6 +90,7 @@ final class LibrarySectionListViewController: UIViewController {
         view.backgroundColor = .gpBackground
         navigationItem.title = route.title
         navigationItem.largeTitleDisplayMode = .never
+        GameDetailSeedStore.shared.store(items: currentItems, screen: "Library.sectionList.initial")
         setupCollectionView()
         setupDataSource()
         applySnapshot()
@@ -174,6 +175,7 @@ final class LibrarySectionListViewController: UIViewController {
         animated: Bool = false
     ) {
         currentItems = items
+        GameDetailSeedStore.shared.store(items: currentItems, screen: "Library.sectionList.render")
         if currentLayoutStyle != layoutStyle {
             currentLayoutStyle = layoutStyle
             collectionView.setCollectionViewLayout(makeLayout(), animated: animated)
@@ -923,6 +925,7 @@ extension LibrarySectionListViewController: UICollectionViewDelegate {
         case .recentCard(let viewState):
             switch viewState.detailDestination {
             case .igdb(let gameID):
+                GameDetailSeedStore.shared.store(items: [item], screen: "Library.sectionList.tap")
                 print(
                     "[GameTap] screen=Library.sectionList.\(route.kind.title) " +
                     "title=\(viewState.title) " +
@@ -947,6 +950,7 @@ extension LibrarySectionListViewController: UICollectionViewDelegate {
         case .row(let viewState):
             switch viewState.detailDestination {
             case .igdb(let gameID):
+                GameDetailSeedStore.shared.store(items: [item], screen: "Library.sectionList.tap")
                 print(
                     "[GameTap] screen=Library.sectionList.\(route.kind.title) " +
                     "title=\(viewState.title) " +

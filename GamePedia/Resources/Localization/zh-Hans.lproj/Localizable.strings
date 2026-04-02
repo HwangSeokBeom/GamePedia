@@ -72,6 +72,7 @@
 "detail.button.editReview" = "编辑评论";
 "detail.review.none" = "暂无评论";
 "detail.review.userReviews" = "用户评论";
+"detail.notice.partialUnavailable" = "部分游戏信息暂时无法加载。";
 "detail.fallback.note" = "类型、评分、剧情等详细信息可能会在 GamePedia 中逐步补充。";
 "detail.steamReview.badge" = "已写 Steam 评论";
 "detail.steamReview.helper" = "你已在 Steam 上评论过这款游戏。\n也在 GamePedia 留下感想吧。";

@@ -72,6 +72,7 @@
 "detail.button.editReview" = "리뷰 수정";
 "detail.review.none" = "아직 리뷰가 없어요";
 "detail.review.userReviews" = "유저 리뷰";
+"detail.notice.partialUnavailable" = "일부 게임 정보를 잠시 불러올 수 없어요.";
 "detail.fallback.note" = "장르, 평점, 스토리 같은 세부 정보는 GamePedia에서 순차적으로 보강될 수 있어요.";
 "detail.steamReview.badge" = "Steam 리뷰 작성됨";
 "detail.steamReview.helper" = "Steam에서 리뷰한 게임이에요.\nGamePedia에도 감상을 남겨보세요.";

@@ -116,6 +116,20 @@ final class GameDetailRootView: UIView {
         return label
     }()
 
+    let inlineNoticeLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 13, weight: .medium)
+        label.textColor = .gpTextSecondary
+        label.backgroundColor = .gpSurfaceElevated
+        label.layer.cornerRadius = 12
+        label.layer.masksToBounds = true
+        label.numberOfLines = 0
+        label.textAlignment = .natural
+        label.isHidden = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
     let translationIndicatorLabel: UILabel = {
         let label = UILabel()
         label.text = L10n.Translation.Banner.machineTranslated
@@ -235,6 +249,7 @@ final class GameDetailRootView: UIView {
             actionStackView,
             steamReviewBannerView,
             descriptionTitleLabel,
+            inlineNoticeLabel,
             translationMetaStackView,
             descriptionLabel,
             reviewSectionHeader,
@@ -248,6 +263,7 @@ final class GameDetailRootView: UIView {
         contentStackView.translatesAutoresizingMaskIntoConstraints = false
 
         contentStackView.setCustomSpacing(10, after: descriptionTitleLabel)
+        contentStackView.setCustomSpacing(10, after: inlineNoticeLabel)
         contentStackView.setCustomSpacing(10, after: translationMetaStackView)
         contentStackView.setCustomSpacing(12, after: reviewSectionHeader)
         contentStackView.setCustomSpacing(12, after: reviewSummaryLabel)
@@ -298,6 +314,8 @@ final class GameDetailRootView: UIView {
         developerLabel.text = game.developerLine
         statsView.configure(game: game)
         descriptionLabel.text = state.summary
+        inlineNoticeLabel.text = state.inlineNoticeMessage
+        inlineNoticeLabel.isHidden = state.inlineNoticeMessage == nil
         translationIndicatorLabel.isHidden = !state.isTranslated
         translationToggleButton.isHidden = !state.hasTranslation
         var translationToggleConfiguration = translationToggleButton.configuration
