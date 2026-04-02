@@ -136,6 +136,14 @@ final class DefaultFriendRemoteDataSource: FriendRemoteDataSource {
             .socialPrivacySettings,
             as: FriendResponseEnvelopeDTO<SocialPrivacySettingsResponseDataDTO>.self
         )
+        print(
+            "[FriendPrivacy] response fetch " +
+            "friendsList=\(response.data.isFriendsListPublic.map(String.init(describing:)) ?? "nil") " +
+            "recentPlay=\(response.data.isRecentPlayPublic.map(String.init(describing:)) ?? "nil") " +
+            "likedGames=\(response.data.isLikedGamesPublic.map(String.init(describing:)) ?? "nil") " +
+            "reviews=\(response.data.isReviewsPublic.map(String.init(describing:)) ?? "nil") " +
+            "steamFriends=\(response.data.steamFriendsFeatureAvailable.map(String.init(describing:)) ?? "nil")"
+        )
         return response.data
     }
 
@@ -144,6 +152,14 @@ final class DefaultFriendRemoteDataSource: FriendRemoteDataSource {
         let response = try await apiClient.request(
             .updateSocialPrivacySettings(body: payload),
             as: FriendResponseEnvelopeDTO<SocialPrivacySettingsResponseDataDTO>.self
+        )
+        print(
+            "[FriendPrivacy] response update " +
+            "friendsList=\(response.data.isFriendsListPublic.map(String.init(describing:)) ?? "nil") " +
+            "recentPlay=\(response.data.isRecentPlayPublic.map(String.init(describing:)) ?? "nil") " +
+            "likedGames=\(response.data.isLikedGamesPublic.map(String.init(describing:)) ?? "nil") " +
+            "reviews=\(response.data.isReviewsPublic.map(String.init(describing:)) ?? "nil") " +
+            "steamFriends=\(response.data.steamFriendsFeatureAvailable.map(String.init(describing:)) ?? "nil")"
         )
         return response.data
     }

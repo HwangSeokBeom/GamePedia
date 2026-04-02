@@ -8,7 +8,7 @@
       buildArchitectures = "Automatic">
       <BuildActionEntries>
          <BuildActionEntry
-            buildForTesting = "YES"
+            buildForTesting = "NO"
             buildForRunning = "YES"
             buildForProfiling = "YES"
             buildForArchiving = "YES"
@@ -28,30 +28,8 @@
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
-      shouldAutocreateTestPlan = "YES">
+      shouldAutocreateTestPlan = "NO">
       <Testables>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "8B9A885E2F6EDC9B00D5F380"
-               BuildableName = "GamePediaTests.xctest"
-               BlueprintName = "GamePediaTests"
-               ReferencedContainer = "container:GamePedia.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "8B9A88682F6EDC9B00D5F380"
-               BuildableName = "GamePediaUITests.xctest"
-               BlueprintName = "GamePediaUITests"
-               ReferencedContainer = "container:GamePedia.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

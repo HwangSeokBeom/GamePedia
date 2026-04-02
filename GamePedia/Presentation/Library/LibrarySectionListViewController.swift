@@ -90,6 +90,7 @@ final class LibrarySectionListViewController: UIViewController {
         view.backgroundColor = .gpBackground
         navigationItem.title = route.title
         navigationItem.largeTitleDisplayMode = .never
+        GameDetailSeedStore.shared.store(items: currentItems, screen: "Library.sectionList.initial")
         setupCollectionView()
         setupDataSource()
         applySnapshot()
@@ -174,6 +175,7 @@ final class LibrarySectionListViewController: UIViewController {
         animated: Bool = false
     ) {
         currentItems = items
+        GameDetailSeedStore.shared.store(items: currentItems, screen: "Library.sectionList.render")
         if currentLayoutStyle != layoutStyle {
             currentLayoutStyle = layoutStyle
             collectionView.setCollectionViewLayout(makeLayout(), animated: animated)
@@ -489,7 +491,9 @@ final class LibrarySectionListViewController: UIViewController {
                 subtitleText: "\(entry.game.genre) · \(releaseText(for: entry.game.releaseYear))",
                 metadataText: entry.game.platform,
                 coverImageURL: entry.game.coverImageURL,
-                ratingText: entry.game.rating > 0 ? String(format: "%.1f", entry.game.rating) : nil,
+                ratingText: entry.game.rating.isFinite && entry.game.rating >= 0
+                    ? LocalizedNumberFormatter.oneFraction(entry.game.rating)
+                    : nil,
                 trailingAction: nil
             )
         )
@@ -509,7 +513,9 @@ final class LibrarySectionListViewController: UIViewController {
                 metadataText: "\(reviewedGame.game.genre) · \(releaseText(for: reviewedGame.game.releaseYear))",
                 coverImageURL: reviewedGame.game.coverImageURL,
                 fallbackCoverImageURLs: [],
-                ratingText: String(format: "%.1f", reviewedGame.rating),
+                ratingText: reviewedGame.rating.isFinite
+                    ? LocalizedNumberFormatter.oneFraction(reviewedGame.rating)
+                    : nil,
                 trailingAction: nil
             )
         )
@@ -562,23 +568,7 @@ final class LibrarySectionListViewController: UIViewController {
             recentPlaytimeMinutes: summary.recentPlaytimeMinutes,
             fallbackReason: summary.recentPlayFallbackReason
         )
-        let recentPlayMetadataText = display.finalText
-        let timestampUsedForRelativeText = display.relativeTimeText == nil
-            ? "nil"
-            : (summary.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")
-        print(
-            "[RecentPlayDisplay] " +
-            "screen=Library.fullList.\(route.kind.title) " +
-            "title=\(summary.displayTitle) " +
-            "lastPlayedAt=\(summary.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
-            "recentPlaytimeMinutes=\(summary.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
-            "hasReliableLastPlayedAt=\(summary.hasReliableLastPlayedAt) " +
-            "timestampUsedForRelativeText=\(timestampUsedForRelativeText) " +
-            "relativeTime=\(display.relativeTimeText ?? "nil") " +
-            "fallbackReason=\(summary.recentPlayFallbackReason ?? "nil") " +
-            "finalText=\(recentPlayMetadataText)"
-        )
-        return recentPlayMetadataText
+        return display.finalText
     }
 
     private func logRatingMapping(summary: LibraryGameSummary, context: String) {
@@ -919,6 +909,7 @@ extension LibrarySectionListViewController: UICollectionViewDelegate {
         case .recentCard(let viewState):
             switch viewState.detailDestination {
             case .igdb(let gameID):
+                GameDetailSeedStore.shared.store(items: [item], screen: "Library.sectionList.tap")
                 print(
                     "[GameTap] screen=Library.sectionList.\(route.kind.title) " +
                     "title=\(viewState.title) " +
@@ -943,6 +934,7 @@ extension LibrarySectionListViewController: UICollectionViewDelegate {
         case .row(let viewState):
             switch viewState.detailDestination {
             case .igdb(let gameID):
+                GameDetailSeedStore.shared.store(items: [item], screen: "Library.sectionList.tap")
                 print(
                     "[GameTap] screen=Library.sectionList.\(route.kind.title) " +
                     "title=\(viewState.title) " +

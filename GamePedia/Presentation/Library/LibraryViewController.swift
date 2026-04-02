@@ -6,6 +6,20 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         let item: LibraryCollectionItem
     }
 
+    private struct TopRenderSignature: Equatable {
+        let selectedTab: LibraryTab
+        let selectedHighlightChip: LibraryHighlightChip
+        let summaryState: LibraryTabSummaryState
+        let isSummaryLoading: Bool
+        let steamLinkStatus: SteamLinkStatus
+        let isSteamConnected: Bool
+        let steamSyncStatus: SteamSyncStatus
+        let isSteamSyncAvailable: Bool
+        let steamSyncErrorCode: String?
+        let isSyncingOwnedSteamLibrary: Bool
+        let isUnlinkingSteamAccount: Bool
+    }
+
     private let viewModel: LibraryViewModel
     private var dataSource: UICollectionViewDiffableDataSource<LibrarySectionKind, SectionScopedItem>!
     private var currentSections: [LibrarySectionViewState] = []
@@ -15,6 +29,12 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     private let refreshControl = UIRefreshControl()
     private var toastHideWorkItem: DispatchWorkItem?
     private weak var toastView: LibraryToastView?
+    private var summaryLoadStartedAt: CFTimeInterval?
+    private var didLogFirstSnapshotApplyForCurrentLoad = false
+    private var wasSummaryLoading = false
+    private var lastSnapshotInputSections: [LibrarySectionViewState] = []
+    private var lastSnapshotInputFocusSection: LibrarySectionKind?
+    private var lastTopRenderSignature: TopRenderSignature?
 
     var onGameSelected: ((Int) -> Void)?
     var onSteamDetailRequested: ((SteamFallbackGameDetailViewState) -> Void)?
@@ -48,8 +68,62 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     }
 
     override func render(_ state: LibraryState) {
-        rootView.render(state)
-        applySnapshot(sections: state.sections, focusedSection: state.pendingFocusSection)
+        GameDetailSeedStore.shared.store(
+            librarySummaries: state.recentlyPlayed
+                + state.playingGames
+                + state.ownedGames
+                + state.backlogGames
+                + state.playtimeRecommendations.map(\.game)
+                + state.friendRecommendations.map(\.game),
+            screen: "Library.render"
+        )
+
+        if state.isSummaryLoading, !wasSummaryLoading {
+            summaryLoadStartedAt = CACurrentMediaTime()
+            didLogFirstSnapshotApplyForCurrentLoad = false
+        }
+
+        let summaryBecameReady = wasSummaryLoading && !state.isSummaryLoading
+        let topRenderSignature = TopRenderSignature(
+            selectedTab: state.selectedTab,
+            selectedHighlightChip: state.selectedHighlightChip,
+            summaryState: state.summaryByTab[state.selectedTab] ?? .empty(for: state.selectedTab),
+            isSummaryLoading: state.isSummaryLoading,
+            steamLinkStatus: state.steamLinkStatus,
+            isSteamConnected: state.isSteamConnected,
+            steamSyncStatus: state.steamSyncStatus,
+            isSteamSyncAvailable: state.isSteamSyncAvailable,
+            steamSyncErrorCode: state.steamSyncErrorCode,
+            isSyncingOwnedSteamLibrary: state.isSyncingOwnedSteamLibrary,
+            isUnlinkingSteamAccount: state.isUnlinkingSteamAccount
+        )
+        if topRenderSignature != lastTopRenderSignature {
+            rootView.render(state)
+            lastTopRenderSignature = topRenderSignature
+        } else {
+            print("[LibraryRender] topAreaSkipped reason=unchanged")
+        }
+
+        if summaryBecameReady, let summaryLoadStartedAt {
+            let elapsedMilliseconds = Int((CACurrentMediaTime() - summaryLoadStartedAt) * 1000)
+            let summarySource = state.summaryByTab[state.selectedTab]?.sourceDescription ?? "nil"
+            print(
+                "[LibraryPerformance] " +
+                "timeToFirstSummaryRenderMs=\(elapsedMilliseconds) " +
+                "selectedTab=\(state.selectedTab) " +
+                "summarySource=\(summarySource) " +
+                "waitedForSnapshot=false"
+            )
+        }
+
+        if state.sections == lastSnapshotInputSections,
+           state.pendingFocusSection == lastSnapshotInputFocusSection {
+            print("[LibraryRender] snapshotWorkSkipped reason=inputUnchanged")
+        } else {
+            lastSnapshotInputSections = state.sections
+            lastSnapshotInputFocusSection = state.pendingFocusSection
+            applySnapshot(sections: state.sections, focusedSection: state.pendingFocusSection)
+        }
 
         if !state.isRefreshing {
             refreshControl.endRefreshing()
@@ -83,6 +157,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         }
 
         updateNavigationItems(with: state)
+        wasSummaryLoading = state.isSummaryLoading
     }
 
     func retrySteamPrivacyGuidance() {
@@ -283,6 +358,16 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
             "[LibrarySnapshot] applyPerformed " +
             "sectionCounts=\(sanitizedSections.map { "\($0.kind)=\($0.items.count)" }.joined(separator: ","))"
         )
+
+        if let summaryLoadStartedAt, !didLogFirstSnapshotApplyForCurrentLoad {
+            let elapsedMilliseconds = Int((CACurrentMediaTime() - summaryLoadStartedAt) * 1000)
+            print(
+                "[LibraryPerformance] " +
+                "timeToFirstSnapshotApplyMs=\(elapsedMilliseconds) " +
+                "sectionCount=\(sanitizedSections.count)"
+            )
+            didLogFirstSnapshotApplyForCurrentLoad = true
+        }
 
         dataSource.apply(snapshot, animatingDifferences: false) { [weak self] in
             guard let self else { return }
@@ -521,6 +606,7 @@ extension LibraryViewController: UICollectionViewDelegate {
         case .recentCard(let viewState):
             switch viewState.detailDestination {
             case .igdb(let gameID):
+                GameDetailSeedStore.shared.store(items: [item], screen: "Library.overview.tap")
                 print(
                     "[GameTap] screen=Library.overview.\(section.kind.title) " +
                     "title=\(viewState.title) " +
@@ -549,6 +635,7 @@ extension LibraryViewController: UICollectionViewDelegate {
         case .row(let viewState):
             switch viewState.detailDestination {
             case .igdb(let gameID):
+                GameDetailSeedStore.shared.store(items: [item], screen: "Library.overview.tap")
                 print(
                     "[GameTap] screen=Library.overview.\(section.kind.title) " +
                     "title=\(viewState.title) " +

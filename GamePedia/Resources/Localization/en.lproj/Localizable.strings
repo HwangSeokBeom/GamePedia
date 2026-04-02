@@ -1,3 +1,6 @@
+"app.name" = "GamePedia";
+"splash.subtitle" = "Discover and track games";
+
 "common.button.confirm" = "Confirm";
 "common.button.cancel" = "Cancel";
 "common.button.retry" = "Retry";
@@ -69,6 +72,7 @@
 "detail.button.editReview" = "Edit Review";
 "detail.review.none" = "No reviews yet";
 "detail.review.userReviews" = "User Reviews";
+"detail.notice.partialUnavailable" = "Some game details are temporarily unavailable.";
 "detail.fallback.note" = "Detailed information such as genre, rating, and story may be enriched gradually in GamePedia.";
 "detail.steamReview.badge" = "Steam Review Added";
 "detail.steamReview.helper" = "You reviewed this game on Steam.\nLeave your thoughts on GamePedia too.";

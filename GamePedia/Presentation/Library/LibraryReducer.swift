@@ -9,6 +9,8 @@ enum LibraryReducer {
             state.isLoading = isLoading
         case .setRefreshing(let isRefreshing):
             state.isRefreshing = isRefreshing
+        case .setSummaryLoading(let isSummaryLoading):
+            state.isSummaryLoading = isSummaryLoading
         case .setSelectedTab(let selectedTab):
             state.selectedTab = selectedTab
             state.pendingFocusSection = selectedTab.focusedSection

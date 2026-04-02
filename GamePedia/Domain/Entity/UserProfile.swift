@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - UserProfile
 
-struct UserProfile {
+struct UserProfile: Equatable {
     let id: Int
     let email: String?
     let name: String
@@ -70,7 +70,7 @@ struct UserProfile {
 
 // MARK: - RecentGame
 
-struct RecentGame {
+struct RecentGame: Equatable {
     let gameId: Int
     let igdbGameId: Int?
     let externalGameId: String?

@@ -8,6 +8,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
     let gameId: Int
     private var previewReviews: [Review] = []
     private var lastPresentedErrorMessage: String?
+    private var lastPresentedBlockingLoadErrorMessage: String?
     private lazy var translationHostController = TranslationHostContainerViewController { [weak self] results in
         self?.viewModel.send(.didReceiveTranslationResults(results))
     }
@@ -148,6 +149,19 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
             let alert = UIAlertController(title: L10n.Common.Error.title, message: errorMessage, preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default))
             present(alert, animated: true)
+        } else if state.errorMessage == nil {
+            lastPresentedErrorMessage = nil
+        }
+
+        if let errorMessage = state.blockingLoadErrorMessage,
+           errorMessage != lastPresentedBlockingLoadErrorMessage,
+           !state.hasRenderableContent {
+            lastPresentedBlockingLoadErrorMessage = errorMessage
+            let alert = UIAlertController(title: L10n.Common.Error.title, message: errorMessage, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default))
+            present(alert, animated: true)
+        } else if state.blockingLoadErrorMessage == nil {
+            lastPresentedBlockingLoadErrorMessage = nil
         }
     }
 

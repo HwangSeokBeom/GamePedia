@@ -50,7 +50,7 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
             applyTitleAppearance()
             navigationItem.largeTitleDisplayMode = .never
             navigationItem.titleView = nil
-            navigationItem.title = "GamePedia"
+            navigationItem.title = L10n.App.name
             navigationItem.leftBarButtonItem = makeFilterItem()
             navigationItem.rightBarButtonItem = makeNotificationItem()
         }
@@ -90,6 +90,7 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
 
     private func setupHighlightSelection() {
         rootView.highlightCarouselView.onHighlightSelected = { [weak self] highlight in
+            GameDetailSeedStore.shared.store(games: [highlight.game], screen: "Home.highlightTap")
             self?.viewModel.send(.didTapGame(highlight.game))
             self?.onGameSelected?(highlight.game.id)
         }
@@ -243,6 +244,17 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
     }
 
     override func render(_ state: HomeState) {
+        GameDetailSeedStore.shared.store(
+            games: Array(
+                Set(
+                    state.highlights.map(\.game) +
+                    state.todayRecommendations.map(\.game) +
+                    state.popularGames +
+                    state.trendingGames
+                )
+            ),
+            screen: "Home.render"
+        )
         filterButton.setTintColor(state.hasActiveFilters ? .gpPrimary : .gpTextSecondary)
         notificationButton.setBadgeVisible(state.unreadNotificationCount > 0)
         rootView.setHighlightLoadingVisible(state.showsSkeleton)
@@ -381,6 +393,7 @@ extension HomeViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard let item = dataSource.itemIdentifier(for: indexPath),
               let game = item.selectedGame else { return }
+        GameDetailSeedStore.shared.store(games: [game], screen: "Home.tap")
         viewModel.send(.didTapGame(game))
         onGameSelected?(game.id)
     }

@@ -57,7 +57,7 @@ enum LibraryRecentlyPlayedSource: Hashable {
     case full
 }
 
-enum LibrarySummaryPrimaryValueKind: Hashable {
+enum LibrarySummaryPrimaryValueKind: String, Codable, Hashable {
     case hours
     case count
 }
@@ -75,7 +75,7 @@ struct LibraryTabSummaryState: Hashable {
         switch tab {
         case .playing:
             return LibraryTabSummaryState(
-                primaryTitle: L10n.Library.Label.playtime,
+                primaryTitle: L10n.Library.Summary.totalPlay,
                 primaryValue: 0,
                 primaryValueKind: .hours,
                 averageRating: nil,
@@ -115,7 +115,7 @@ struct LibraryTabSummaryState: Hashable {
     }
 }
 
-struct LibraryState {
+struct LibraryState: Equatable {
     var selectedTab: LibraryTab = .playing
     var selectedHighlightChip: LibraryHighlightChip = .recentlyPlayed
     var selectedSort: LibrarySortOption = .latest
@@ -147,6 +147,7 @@ struct LibraryState {
     var sections: [LibrarySectionViewState] = []
     var isLoading: Bool = false
     var isRefreshing: Bool = false
+    var isSummaryLoading: Bool = false
     var errorMessage: String? = nil
     var successMessage: String? = nil
     var steamConnectionOnboarding: LibraryOnboardingViewState? = nil

@@ -101,6 +101,7 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
                 $0.genre.localizedCaseInsensitiveContains(selectedGenre)
             }
         }
+        GameDetailSeedStore.shared.store(games: results, screen: "Search.render")
 
         // Override the count label to reflect the client-filtered count.
         if !state.query.isEmpty {
@@ -198,6 +199,7 @@ extension SearchViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let game = results[indexPath.row]
+        GameDetailSeedStore.shared.store(games: [game], screen: "Search.tap")
         viewModel.send(.didTapGame(id: game.id))
         onGameSelected?(game.id)
     }

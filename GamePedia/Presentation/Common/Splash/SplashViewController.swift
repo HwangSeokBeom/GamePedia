@@ -51,7 +51,7 @@ final class SplashViewController: UIViewController {
 
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "GamePedia"
+        label.text = L10n.App.name
         let baseDescriptor = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .largeTitle)
         let descriptor = baseDescriptor.withDesign(.serif) ?? baseDescriptor
         label.font = UIFont(descriptor: descriptor, size: 36)
@@ -62,7 +62,7 @@ final class SplashViewController: UIViewController {
 
     private let subtitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "게임을 발견하고 기록하세요"
+        label.text = L10n.Splash.subtitle
         label.font = .systemFont(ofSize: 14, weight: .medium)
         label.textColor = .gpTextSecondary
         label.translatesAutoresizingMaskIntoConstraints = false

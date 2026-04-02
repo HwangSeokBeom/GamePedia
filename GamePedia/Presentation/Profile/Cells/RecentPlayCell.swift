@@ -102,23 +102,6 @@ final class RecentPlayCell: UITableViewCell {
     func configure(with game: RecentGame, resolvedTitle: String) {
         thumbnailView.loadImage(url: game.coverImageURL)
         titleLabel.text = resolvedTitle
-        let timestampUsedForRelativeText = game.hasReliableLastPlayedAt
-            ? (game.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")
-            : "nil"
-        let relativeTimeText = game.hasReliableLastPlayedAt
-            ? (game.formattedLastPlayed.components(separatedBy: " · ").first ?? game.formattedLastPlayed)
-            : "nil"
-        print(
-            "[RecentPlayDisplay] " +
-            "screen=Profile.cell " +
-            "title=\(resolvedTitle) " +
-            "lastPlayedAt=\(game.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
-            "recentPlaytimeMinutes=\(game.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
-            "hasReliableLastPlayedAt=\(game.hasReliableLastPlayedAt) " +
-            "timestampUsedForRelativeText=\(timestampUsedForRelativeText) " +
-            "relativeTime=\(relativeTimeText) " +
-            "finalText=\(game.formattedLastPlayed)"
-        )
         timeLabel.text = game.formattedLastPlayed
         if let rating = game.formattedRating {
             ratingLabel.text = "★ \(rating)"

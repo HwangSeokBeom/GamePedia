@@ -51,6 +51,7 @@ final class ProfileRecentPlayListViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         print("[Profile] recentPlayList didLoad count=\(games.count)")
+        GameDetailSeedStore.shared.store(recentGames: games, screen: "Profile.recentPlayList.render")
         view.backgroundColor = .gpBackground
         navigationItem.title = L10n.Profile.Section.recentPlay
         navigationItem.largeTitleDisplayMode = .never
@@ -102,6 +103,7 @@ extension ProfileRecentPlayListViewController: UITableViewDataSource, UITableVie
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let game = games[indexPath.row]
+        GameDetailSeedStore.shared.store(recentGames: [game], screen: "Profile.recentPlayList.tap")
         let resolvedTitle = game.title
         let resolvedGameId = game.resolvedDetailGameId
         let blockedReason: String?

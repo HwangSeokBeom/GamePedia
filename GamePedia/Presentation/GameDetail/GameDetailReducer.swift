@@ -11,6 +11,9 @@ enum GameDetailReducer {
         case .setGame(let game):
             state.game = game
             state.isLoading = false
+            state.errorMessage = nil
+            state.blockingLoadErrorMessage = nil
+            state.inlineNoticeMessage = nil
             state.translatedSummary = nil
             state.translatedStoryline = nil
             state.isTranslationLoading = false
@@ -27,6 +30,13 @@ enum GameDetailReducer {
         case .setError(let msg):
             state.errorMessage = msg
             state.isLoading = false
+        case .clearError:
+            state.errorMessage = nil
+        case .setBlockingLoadError(let message):
+            state.blockingLoadErrorMessage = message
+            state.isLoading = false
+        case .setInlineNotice(let message):
+            state.inlineNoticeMessage = message
         case .setTranslatedFields(let summary, let storyline):
             if let summary {
                 state.translatedSummary = summary

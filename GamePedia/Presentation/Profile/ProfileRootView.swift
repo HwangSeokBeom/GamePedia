@@ -3,6 +3,33 @@ import UIKit
 // MARK: - ProfileRootView
 
 final class ProfileRootView: UIView {
+    private struct RootRenderSignature: Equatable {
+        let profileImageURL: URL?
+        let nickname: String?
+        let email: String?
+        let badgeTitles: [String]
+        let descriptionText: String
+        let primaryMetaText: String
+        let secondaryMetaText: String
+        let isLoading: Bool
+        let playedGameCount: Int
+        let writtenReviewCount: Int
+        let wishlistCount: Int
+        let isSteamConnected: Bool
+        let steamConnectionSubtitle: String
+        let friendManagementText: String
+        let friendActivityText: String
+        let tasteSummaryText: String
+        let isAccountActionInProgress: Bool
+        let isUnlinkingSteamAccount: Bool
+    }
+
+    private struct RecentPlaySectionSignature: Equatable {
+        let rowCount: Int
+        let hasMoreRecentPlayed: Bool
+        let recentPlayLoadState: ProfileRecentPlayLoadState
+        let emptyText: String
+    }
 
     private let sectionHorizontalInset: CGFloat = 20
 
@@ -393,6 +420,8 @@ final class ProfileRootView: UIView {
     }()
 
     private var recentPlayTableHeightConstraint: NSLayoutConstraint?
+    private var lastRootRenderSignature: RootRenderSignature?
+    private var lastRecentPlaySectionSignature: RecentPlaySectionSignature?
 
     // MARK: Init
     override init(frame: CGRect) {
@@ -586,10 +615,13 @@ final class ProfileRootView: UIView {
     // MARK: - State Rendering
 
     func render(_ state: ProfileState) {
-        print(
-            "[Profile] rendered selectedTitleKey = \(state.selectedTitleKey ?? "nil")"
-        )
-        headerCardView.render(
+        let friendActivitySubtitle: String
+        if state.friendCount == 0 || state.friendActivityCount == 0 {
+            friendActivitySubtitle = L10n.Profile.Activity.none
+        } else {
+            friendActivitySubtitle = L10n.Profile.Activity.newCount(state.friendActivityCount)
+        }
+        let rootRenderSignature = RootRenderSignature(
             profileImageURL: state.profileImageURL,
             nickname: state.displayName,
             email: state.displayEmail,
@@ -597,36 +629,62 @@ final class ProfileRootView: UIView {
             descriptionText: makeProfileDescription(from: state),
             primaryMetaText: L10n.Common.Count.friends(state.friendCount),
             secondaryMetaText: L10n.Profile.Count.likes(state.wishlistCount),
-            isLoading: state.isLoading && state.authenticatedUser == nil
+            isLoading: state.isLoading && state.authenticatedUser == nil,
+            playedGameCount: state.playedGameCount,
+            writtenReviewCount: state.writtenReviewCount,
+            wishlistCount: state.wishlistCount,
+            isSteamConnected: state.isSteamConnected,
+            steamConnectionSubtitle: state.steamConnectionSubtitle,
+            friendManagementText: L10n.Profile.Meta.friendsConnected(state.friendCount),
+            friendActivityText: friendActivitySubtitle,
+            tasteSummaryText: makeTasteSummary(from: state),
+            isAccountActionInProgress: state.isAccountActionInProgress,
+            isUnlinkingSteamAccount: state.isUnlinkingSteamAccount
         )
+        if lastRootRenderSignature != rootRenderSignature {
+            print("[ProfileRender] headerUpdated reason=changed")
+            headerCardView.render(
+                profileImageURL: state.profileImageURL,
+                nickname: state.displayName,
+                email: state.displayEmail,
+                badgeTitles: state.heroBadgeTitles,
+                descriptionText: rootRenderSignature.descriptionText,
+                primaryMetaText: rootRenderSignature.primaryMetaText,
+                secondaryMetaText: rootRenderSignature.secondaryMetaText,
+                isLoading: rootRenderSignature.isLoading
+            )
 
-        playedStatView.configure(value: "\(state.playedGameCount)", title: L10n.Profile.Stat.playedGames)
-        reviewStatView.configure(value: "\(state.writtenReviewCount)", title: L10n.Profile.Stat.writtenReviews)
-        wishlistStatView.configure(value: "\(state.wishlistCount)", title: L10n.Profile.Stat.wishlistedGames)
-        connectedAccountsSectionStackView.isHidden = !state.isSteamConnected
-        steamAccountSubtitleLabel.text = state.steamConnectionSubtitle
-        socialManagementRowView.setSecondaryText(L10n.Profile.Meta.friendsConnected(state.friendCount))
-        let friendActivitySubtitle: String
-        if state.friendCount == 0 || state.friendActivityCount == 0 {
-            friendActivitySubtitle = L10n.Profile.Activity.none
+            playedStatView.configure(value: "\(state.playedGameCount)", title: L10n.Profile.Stat.playedGames)
+            reviewStatView.configure(value: "\(state.writtenReviewCount)", title: L10n.Profile.Stat.writtenReviews)
+            wishlistStatView.configure(value: "\(state.wishlistCount)", title: L10n.Profile.Stat.wishlistedGames)
+            connectedAccountsSectionStackView.isHidden = !state.isSteamConnected
+            steamAccountSubtitleLabel.text = state.steamConnectionSubtitle
+            socialManagementRowView.setSecondaryText(rootRenderSignature.friendManagementText)
+            socialActivityRowView.setSecondaryText(rootRenderSignature.friendActivityText)
+            tasteSummaryRowView.setSecondaryText(rootRenderSignature.tasteSummaryText)
+            updateAccountActionButtons(with: state)
+            lastRootRenderSignature = rootRenderSignature
         } else {
-            friendActivitySubtitle = L10n.Profile.Activity.newCount(state.friendActivityCount)
+            print("[ProfileRender] headerSkipped reason=unchanged")
         }
-        print(
-            "[Profile] friendActivitySubtitle " +
-            "friendCount=\(state.friendCount) " +
-            "friendActivityCount=\(state.friendActivityCount) " +
-            "subtitle=\(friendActivitySubtitle)"
-        )
-        socialActivityRowView.setSecondaryText(friendActivitySubtitle)
-        tasteSummaryRowView.setSecondaryText(makeTasteSummary(from: state))
-        recentPlayEmptyLabel.text = makeRecentPlayEmptyText(from: state)
-        updateRecentPlayTableHeight(
-            rowCount: state.recentlyPlayedGames.count,
-            hasMoreRecentPlayed: state.hasMoreRecentPlayed
-        )
 
-        updateAccountActionButtons(with: state)
+        let recentPlaySectionSignature = RecentPlaySectionSignature(
+            rowCount: state.recentlyPlayedGames.count,
+            hasMoreRecentPlayed: state.hasMoreRecentPlayed,
+            recentPlayLoadState: state.recentPlayLoadState,
+            emptyText: makeRecentPlayEmptyText(from: state)
+        )
+        if lastRecentPlaySectionSignature != recentPlaySectionSignature {
+            recentPlayEmptyLabel.text = recentPlaySectionSignature.emptyText
+            updateRecentPlayTableHeight(
+                rowCount: recentPlaySectionSignature.rowCount,
+                hasMoreRecentPlayed: recentPlaySectionSignature.hasMoreRecentPlayed
+            )
+            lastRecentPlaySectionSignature = recentPlaySectionSignature
+            print("[ProfileRender] recentPlaySectionUpdated reason=changed")
+        } else {
+            print("[ProfileRender] recentPlaySectionSkipped reason=unchanged")
+        }
     }
 
     func updateRecentPlayTableHeight(rowCount: Int, hasMoreRecentPlayed: Bool = false) {
@@ -794,6 +852,17 @@ final class ProfileStatView: UIView {
 }
 
 final class ProfileHeaderCardView: UIView {
+    private struct HeaderRenderSignature: Equatable {
+        let profileImageURL: URL?
+        let nickname: String?
+        let email: String?
+        let badgeTitles: [String]
+        let descriptionText: String
+        let primaryMetaText: String
+        let secondaryMetaText: String
+        let isLoading: Bool
+    }
+
     private let profileCardView: UIView = {
         let view = UIView()
         view.backgroundColor = .secondarySystemBackground
@@ -937,6 +1006,11 @@ final class ProfileHeaderCardView: UIView {
     }()
 
     private let descriptionSkeletonView = SkeletonPlaceholderView(cornerRadius: 8)
+    private var lastRenderSignature: HeaderRenderSignature?
+    private var lastBadgeTitles: [String] = []
+    private var badgeLoadedConstraints: [NSLayoutConstraint] = []
+    private var badgeLoadingConstraints: [NSLayoutConstraint] = []
+    private var isBadgeLoadingLayoutActive = false
 
     private let metadataStackView: UIStackView = {
         let stackView = UIStackView()
@@ -969,11 +1043,27 @@ final class ProfileHeaderCardView: UIView {
         secondaryMetaText: String,
         isLoading: Bool
     ) {
+        let renderSignature = HeaderRenderSignature(
+            profileImageURL: profileImageURL,
+            nickname: nickname,
+            email: email,
+            badgeTitles: badgeTitles,
+            descriptionText: descriptionText,
+            primaryMetaText: primaryMetaText,
+            secondaryMetaText: secondaryMetaText,
+            isLoading: isLoading
+        )
+        guard renderSignature != lastRenderSignature else {
+            print("[ProfileRender] headerCardSkipped reason=unchanged")
+            return
+        }
+        lastRenderSignature = renderSignature
+
         let placeholderImage = UIImage(systemName: "person.fill")
         profileImageView.tintColor = .gpTextTertiary
         profileImageView.contentMode = profileImageURL == nil ? .center : .scaleAspectFill
         profileImageView.loadImage(url: profileImageURL, placeholder: placeholderImage)
-        nicknameLabel.text = nickname ?? "GamePedia"
+        nicknameLabel.text = nickname ?? L10n.App.name
         emailLabel.text = email ?? ""
         emailLabel.lineBreakMode = .byTruncatingTail
         descriptionLabel.text = descriptionText
@@ -984,7 +1074,10 @@ final class ProfileHeaderCardView: UIView {
             "selectedTitle=\(badgeTitles.first ?? "nil") " +
             "beforeHidden=\(badgeContainerView.isHidden)"
         )
-        configureBadgeTitles(badgeTitles)
+        if lastBadgeTitles != badgeTitles {
+            configureBadgeTitles(badgeTitles)
+            lastBadgeTitles = badgeTitles
+        }
 
         emailContainerView.isHidden = (!isLoading && (email?.isEmpty ?? true))
         badgeContainerView.isHidden = (!isLoading && badgeTitles.isEmpty)
@@ -1001,6 +1094,8 @@ final class ProfileHeaderCardView: UIView {
         badgeSkeletonView.isHidden = !isLoading
         descriptionSkeletonView.isHidden = !isLoading
         badgeScrollView.isHidden = isLoading
+        updateBadgeLoadingLayout(isLoading: isLoading)
+        print("[ProfileRender] skeletonVisible=\(isLoading)")
 
         layoutIfNeeded()
         let renderedChipTexts = badgeStackView.arrangedSubviews.compactMap { arrangedSubview in
@@ -1126,25 +1221,31 @@ final class ProfileHeaderCardView: UIView {
             emailSkeletonView.widthAnchor.constraint(equalToConstant: 132),
             emailSkeletonView.heightAnchor.constraint(equalToConstant: 16),
             emailSkeletonView.bottomAnchor.constraint(equalTo: emailContainerView.bottomAnchor, constant: -1),
+        ])
 
+        badgeContainerView.heightAnchor.constraint(equalToConstant: 24).isActive = true
+
+        badgeLoadedConstraints = [
             badgeScrollView.topAnchor.constraint(equalTo: badgeContainerView.topAnchor),
             badgeScrollView.leadingAnchor.constraint(equalTo: badgeContainerView.leadingAnchor),
             badgeScrollView.trailingAnchor.constraint(equalTo: badgeContainerView.trailingAnchor),
             badgeScrollView.bottomAnchor.constraint(equalTo: badgeContainerView.bottomAnchor),
-            badgeScrollView.heightAnchor.constraint(equalToConstant: 24),
-            badgeContainerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 24),
             badgeStackView.topAnchor.constraint(equalTo: badgeScrollView.contentLayoutGuide.topAnchor),
             badgeStackView.leadingAnchor.constraint(equalTo: badgeScrollView.contentLayoutGuide.leadingAnchor),
             badgeStackView.trailingAnchor.constraint(equalTo: badgeScrollView.contentLayoutGuide.trailingAnchor),
             badgeStackView.bottomAnchor.constraint(equalTo: badgeScrollView.contentLayoutGuide.bottomAnchor),
-            badgeStackView.heightAnchor.constraint(equalTo: badgeScrollView.frameLayoutGuide.heightAnchor),
+            badgeStackView.heightAnchor.constraint(equalTo: badgeScrollView.frameLayoutGuide.heightAnchor)
+        ]
 
-            badgeSkeletonView.topAnchor.constraint(equalTo: badgeContainerView.topAnchor),
+        badgeLoadingConstraints = [
+            badgeSkeletonView.centerYAnchor.constraint(equalTo: badgeContainerView.centerYAnchor),
             badgeSkeletonView.leadingAnchor.constraint(equalTo: badgeContainerView.leadingAnchor),
             badgeSkeletonView.widthAnchor.constraint(equalToConstant: 96),
-            badgeSkeletonView.heightAnchor.constraint(equalToConstant: 22),
-            badgeSkeletonView.bottomAnchor.constraint(equalTo: badgeContainerView.bottomAnchor)
-        ])
+            badgeSkeletonView.heightAnchor.constraint(equalToConstant: 22)
+        ]
+
+        NSLayoutConstraint.activate(badgeLoadedConstraints)
+        isBadgeLoadingLayoutActive = false
     }
 
     private func configureBadgeTitles(_ badgeTitles: [String]) {
@@ -1168,6 +1269,22 @@ final class ProfileHeaderCardView: UIView {
             badgeStackView.addArrangedSubview(badgeLabel)
         }
         print("[ProfileHeader] rendered selectedTitle=\(badgeTitles.first ?? "nil")")
+    }
+
+    private func updateBadgeLoadingLayout(isLoading: Bool) {
+        guard isBadgeLoadingLayoutActive != isLoading else { return }
+
+        if isLoading {
+            NSLayoutConstraint.deactivate(badgeLoadedConstraints)
+            NSLayoutConstraint.activate(badgeLoadingConstraints)
+            print("[ProfileRender] badgeSkeletonShown")
+        } else {
+            NSLayoutConstraint.deactivate(badgeLoadingConstraints)
+            NSLayoutConstraint.activate(badgeLoadedConstraints)
+            print("[ProfileRender] badgeSkeletonHidden")
+        }
+
+        isBadgeLoadingLayoutActive = isLoading
     }
 }
 
