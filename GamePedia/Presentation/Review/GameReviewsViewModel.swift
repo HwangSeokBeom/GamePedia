@@ -58,7 +58,7 @@ final class GameReviewsViewModel {
                 await MainActor.run {
                     let reviewError = ReviewError.from(error: error)
                     self.state.isLoading = false
-                    self.state.errorMessage = reviewError.errorDescription ?? L10n.tr("Localizable", "review.error.loadFailed")
+                    self.state.errorMessage = reviewError.errorDescription ?? "리뷰를 불러오지 못했습니다."
                     self.state.reviews = []
                     self.state.reviewSummary = nil
                 }
@@ -112,14 +112,14 @@ final class GameReviewsViewModel {
                     self.state.reportingReviewId = nil
                     self.state.reviews = self.state.reviews.filter { $0.id != review.id }
                     self.state.reviewSummary = self.makeReviewSummary(from: self.state.reviews)
-                    self.state.successMessage = L10n.tr("Localizable", "review.success.reported")
+                    self.state.successMessage = "신고가 접수되었습니다."
                     self.onReviewsChanged?()
                 }
             } catch {
                 await MainActor.run {
                     let moderationError = ModerationError.from(error: error)
                     self.state.reportingReviewId = nil
-                    self.state.errorMessage = moderationError.errorDescription ?? L10n.tr("Localizable", "review.error.reportFailed")
+                    self.state.errorMessage = moderationError.errorDescription ?? "신고를 접수하지 못했습니다."
                 }
             }
         }
@@ -154,14 +154,14 @@ final class GameReviewsViewModel {
                     self.state.blockingUserId = nil
                     self.state.reviews = self.state.reviews.filter { $0.author.id != review.author.id }
                     self.state.reviewSummary = self.makeReviewSummary(from: self.state.reviews)
-                    self.state.successMessage = L10n.tr("Localizable", "review.success.blocked")
+                    self.state.successMessage = "차단한 사용자의 콘텐츠는 더 이상 표시되지 않습니다."
                     self.onReviewsChanged?()
                 }
             } catch {
                 await MainActor.run {
                     let moderationError = ModerationError.from(error: error)
                     self.state.blockingUserId = nil
-                    self.state.errorMessage = moderationError.errorDescription ?? L10n.tr("Localizable", "review.error.blockFailed")
+                    self.state.errorMessage = moderationError.errorDescription ?? "사용자를 차단하지 못했습니다."
                 }
             }
         }
@@ -199,7 +199,7 @@ final class GameReviewsViewModel {
                 await MainActor.run {
                     let reviewError = ReviewError.from(error: error)
                     self.state.deletingReviewId = nil
-                    self.state.errorMessage = reviewError.errorDescription ?? L10n.tr("Localizable", "review.error.deleteFailed")
+                    self.state.errorMessage = reviewError.errorDescription ?? "리뷰를 삭제하지 못했습니다."
                 }
             }
         }

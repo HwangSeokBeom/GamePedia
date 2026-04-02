@@ -14,9 +14,9 @@ enum IGDBGameMapper {
         return Game(
             id: dto.id,
             title: dto.name,
-            translatedTitle: nil,
+            translatedTitle: dto.translatedTitle,
             summary: dto.summary?.trimmingCharacters(in: .whitespacesAndNewlines),
-            translatedSummary: nil,
+            translatedSummary: dto.translatedSummary?.trimmingCharacters(in: .whitespacesAndNewlines),
             genre: dto.genres?.first?.name ?? "기타",
             category: dto.genres?.first?.name ?? "기타",
             developer: "—",         // not fetched in list query — populated in detail
@@ -48,7 +48,7 @@ enum IGDBGameMapper {
         return GameDetail(
             id: dto.id,
             title: dto.name,
-            translatedTitle: nil,
+            translatedTitle: dto.translatedTitle,
             genre: genreName,
             developer: developerName,
             releaseYear: year,
@@ -58,14 +58,13 @@ enum IGDBGameMapper {
             reviewCount: ratingCount,
             avgPlaytimeHours: 0,        // TODO: IGDB doesn't provide playtime — integrate HLTB API if needed
             summary: dto.summary ?? "소개 정보가 없습니다.",
-            translatedSummary: nil,
+            translatedSummary: dto.translatedSummary,
             storyline: dto.summary ?? "소개 정보가 없습니다.",
-            translatedStoryline: nil,
+            translatedStoryline: dto.translatedStoryline ?? dto.translatedSummary,
             formattedRating: formattedRating5(ratingOn5Scale, hasRating: dto.rating != nil),
             formattedReviewCount: ratingCount.abbreviated,
             formattedPlaytime: "—",
-            developerLine: "\(developerName) · \(genreName) · \(year)",
-            hasSteamReview: false
+            developerLine: "\(developerName) · \(genreName) · \(year)"
         )
     }
 
@@ -115,6 +114,6 @@ enum IGDBGameMapper {
     /// Formats a 0–5 scale rating. Returns "—" when IGDB provided no rating.
     private static func formattedRating5(_ ratingOn5: Double, hasRating: Bool) -> String {
         guard hasRating else { return "—" }
-        return LocalizedNumberFormatter.oneFraction(ratingOn5)
+        return String(format: "%.1f", ratingOn5)
     }
 }

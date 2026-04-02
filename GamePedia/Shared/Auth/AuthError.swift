@@ -3,7 +3,6 @@ import Foundation
 enum AuthError: Error, LocalizedError, Equatable {
     case invalidCredentials
     case emailAlreadyExists
-    case nicknameAlreadyExists
     case accountDeletionUnavailable
     case appleLoginUnavailable
     case googleLoginUnavailable
@@ -30,10 +29,8 @@ enum AuthError: Error, LocalizedError, Equatable {
         switch serverCode.uppercased() {
         case "INVALID_CREDENTIALS":
             return .invalidCredentials
-        case "EMAIL_ALREADY_EXISTS", "EMAIL_ALREADY_IN_USE":
+        case "EMAIL_ALREADY_EXISTS":
             return .emailAlreadyExists
-        case "NICKNAME_ALREADY_EXISTS", "NICKNAME_ALREADY_IN_USE", "DUPLICATE_NICKNAME":
-            return .nicknameAlreadyExists
         case "ACCOUNT_DELETION_UNAVAILABLE":
             return .accountDeletionUnavailable
         case "APPLE_LOGIN_UNAVAILABLE", "APPLE_AUTH_NOT_CONFIGURED", "APPLE_AUTH_UNAVAILABLE":
@@ -64,49 +61,47 @@ enum AuthError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidCredentials:
-            return L10n.tr("Localizable", "auth.error.invalidCredentials")
+            return "이메일 또는 비밀번호를 다시 확인해주세요."
         case .emailAlreadyExists:
-            return L10n.tr("Localizable", "auth.error.emailAlreadyExists")
-        case .nicknameAlreadyExists:
-            return L10n.tr("Localizable", "auth.error.nicknameAlreadyExists")
+            return "이미 가입된 이메일입니다."
         case .accountDeletionUnavailable:
-            return L10n.tr("Localizable", "auth.error.accountDeletionUnavailable")
+            return "현재 서버에서 회원 탈퇴를 지원하지 않습니다. 잠시 후 다시 시도해주세요."
         case .appleLoginUnavailable:
-            return L10n.tr("Localizable", "auth.error.appleLoginUnavailable")
+            return "현재 Apple 로그인을 사용할 수 없습니다. 잠시 후 다시 시도해주세요."
         case .googleLoginUnavailable:
-            return L10n.tr("Localizable", "auth.error.googleLoginUnavailable")
+            return "현재 Google 로그인을 사용할 수 없습니다. 잠시 후 다시 시도해주세요."
         case .googleLoginNotConfigured:
-            return L10n.tr("Localizable", "auth.error.googleLoginNotConfigured")
+            return "Google 로그인 설정이 완료되지 않았습니다."
         case .socialLoginCancelled:
             return nil
         case .emptyPasswordResetToken:
-            return L10n.tr("Localizable", "auth.error.emptyPasswordResetToken")
+            return "재설정 토큰을 입력해주세요."
         case .passwordResetTokenInvalid:
-            return L10n.tr("Localizable", "auth.error.passwordResetTokenInvalid")
+            return "재설정 링크가 올바르지 않습니다. 다시 요청해주세요."
         case .passwordResetTokenExpired:
-            return L10n.tr("Localizable", "auth.error.passwordResetTokenExpired")
+            return "재설정 링크가 만료되었습니다. 새 링크를 요청해주세요."
         case .passwordResetTokenUsed:
-            return L10n.tr("Localizable", "auth.error.passwordResetTokenUsed")
+            return "이미 사용한 재설정 링크입니다. 새 링크를 요청해주세요."
         case .tokenExpired:
-            return L10n.tr("Localizable", "auth.error.tokenExpired")
+            return "세션이 만료되었습니다. 다시 로그인해주세요."
         case .unauthorized:
-            return L10n.Common.Error.unauthorized
+            return "인증이 필요합니다."
         case .validationFailed(let message):
             return message
         case .invalidEmailFormat:
-            return L10n.tr("Localizable", "auth.error.invalidEmailFormat")
+            return "올바른 이메일 형식을 입력해주세요."
         case .passwordTooShort:
-            return L10n.tr("Localizable", "auth.error.passwordTooShort")
+            return "비밀번호는 8자 이상이어야 합니다."
         case .passwordMismatch:
-            return L10n.tr("Localizable", "auth.error.passwordMismatch")
+            return "비밀번호가 일치하지 않습니다."
         case .emptyNickname:
-            return L10n.tr("Localizable", "auth.error.emptyNickname")
+            return "닉네임을 입력해주세요."
         case .missingRefreshToken:
-            return L10n.tr("Localizable", "auth.error.missingRefreshToken")
+            return "저장된 세션이 없습니다."
         case .invalidResponse:
-            return L10n.Common.Error.server
+            return "서버 응답을 처리하지 못했습니다."
         case .networkError:
-            return L10n.Common.Error.network
+            return "네트워크 연결을 확인해주세요."
         case .server(_, let message):
             return message
         case .unknown(let message):

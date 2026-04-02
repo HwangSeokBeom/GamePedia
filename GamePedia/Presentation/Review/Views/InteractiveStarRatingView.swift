@@ -47,8 +47,8 @@ final class InteractiveStarRatingView: UIView {
             button.widthAnchor.constraint(equalToConstant: 44).isActive = true
             button.heightAnchor.constraint(equalToConstant: 44).isActive = true
             button.tag = index
-            button.accessibilityLabel = L10n.tr("Localizable", "review.accessibility.starLabel", index + 1)
-            button.accessibilityHint = L10n.tr("Localizable", "review.accessibility.starHint")
+            button.accessibilityLabel = "\(index + 1)번째 별"
+            button.accessibilityHint = "왼쪽은 0.5점, 오른쪽은 1점 단위로 선택"
             let tapGesture = UITapGestureRecognizer(target: self, action: #selector(starTapped(_:)))
             button.addGestureRecognizer(tapGesture)
             starButtons.append(button)
@@ -95,7 +95,7 @@ final class InteractiveStarRatingView: UIView {
             }
             button.setImage(UIImage(systemName: name, withConfiguration: symbolConfig), for: .normal)
             button.tintColor = name == "star" ? .gpTextTertiary : .gpStar
-            button.accessibilityValue = L10n.tr("Localizable", "review.accessibility.selected", rating)
+            button.accessibilityValue = String(format: "%.1f점 선택됨", rating)
         }
     }
 }

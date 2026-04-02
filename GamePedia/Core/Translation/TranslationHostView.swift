@@ -53,9 +53,6 @@ struct TranslationHostView: View {
             try await session.prepareTranslation()
         } catch {
             print("[TranslationHost] skipped reason=session-unavailable error=\(error.localizedDescription)")
-            await MainActor.run {
-                onResult([])
-            }
             return
         }
 
@@ -94,9 +91,6 @@ struct TranslationHostView: View {
 
         guard !translatedItems.isEmpty else {
             print("[TranslationHost] skipped reason=no-results")
-            await MainActor.run {
-                onResult([])
-            }
             return
         }
 

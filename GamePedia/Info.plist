@@ -25,8 +25,6 @@
 	</array>
 	<key>CommunityGuidelinesURL</key>
 	<string>$(COMMUNITY_GUIDELINES_URL)</string>
-	<key>CoreBaseURL</key>
-	<string>$(CORE_BASE_URL)</string>
 	<key>GIDClientID</key>
 	<string>$(GOOGLE_CLIENT_ID)</string>
 	<key>GoogleReverseClientID</key>
@@ -57,8 +55,6 @@
 	<string>$(SUPPORT_EMAIL)</string>
 	<key>TermsOfServiceURL</key>
 	<string>$(TERMS_OF_SERVICE_URL)</string>
-	<key>TranslationBaseURL</key>
-	<string>$(TRANSLATION_BASE_URL)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

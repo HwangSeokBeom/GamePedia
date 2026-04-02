@@ -8,36 +8,36 @@ final class DefaultGameRepository: GameRepository {
         self.apiClient = apiClient
     }
 
-    func fetchHighlights(limit: Int, filter: HomeContentFilter?) async throws -> [Game] {
+    func fetchHighlights(limit: Int) async throws -> [Game] {
         try await fetchGames(
-            endpoint: .highlightGames(limit: limit, filter: filter),
+            endpoint: .highlightGames(limit: limit),
             logLabel: "highlights",
             isTrending: false
         )
     }
 
     func fetchFeaturedGame() async throws -> Game? {
-        try await fetchHighlights(limit: 1, filter: nil).first
+        try await fetchHighlights(limit: 1).first
     }
 
-    func fetchPopularGames(limit: Int, filter: HomeContentFilter?) async throws -> [Game] {
+    func fetchPopularGames(limit: Int) async throws -> [Game] {
         try await fetchGames(
-            endpoint: .popularGames(limit: limit, filter: filter),
+            endpoint: .popularGames(limit: limit),
             logLabel: "popular",
             isTrending: false
         )
     }
 
-    func fetchTrendingGames(limit: Int, filter: HomeContentFilter?) async throws -> [Game] {
+    func fetchTrendingGames(limit: Int) async throws -> [Game] {
         try await fetchGames(
-            endpoint: .recommendedGames(limit: limit, filter: filter),
+            endpoint: .recommendedGames(limit: limit),
             logLabel: "recommended",
             isTrending: true
         )
     }
 
     func fetchLatestGames(limit: Int) async throws -> [Game] {
-        try await fetchTrendingGames(limit: limit, filter: nil)
+        try await fetchTrendingGames(limit: limit)
     }
 
     func fetchGames(ids: [Int]) async throws -> [Game] {

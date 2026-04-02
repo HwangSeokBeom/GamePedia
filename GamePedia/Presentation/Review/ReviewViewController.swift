@@ -115,12 +115,12 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
 
     @objc private func didTapDelete() {
         let alert = UIAlertController(
-            title: L10n.Review.Alert.deleteTitle,
-            message: L10n.Review.Alert.deleteMessage,
+            title: "리뷰를 삭제할까요?",
+            message: "삭제한 리뷰는 복구할 수 없습니다.",
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
-        alert.addAction(UIAlertAction(title: L10n.Review.Button.delete, style: .destructive) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alert.addAction(UIAlertAction(title: "삭제", style: .destructive) { [weak self] _ in
             print("[ReviewDelete] ViewController forwarded delete action")
             self?.viewModel.send(.didTapDelete)
         })
@@ -173,8 +173,8 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
     // MARK: Helpers
 
     private func showErrorAlert(message: String) {
-        let alert = UIAlertController(title: L10n.Common.Error.title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default))
+        let alert = UIAlertController(title: "오류", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
     }
 }

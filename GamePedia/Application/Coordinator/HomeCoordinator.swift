@@ -23,7 +23,7 @@ final class HomeCoordinator {
     init() {
         navigationController = UINavigationController()
         navigationController.tabBarItem = UITabBarItem(
-            title: L10n.Home.Tab.title,
+            title: "홈",
             image: UIImage(systemName: "house"),
             selectedImage: UIImage(systemName: "house.fill")
         )
@@ -43,22 +43,6 @@ final class HomeCoordinator {
         navigationController.setViewControllers([homeVC], animated: false)
     }
 
-    func navigateToGameDetail(gameID: Int) {
-        showDetail(gameId: gameID)
-    }
-
-    func navigateToNotifications() {
-        showNotifications()
-    }
-
-    func navigateToFriendRequests() {
-        showFriendRequests()
-    }
-
-    func navigateToFriendProfile(userID: String) {
-        showFriendProfile(userID: userID)
-    }
-
     // MARK: - Navigation
 
     private func showDetail(gameId: Int) {
@@ -76,7 +60,7 @@ final class HomeCoordinator {
         }
         detailVC.onShare = { [weak self] game in
             guard let topVC = self?.navigationController.topViewController else { return }
-            let items: [Any] = [L10n.tr("Localizable", "common.share.gameInvitation", game.displayTitle)]
+            let items: [Any] = ["\(game.displayTitle) — GamePedia에서 확인해보세요!"]
             let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
             topVC.present(activityVC, animated: true)
         }
@@ -87,10 +71,6 @@ final class HomeCoordinator {
         switch route {
         case .showGameList(let section, let games, let wishlistedGameIDs):
             showGameList(section: section, games: games, wishlistedGameIDs: wishlistedGameIDs)
-        case .showNotifications:
-            showNotifications()
-        case .presentHomeFilterSheet:
-            break
         }
     }
 
@@ -112,70 +92,6 @@ final class HomeCoordinator {
             self?.showDetail(gameId: gameId)
         }
         navigationController.pushViewController(listViewController, animated: true)
-    }
-
-    private func showNotifications() {
-        guard APIClient.shared.userAuthToken != nil else {
-            let presenter = navigationController.topViewController ?? navigationController
-            onAuthenticationRequested?(presenter, .profile) { [weak self] in
-                self?.showNotifications()
-            }
-            return
-        }
-
-        let viewController = NotificationsViewController(rootView: NotificationsRootView())
-        viewController.onGameSelected = { [weak self] gameID in
-            self?.showDetail(gameId: gameID)
-        }
-        viewController.onFriendRequestsSelected = { [weak self] in
-            self?.showFriendRequests()
-        }
-        viewController.onFriendSelected = { [weak self] userID in
-            self?.showFriendProfile(userID: userID)
-        }
-        viewController.onSocialRoute = { [weak self] route in
-            self?.handleSocialActivityRoute(route)
-        }
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showFriendRequests() {
-        let viewController = FriendRequestsViewController()
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showFriendProfile(userID: String) {
-        let viewController = FriendProfileViewController(userID: userID)
-        viewController.onGameSelected = { [weak self] gameID in
-            self?.showDetail(gameId: gameID)
-        }
-        viewController.onReviewGameSelected = { [weak self] gameID in
-            self?.showDetail(gameId: gameID)
-        }
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showFriendActivity() {
-        let viewController = FriendActivityFeedViewController()
-        viewController.onRoute = { [weak self] route in
-            self?.handleSocialActivityRoute(route)
-        }
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func handleSocialActivityRoute(_ route: SocialActivityRoute) {
-        switch route {
-        case .friendActivityFeed:
-            showFriendActivity()
-        case .friendRequests:
-            showFriendRequests()
-        case .friendProfile(let userID):
-            showFriendProfile(userID: userID)
-        case .gameDetail(let gameID):
-            showDetail(gameId: gameID)
-        case .review(let gameID, _):
-            showDetail(gameId: gameID)
-        }
     }
 
     private func showReview(

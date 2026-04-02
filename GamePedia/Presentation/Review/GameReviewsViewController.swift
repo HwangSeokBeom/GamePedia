@@ -111,36 +111,36 @@ final class GameReviewsViewController: BaseViewController<GameReviewsRootView, G
     private func presentReviewActionSheet(for review: Review) {
         let alertController = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
         if review.isMine {
-            alertController.addAction(UIAlertAction(title: L10n.Review.Action.edit, style: .default) { [weak self] _ in
+            alertController.addAction(UIAlertAction(title: "리뷰 수정", style: .default) { [weak self] _ in
                 self?.performAuthenticatedAction(for: .writeReview) { [weak self] in
                     self?.viewModel.didTapEdit(review: review)
                 }
             })
-            alertController.addAction(UIAlertAction(title: L10n.Review.Action.delete, style: .destructive) { [weak self] _ in
+            alertController.addAction(UIAlertAction(title: "리뷰 삭제", style: .destructive) { [weak self] _ in
                 self?.performAuthenticatedAction(for: .writeReview) { [weak self] in
                     self?.presentDeleteConfirmationAlert(for: review)
                 }
             })
         } else {
-            alertController.addAction(UIAlertAction(title: L10n.Review.Action.report, style: .destructive) { [weak self] _ in
+            alertController.addAction(UIAlertAction(title: "신고하기", style: .destructive) { [weak self] _ in
                 self?.performAuthenticatedAction(for: .moderation) { [weak self] in
                     self?.presentReportReasonSheet(for: review)
                 }
             })
-            alertController.addAction(UIAlertAction(title: L10n.Review.Action.block, style: .destructive) { [weak self] _ in
+            alertController.addAction(UIAlertAction(title: "차단하기", style: .destructive) { [weak self] _ in
                 self?.performAuthenticatedAction(for: .moderation) { [weak self] in
                     self?.presentBlockConfirmationAlert(for: review)
                 }
             })
         }
-        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
+        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
         present(alertController, animated: true)
     }
 
     private func presentReportReasonSheet(for review: Review) {
         let alertController = UIAlertController(
-            title: L10n.Review.Report.selectReason,
-            message: L10n.Review.Report.message,
+            title: "신고 사유를 선택해 주세요",
+            message: "문제가 있는 콘텐츠를 발견하면 신고해 주세요.",
             preferredStyle: .actionSheet
         )
 
@@ -155,22 +155,22 @@ final class GameReviewsViewController: BaseViewController<GameReviewsRootView, G
             })
         }
 
-        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
+        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
         present(alertController, animated: true)
     }
 
     private func presentOtherReasonAlert(for review: Review) {
         let alertController = UIAlertController(
-            title: L10n.Review.Report.otherTitle,
-            message: L10n.Review.Report.otherMessage,
+            title: "기타 사유를 입력해 주세요",
+            message: "선택 사항입니다. 필요한 경우 상세 내용을 입력해 주세요.",
             preferredStyle: .alert
         )
         alertController.addTextField { textField in
-            textField.placeholder = L10n.Review.Report.otherPlaceholder
+            textField.placeholder = "상세 내용을 입력해 주세요"
             textField.clearButtonMode = .whileEditing
         }
-        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
-        alertController.addAction(UIAlertAction(title: L10n.Review.Report.submit, style: .destructive) { [weak self, weak alertController] _ in
+        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alertController.addAction(UIAlertAction(title: "신고 접수", style: .destructive) { [weak self, weak alertController] _ in
             let detail = alertController?.textFields?.first?.text
             self?.viewModel.report(review: review, reason: .other, detail: detail)
         })
@@ -179,12 +179,12 @@ final class GameReviewsViewController: BaseViewController<GameReviewsRootView, G
 
     private func presentBlockConfirmationAlert(for review: Review) {
         let alertController = UIAlertController(
-            title: L10n.Review.Block.title,
-            message: L10n.Review.Block.message,
+            title: "이 사용자를 차단하시겠습니까?",
+            message: "차단한 사용자의 콘텐츠는 더 이상 표시되지 않습니다.",
             preferredStyle: .alert
         )
-        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
-        alertController.addAction(UIAlertAction(title: L10n.Review.Action.block, style: .destructive) { [weak self] _ in
+        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alertController.addAction(UIAlertAction(title: "차단", style: .destructive) { [weak self] _ in
             self?.viewModel.block(review: review)
         })
         present(alertController, animated: true)
@@ -192,26 +192,26 @@ final class GameReviewsViewController: BaseViewController<GameReviewsRootView, G
 
     private func presentDeleteConfirmationAlert(for review: Review) {
         let alertController = UIAlertController(
-            title: L10n.Review.Alert.deleteTitle,
-            message: L10n.Review.Alert.deleteMessage,
+            title: "리뷰를 삭제할까요?",
+            message: "삭제한 리뷰는 복구할 수 없습니다.",
             preferredStyle: .alert
         )
-        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
-        alertController.addAction(UIAlertAction(title: L10n.Review.Button.delete, style: .destructive) { [weak self] _ in
+        alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
+        alertController.addAction(UIAlertAction(title: "삭제", style: .destructive) { [weak self] _ in
             self?.viewModel.delete(review: review)
         })
         present(alertController, animated: true)
     }
 
     private func presentErrorAlert(message: String) {
-        let alertController = UIAlertController(title: L10n.Common.Error.title, message: message, preferredStyle: .alert)
-        alertController.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default))
+        let alertController = UIAlertController(title: "오류", message: message, preferredStyle: .alert)
+        alertController.addAction(UIAlertAction(title: "확인", style: .default))
         present(alertController, animated: true)
     }
 
     private func presentSuccessAlert(message: String) {
         let alertController = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        alertController.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .default) { [weak self] _ in
+        alertController.addAction(UIAlertAction(title: "확인", style: .default) { [weak self] _ in
             self?.viewModel.clearSuccessMessage()
         })
         present(alertController, animated: true)

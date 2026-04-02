@@ -14,7 +14,7 @@ final class SearchCoordinator {
     init() {
         navigationController = UINavigationController()
         navigationController.tabBarItem = UITabBarItem(
-            title: L10n.Search.Tab.title,
+            title: "검색",
             image: UIImage(systemName: "magnifyingglass"),
             selectedImage: UIImage(systemName: "magnifyingglass")
         )
@@ -48,7 +48,7 @@ final class SearchCoordinator {
         }
         detailVC.onShare = { [weak self] game in
             guard let topVC = self?.navigationController.topViewController else { return }
-            let items: [Any] = [L10n.tr("Localizable", "common.share.gameInvitation", game.displayTitle)]
+            let items: [Any] = ["\(game.displayTitle) — GamePedia에서 확인해보세요!"]
             let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
             topVC.present(activityVC, animated: true)
         }

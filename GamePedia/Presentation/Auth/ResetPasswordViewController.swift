@@ -33,7 +33,7 @@ final class ResetPasswordViewController: BaseViewController<ResetPasswordRootVie
 
     private func configureNavigationItem() {
         UIView.performWithoutAnimation {
-            navigationItem.title = L10n.tr("Localizable", "auth.resetPassword.title")
+            navigationItem.title = "비밀번호 재설정"
             navigationItem.largeTitleDisplayMode = .never
             navigationItem.backButtonDisplayMode = .minimal
         }
@@ -96,7 +96,7 @@ final class ResetPasswordViewController: BaseViewController<ResetPasswordRootVie
         if let errorMessage = state.errorMessage,
            errorMessage != lastPresentedErrorMessage {
             lastPresentedErrorMessage = errorMessage
-            showAlert(title: L10n.tr("Localizable", "auth.resetPassword.errorTitle"), message: errorMessage)
+            showAlert(title: "재설정 실패", message: errorMessage)
         } else if state.errorMessage == nil {
             lastPresentedErrorMessage = nil
         }
@@ -105,7 +105,7 @@ final class ResetPasswordViewController: BaseViewController<ResetPasswordRootVie
            successMessage != lastPresentedSuccessMessage {
             lastPresentedSuccessMessage = successMessage
             let alert = UIAlertController(title: nil, message: successMessage, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: L10n.tr("Localizable", "common.button.ok"), style: .default) { [weak self] _ in
+            alert.addAction(UIAlertAction(title: "확인", style: .default) { [weak self] _ in
                 self?.viewModel.send(.didAcknowledgeSuccess)
             })
             present(alert, animated: true)
@@ -116,7 +116,7 @@ final class ResetPasswordViewController: BaseViewController<ResetPasswordRootVie
 
     private func showAlert(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: L10n.tr("Localizable", "common.button.ok"), style: .default))
+        alert.addAction(UIAlertAction(title: "확인", style: .default))
         present(alert, animated: true)
     }
 

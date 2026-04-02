@@ -5,14 +5,14 @@ enum LibraryTab: Int {
     case favorites = 1
     case reviewed = 2
 
-    var focusedSection: LibrarySectionKind {
+    var emptyMessage: String {
         switch self {
         case .playing:
-            return .playing
+            return "플레이중인 게임 연동은 아직 준비 중이에요."
         case .favorites:
-            return .wishlist
+            return "찜한 게임이 아직 없어요."
         case .reviewed:
-            return .reviewed
+            return "작성한 리뷰가 없어요."
         }
     }
 }
@@ -28,133 +28,38 @@ enum LibrarySortOption: Int {
     var reviewSort: ReviewSortOption {
         self == .oldest ? .oldest : .latest
     }
-
-    var userGameSort: UserGameCollectionSortOption {
-        self == .oldest ? .oldest : .latest
-    }
-}
-
-enum LibraryHighlightChip: Int {
-    case recentlyPlayed = 0
-    case reviewed = 1
-    case playtimeRecommendations = 2
-
-    var focusedSection: LibrarySectionKind {
-        switch self {
-        case .recentlyPlayed:
-            return .recentlyPlayed
-        case .reviewed:
-            return .reviewed
-        case .playtimeRecommendations:
-            return .playtimeRecommendations
-        }
-    }
-}
-
-enum LibraryRecentlyPlayedSource: Hashable {
-    case none
-    case snapshot
-    case full
-}
-
-enum LibrarySummaryPrimaryValueKind: Hashable {
-    case hours
-    case count
-}
-
-struct LibraryTabSummaryState: Hashable {
-    let primaryTitle: String
-    let primaryValue: Double
-    let primaryValueKind: LibrarySummaryPrimaryValueKind
-    let averageRating: Double?
-    let gameCount: Int
-    let reviewCount: Int
-    let sourceDescription: String
-
-    static func empty(for tab: LibraryTab) -> LibraryTabSummaryState {
-        switch tab {
-        case .playing:
-            return LibraryTabSummaryState(
-                primaryTitle: L10n.Library.Label.playtime,
-                primaryValue: 0,
-                primaryValueKind: .hours,
-                averageRating: nil,
-                gameCount: 0,
-                reviewCount: 0,
-                sourceDescription: "empty"
-            )
-        case .favorites:
-            return LibraryTabSummaryState(
-                primaryTitle: L10n.Library.Summary.wishlist,
-                primaryValue: 0,
-                primaryValueKind: .count,
-                averageRating: nil,
-                gameCount: 0,
-                reviewCount: 0,
-                sourceDescription: "empty"
-            )
-        case .reviewed:
-            return LibraryTabSummaryState(
-                primaryTitle: L10n.Library.Summary.reviewed,
-                primaryValue: 0,
-                primaryValueKind: .count,
-                averageRating: nil,
-                gameCount: 0,
-                reviewCount: 0,
-                sourceDescription: "empty"
-            )
-        }
-    }
-
-    static var defaultsByTab: [LibraryTab: LibraryTabSummaryState] {
-        [
-            .playing: .empty(for: .playing),
-            .favorites: .empty(for: .favorites),
-            .reviewed: .empty(for: .reviewed)
-        ]
-    }
 }
 
 struct LibraryState {
-    var selectedTab: LibraryTab = .playing
-    var selectedHighlightChip: LibraryHighlightChip = .recentlyPlayed
+    var selectedTab: LibraryTab = .favorites
     var selectedSort: LibrarySortOption = .latest
-    var summaryByTab: [LibraryTab: LibraryTabSummaryState] = LibraryTabSummaryState.defaultsByTab
-    var serverSummaryByTab: [LibraryTab: LibraryServerSummary] = [:]
-    var previewGeneratedAt: Date? = nil
-    var fullGeneratedAt: Date? = nil
-    var mergedGeneratedAt: Date? = nil
-    var recentlyPlayedSource: LibraryRecentlyPlayedSource = .none
-    var steamLinkStatus: SteamLinkStatus = .notLinked
-    var isSteamConnected: Bool = false
-    var steamSyncStatus: SteamSyncStatus = .idle
-    var isSteamSyncAvailable: Bool = true
-    var steamSyncErrorCode: String? = nil
-    var recentlyPlayed: [LibraryGameSummary] = []
-    var playingGames: [LibraryGameSummary] = []
-    var ownedGames: [LibraryGameSummary] = []
-    var backlogGames: [LibraryGameSummary] = []
-    var playtimeRecommendations: [PlaytimeRecommendation] = []
-    var friendRecommendations: [SteamFriendRecommendation] = []
-    var friendRecommendationsSource: LibraryFriendRecommendationSource = .none
-    var friendRecommendationsEmptyState: LibraryFriendRecommendationsEmptyState? = nil
-    var likedGames: [Game] = []
-    var reviews: [ReviewedGame] = []
-    var steamOwnedSyncErrorCode: String? = nil
-    var addingToPlayingIdentifiers: Set<LibraryGameIdentifier> = []
-    var isSyncingOwnedSteamLibrary: Bool = false
-    var isUnlinkingSteamAccount: Bool = false
-    var sections: [LibrarySectionViewState] = []
+    var items: [LibraryGameCardItem] = []
     var isLoading: Bool = false
-    var isRefreshing: Bool = false
     var errorMessage: String? = nil
-    var successMessage: String? = nil
-    var steamConnectionOnboarding: LibraryOnboardingViewState? = nil
-    var pendingFocusSection: LibrarySectionKind? = nil
-}
+    var itemCount: Int = 0
+    var averageRatingText: String = "0.0"
+    var highestRatingText: String = "0.0"
 
-struct LibraryOnboardingViewState: Equatable {
-    let title: String
-    let message: String
-    let helperText: String?
+    var showsManagedContent: Bool {
+        selectedTab != .playing
+    }
+
+    var showsEmptyState: Bool {
+        !isLoading && items.isEmpty
+    }
+
+    var emptyMessage: String {
+        selectedTab.emptyMessage
+    }
+
+    var countSubtitle: String {
+        switch selectedTab {
+        case .favorites:
+            return "찜한 게임"
+        case .reviewed:
+            return "작성한 리뷰"
+        case .playing:
+            return "항목"
+        }
+    }
 }

@@ -5,7 +5,7 @@ import UIKit
 final class ReviewRootView: UIView {
 
     private enum UIConstants {
-        static let placeholderText = L10n.Review.Placeholder.content
+        static let placeholderText = "플레이 경험, 좋았던 점, 아쉬운 점을 자유롭게 남겨보세요."
         static let submitAreaHorizontalInset: CGFloat = 20
         static let submitAreaVerticalInset: CGFloat = 12
         static let submitButtonHeight: CGFloat = 56
@@ -71,7 +71,7 @@ final class ReviewRootView: UIView {
     // Rating
     let ratingPromptLabel: UILabel = {
         let label = UILabel()
-        label.text = L10n.Review.Prompt.rateGame
+        label.text = "이 게임의 평점을 남겨주세요"
         label.font = .systemFont(ofSize: 16, weight: .semibold)
         label.textColor = .gpTextPrimary
         label.textAlignment = .center
@@ -85,7 +85,7 @@ final class ReviewRootView: UIView {
 
     let ratingDisplayLabel: UILabel = {
         let label = UILabel()
-        label.text = L10n.Review.Prompt.selectRating
+        label.text = "별점을 선택해주세요"
         label.font = .systemFont(ofSize: 14, weight: .medium)
         label.textColor = .gpTextTertiary
         label.textAlignment = .center
@@ -96,7 +96,7 @@ final class ReviewRootView: UIView {
     // Text
     let reviewTitleLabel: UILabel = {
         let label = UILabel()
-        label.text = L10n.Review.Label.content
+        label.text = "리뷰 내용"
         label.font = .systemFont(ofSize: 14, weight: .semibold)
         label.textColor = .gpTextPrimary
         return label
@@ -129,7 +129,7 @@ final class ReviewRootView: UIView {
 
     let charCountLabel: UILabel = {
         let label = UILabel()
-        label.text = L10n.Review.Count.characters(0, 500)
+        label.text = "0 / 500자"
         label.font = .systemFont(ofSize: 12)
         label.textColor = .gpTextTertiary
         label.textAlignment = .natural
@@ -148,7 +148,7 @@ final class ReviewRootView: UIView {
     // Submit
     let submitButton: UIButton = {
         var config = UIButton.Configuration.filled()
-        config.title = L10n.Review.Button.submit
+        config.title = "리뷰 작성하기"
         config.image = UIImage(systemName: "square.and.pencil")
         config.imagePadding = 8
         config.baseBackgroundColor = .gpPrimary
@@ -166,7 +166,7 @@ final class ReviewRootView: UIView {
 
     let deleteButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
-        configuration.title = L10n.Review.Button.delete
+        configuration.title = "삭제"
         configuration.baseBackgroundColor = .gpSurfaceElevated
         configuration.baseForegroundColor = .gpCoral
         configuration.cornerStyle = .capsule
@@ -304,7 +304,7 @@ final class ReviewRootView: UIView {
         gameThumbnailView.loadImage(url: URL(string: state.gameThumbnailURL))
 
         starRatingView.setRating(state.rating)
-        ratingDisplayLabel.text = state.hasSelectedRating ? state.formattedRating : L10n.Review.Prompt.selectRating
+        ratingDisplayLabel.text = state.hasSelectedRating ? state.formattedRating : "별점을 선택해주세요"
         ratingDisplayLabel.textColor = state.hasSelectedRating ? .gpPrimary : .gpTextTertiary
 
         if reviewTextView.text != state.reviewText {

@@ -18,13 +18,11 @@ final class GameDetailViewModel {
 
     // MARK: Dependencies
     private let apiClient: APIClient
+    private let translateTextUseCase: TranslateTextUseCase
     private let fetchGameReviewsUseCase: FetchGameReviewsUseCase
     private let fetchFavoriteStatusUseCase: FetchFavoriteStatusUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let moderationRepository: any ModerationRepository
-    private let languageProvider: any LanguageProviding
-    private let translationProvider: any TranslationProviding
-    private let translationCache: any TranslationCaching
 
     // MARK: Init
     init(
@@ -39,18 +37,17 @@ final class GameDetailViewModel {
             favoriteRepository: DefaultFavoriteRepository()
         ),
         moderationRepository: any ModerationRepository = DefaultModerationRepository(),
-        languageProvider: any LanguageProviding = DefaultLanguageProvider.shared,
-        translationProvider: any TranslationProviding = makeTranslationProvider(),
-        translationCache: any TranslationCaching = DefaultTranslationCache.shared
+        translateTextUseCase: TranslateTextUseCase? = nil
     ) {
         self.apiClient = apiClient
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
         self.fetchFavoriteStatusUseCase = fetchFavoriteStatusUseCase
         self.toggleFavoriteUseCase = toggleFavoriteUseCase
         self.moderationRepository = moderationRepository
-        self.languageProvider = languageProvider
-        self.translationProvider = translationProvider
-        self.translationCache = translationCache
+        self.translateTextUseCase = translateTextUseCase ?? DefaultTranslateTextUseCase(
+            repository: DefaultTranslationRepository(),
+            languageProvider: DefaultLanguageProvider.shared
+        )
     }
 
     // MARK: - Intent Processing
@@ -70,11 +67,6 @@ final class GameDetailViewModel {
         case .didTapSeeAllReviews:
             guard let game = state.game else { return }
             onShowAllReviews?(game)
-        case .didTapTranslationToggle:
-            guard state.hasTranslation else { return }
-            apply(.setShowingTranslated(!state.isShowingTranslated))
-        case .didReceiveTranslationResults(let results):
-            handleTranslationResults(results)
         }
     }
 
@@ -103,11 +95,11 @@ final class GameDetailViewModel {
                 as: GameResponseEnvelopeDTO<GameDetailResponseDataDTO>.self
             )
             let entity = GameMapper.toDetailEntity(response.data.game)
+            let translatedEntity = await translateGame(entity)
             print("[GameDetail] success id=\(id) title=\(entity.title)")
             await MainActor.run {
-                self.apply(.setGame(entity))
+                self.apply(.setGame(translatedEntity))
             }
-            await prepareTranslation(for: entity)
         } catch {
             print("[GameDetail] failed id=\(id) error=\(error.localizedDescription)")
             await MainActor.run { self.apply(.setError(error.localizedDescription)) }
@@ -178,133 +170,45 @@ final class GameDetailViewModel {
                 let favoriteError = FavoriteError.from(error: error)
                 await MainActor.run {
                     self.apply(.setFavoriteLoading(false))
-                    self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
+                    self.apply(.setError(favoriteError.errorDescription ?? "찜 상태를 변경하지 못했습니다."))
                 }
             }
         }
     }
 
-    private func prepareTranslation(for game: GameDetail) async {
-        let targetLanguage = languageProvider.currentLanguage
-        let isSupported = translationProvider.supportsOnDeviceTranslation(
-            targetLanguage: languageProvider.currentLanguageCode
-        )
-        print(
-            "[TranslationAvailability] " +
-            "iosVersion=\(currentOSVersionString()) " +
-            "isSupported=\(isSupported)"
-        )
-
-        guard targetLanguage.isEnglish == false else {
-            await MainActor.run {
-                self.apply(.setTranslationLoading(false))
-                self.apply(.setTranslationRequest(nil))
-                self.apply(.setShowingTranslated(false))
-            }
-            return
-        }
-
+    private func translateGame(_ game: GameDetail) async -> GameDetail {
         let normalizedSummary = game.summary.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedStoryline = game.storyline.trimmingCharacters(in: .whitespacesAndNewlines)
-        let sharesSummaryText = normalizedSummary.isEmpty == false && normalizedSummary == normalizedStoryline
-
-        let cachedSummary = normalizedSummary.isEmpty
-            ? nil
-            : translationCache.get(text: normalizedSummary, lang: targetLanguage)
-        let cachedStoryline = normalizedStoryline.isEmpty
-            ? nil
-            : (sharesSummaryText
-                ? cachedSummary
-                : translationCache.get(text: normalizedStoryline, lang: targetLanguage))
-
-        guard isSupported else {
-            await MainActor.run {
-                self.apply(.setTranslationLoading(false))
-                self.apply(.setTranslationRequest(nil))
-                self.apply(.setShowingTranslated(false))
-            }
-            return
-        }
+        let sharesSummaryText = normalizedSummary == normalizedStoryline
 
         let items = [
-            !normalizedSummary.isEmpty && cachedSummary == nil
-                ? TranslationRequestItem(identifier: String(game.id), field: "summary", text: normalizedSummary)
+            game.translatedTitle == nil
+                ? TranslationRequestItem(identifier: String(game.id), field: "title", text: game.title)
                 : nil,
-            !normalizedStoryline.isEmpty && !sharesSummaryText && cachedStoryline == nil
-                ? TranslationRequestItem(identifier: String(game.id), field: "storyline", text: normalizedStoryline)
+            !normalizedSummary.isEmpty
+                ? TranslationRequestItem(identifier: String(game.id), field: "summary", text: game.summary)
+                : nil,
+            !normalizedStoryline.isEmpty && !sharesSummaryText
+                ? TranslationRequestItem(identifier: String(game.id), field: "storyline", text: game.storyline)
                 : nil
         ].compactMap { $0 }
 
-        items.forEach { item in
-            print("[TranslationStart] textLength=\(item.text.count)")
-        }
+        guard !items.isEmpty else { return game }
 
-        let request = items.isEmpty
-            ? nil
-            : TranslationBatchRequest(
-                context: "GameDetail",
-                sourceLanguage: "en",
-                targetLanguage: languageProvider.currentLanguageCode,
-                items: items
-            )
-
-        await MainActor.run {
-            self.apply(.setTranslatedFields(summary: cachedSummary, storyline: cachedStoryline))
-            self.apply(.setShowingTranslated((cachedSummary?.isEmpty == false) || (cachedStoryline?.isEmpty == false)))
-            self.apply(.setTranslationRequest(request))
-            self.apply(.setTranslationLoading(request != nil))
-        }
-    }
-
-    private func handleTranslationResults(_ results: [TranslationResultItem]) {
-        guard let game = state.game else { return }
-        let filteredResults = results.filter { $0.identifier == String(game.id) }
-
-        guard !filteredResults.isEmpty else {
-            apply(.setTranslationLoading(false))
-            apply(.setTranslationRequest(nil))
-            return
-        }
-
-        var translatedSummary: String?
-        var translatedStoryline: String?
-
-        for result in filteredResults {
-            let normalizedTranslation = result.translatedText.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard normalizedTranslation.isEmpty == false else { continue }
-
-            translationCache.save(
-                text: result.sourceText,
-                lang: languageProvider.currentLanguage,
-                translated: normalizedTranslation
-            )
-            print("[TranslationSuccess] translatedLength=\(normalizedTranslation.count)")
-
-            switch result.field {
-            case "summary":
-                translatedSummary = normalizedTranslation
-            case "storyline":
-                translatedStoryline = normalizedTranslation
-            default:
-                break
-            }
-        }
-
-        apply(.setTranslatedFields(summary: translatedSummary, storyline: translatedStoryline))
-        apply(
-            .setShowingTranslated(
-                (translatedSummary?.isEmpty == false) ||
-                (translatedStoryline?.isEmpty == false) ||
-                state.hasTranslation
-            )
+        let results = await translateTextUseCase.execute(
+            items: items,
+            context: "GameDetail",
+            sourceLanguage: "en"
         )
-        apply(.setTranslationLoading(false))
-        apply(.setTranslationRequest(nil))
-    }
+        let translatedValues = Dictionary(uniqueKeysWithValues: results.map { ($0.field, $0.translatedText) })
+        let translatedSummary = translatedValues["summary"]
+        let translatedStoryline = translatedValues["storyline"] ?? (sharesSummaryText ? translatedSummary : nil)
 
-    private func currentOSVersionString() -> String {
-        let version = ProcessInfo.processInfo.operatingSystemVersion
-        return "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
+        return game.replacingTranslated(
+            translatedTitle: translatedValues["title"],
+            translatedSummary: translatedSummary,
+            translatedStoryline: translatedStoryline
+        )
     }
 
     private func visibleReviews(from reviews: [Review]) -> [Review] {

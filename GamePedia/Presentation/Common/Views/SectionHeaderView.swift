@@ -23,13 +23,11 @@ final class SectionHeaderView: UIView {
 
     let seeMoreButton: UIButton = {
         var config = UIButton.Configuration.plain()
-        config.title = L10n.Common.Button.seeAll
+        config.title = "더보기"
         config.baseForegroundColor = .gpPrimary
         config.contentInsets = .zero
         let button = UIButton(configuration: config)
         button.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
-        button.setContentHuggingPriority(.required, for: .horizontal)
-        button.setContentCompressionResistancePriority(.required, for: .horizontal)
         return button
     }()
 

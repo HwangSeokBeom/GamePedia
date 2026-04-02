@@ -106,9 +106,6 @@ final class AuthRemoteDataSource {
                 .mapError { _ in AuthError.networkError }
                 .tryMap { [weak self] data, response in
                     guard let self else { throw AuthError.invalidResponse }
-                    if case .updateCurrentUserProfile = endpoint {
-                        self.logProfileEditResponse(data: data)
-                    }
                     return try self.decodeResponse(data: data, response: response, responseType: responseType)
                 }
                 .mapError { $0 as? AuthError ?? AuthError.unknown(message: $0.localizedDescription) }
@@ -188,8 +185,7 @@ final class AuthRemoteDataSource {
                 """
                 [ProfileEdit] request sending \
                 requestURL=\(url.absoluteString) \
-                nicknameLength=\(requestDTO.nickname.count) \
-                selectedTitleKeys=\(requestDTO.selectedTitleKeys)
+                nicknameLength=\(requestDTO.nickname.count)
                 """
             )
         }
@@ -206,40 +202,6 @@ final class AuthRemoteDataSource {
         }
 
         return urlRequest
-    }
-
-    private func logProfileEditResponse(data: Data) {
-        guard
-            let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
-            print("[ProfileEdit] response selectedTitleKeys=nil selectedTitles=nil explicitSelected=nil")
-            return
-        }
-
-        let dataObject = jsonObject["data"] as? [String: Any]
-        let userObject = dataObject?["user"] as? [String: Any]
-        let summaryObject =
-            dataObject?["summary"] as? [String: Any] ??
-            dataObject?["profileSummary"] as? [String: Any] ??
-            dataObject?["profile"] as? [String: Any]
-
-        let selectedTitleKeys =
-            summaryObject?["selectedTitleKeys"] as? [String] ??
-            dataObject?["selectedTitleKeys"] as? [String]
-        let selectedTitles =
-            summaryObject?["selectedTitles"] as? [String] ??
-            dataObject?["selectedTitles"] as? [String]
-        let explicitSelected =
-            summaryObject?["explicitSelected"] as? Bool ??
-            dataObject?["explicitSelected"] as? Bool ??
-            userObject?["explicitSelected"] as? Bool
-
-        print(
-            "[ProfileEdit] response " +
-            "selectedTitleKeys=\(selectedTitleKeys ?? []) " +
-            "selectedTitles=\(selectedTitles ?? []) " +
-            "explicitSelected=\(explicitSelected.map(String.init(describing:)) ?? "nil")"
-        )
     }
 
     private func decodeResponse<ResponseDTO: Decodable>(

@@ -5,16 +5,14 @@ import UIKit
 final class RecentPlayCell: UITableViewCell {
 
     static let reuseId = "RecentPlayCell"
-    static let height: CGFloat = 88
+    // Card height 72 (48 thumb + 12×2 padding) + 10 inter-card gap
+    static let height: CGFloat = 82
 
     // MARK: Subviews
     private let cardView: UIView = {
         let v = UIView()
         v.backgroundColor = .gpCardBackground
-        v.layer.cornerRadius = 18
-        v.layer.cornerCurve = .continuous
-        v.layer.borderWidth = 1
-        v.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.24).cgColor
+        v.layer.cornerRadius = 14
         v.clipsToBounds = true
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
@@ -24,7 +22,7 @@ final class RecentPlayCell: UITableViewCell {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFill
         iv.clipsToBounds = true
-        iv.layer.cornerRadius = 12
+        iv.layer.cornerRadius = 10
         iv.backgroundColor = .gpSurface
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
@@ -32,23 +30,21 @@ final class RecentPlayCell: UITableViewCell {
 
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 15, weight: .semibold)
+        label.font = .systemFont(ofSize: 14, weight: .semibold)
         label.textColor = .gpTextPrimary
-        label.numberOfLines = 2
         return label
     }()
 
     private let timeLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.font = .systemFont(ofSize: 11)
         label.textColor = .gpTextSecondary
-        label.numberOfLines = 2
         return label
     }()
 
     private let ratingLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.font = .systemFont(ofSize: 14, weight: .bold)
         label.textColor = .gpStar
         return label
     }()
@@ -84,17 +80,17 @@ final class RecentPlayCell: UITableViewCell {
 
         NSLayoutConstraint.activate([
             cardView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            cardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            cardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            cardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            cardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
 
-            thumbnailView.widthAnchor.constraint(equalToConstant: 52),
-            thumbnailView.heightAnchor.constraint(equalToConstant: 52),
+            thumbnailView.widthAnchor.constraint(equalToConstant: 48),
+            thumbnailView.heightAnchor.constraint(equalToConstant: 48),
 
             mainStack.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 12),
             mainStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -12),
-            mainStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 14),
-            mainStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -14)
+            mainStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 12),
+            mainStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -12)
         ])
     }
 
@@ -102,23 +98,6 @@ final class RecentPlayCell: UITableViewCell {
     func configure(with game: RecentGame, resolvedTitle: String) {
         thumbnailView.loadImage(url: game.coverImageURL)
         titleLabel.text = resolvedTitle
-        let timestampUsedForRelativeText = game.hasReliableLastPlayedAt
-            ? (game.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")
-            : "nil"
-        let relativeTimeText = game.hasReliableLastPlayedAt
-            ? (game.formattedLastPlayed.components(separatedBy: " · ").first ?? game.formattedLastPlayed)
-            : "nil"
-        print(
-            "[RecentPlayDisplay] " +
-            "screen=Profile.cell " +
-            "title=\(resolvedTitle) " +
-            "lastPlayedAt=\(game.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
-            "recentPlaytimeMinutes=\(game.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
-            "hasReliableLastPlayedAt=\(game.hasReliableLastPlayedAt) " +
-            "timestampUsedForRelativeText=\(timestampUsedForRelativeText) " +
-            "relativeTime=\(relativeTimeText) " +
-            "finalText=\(game.formattedLastPlayed)"
-        )
         timeLabel.text = game.formattedLastPlayed
         if let rating = game.formattedRating {
             ratingLabel.text = "★ \(rating)"

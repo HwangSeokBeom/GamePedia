@@ -12,19 +12,14 @@ struct ReviewSummary: Equatable {
 
     var formattedAverageRating: String {
         guard let averageRating else { return "—" }
-        return LocalizedNumberFormatter.oneFraction(averageRating)
+        return String(format: "%.1f", averageRating)
     }
 
     var summaryText: String {
         if reviewCount == 0 {
-            return L10n.tr("Localizable", "review.summary.empty")
+            return "아직 리뷰가 없어요"
         }
-        return L10n.tr(
-            "Localizable",
-            "review.summary.averageAndCount",
-            formattedAverageRating,
-            L10n.Common.Count.reviews(reviewCount)
-        )
+        return "평균 \(formattedAverageRating) · 리뷰 \(reviewCount)개"
     }
 }
 

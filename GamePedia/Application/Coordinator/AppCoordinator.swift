@@ -34,13 +34,13 @@ enum RestrictedActionContext {
     var promptMessage: String {
         switch self {
         case .favoriteGame, .writeReview:
-            return L10n.tr("Localizable", "app.authRequired.prompt.favorite")
+            return "로그인하면 리뷰 작성과 찜 기능을 사용할 수 있어요."
         case .viewReviews:
-            return L10n.tr("Localizable", "app.authRequired.prompt.viewReviews")
+            return "리뷰를 확인하려면 로그인이 필요합니다."
         case .library, .profile:
-            return L10n.tr("Localizable", "app.authRequired.prompt.libraryProfile")
+            return "내 라이브러리와 프로필을 사용하려면 로그인이 필요합니다."
         case .moderation:
-            return L10n.tr("Localizable", "app.authRequired.prompt.default")
+            return "이 기능을 사용하려면 로그인이 필요합니다."
         }
     }
 }
@@ -70,10 +70,7 @@ final class AppCoordinator {
     private weak var mainTabBarController: MainTabBarController?
     private var modalAuthCoordinator: AuthCoordinator?
     private var pendingResetPasswordToken: String?
-    private var pendingSteamLinkCallbackURL: URL?
     private var cancellables = Set<AnyCancellable>()
-    private let steamLinkFlowController = SteamLinkFlowController()
-    private lazy var socialActivityBannerPresenter = SocialActivityBannerPresenter(window: window)
 
     private lazy var authRemoteDataSource = AuthRemoteDataSource(tokenStore: tokenStore)
     private lazy var authRepository: any AuthRepository = DefaultAuthRepository(
@@ -106,31 +103,19 @@ final class AppCoordinator {
     // MARK: Start
 
     func start() {
-        bindSocialActivityEvents()
         showSplash()
     }
 
-    @discardableResult
-    func handleIncomingURL(_ url: URL) -> Bool {
-        if SteamLinkCallbackParser.isSteamCallbackURL(url) {
-            if window.rootViewController is SplashViewController {
-                pendingSteamLinkCallbackURL = url
-            } else {
-                _ = steamLinkFlowController.handleIncomingURL(url)
-            }
-            return true
-        }
-
-        guard let resetPasswordToken = resetPasswordToken(from: url) else { return false }
+    func handleIncomingURL(_ url: URL) {
+        guard let resetPasswordToken = resetPasswordToken(from: url) else { return }
         print("[PasswordReset] deepLinkReceived tokenLength=\(resetPasswordToken.count)")
 
         if window.rootViewController is SplashViewController {
             pendingResetPasswordToken = resetPasswordToken
-            return true
+            return
         }
 
         presentResetPasswordFlow(token: resetPasswordToken)
-        return true
     }
 
     private func showSplash() {
@@ -141,54 +126,6 @@ final class AppCoordinator {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + Metrics.splashDuration) { [weak self] in
             self?.resolveInitialInterface()
-        }
-    }
-
-    private func bindSocialActivityEvents() {
-        SocialActivityEventDispatcher.shared.publisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
-                self?.handleSocialActivityEvent(event)
-            }
-            .store(in: &cancellables)
-    }
-
-    private func handleSocialActivityEvent(_ event: SocialActivityAppEvent) {
-        switch event {
-        case .showBanner(let payload):
-            socialActivityBannerPresenter.enqueue(payload: payload) { [weak self] in
-                self?.handleSocialActivityRoute(payload.route)
-            }
-        case .route(let route):
-            handleSocialActivityRoute(route)
-        }
-    }
-
-    private func handleSocialActivityRoute(_ route: SocialActivityRoute) {
-        switch route {
-        case .friendActivityFeed:
-            ensureMainInterface(selectedIndex: 3)
-            profileCoordinator?.navigateToFriendActivityFeed()
-        case .friendRequests:
-            ensureMainInterface(selectedIndex: 3)
-            profileCoordinator?.navigateToFriendRequests()
-        case .friendProfile(let userID):
-            ensureMainInterface(selectedIndex: 3)
-            profileCoordinator?.navigateToFriendProfile(userID: userID)
-        case .gameDetail(let gameID):
-            ensureMainInterface(selectedIndex: 0)
-            homeCoordinator?.navigateToGameDetail(gameID: gameID)
-        case .review(let gameID, _):
-            ensureMainInterface(selectedIndex: 0)
-            homeCoordinator?.navigateToGameDetail(gameID: gameID)
-        }
-    }
-
-    private func ensureMainInterface(selectedIndex: Int) {
-        if mainTabBarController == nil {
-            showMainInterface(selectedIndex: selectedIndex)
-        } else {
-            mainTabBarController?.selectTab(index: selectedIndex)
         }
     }
 
@@ -248,20 +185,12 @@ final class AppCoordinator {
                 self?.presentResetPasswordFlow(token: pendingResetPasswordToken)
             }
         }
-
-        if let pendingSteamLinkCallbackURL {
-            self.pendingSteamLinkCallbackURL = nil
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                _ = self.steamLinkFlowController.handleIncomingURL(pendingSteamLinkCallbackURL)
-            }
-        }
     }
 
     private func makeMainTabBarController(selectedIndex: Int) -> MainTabBarController {
         let homeCoord    = HomeCoordinator()
         let searchCoord  = SearchCoordinator()
-        let libraryCoord = LibraryCoordinator(steamLinkFlowController: steamLinkFlowController)
+        let libraryCoord = LibraryCoordinator()
         let profileCoord = ProfileCoordinator(
             fetchCurrentUserUseCase: fetchCurrentUserUseCase,
             updateCurrentUserProfileUseCase: updateCurrentUserProfileUseCase,
@@ -269,8 +198,7 @@ final class AppCoordinator {
             removeCurrentUserProfileImageUseCase: removeCurrentUserProfileImageUseCase,
             logoutUseCase: logoutUseCase,
             deleteAccountUseCase: deleteAccountUseCase,
-            userSessionStore: userSessionStore,
-            steamLinkFlowController: steamLinkFlowController
+            userSessionStore: userSessionStore
         )
         let authenticationHandler: (UIViewController, RestrictedActionContext, @escaping () -> Void) -> Void = {
             [weak self] presenter, context, completion in
@@ -365,12 +293,12 @@ final class AppCoordinator {
         print("[GuestMode] restrictedActionTriggered action=\(context.logName)")
 
         let alertController = UIAlertController(
-            title: L10n.tr("Localizable", "app.authRequired.title"),
+            title: "로그인이 필요합니다",
             message: context.promptMessage,
             preferredStyle: .alert
         )
-        alertController.addAction(UIAlertAction(title: L10n.tr("Localizable", "app.authRequired.later"), style: .cancel))
-        alertController.addAction(UIAlertAction(title: L10n.Settings.Action.login, style: .default) { [weak self, weak presenter] _ in
+        alertController.addAction(UIAlertAction(title: "나중에 하기", style: .cancel))
+        alertController.addAction(UIAlertAction(title: "로그인", style: .default) { [weak self, weak presenter] _ in
             guard let self, let presenter else { return }
             print("[GuestMode] loginRouteRequested action=\(context.logName)")
             self.presentAuthFlow(from: presenter, onAuthenticated: onAuthenticated)
@@ -476,22 +404,16 @@ final class AppCoordinator {
             DebugEnvironmentSelectionStore.selectedEnvironment = selectedEnvironment
             let resolvedEnvironment = selectedEnvironment ?? AppEnvironmentResolver.current
             let alertController = UIAlertController(
-                title: L10n.tr("Localizable", "debug.environment.savedTitle"),
-                message: L10n.tr(
-                    "Localizable",
-                    "debug.environment.savedMessage",
-                    resolvedEnvironment.rawValue,
-                    resolvedEnvironment.apiBaseURL.absoluteString,
-                    resolvedEnvironment.translationBaseURL.absoluteString
-                ),
+                title: "환경이 저장되었습니다",
+                message: """
+                다음 실행부터 \(resolvedEnvironment.rawValue) 환경이 적용됩니다.
+
+                API: \(resolvedEnvironment.apiBaseURL.absoluteString)
+                Translation: \(resolvedEnvironment.translationBaseURL.absoluteString)
+                """,
                 preferredStyle: .alert
             )
-            alertController.addAction(
-                UIAlertAction(
-                    title: L10n.tr("Localizable", "common.button.ok"),
-                    style: .default
-                )
-            )
+            alertController.addAction(UIAlertAction(title: "확인", style: .default))
             presenter?.present(alertController, animated: true)
         }
     }

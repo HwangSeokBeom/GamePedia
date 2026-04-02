@@ -43,7 +43,7 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
 
     private func configureNavigationItem() {
         UIView.performWithoutAnimation {
-            navigationItem.title = L10n.Search.Tab.title
+            navigationItem.title = "검색"
             navigationItem.largeTitleDisplayMode = .never
         }
     }
@@ -94,7 +94,7 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
 
         // Client-side genre filter applied on top of API results.
         // Covers the case where the backend does not support genre filtering.
-        if selectedGenre == L10n.Search.Filter.all || selectedGenre.isEmpty {
+        if selectedGenre == "전체" || selectedGenre.isEmpty {
             results = state.results
         } else {
             results = state.results.filter {
@@ -105,7 +105,7 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
         // Override the count label to reflect the client-filtered count.
         if !state.query.isEmpty {
             rootView.resultCountLabel.isHidden = false
-            rootView.resultCountLabel.text = L10n.Search.Count.results(results.count)
+            rootView.resultCountLabel.text = "검색 결과 \(results.count)건"
         }
 
         // Sync empty state with the filtered result set.

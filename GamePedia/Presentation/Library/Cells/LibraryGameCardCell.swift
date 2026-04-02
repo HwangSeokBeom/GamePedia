@@ -1,22 +1,24 @@
 import UIKit
 
+struct LibraryGameCardItem: Hashable {
+    let id: Int
+    let title: String
+    let metadataText: String
+    let ratingValue: Double?
+    let coverImageURL: URL?
+    let symbolName: String
+    let startColorHex: String
+    let endColorHex: String
+    let isFavorite: Bool
+    let showsFavoriteButton: Bool
+}
+
 final class LibraryGameCardCell: UICollectionViewCell {
 
     static let reuseId = "LibraryGameCardCell"
-    var onActionButtonTapped: (() -> Void)?
+    var onFavoriteButtonTapped: (() -> Void)?
 
     private let artworkView = LibraryArtworkView()
-
-    private let badgeLabel: PaddingLabel = {
-        let label = PaddingLabel(insets: UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8))
-        label.font = .systemFont(ofSize: 11, weight: .semibold)
-        label.textColor = .gpOnPrimary
-        label.backgroundColor = UIColor.gpPrimary.withAlphaComponent(0.92)
-        label.layer.cornerRadius = 10
-        label.layer.masksToBounds = true
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
 
     private let titleLabel: UILabel = {
         let label = UILabel()
@@ -27,72 +29,48 @@ final class LibraryGameCardCell: UICollectionViewCell {
         return label
     }()
 
-    private let metadataLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 12, weight: .medium)
-        label.textColor = .gpTextSecondary
-        label.numberOfLines = 2
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
+    private let starImageView: UIImageView = {
+        let imageView = UIImageView(
+            image: UIImage(
+                systemName: "star.fill",
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: 10, weight: .medium)
+            )
+        )
+        imageView.tintColor = .gpStar
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
     }()
 
     private let ratingLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 12, weight: .semibold)
+        label.font = .systemFont(ofSize: 12, weight: .medium)
         label.textColor = .gpStar
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
 
-    private let favoriteIconView: UIImageView = {
-        let imageView = UIImageView()
-        imageView.image = UIImage(
-            systemName: "heart",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+    private let playtimeLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 11, weight: .medium)
+        label.textColor = .gpTextTertiary
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let favoriteButton: UIButton = {
+        let button = UIButton(type: .system)
+        var configuration = UIButton.Configuration.plain()
+        configuration.image = UIImage(
+            systemName: "heart.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .regular)
         )
-        imageView.tintColor = .systemRed
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        return imageView
-    }()
-
-    private let favoriteContainerView: UIView = {
-        let view = UIView()
-        view.backgroundColor = .clear
-        view.layer.cornerRadius = 11
-        view.layer.cornerCurve = .continuous
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
-    }()
-
-    private let bottomInfoRow: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.alignment = .center
-        stackView.spacing = 8
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
-    }()
-
-    private let actionButton: UIButton = {
-        var configuration = UIButton.Configuration.filled()
-        configuration.baseBackgroundColor = .gpPrimary
-        configuration.baseForegroundColor = .gpOnPrimary
-        configuration.cornerStyle = .capsule
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
-        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
-            var attributes = attributes
-            attributes.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
-            return attributes
-        }
-        let button = UIButton(configuration: configuration)
+        configuration.baseForegroundColor = .gpRed
+        configuration.contentInsets = .zero
+        button.configuration = configuration
+        button.isUserInteractionEnabled = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
-
-    private var actionButtonHeightConstraint: NSLayoutConstraint?
-    private var actionButtonTopConstraint: NSLayoutConstraint?
-    private var actionButtonBottomConstraint: NSLayoutConstraint?
-    private var ratingBottomConstraint: NSLayoutConstraint?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -107,134 +85,90 @@ final class LibraryGameCardCell: UICollectionViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         artworkView.prepareForReuse()
-        badgeLabel.text = nil
-        titleLabel.text = nil
-        metadataLabel.text = nil
-        ratingLabel.text = nil
-        actionButton.isHidden = true
-        actionButton.isEnabled = true
-        actionButton.alpha = 1
-        badgeLabel.isHidden = false
-        favoriteIconView.isHidden = false
-        ratingLabel.textColor = .gpStar
-        applyActionVisibility(false)
-        onActionButtonTapped = nil
+        onFavoriteButtonTapped = nil
     }
 
-    func configure(with viewState: LibraryRecentGameCardViewState) {
+    func configure(with item: LibraryGameCardItem) {
         artworkView.configure(
-            title: viewState.title,
-            identifier: viewState.identifier,
-            imageURL: viewState.coverImageURL,
-            fallbackImageURLs: viewState.fallbackCoverImageURLs
+            title: item.title,
+            symbolName: item.symbolName,
+            startColorHex: item.startColorHex,
+            endColorHex: item.endColorHex,
+            imageURL: item.coverImageURL
         )
-        badgeLabel.text = viewState.badgeText
-        badgeLabel.isHidden = viewState.badgeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        titleLabel.text = viewState.title
-        metadataLabel.text = viewState.metadataText
-        if let ratingText = viewState.ratingText {
-            ratingLabel.text = "★ \(ratingText)"
+        titleLabel.text = item.title
+        if let ratingValue = item.ratingValue {
+            ratingLabel.text = String(format: "%.1f", ratingValue)
             ratingLabel.isHidden = false
-            ratingLabel.textColor = .gpStar
+            starImageView.isHidden = false
         } else {
-            ratingLabel.text = L10n.Common.Label.noRating
-            ratingLabel.isHidden = false
-            ratingLabel.textColor = .gpTextTertiary
+            ratingLabel.isHidden = true
+            starImageView.isHidden = true
         }
+        playtimeLabel.text = item.metadataText
 
-        var configuration = actionButton.configuration
-        configuration?.title = viewState.actionTitle
-        actionButton.configuration = configuration
-        actionButton.isHidden = viewState.actionTitle == nil
-        actionButton.isEnabled = viewState.isActionEnabled
-        actionButton.alpha = viewState.isActionEnabled ? 1 : 0.6
-        applyActionVisibility(viewState.actionTitle != nil)
+        var configuration = favoriteButton.configuration
+        configuration?.image = UIImage(
+            systemName: item.isFavorite ? "heart.fill" : "heart",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+        )
+        favoriteButton.configuration = configuration
+        favoriteButton.isHidden = !item.showsFavoriteButton
     }
 
     private func setup() {
         backgroundColor = .clear
         contentView.backgroundColor = .gpCardBackground
-        contentView.layer.cornerRadius = 20
-        contentView.layer.cornerCurve = .continuous
-        contentView.layer.borderWidth = 1
-        contentView.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.28).cgColor
+        contentView.layer.cornerRadius = 16
         contentView.layer.masksToBounds = true
 
-        favoriteContainerView.addSubview(favoriteIconView)
-        [ratingLabel, UIView(), favoriteContainerView].forEach { bottomInfoRow.addArrangedSubview($0) }
-
-        [artworkView, badgeLabel, titleLabel, metadataLabel, bottomInfoRow, actionButton].forEach {
-            contentView.addSubview($0)
-        }
-
-        actionButton.addTarget(self, action: #selector(didTapActionButton), for: .touchUpInside)
+        contentView.addSubview(artworkView)
+        contentView.addSubview(titleLabel)
+        contentView.addSubview(starImageView)
+        contentView.addSubview(ratingLabel)
+        contentView.addSubview(favoriteButton)
+        contentView.addSubview(playtimeLabel)
+        favoriteButton.addTarget(self, action: #selector(didTapFavoriteButton), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
-            artworkView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            artworkView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            artworkView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-            artworkView.heightAnchor.constraint(equalTo: artworkView.widthAnchor, multiplier: 1.1),
-
-            badgeLabel.topAnchor.constraint(equalTo: artworkView.topAnchor, constant: 10),
-            badgeLabel.leadingAnchor.constraint(equalTo: artworkView.leadingAnchor, constant: 10),
+            artworkView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            artworkView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            artworkView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            artworkView.heightAnchor.constraint(equalTo: artworkView.widthAnchor),
 
             titleLabel.topAnchor.constraint(equalTo: artworkView.bottomAnchor, constant: 10),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
+            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
 
-            metadataLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
-            metadataLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            metadataLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+            starImageView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            starImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
+            starImageView.widthAnchor.constraint(equalToConstant: 10),
+            starImageView.heightAnchor.constraint(equalToConstant: 10),
 
-            bottomInfoRow.topAnchor.constraint(equalTo: metadataLabel.bottomAnchor, constant: 6),
-            bottomInfoRow.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            bottomInfoRow.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+            ratingLabel.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
+            ratingLabel.leadingAnchor.constraint(equalTo: starImageView.trailingAnchor, constant: 4),
 
-            favoriteContainerView.widthAnchor.constraint(equalToConstant: 22),
-            favoriteContainerView.heightAnchor.constraint(equalToConstant: 22),
-            favoriteIconView.centerXAnchor.constraint(equalTo: favoriteContainerView.centerXAnchor),
-            favoriteIconView.centerYAnchor.constraint(equalTo: favoriteContainerView.centerYAnchor)
+            favoriteButton.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
+            favoriteButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            favoriteButton.widthAnchor.constraint(equalToConstant: 20),
+            favoriteButton.heightAnchor.constraint(equalToConstant: 20),
+
+            playtimeLabel.topAnchor.constraint(equalTo: starImageView.bottomAnchor, constant: 4),
+            playtimeLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
+            playtimeLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
+            playtimeLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10)
         ])
-
-        let actionButtonTopConstraint = actionButton.topAnchor.constraint(equalTo: bottomInfoRow.bottomAnchor, constant: 8)
-        let actionButtonBottomConstraint = actionButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
-        let actionButtonHeightConstraint = actionButton.heightAnchor.constraint(equalToConstant: 32)
-        let ratingBottomConstraint = bottomInfoRow.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
-
-        self.actionButtonTopConstraint = actionButtonTopConstraint
-        self.actionButtonBottomConstraint = actionButtonBottomConstraint
-        self.actionButtonHeightConstraint = actionButtonHeightConstraint
-        self.ratingBottomConstraint = ratingBottomConstraint
-
-        NSLayoutConstraint.activate([
-            actionButtonTopConstraint,
-            actionButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            actionButton.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -12),
-            actionButtonBottomConstraint,
-            actionButtonHeightConstraint
-        ])
-
-        applyActionVisibility(false)
     }
 
     @objc
-    private func didTapActionButton() {
-        onActionButtonTapped?()
-    }
-
-    private func applyActionVisibility(_ isVisible: Bool) {
-        actionButtonHeightConstraint?.constant = isVisible ? 32 : 0
-        actionButtonTopConstraint?.isActive = isVisible
-        actionButtonBottomConstraint?.isActive = isVisible
-        ratingBottomConstraint?.isActive = !isVisible
-        favoriteIconView.isHidden = isVisible
+    private func didTapFavoriteButton() {
+        onFavoriteButtonTapped?()
     }
 }
 
 private final class LibraryArtworkView: UIView {
 
     private let gradientLayer = CAGradientLayer()
-
     private let imageView: UIImageView = {
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFit
@@ -245,21 +179,17 @@ private final class LibraryArtworkView: UIView {
 
     private let monogramLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 30, weight: .bold)
-        label.textColor = UIColor.white.withAlphaComponent(0.2)
+        label.font = .systemFont(ofSize: 28, weight: .bold)
+        label.textColor = UIColor.white.withAlphaComponent(0.18)
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
 
     private let symbolImageView: UIImageView = {
         let imageView = UIImageView()
-        imageView.tintColor = UIColor.white.withAlphaComponent(0.18)
+        imageView.tintColor = UIColor.white.withAlphaComponent(0.20)
         imageView.contentMode = .scaleAspectFit
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.image = UIImage(
-            systemName: "gamecontroller.fill",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 40, weight: .medium)
-        )
         return imageView
     }()
 
@@ -278,36 +208,26 @@ private final class LibraryArtworkView: UIView {
         gradientLayer.frame = bounds
     }
 
-    func configure(
-        title: String,
-        identifier: LibraryGameIdentifier,
-        imageURL: URL?,
-        fallbackImageURLs: [URL]
-    ) {
+    func configure(title: String, symbolName: String, startColorHex: String, endColorHex: String, imageURL: URL?) {
         gradientLayer.colors = [
-            UIColor(hex: "#164B8C").cgColor,
-            UIColor(hex: "#0B0B0E").cgColor
+            UIColor(hex: startColorHex).cgColor,
+            UIColor(hex: endColorHex).cgColor
         ]
+        symbolImageView.image = UIImage(
+            systemName: symbolName,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 42, weight: .medium)
+        )
         monogramLabel.text = String(title.prefix(1))
-        let hasRemoteImage = imageURL != nil || fallbackImageURLs.isEmpty == false
-        if hasRemoteImage {
-            imageView.loadImage(
-                url: imageURL,
-                fallbackURLs: fallbackImageURLs,
-                placeholder: .gpGameCoverPlaceholder,
-                logContext: "Library.recentlyPlayed.\(identifier.uniqueKey)"
-            )
-        } else {
-            imageView.image = nil
-        }
-        imageView.isHidden = hasRemoteImage == false
-        symbolImageView.isHidden = hasRemoteImage
-        monogramLabel.isHidden = hasRemoteImage
+        imageView.loadImage(url: imageURL)
+        imageView.isHidden = imageURL == nil
+        symbolImageView.isHidden = imageURL != nil
+        monogramLabel.isHidden = imageURL != nil
     }
 
     func prepareForReuse() {
         imageView.cancelLoad()
         imageView.image = nil
+        symbolImageView.image = nil
         monogramLabel.text = nil
         imageView.isHidden = true
         symbolImageView.isHidden = false
@@ -316,7 +236,7 @@ private final class LibraryArtworkView: UIView {
 
     private func setup() {
         translatesAutoresizingMaskIntoConstraints = false
-        layer.cornerRadius = 14
+        layer.cornerRadius = 12
         layer.masksToBounds = true
 
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
@@ -324,8 +244,8 @@ private final class LibraryArtworkView: UIView {
         layer.insertSublayer(gradientLayer, at: 0)
 
         addSubview(imageView)
-        addSubview(monogramLabel)
         addSubview(symbolImageView)
+        addSubview(monogramLabel)
 
         NSLayoutConstraint.activate([
             imageView.topAnchor.constraint(equalTo: topAnchor),
@@ -333,38 +253,13 @@ private final class LibraryArtworkView: UIView {
             imageView.trailingAnchor.constraint(equalTo: trailingAnchor),
             imageView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            monogramLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            monogramLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+            symbolImageView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            symbolImageView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            symbolImageView.widthAnchor.constraint(equalToConstant: 50),
+            symbolImageView.heightAnchor.constraint(equalToConstant: 50),
 
-            symbolImageView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            symbolImageView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            symbolImageView.widthAnchor.constraint(equalToConstant: 44),
-            symbolImageView.heightAnchor.constraint(equalToConstant: 44)
+            monogramLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            monogramLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10)
         ])
-    }
-}
-
-private final class PaddingLabel: UILabel {
-    private let insets: UIEdgeInsets
-
-    init(insets: UIEdgeInsets) {
-        self.insets = insets
-        super.init(frame: .zero)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func drawText(in rect: CGRect) {
-        super.drawText(in: rect.inset(by: insets))
-    }
-
-    override var intrinsicContentSize: CGSize {
-        let size = super.intrinsicContentSize
-        return CGSize(
-            width: size.width + insets.left + insets.right,
-            height: size.height + insets.top + insets.bottom
-        )
     }
 }

@@ -23,7 +23,7 @@ enum FavoriteError: Error, LocalizedError, Equatable {
                 return .unauthorized
             case .serverError(_, let code, let message):
                 let resolvedCode = code?.uppercased() ?? "UNKNOWN_ERROR"
-                let resolvedMessage = message ?? L10n.tr("Localizable", "favorite.error.requestFailed")
+                let resolvedMessage = message ?? "찜 요청을 처리하지 못했습니다."
                 switch resolvedCode {
                 case "UNAUTHORIZED":
                     return .unauthorized
@@ -49,17 +49,17 @@ enum FavoriteError: Error, LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unauthorized:
-            return L10n.Common.Error.unauthorized
+            return "로그인이 필요합니다."
         case .invalidGameId:
-            return L10n.tr("Localizable", "favorite.error.invalidGameId")
+            return "유효한 게임 정보를 찾지 못했습니다."
         case .invalidSort:
-            return L10n.tr("Localizable", "favorite.error.invalidSort")
+            return "정렬 옵션이 올바르지 않습니다."
         case .validationFailed(let message):
             return message
         case .invalidResponse:
-            return L10n.Common.Error.server
+            return "서버 응답을 처리하지 못했습니다."
         case .network:
-            return L10n.Common.Error.network
+            return "네트워크 연결을 확인해주세요."
         case .server(_, let message):
             return message
         case .unknown(let message):

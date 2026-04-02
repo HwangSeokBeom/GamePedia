@@ -15,7 +15,6 @@ final class ProfileCoordinator: NSObject {
     private let logoutUseCase: LogoutUseCase
     private let deleteAccountUseCase: DeleteAccountUseCase
     private let userSessionStore: any UserSessionStore
-    private let steamLinkFlowController: any SteamLinkFlowControlling
     var onAuthenticationRequested: ((UIViewController, RestrictedActionContext, @escaping () -> Void) -> Void)?
 
     var onLoggedOut: (() -> Void)?
@@ -29,8 +28,7 @@ final class ProfileCoordinator: NSObject {
         removeCurrentUserProfileImageUseCase: RemoveCurrentUserProfileImageUseCase,
         logoutUseCase: LogoutUseCase,
         deleteAccountUseCase: DeleteAccountUseCase,
-        userSessionStore: any UserSessionStore,
-        steamLinkFlowController: any SteamLinkFlowControlling
+        userSessionStore: any UserSessionStore
     ) {
         self.fetchCurrentUserUseCase = fetchCurrentUserUseCase
         self.updateCurrentUserProfileUseCase = updateCurrentUserProfileUseCase
@@ -39,10 +37,9 @@ final class ProfileCoordinator: NSObject {
         self.logoutUseCase = logoutUseCase
         self.deleteAccountUseCase = deleteAccountUseCase
         self.userSessionStore = userSessionStore
-        self.steamLinkFlowController = steamLinkFlowController
         navigationController = UINavigationController()
         navigationController.tabBarItem = UITabBarItem(
-            title: L10n.Profile.Tab.title,
+            title: "프로필",
             image: UIImage(systemName: "person"),
             selectedImage: UIImage(systemName: "person.fill")
         )
@@ -68,43 +65,14 @@ final class ProfileCoordinator: NSObject {
         profileVC.onLoggedOut = { [weak self] in
             self?.onLoggedOut?()
         }
-        profileVC.onShowEditProfile = { [weak self] selectedTitleKey in
-            self?.showEditProfile(selectedTitleKey: selectedTitleKey)
-        }
-        profileVC.onShowSettings = { [weak self, weak profileVC] in
-            guard let self, let profileVC else { return }
-            self.showSettings(profileViewController: profileVC)
-        }
-        profileVC.onShowPlayedGames = { [weak self] in
-            print("[Profile] coordinator push playedGames")
-            self?.showLibrary(tab: .playing)
-        }
-        profileVC.onShowRecentPlayList = { [weak self] games, translatedTitles in
-            self?.showRecentPlayList(games: games, translatedTitles: translatedTitles)
+        profileVC.onShowEditProfile = { [weak self] in
+            self?.showEditProfile()
         }
         profileVC.onShowFavoriteGames = { [weak self] in
             self?.showLibrary(tab: .favorites)
         }
         profileVC.onShowWrittenReviews = { [weak self] in
             self?.showLibrary(tab: .reviewed)
-        }
-        profileVC.onShowFriendsList = { [weak self] in
-            self?.showFriendsList()
-        }
-        profileVC.onShowSteamFriends = { [weak self] in
-            self?.showSteamFriends()
-        }
-        profileVC.onShowFriendRequests = { [weak self] in
-            self?.showFriendRequests()
-        }
-        profileVC.onShowFriendSearch = { [weak self] in
-            self?.showFriendSearch()
-        }
-        profileVC.onShowFriendActivity = { [weak self] in
-            self?.showFriendActivity()
-        }
-        profileVC.onShowSocialPrivacySettings = { [weak self] in
-            self?.showSocialPrivacySettings()
         }
         profileVC.onShowTermsOfService = { [weak self] in
             self?.showWebPage(url: AppConfig.termsOfServiceURL)
@@ -119,18 +87,6 @@ final class ProfileCoordinator: NSObject {
             self?.contactSupport()
         }
         navigationController.setViewControllers([profileVC], animated: false)
-    }
-
-    func navigateToFriendProfile(userID: String) {
-        showFriendProfile(userID: userID)
-    }
-
-    func navigateToFriendActivityFeed() {
-        showFriendActivity()
-    }
-
-    func navigateToFriendRequests() {
-        showFriendRequests()
     }
 
     // MARK: - Navigation
@@ -150,7 +106,7 @@ final class ProfileCoordinator: NSObject {
         }
         detailVC.onShare = { [weak self] game in
             guard let topVC = self?.navigationController.topViewController else { return }
-            let items: [Any] = [L10n.tr("Localizable", "common.share.gameInvitation", game.displayTitle)]
+            let items: [Any] = ["\(game.displayTitle) — GamePedia에서 확인해보세요!"]
             let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
             topVC.present(activityVC, animated: true)
         }
@@ -215,145 +171,14 @@ final class ProfileCoordinator: NSObject {
         libraryViewController.onGameSelected = { [weak self] gameId in
             self?.showDetail(gameId: gameId)
         }
-        libraryViewController.onSteamDetailRequested = { [weak self] viewState in
-            self?.showSteamDetail(viewState: viewState)
-        }
-        libraryViewController.onSteamLinkRequested = { [weak self, weak libraryViewController] url in
-            let presenter = libraryViewController ?? self?.navigationController.topViewController ?? self?.navigationController
-            self?.showSteamLink(url: url, presenter: presenter)
-        }
-        libraryViewController.onSteamPrivacyGuideRequested = { [weak self, weak libraryViewController] url in
-            let presenter = libraryViewController ?? self?.navigationController.topViewController ?? self?.navigationController
-            self?.showSteamPrivacyGuidance(
-                url: url,
-                presenter: presenter,
-                retryHandler: { [weak libraryViewController] in
-                    libraryViewController?.retrySteamPrivacyGuidance()
-                }
-            )
-        }
-        libraryViewController.onSectionListRequested = { [weak self] route in
-            self?.showLibrarySectionList(route)
-        }
         navigationController.pushViewController(libraryViewController, animated: true)
     }
 
-    private func showLibrarySectionList(_ route: LibrarySectionListRoute) {
-        let listViewController = LibrarySectionListViewController(route: route)
-        listViewController.onGameSelected = { [weak self] gameID in
-            self?.showDetail(gameId: gameID)
-        }
-        listViewController.onSteamDetailRequested = { [weak self] viewState in
-            self?.showSteamDetail(viewState: viewState)
-        }
-        navigationController.pushViewController(listViewController, animated: true)
-    }
-
-    private func showFriendsList() {
-        let viewController = FriendsListViewController()
-        viewController.onFriendSelected = { [weak self] userID in
-            self?.showFriendProfile(userID: userID)
-        }
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showSteamFriends() {
-        let viewController = SteamFriendsViewController()
-        viewController.onLinkedFriendSelected = { [weak self] userID in
-            self?.showFriendProfile(userID: userID)
-        }
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showFriendRequests() {
-        let viewController = FriendRequestsViewController()
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showFriendSearch() {
-        let viewController = FriendSearchViewController()
-        viewController.onFriendSelected = { [weak self] userID in
-            self?.showFriendProfile(userID: userID)
-        }
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showFriendProfile(userID: String) {
-        let viewController = FriendProfileViewController(userID: userID)
-        viewController.onGameSelected = { [weak self] gameID in
-            self?.showDetail(gameId: gameID)
-        }
-        viewController.onReviewGameSelected = { [weak self] gameID in
-            self?.showDetail(gameId: gameID)
-        }
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showFriendActivity() {
-        let viewController = FriendActivityFeedViewController()
-        viewController.onRoute = { [weak self] route in
-            self?.handleSocialActivityRoute(route)
-        }
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showRecentPlayList(games: [RecentGame], translatedTitles: [Int: String]) {
-        print("[Profile] coordinator push recentPlayList count=\(games.count)")
-        let viewController = ProfileRecentPlayListViewController(
-            games: games,
-            translatedTitles: translatedTitles
-        )
-        viewController.onGameSelected = { [weak self] gameID in
-            self?.showDetail(gameId: gameID)
-        }
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showSocialPrivacySettings() {
-        let viewController = SocialPrivacySettingsViewController()
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showSettings(profileViewController: ProfileViewController) {
-        let viewController = ProfileSettingsViewController()
-        viewController.onShowSocialPrivacySettings = { [weak self] in
-            self?.showSocialPrivacySettings()
-        }
-        viewController.onLogoutConfirmed = { [weak profileViewController] in
-            profileViewController?.performLogoutFromSettings()
-        }
-        viewController.onDeleteAccountConfirmed = { [weak profileViewController] in
-            profileViewController?.performDeleteAccountFromSettings()
-        }
-        viewController.onShowTermsOfService = { [weak self] in
-            self?.showWebPage(url: AppConfig.termsOfServiceURL)
-        }
-        viewController.onShowPrivacyPolicy = { [weak self] in
-            self?.showWebPage(url: AppConfig.privacyPolicyURL)
-        }
-        viewController.onShowCommunityGuidelines = { [weak self] in
-            self?.showWebPage(url: AppConfig.communityGuidelinesURL)
-        }
-        viewController.onContactSupport = { [weak self] in
-            self?.contactSupport()
-        }
-        viewController.onShowNotificationSettings = { [weak self] in
-            self?.showNotificationSettings()
-        }
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showSteamDetail(viewState: SteamFallbackGameDetailViewState) {
-        let viewController = SteamFallbackGameDetailViewController(viewState: viewState)
-        navigationController.pushViewController(viewController, animated: true)
-    }
-
-    private func showEditProfile(selectedTitleKey: String?) {
+    private func showEditProfile() {
         guard let authenticatedUser = userSessionStore.fetchUser() else { return }
 
         let profileEditViewModel = ProfileEditViewModel(
             authenticatedUser: authenticatedUser,
-            initialSelectedTitleKey: selectedTitleKey,
             updateCurrentUserProfileUseCase: updateCurrentUserProfileUseCase,
             uploadCurrentUserProfileImageUseCase: uploadCurrentUserProfileImageUseCase,
             removeCurrentUserProfileImageUseCase: removeCurrentUserProfileImageUseCase
@@ -374,86 +199,19 @@ final class ProfileCoordinator: NSObject {
         navigationController.topViewController?.present(safariViewController, animated: true)
     }
 
-    private func showSteamPrivacyGuidance(
-        url: URL,
-        presenter: UIViewController?,
-        retryHandler: @escaping () -> Void
-    ) {
-        guard let presenter else { return }
-
-        let guidanceViewController = SteamPrivacyGuidanceViewController()
-        let modalNavigationController = UINavigationController(rootViewController: guidanceViewController)
-        modalNavigationController.modalPresentationStyle = .pageSheet
-        NavigationBarStyler.configureGlobalAppearance(on: modalNavigationController.navigationBar)
-
-        if let sheetPresentationController = modalNavigationController.sheetPresentationController {
-            sheetPresentationController.detents = [.medium(), .large()]
-            sheetPresentationController.prefersGrabberVisible = true
-        }
-
-        guidanceViewController.onShowInstructions = { [weak self, weak modalNavigationController] in
-            guard let modalNavigationController else { return }
-            self?.showSteamPrivacyInstructions(url: url, navigationController: modalNavigationController)
-        }
-        guidanceViewController.onRetry = { [weak modalNavigationController] in
-            modalNavigationController?.dismiss(animated: true) {
-                retryHandler()
-            }
-        }
-
-        presenter.present(modalNavigationController, animated: true)
-    }
-
-    private func showSteamPrivacyInstructions(url: URL, navigationController: UINavigationController) {
-        let instructionsViewController = SteamPrivacyInstructionsViewController()
-        instructionsViewController.onOpenSteamSettings = { [weak instructionsViewController] in
-            let presenter = instructionsViewController ?? navigationController.topViewController
-            guard let presenter else { return }
-            let safariViewController = SFSafariViewController(url: url)
-            safariViewController.preferredControlTintColor = .gpPrimary
-            presenter.present(safariViewController, animated: true)
-        }
-        navigationController.pushViewController(instructionsViewController, animated: true)
-    }
-
     private func contactSupport() {
         guard let mailURL = URL(string: "mailto:\(AppConfig.supportEmail)") else { return }
         guard UIApplication.shared.canOpenURL(mailURL) else {
             let alertController = UIAlertController(
-                title: L10n.Common.Error.title,
-                message: L10n.Common.Error.tryAgain,
+                title: "메일을 열 수 없어요",
+                message: "Mail 앱을 사용할 수 있는 환경에서 다시 시도해 주세요.",
                 preferredStyle: .alert
             )
-            alertController.addAction(UIAlertAction(title: L10n.tr("Localizable", "common.button.ok"), style: .default))
+            alertController.addAction(UIAlertAction(title: "확인", style: .default))
             navigationController.topViewController?.present(alertController, animated: true)
             return
         }
 
         UIApplication.shared.open(mailURL)
-    }
-
-    private func showNotificationSettings() {
-        guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else { return }
-        UIApplication.shared.open(settingsURL)
-    }
-
-    private func handleSocialActivityRoute(_ route: SocialActivityRoute) {
-        switch route {
-        case .friendActivityFeed:
-            showFriendActivity()
-        case .friendRequests:
-            showFriendRequests()
-        case .friendProfile(let userID):
-            showFriendProfile(userID: userID)
-        case .gameDetail(let gameID):
-            showDetail(gameId: gameID)
-        case .review(let gameID, _):
-            showDetail(gameId: gameID)
-        }
-    }
-
-    private func showSteamLink(url: URL, presenter: UIViewController?) {
-        guard let presenter else { return }
-        steamLinkFlowController.start(url: url, presenter: presenter)
     }
 }

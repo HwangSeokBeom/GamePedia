@@ -1,236 +1,107 @@
 import UIKit
 
 final class LibraryRootView: UIView {
-    private struct LibrarySummaryMetrics {
-        let primaryTitle: String
-        let totalPlaytimeText: String
-        let averageRatingText: String
-        let gameCountText: String
-        let rawReviewsCount: Int
-        let rawAverageRating: Double?
-        let sourceDescription: String
-    }
 
-    var onPrimaryTabSelected: ((Int) -> Void)?
+    var onTabSelected: ((Int) -> Void)?
     var onFilterSelected: ((Int) -> Void)?
-    var onSteamPrimaryActionTapped: (() -> Void)?
-    var onSteamSecondaryActionTapped: (() -> Void)?
-    var onOwnedSummaryTapped: (() -> Void)?
-    var onPlayingSummaryTapped: (() -> Void)?
-    var onRecommendationSummaryTapped: (() -> Void)?
 
-    private let topContentStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .vertical
-        stackView.spacing = 12
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
+    let collectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.minimumInteritemSpacing = 12
+        layout.minimumLineSpacing = 14
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .clear
+        collectionView.showsVerticalScrollIndicator = false
+        collectionView.isScrollEnabled = false
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        return collectionView
     }()
 
-    private let primaryTabContainerView: UIView = {
+    private let scrollView: UIScrollView = {
+        let scrollView = UIScrollView()
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 108, right: 0)
+        scrollView.scrollIndicatorInsets = UIEdgeInsets(top: 0, left: 0, bottom: 108, right: 0)
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        return scrollView
+    }()
+
+    private let contentView: UIView = {
         let view = UIView()
-        view.backgroundColor = .gpCardBackground
-        view.layer.cornerRadius = 18
-        view.layer.cornerCurve = .continuous
-        view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.26).cgColor
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
 
-    private let primaryTabStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.spacing = 8
-        stackView.distribution = .fillEqually
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
-    }()
-
-    private let summaryStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.spacing = 8
-        stackView.distribution = .fillEqually
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
-    }()
-
-    private let totalPlaySummaryView = LibrarySummaryMetricView()
-    private let averageRatingSummaryView = LibrarySummaryMetricView()
-    private let gameCountSummaryView = LibrarySummaryMetricView()
-
-    private let steamCardView: UIView = {
-        let view = UIView()
-        view.backgroundColor = .gpCardBackground
-        view.layer.cornerRadius = 20
-        view.layer.cornerCurve = .continuous
-        view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.26).cgColor
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
-    }()
-
-    private let steamCardTitleLabel: UILabel = {
+    private let titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 15, weight: .semibold)
+        let baseDescriptor = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .largeTitle)
+        let descriptor = baseDescriptor.withDesign(.serif) ?? baseDescriptor
+        label.font = UIFont(descriptor: descriptor, size: 32)
+        label.text = "내 라이브러리"
         label.textColor = .gpTextPrimary
-        label.numberOfLines = 1
+        label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
 
-    private let steamLastSyncLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 12, weight: .medium)
-        label.textColor = .gpTextSecondary
-        label.numberOfLines = 1
-        return label
+    private lazy var headerRow: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [titleLabel])
+        stackView.axis = .horizontal
+        stackView.alignment = .center
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
     }()
 
-    private let steamConnectionIconView: UIImageView = {
-        let imageView = UIImageView()
-        imageView.image = UIImage(
-            systemName: "link.circle.fill",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
-        )
-        imageView.tintColor = .gpPrimaryLight
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        return imageView
-    }()
-
-    private let steamStatusDotView: UIView = {
+    private let tabsContainerView: UIView = {
         let view = UIView()
-        view.layer.cornerRadius = 4
-        view.layer.cornerCurve = .continuous
+        view.backgroundColor = .gpSurface
+        view.layer.cornerRadius = 16
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
 
-    private let steamStatusLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 12, weight: .semibold)
-        label.textColor = .gpTextPrimary
-        label.numberOfLines = 1
-        return label
-    }()
-
-    private let steamCardMessageLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 13)
-        label.textColor = .gpTextSecondary
-        label.numberOfLines = 0
-        return label
-    }()
-
-    private let steamStatusContainerView: UIView = {
-        let view = UIView()
-        view.backgroundColor = UIColor.white.withAlphaComponent(0.03)
-        view.layer.cornerRadius = 12
-        view.layer.cornerCurve = .continuous
-        view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.2).cgColor
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
-    }()
-
-    private let steamPrimaryButton: UIButton = {
-        var configuration = UIButton.Configuration.filled()
-        configuration.baseBackgroundColor = .gpPrimary
-        configuration.baseForegroundColor = .gpOnPrimary
-        configuration.cornerStyle = .capsule
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
-        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
-            var attributes = attributes
-            attributes.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
-            return attributes
-        }
-        let button = UIButton(configuration: configuration)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-
-    private let steamSecondaryButton: UIButton = {
-        var configuration = UIButton.Configuration.plain()
-        configuration.baseForegroundColor = .gpTextSecondary
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
-        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
-            var attributes = attributes
-            attributes.font = UIFont.systemFont(ofSize: 12, weight: .medium)
-            return attributes
-        }
-        let button = UIButton(configuration: configuration)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-
-    private let steamTextStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .vertical
-        stackView.spacing = 4
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
-    }()
-
-    private let steamButtonRowView: UIStackView = {
+    private let tabStackView: UIStackView = {
         let stackView = UIStackView()
         stackView.axis = .horizontal
-        stackView.alignment = .center
-        stackView.distribution = .fill
-        stackView.spacing = 10
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
-    }()
-
-    private let steamTopRowStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.alignment = .center
-        stackView.spacing = 12
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
-    }()
-
-    private let steamConnectionTitleStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .vertical
-        stackView.spacing = 2
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
-    }()
-
-    private let steamStatusStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.alignment = .center
         stackView.spacing = 6
+        stackView.distribution = .fillEqually
         stackView.translatesAutoresizingMaskIntoConstraints = false
         return stackView
     }()
 
-    private let steamContentStackView: UIStackView = {
+    private let statsStackView: UIStackView = {
         let stackView = UIStackView()
-        stackView.axis = .vertical
-        stackView.spacing = 12
+        stackView.axis = .horizontal
+        stackView.spacing = 10
+        stackView.distribution = .fillEqually
         stackView.translatesAutoresizingMaskIntoConstraints = false
         return stackView
     }()
 
-    private let miniFilterStackView: UIStackView = {
+    private let favoriteCountStatView = LibraryStatCardView(
+        value: "0",
+        subtitle: "찜한 게임",
+        accentColor: .gpRed
+    )
+
+    private let averageRatingStatView = LibraryStatCardView(
+        value: "0.0",
+        subtitle: "평균 평점",
+        accentColor: .gpOrange
+    )
+
+    private let highestRatingStatView = LibraryStatCardView(
+        value: "0.0",
+        subtitle: "최고 평점",
+        accentColor: .gpPrimaryLight
+    )
+
+    private let filterStackView: UIStackView = {
         let stackView = UIStackView()
         stackView.axis = .horizontal
         stackView.spacing = 8
         stackView.alignment = .fill
         stackView.translatesAutoresizingMaskIntoConstraints = false
         return stackView
-    }()
-
-    let collectionView: UICollectionView = {
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewLayout())
-        collectionView.backgroundColor = .clear
-        collectionView.showsVerticalScrollIndicator = false
-        collectionView.alwaysBounceVertical = true
-        collectionView.translatesAutoresizingMaskIntoConstraints = false
-        return collectionView
     }()
 
     private let loadingIndicatorView: UIActivityIndicatorView = {
@@ -241,315 +112,201 @@ final class LibraryRootView: UIView {
         return indicatorView
     }()
 
-    private var primaryTabButtons: [LibraryPillButton] = []
+    private let emptyStateLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.textColor = .gpTextSecondary
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.isHidden = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private var collectionHeightConstraint: NSLayoutConstraint!
+    private var tabButtons: [LibraryPillButton] = []
     private var filterButtons: [LibraryPillButton] = []
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupView()
         setupLayout()
+        configureSelections()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupView()
         setupLayout()
+        configureSelections()
     }
 
-    func setCollectionViewLayout(_ layout: UICollectionViewLayout) {
-        collectionView.setCollectionViewLayout(layout, animated: false)
-    }
-
-    func render(_ state: LibraryState) {
-        setSelectedPrimaryTab(tab: state.selectedTab)
-        let summaryMetrics = summaryMetrics(for: state)
-
-        print(
-            "[LibrarySummaryUI] " +
-            "selectedTab=\(state.selectedTab) " +
-            "gameCount=\(summaryMetrics.gameCountText) " +
-            "totalPlaytimeHours=\(summaryMetrics.totalPlaytimeText) " +
-            "source=\(summaryMetrics.sourceDescription)"
-        )
-
-        totalPlaySummaryView.configure(
-            value: summaryMetrics.totalPlaytimeText,
-            title: summaryMetrics.primaryTitle,
-            valueColor: .gpTeal
-        )
-        averageRatingSummaryView.configure(
-            value: summaryMetrics.averageRatingText,
-            title: L10n.Library.Summary.averageRating,
-            valueColor: .gpPrimaryLight
-        )
-        gameCountSummaryView.configure(
-            value: summaryMetrics.gameCountText,
-            title: L10n.Library.Summary.gameCount,
-            valueColor: .gpCoral
-        )
-
-        setSelectedHighlightChip(chip: state.selectedHighlightChip)
-        configureSteamCard(with: state)
-        loadingIndicatorView.stopAnimating()
-        logSummaryMetrics(summaryMetrics, for: state)
-    }
-
-    private func setSelectedPrimaryTab(tab: LibraryTab) {
-        primaryTabButtons.enumerated().forEach { index, button in
-            button.applyPrimaryTabStyle(isSelected: index == tab.rawValue)
+    func setSelectedTab(index: Int) {
+        tabButtons.enumerated().forEach { offset, button in
+            button.applyStyle(
+                isSelected: offset == index,
+                selectedBackgroundColor: .gpPrimary,
+                selectedTextColor: .gpOnPrimary,
+                normalBackgroundColor: .clear,
+                normalTextColor: .gpTextSecondary,
+                normalBorderColor: .clear
+            )
         }
     }
 
-    private func setSelectedHighlightChip(chip: LibraryHighlightChip) {
-        filterButtons.enumerated().forEach { index, button in
-            button.applySecondaryChipStyle(isSelected: index == chip.rawValue)
+    func setSelectedFilter(index: Int) {
+        filterButtons.enumerated().forEach { offset, button in
+            button.applyStyle(
+                isSelected: offset == index,
+                selectedBackgroundColor: UIColor.gpPrimary.withAlphaComponent(0.16),
+                selectedTextColor: .gpPrimaryLight,
+                normalBackgroundColor: .gpSurface,
+                normalTextColor: .gpTextSecondary,
+                normalBorderColor: .gpSeparator
+            )
         }
+    }
+
+    func updateCollectionHeight() {
+        layoutIfNeeded()
+        collectionHeightConstraint.constant = collectionView.collectionViewLayout.collectionViewContentSize.height
+    }
+
+    func setUsesNavigationTitle(_ usesNavigationTitle: Bool) {
+        titleLabel.isHidden = usesNavigationTitle
+        headerRow.isHidden = usesNavigationTitle
     }
 
     private func setupView() {
         backgroundColor = .gpBackground
 
-        [totalPlaySummaryView, averageRatingSummaryView, gameCountSummaryView].forEach {
-            $0.isUserInteractionEnabled = false
-            summaryStackView.addArrangedSubview($0)
-        }
+        addSubview(scrollView)
+        scrollView.addSubview(contentView)
 
-        [steamCardTitleLabel, steamLastSyncLabel].forEach { steamConnectionTitleStackView.addArrangedSubview($0) }
-        [steamStatusDotView, steamStatusLabel].forEach { steamStatusStackView.addArrangedSubview($0) }
-        steamStatusContainerView.addSubview(steamStatusStackView)
-        [steamConnectionIconView, steamConnectionTitleStackView, UIView(), steamStatusContainerView].forEach {
-            steamTopRowStackView.addArrangedSubview($0)
-        }
+        contentView.addSubview(headerRow)
+        contentView.addSubview(tabsContainerView)
+        tabsContainerView.addSubview(tabStackView)
+        contentView.addSubview(statsStackView)
+        contentView.addSubview(filterStackView)
+        contentView.addSubview(emptyStateLabel)
+        contentView.addSubview(collectionView)
+        contentView.addSubview(loadingIndicatorView)
 
-        [UIView(), steamPrimaryButton, steamSecondaryButton].forEach { steamButtonRowView.addArrangedSubview($0) }
-        [steamTopRowStackView, steamCardMessageLabel, steamButtonRowView].forEach { steamContentStackView.addArrangedSubview($0) }
-        steamCardView.addSubview(steamContentStackView)
-
-        [primaryTabContainerView, summaryStackView, steamCardView, miniFilterStackView].forEach {
-            topContentStackView.addArrangedSubview($0)
-        }
-
-        [primaryTabStackView].forEach { primaryTabContainerView.addSubview($0) }
-        [topContentStackView, collectionView, loadingIndicatorView].forEach { addSubview($0) }
-
-        [L10n.Library.PrimaryTab.playing, L10n.Library.PrimaryTab.wishlist, L10n.Library.PrimaryTab.reviewed].enumerated().forEach { index, title in
+        ["플레이중", "찜한 게임", "리뷰 작성함"].enumerated().forEach { index, title in
             let button = LibraryPillButton(title: title)
             button.tag = index
-            button.addTarget(self, action: #selector(didTapPrimaryTab(_:)), for: .touchUpInside)
-            primaryTabButtons.append(button)
-            primaryTabStackView.addArrangedSubview(button)
+            button.addTarget(self, action: #selector(didTapTab(_:)), for: .touchUpInside)
+            tabButtons.append(button)
+            tabStackView.addArrangedSubview(button)
         }
 
-        [L10n.Library.Filter.recent, L10n.Library.Filter.rating, L10n.Library.Filter.playtime].enumerated().forEach { index, title in
+        [favoriteCountStatView, averageRatingStatView, highestRatingStatView].forEach {
+            statsStackView.addArrangedSubview($0)
+        }
+
+        ["최신순", "오래된순"].enumerated().forEach { index, title in
             let button = LibraryPillButton(title: title)
             button.tag = index
             button.addTarget(self, action: #selector(didTapFilter(_:)), for: .touchUpInside)
             filterButtons.append(button)
-            miniFilterStackView.addArrangedSubview(button)
+            filterStackView.addArrangedSubview(button)
         }
 
-        steamPrimaryButton.addTarget(self, action: #selector(didTapSteamPrimaryAction), for: .touchUpInside)
-        steamSecondaryButton.addTarget(self, action: #selector(didTapSteamSecondaryAction), for: .touchUpInside)
+        collectionView.register(LibraryGameCardCell.self, forCellWithReuseIdentifier: LibraryGameCardCell.reuseId)
+        collectionHeightConstraint = collectionView.heightAnchor.constraint(equalToConstant: 420)
+
+        NSLayoutConstraint.activate([
+            headerRow.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 0),
+            headerRow.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            headerRow.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+
+            tabsContainerView.topAnchor.constraint(equalTo: headerRow.bottomAnchor, constant: 20),
+            tabsContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            tabsContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+
+            tabStackView.topAnchor.constraint(equalTo: tabsContainerView.topAnchor, constant: 4),
+            tabStackView.leadingAnchor.constraint(equalTo: tabsContainerView.leadingAnchor, constant: 4),
+            tabStackView.trailingAnchor.constraint(equalTo: tabsContainerView.trailingAnchor, constant: -4),
+            tabStackView.bottomAnchor.constraint(equalTo: tabsContainerView.bottomAnchor, constant: -4),
+
+            statsStackView.topAnchor.constraint(equalTo: tabsContainerView.bottomAnchor, constant: 14),
+            statsStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            statsStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+
+            filterStackView.topAnchor.constraint(equalTo: statsStackView.bottomAnchor, constant: 14),
+            filterStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            filterStackView.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -16),
+
+            emptyStateLabel.topAnchor.constraint(equalTo: filterStackView.bottomAnchor, constant: 40),
+            emptyStateLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            emptyStateLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+
+            collectionView.topAnchor.constraint(equalTo: filterStackView.bottomAnchor, constant: 14),
+            collectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            collectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            collectionView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24),
+            collectionHeightConstraint,
+
+            loadingIndicatorView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            loadingIndicatorView.topAnchor.constraint(equalTo: filterStackView.bottomAnchor, constant: 40)
+        ])
     }
 
     private func setupLayout() {
         NSLayoutConstraint.activate([
-            topContentStackView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 0),
-            topContentStackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
-            topContentStackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+            scrollView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            primaryTabStackView.topAnchor.constraint(equalTo: primaryTabContainerView.topAnchor, constant: 6),
-            primaryTabStackView.leadingAnchor.constraint(equalTo: primaryTabContainerView.leadingAnchor, constant: 6),
-            primaryTabStackView.trailingAnchor.constraint(equalTo: primaryTabContainerView.trailingAnchor, constant: -6),
-            primaryTabStackView.bottomAnchor.constraint(equalTo: primaryTabContainerView.bottomAnchor, constant: -6),
-
-            steamContentStackView.topAnchor.constraint(equalTo: steamCardView.topAnchor, constant: 16),
-            steamContentStackView.leadingAnchor.constraint(equalTo: steamCardView.leadingAnchor, constant: 16),
-            steamContentStackView.trailingAnchor.constraint(equalTo: steamCardView.trailingAnchor, constant: -16),
-            steamContentStackView.bottomAnchor.constraint(equalTo: steamCardView.bottomAnchor, constant: -16),
-
-            steamConnectionIconView.widthAnchor.constraint(equalToConstant: 20),
-            steamConnectionIconView.heightAnchor.constraint(equalToConstant: 20),
-            steamStatusDotView.widthAnchor.constraint(equalToConstant: 8),
-            steamStatusDotView.heightAnchor.constraint(equalToConstant: 8),
-            steamStatusStackView.topAnchor.constraint(equalTo: steamStatusContainerView.topAnchor, constant: 6),
-            steamStatusStackView.leadingAnchor.constraint(equalTo: steamStatusContainerView.leadingAnchor, constant: 10),
-            steamStatusStackView.trailingAnchor.constraint(equalTo: steamStatusContainerView.trailingAnchor, constant: -10),
-            steamStatusStackView.bottomAnchor.constraint(equalTo: steamStatusContainerView.bottomAnchor, constant: -6),
-
-            steamPrimaryButton.heightAnchor.constraint(equalToConstant: 36),
-            steamPrimaryButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 112),
-            steamSecondaryButton.heightAnchor.constraint(equalToConstant: 36),
-
-            collectionView.topAnchor.constraint(equalTo: topContentStackView.bottomAnchor, constant: 10),
-            collectionView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            collectionView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: bottomAnchor),
-
-            loadingIndicatorView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            loadingIndicatorView.centerYAnchor.constraint(equalTo: centerYAnchor),
-
-            miniFilterStackView.heightAnchor.constraint(greaterThanOrEqualToConstant: 34)
+            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
         ])
     }
 
-    private func configureSteamCard(with state: LibraryState) {
-        let statusPresentation = steamStatusPresentation(for: state)
-        steamStatusDotView.backgroundColor = statusPresentation.color
-        steamStatusLabel.text = statusPresentation.text
+    private func configureSelections() {
+        setSelectedTab(index: 1)
+        setSelectedFilter(index: 0)
+    }
 
-        if state.isSteamConnected {
-            steamCardTitleLabel.text = L10n.Library.Steam.Title.connected
-            steamLastSyncLabel.text = lastSyncText(for: state)
-            if state.isSyncingOwnedSteamLibrary {
-                steamCardMessageLabel.text = L10n.Library.Steam.Message.syncing
-            } else {
-                steamCardMessageLabel.text = L10n.Library.Steam.Message.connected
-            }
-            var configuration = steamPrimaryButton.configuration
-            configuration?.title = state.isSyncingOwnedSteamLibrary ? L10n.Library.Steam.Button.syncing : L10n.Library.Steam.Button.sync
-            configuration?.showsActivityIndicator = state.isSyncingOwnedSteamLibrary
-            steamPrimaryButton.configuration = configuration
-            steamPrimaryButton.isEnabled = state.steamLinkStatus.canSync && !state.isSyncingOwnedSteamLibrary
-            steamPrimaryButton.alpha = steamPrimaryButton.isEnabled ? 1.0 : 0.7
+    func render(_ state: LibraryState) {
+        setSelectedTab(index: state.selectedTab.rawValue)
+        setSelectedFilter(index: state.selectedSort.rawValue)
 
-            var secondaryConfiguration = UIButton.Configuration.plain()
-            secondaryConfiguration.baseForegroundColor = .systemRed
-            secondaryConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
-            secondaryConfiguration.title = L10n.Library.Steam.Button.disconnect
-            secondaryConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
-                var attributes = attributes
-                attributes.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
-                return attributes
-            }
-            steamSecondaryButton.configuration = secondaryConfiguration
-            steamSecondaryButton.isHidden = !state.steamLinkStatus.canDisconnect
-            steamSecondaryButton.isEnabled = state.steamLinkStatus.canDisconnect && !state.isUnlinkingSteamAccount
-            steamSecondaryButton.alpha = steamSecondaryButton.isEnabled ? 1.0 : 0.6
+        favoriteCountStatView.configure(value: "\(state.itemCount)", subtitle: state.countSubtitle)
+        averageRatingStatView.configure(value: state.averageRatingText, subtitle: "평균 평점")
+        highestRatingStatView.configure(value: state.highestRatingText, subtitle: "최고 평점")
+
+        statsStackView.isHidden = !state.showsManagedContent
+        filterStackView.isHidden = !state.showsManagedContent
+
+        emptyStateLabel.text = state.emptyMessage
+        emptyStateLabel.isHidden = !state.showsEmptyState
+        collectionView.isHidden = state.isLoading || state.showsEmptyState
+
+        if state.isLoading {
+            loadingIndicatorView.startAnimating()
         } else {
-            steamCardTitleLabel.text = L10n.Library.Steam.Title.guide
-            steamLastSyncLabel.text = L10n.Library.Steam.Message.guide
-            steamCardMessageLabel.text = L10n.Library.Steam.Message.connected
-            var configuration = steamPrimaryButton.configuration
-            configuration?.title = L10n.Library.Steam.Button.connect
-            configuration?.showsActivityIndicator = false
-            steamPrimaryButton.configuration = configuration
-            steamPrimaryButton.isEnabled = true
-            steamPrimaryButton.alpha = 1.0
-            steamSecondaryButton.isHidden = true
-        }
-    }
-
-    private func lastSyncText(for state: LibraryState) -> String {
-        guard let lastSteamSyncAt = state.steamLinkStatus.lastSteamSyncAt else {
-            return L10n.Library.Steam.LastSync.none
+            loadingIndicatorView.stopAnimating()
         }
 
-        if abs(lastSteamSyncAt.timeIntervalSinceNow) < 60 {
-            return L10n.Common.Format.lastSync(L10n.Common.Time.justNow)
-        }
-
-        let formatter = RelativeDateTimeFormatter()
-        formatter.locale = .current
-        formatter.unitsStyle = .full
-        return L10n.Common.Format.lastSync(
-            formatter.localizedString(for: lastSteamSyncAt, relativeTo: Date())
-        )
-    }
-
-    private func steamStatusPresentation(for state: LibraryState) -> (text: String, color: UIColor) {
-        if state.isSyncingOwnedSteamLibrary || state.steamSyncStatus == .syncing {
-            return (L10n.Library.Steam.Status.syncing, .gpPrimary)
-        }
-
-        if state.steamSyncErrorCode != nil || state.steamSyncStatus == .failed || state.steamSyncStatus == .privateProfile || state.steamSyncStatus == .tokenExpired {
-            return (L10n.Library.Steam.Status.error, .systemRed)
-        }
-
-        if state.isSteamConnected {
-            return (L10n.Library.Steam.Status.connected, .systemGreen)
-        }
-
-        return (L10n.Library.Steam.Status.disconnected, .gpTextTertiary)
-    }
-
-    private func summaryMetrics(for state: LibraryState) -> LibrarySummaryMetrics {
-        let summaryState = state.summaryByTab[state.selectedTab] ?? .empty(for: state.selectedTab)
-        return LibrarySummaryMetrics(
-            primaryTitle: summaryState.primaryTitle,
-            totalPlaytimeText: formattedPrimaryValueText(summaryState),
-            averageRatingText: formattedAverageRatingText(
-                summaryState.averageRating,
-                reviewCount: summaryState.reviewCount
-            ),
-            gameCountText: Self.numberFormatter.string(from: NSNumber(value: summaryState.gameCount)) ?? "\(summaryState.gameCount)",
-            rawReviewsCount: summaryState.reviewCount,
-            rawAverageRating: summaryState.averageRating,
-            sourceDescription: summaryState.sourceDescription
-        )
-    }
-
-    private func formattedPrimaryValueText(_ summaryState: LibraryTabSummaryState) -> String {
-        switch summaryState.primaryValueKind {
-        case .hours:
-            if summaryState.primaryValue.rounded(.towardZero) == summaryState.primaryValue {
-                return "\(LocalizedNumberFormatter.integer(Int(summaryState.primaryValue)))h"
-            }
-            return "\(LocalizedNumberFormatter.oneFraction(summaryState.primaryValue))h"
-        case .count:
-            return LocalizedNumberFormatter.integer(Int(summaryState.primaryValue))
-        }
-    }
-
-    private func formattedAverageRatingText(_ rating: Double?, reviewCount: Int) -> String {
-        guard reviewCount > 0, let rating, rating.isFinite else { return "—" }
-        return LocalizedNumberFormatter.oneFraction(rating)
-    }
-
-    private func logSummaryMetrics(_ summaryMetrics: LibrarySummaryMetrics, for state: LibraryState) {
-        let rawAverageRatingText = summaryMetrics.rawAverageRating.map { String(format: "%.2f", $0) } ?? "nil"
-
-        print(
-            "[LibrarySummary] " +
-            "selectedTab=\(state.selectedTab) " +
-            "rawReviewsCount=\(summaryMetrics.rawReviewsCount) " +
-            "rawAverageRating=\(rawAverageRatingText) " +
-            "mappedAverageRatingText=\(summaryMetrics.averageRatingText) " +
-            "finalTotalPlaytime=\(summaryMetrics.totalPlaytimeText) " +
-            "finalGameCount=\(summaryMetrics.gameCountText) " +
-            "source=\(summaryMetrics.sourceDescription)"
-        )
+        collectionHeightConstraint.constant = state.showsEmptyState ? 0 : collectionView.collectionViewLayout.collectionViewContentSize.height
     }
 
     @objc
-    private func didTapPrimaryTab(_ sender: UIButton) {
-        guard let selectedTab = LibraryTab(rawValue: sender.tag) else { return }
-        setSelectedPrimaryTab(tab: selectedTab)
-        onPrimaryTabSelected?(sender.tag)
+    private func didTapTab(_ sender: UIButton) {
+        setSelectedTab(index: sender.tag)
+        onTabSelected?(sender.tag)
     }
 
     @objc
     private func didTapFilter(_ sender: UIButton) {
-        guard let chip = LibraryHighlightChip(rawValue: sender.tag) else { return }
-        setSelectedHighlightChip(chip: chip)
+        setSelectedFilter(index: sender.tag)
         onFilterSelected?(sender.tag)
     }
-
-    @objc
-    private func didTapSteamPrimaryAction() {
-        onSteamPrimaryActionTapped?()
-    }
-
-    @objc
-    private func didTapSteamSecondaryAction() {
-        onSteamSecondaryActionTapped?()
-    }
-
-    private static let numberFormatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        return formatter
-    }()
 }
 
 private final class LibraryPillButton: UIButton {
@@ -558,121 +315,97 @@ private final class LibraryPillButton: UIButton {
         super.init(frame: .zero)
         var configuration = UIButton.Configuration.plain()
         configuration.title = title
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12)
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 9, leading: 12, bottom: 9, trailing: 12)
         configuration.attributedTitle = AttributedString(
             title,
             attributes: AttributeContainer([
-                .font: UIFont.systemFont(ofSize: 13, weight: .semibold)
+                .font: UIFont.systemFont(ofSize: 12, weight: .semibold)
             ])
         )
         self.configuration = configuration
-        layer.cornerRadius = 14
-        layer.cornerCurve = .continuous
-        layer.masksToBounds = true
-        layer.borderWidth = 1
         translatesAutoresizingMaskIntoConstraints = false
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func applyPrimaryTabStyle(isSelected: Bool) {
-        backgroundColor = isSelected ? .gpPrimary : .clear
-        layer.borderColor = (isSelected ? UIColor.gpPrimary : UIColor.clear).cgColor
-        var configuration = configuration
-        configuration?.baseForegroundColor = isSelected ? .gpOnPrimary : .gpTextSecondary
-        self.configuration = configuration
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.cornerRadius = bounds.height / 2
     }
 
-    func applySecondaryChipStyle(isSelected: Bool) {
-        backgroundColor = isSelected ? UIColor.gpPrimary.withAlphaComponent(0.14) : .clear
-        layer.borderColor = (isSelected ? UIColor.gpPrimary.withAlphaComponent(0.18) : UIColor.gpSeparator.withAlphaComponent(0.22)).cgColor
-        var configuration = configuration
-        configuration?.baseForegroundColor = isSelected ? .gpPrimaryLight : .gpTextSecondary
-        self.configuration = configuration
+    func applyStyle(
+        isSelected: Bool,
+        selectedBackgroundColor: UIColor,
+        selectedTextColor: UIColor,
+        normalBackgroundColor: UIColor,
+        normalTextColor: UIColor,
+        normalBorderColor: UIColor
+    ) {
+        backgroundColor = isSelected ? selectedBackgroundColor : normalBackgroundColor
+        layer.borderWidth = isSelected ? 0 : 1
+        layer.borderColor = normalBorderColor.cgColor
+
+        var updatedConfiguration = configuration ?? .plain()
+        updatedConfiguration.baseForegroundColor = isSelected ? selectedTextColor : normalTextColor
+        configuration = updatedConfiguration
     }
 }
 
-private final class LibrarySummaryMetricView: UIView {
+private final class LibraryStatCardView: UIView {
 
     private let valueLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 19, weight: .bold)
-        label.textColor = .gpTextPrimary
-        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .systemFont(ofSize: 20, weight: .bold)
+        label.textAlignment = .center
         return label
     }()
 
-    private let titleLabel: UILabel = {
+    private let subtitleLabel: UILabel = {
         let label = UILabel()
         label.font = .systemFont(ofSize: 10, weight: .medium)
-        label.textColor = .gpTextSecondary
-        label.translatesAutoresizingMaskIntoConstraints = false
+        label.textColor = .gpTextTertiary
+        label.textAlignment = .center
         return label
     }()
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        setup()
-    }
+    init(value: String, subtitle: String, accentColor: UIColor) {
+        super.init(frame: .zero)
 
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setup()
-    }
-
-    func configure(value: String, title: String, valueColor: UIColor) {
-        valueLabel.text = value
-        valueLabel.textColor = valueColor
-        titleLabel.text = title
-    }
-
-    private func setup() {
-        backgroundColor = .gpCardBackground
-        layer.cornerRadius = 16
-        layer.cornerCurve = .continuous
-        layer.borderWidth = 1
-        layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.24).cgColor
+        backgroundColor = .gpSurface
+        layer.cornerRadius = 14
         translatesAutoresizingMaskIntoConstraints = false
 
-        let stackView = UIStackView(arrangedSubviews: [valueLabel, titleLabel])
+        valueLabel.text = value
+        valueLabel.textColor = accentColor
+        subtitleLabel.text = subtitle
+
+        let stackView = UIStackView(arrangedSubviews: [valueLabel, subtitleLabel])
         stackView.axis = .vertical
         stackView.spacing = 4
+        stackView.alignment = .center
+        stackView.isLayoutMarginsRelativeArrangement = true
+        stackView.layoutMargins = UIEdgeInsets(top: 14, left: 8, bottom: 14, right: 8)
         stackView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stackView)
 
         NSLayoutConstraint.activate([
-            stackView.topAnchor.constraint(equalTo: topAnchor, constant: 13),
-            stackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            stackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -13)
+            stackView.topAnchor.constraint(equalTo: topAnchor),
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
-}
 
-private final class PaddingLabel: UILabel {
-
-    private let insets: UIEdgeInsets
-
-    init(insets: UIEdgeInsets) {
-        self.insets = insets
-        super.init(frame: .zero)
+    func configure(value: String, subtitle: String) {
+        valueLabel.text = value
+        subtitleLabel.text = subtitle
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
-    }
-
-    override func drawText(in rect: CGRect) {
-        super.drawText(in: rect.inset(by: insets))
-    }
-
-    override var intrinsicContentSize: CGSize {
-        let size = super.intrinsicContentSize
-        return CGSize(
-            width: size.width + insets.left + insets.right,
-            height: size.height + insets.top + insets.bottom
-        )
     }
 }

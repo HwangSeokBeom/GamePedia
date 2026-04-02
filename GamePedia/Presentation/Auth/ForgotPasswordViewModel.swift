@@ -82,7 +82,7 @@ final class ForgotPasswordViewModel {
                     }
                 },
                 receiveValue: { [weak self] _ in
-                    self?.state.successMessage = L10n.tr("Localizable", "auth.forgotPassword.success")
+                    self?.state.successMessage = "가입된 이메일이라면 비밀번호 재설정 안내를 보냈어요."
                 }
             )
             .store(in: &cancellables)

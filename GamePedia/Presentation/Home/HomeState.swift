@@ -11,10 +11,6 @@ struct HomeState {
     var wishlistedGameIDs: Set<Int> = []
     var errorMessage: String? = nil
     var translatedTitles: [Int: String] = [:]
-    var selectedPlatformFilter: HomePlatformFilter = .all
-    var selectedCategoryFilter: HomeCategoryFilter = .all
-    var selectedGameModeFilter: HomeGameModeFilter = .all
-    var unreadNotificationCount: Int = 0
 
     var showsSkeleton: Bool {
         isLoading
@@ -24,20 +20,8 @@ struct HomeState {
             && trendingGames.isEmpty
     }
 
-    var selectedFilter: HomeContentFilter {
-        HomeContentFilter(
-            platform: selectedPlatformFilter,
-            category: selectedCategoryFilter,
-            gameMode: selectedGameModeFilter
-        )
-    }
-
-    var hasActiveFilters: Bool {
-        selectedFilter.hasActiveSelection
-    }
-
     func resolvedTitle(for game: Game) -> String {
-        game.title
+        translatedTitles[game.id] ?? game.resolvedTitle
     }
 
     func resolvedSupportingText(for highlight: HomeHighlightItem) -> String {

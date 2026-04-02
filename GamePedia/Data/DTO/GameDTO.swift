@@ -49,5 +49,4 @@ struct GameDetailDTO: Decodable {
     let category: Int?
     let videoIds: [String]?
     let similarGames: [GameDTO]?
-    let hasSteamReview: Bool?
 }

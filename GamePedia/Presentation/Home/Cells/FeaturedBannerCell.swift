@@ -68,7 +68,7 @@ final class FeaturedBannerCell: UICollectionViewCell {
         label.textColor = .gpTextSecondary
         label.textAlignment = .center
         label.numberOfLines = 2
-        label.text = L10n.tr("Localizable", "common.state.imageLoading")
+        label.text = "이미지를 불러오는 중이에요"
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -148,7 +148,7 @@ final class FeaturedBannerCell: UICollectionViewCell {
         heroImageView.cancelLoad()
         heroImageView.image = nil
         heroBackdropImageView.image = nil
-        fallbackLabel.text = L10n.tr("Localizable", "common.state.imageLoading")
+        fallbackLabel.text = "이미지를 불러오는 중이에요"
         fallbackOverlayView.isHidden = false
     }
 
@@ -160,7 +160,7 @@ final class FeaturedBannerCell: UICollectionViewCell {
         metaLabel.isHidden = highlight.metaText.isEmpty
         supportingLabel.text = highlight.supportingText
         supportingLabel.isHidden = highlight.supportingText.isEmpty
-        fallbackLabel.text = L10n.tr("Localizable", "common.state.imageLoading")
+        fallbackLabel.text = "이미지를 불러오는 중이에요"
         fallbackOverlayView.isHidden = false
 
         let representedGameID = highlight.game.id
@@ -180,7 +180,7 @@ final class FeaturedBannerCell: UICollectionViewCell {
                 self.fallbackOverlayView.isHidden = true
             case .failure:
                 self.heroBackdropImageView.image = nil
-                self.fallbackLabel.text = L10n.tr("Localizable", "common.error.imageLoadFailed")
+                self.fallbackLabel.text = "대표 이미지를 불러올 수 없어요"
                 self.fallbackOverlayView.isHidden = false
             }
         }

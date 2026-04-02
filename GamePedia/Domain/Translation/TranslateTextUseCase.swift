@@ -57,10 +57,6 @@ final class DefaultTranslateTextUseCase: TranslateTextUseCase {
     ) async -> String {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return text }
-        guard shouldTranslate(context: context, field: nil) else {
-            print("[Translation] skipped reason=unsupported-context context=\(context)")
-            return trimmedText
-        }
 
         guard !languageProvider.currentLanguage.isEnglish else {
             print("[Translation] skipped reason=current-language-en context=\(context)")
@@ -81,20 +77,11 @@ final class DefaultTranslateTextUseCase: TranslateTextUseCase {
         sourceLanguage: String? = "en"
     ) async -> [TranslationResultItem] {
         guard !items.isEmpty else { return [] }
-        let filteredItems = items.filter { shouldTranslate(context: context, field: $0.field) }
-        if filteredItems.count != items.count {
-            let skippedFields = items
-                .filter { shouldTranslate(context: context, field: $0.field) == false }
-                .map(\.field)
-                .joined(separator: ",")
-            print("[Translation] skipped reason=unsupported-fields context=\(context) fields=\(skippedFields)")
-        }
-        guard !filteredItems.isEmpty else { return [] }
 
-        var orderedResults = Array<TranslationResultItem?>(repeating: nil, count: filteredItems.count)
+        var orderedResults = Array<TranslationResultItem?>(repeating: nil, count: items.count)
 
         await withTaskGroup(of: (Int, TranslationResultItem).self) { group in
-            for (index, item) in filteredItems.enumerated() {
+            for (index, item) in items.enumerated() {
                 group.addTask { [self] in
                     let translatedText = await execute(
                         text: item.text,
@@ -119,12 +106,6 @@ final class DefaultTranslateTextUseCase: TranslateTextUseCase {
         }
 
         return orderedResults.compactMap { $0 }
-    }
-
-    private func shouldTranslate(context: String, field: String?) -> Bool {
-        guard context.hasPrefix("GameDetail") else { return false }
-        guard field?.lowercased() != "title" else { return false }
-        return true
     }
 
     private func resolvedFallbackText(from text: String) -> String {

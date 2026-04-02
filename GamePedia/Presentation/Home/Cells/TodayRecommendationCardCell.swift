@@ -109,13 +109,7 @@ final class TodayRecommendationCardCell: UICollectionViewCell {
         reasonLabel.text = recommendation.primaryReason.message
         titleLabel.text = resolvedTitle
         subtitleLabel.text = "\(game.genre) · \(game.developer)"
-        metaLabel.text = L10n.tr(
-            "Localizable",
-            "home.meta.ratingRelease",
-            L10n.Detail.Label.rating,
-            game.formattedRating,
-            releaseText(for: game)
-        )
+        metaLabel.text = "평점 \(game.formattedRating) · \(releaseText(for: game))"
     }
 
     override func prepareForReuse() {
@@ -126,6 +120,6 @@ final class TodayRecommendationCardCell: UICollectionViewCell {
 
     private func releaseText(for game: Game) -> String {
         if game.releaseYear > 0 { return "\(game.releaseYear)" }
-        return L10n.tr("Localizable", "common.status.releaseTBA")
+        return "출시일 미정"
     }
 }

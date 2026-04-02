@@ -8,7 +8,7 @@ final class SearchRootView: UIView {
 
     let searchTextField: UITextField = {
         let textField = UITextField()
-        textField.placeholder = L10n.Search.placeholder
+        textField.placeholder = "게임을 검색하세요"
         textField.textColor = .gpTextPrimary
         textField.font = .systemFont(ofSize: 15)
         textField.backgroundColor = .gpSurface
@@ -118,7 +118,7 @@ final class SearchRootView: UIView {
         tableView.register(SearchResultCell.self, forCellReuseIdentifier: SearchResultCell.reuseId)
         tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 24, right: 0)
 
-        emptyStateView.configure(icon: "magnifyingglass", message: L10n.Search.Empty.noResults)
+        emptyStateView.configure(icon: "magnifyingglass", message: "검색 결과가 없습니다")
 
         NSLayoutConstraint.activate([
             searchTextField.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 0),
@@ -156,7 +156,7 @@ final class SearchRootView: UIView {
             resultCountLabel.isHidden = true
         } else {
             resultCountLabel.isHidden = false
-            resultCountLabel.text = L10n.Search.Count.results(state.resultCount)
+            resultCountLabel.text = "검색 결과 \(state.resultCount)건"
         }
 
         emptyStateView.isHidden = !state.showEmptyResult

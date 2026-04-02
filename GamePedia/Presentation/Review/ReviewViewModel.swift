@@ -126,7 +126,7 @@ final class ReviewViewModel {
                 await MainActor.run {
                     let reviewError = ReviewError.from(error: error)
                     print("[ReviewSubmit] submitFailure error=\(reviewError.localizedDescription)")
-                    self.apply(.setError(reviewError.errorDescription ?? L10n.tr("Localizable", "review.error.saveFailed")))
+                    self.apply(.setError(reviewError.errorDescription ?? "리뷰를 저장하지 못했습니다."))
                 }
             }
         }
@@ -157,7 +157,7 @@ final class ReviewViewModel {
                 await MainActor.run {
                     let reviewError = ReviewError.from(error: error)
                     print("[ReviewDelete] deleteFailure error=\(reviewError.localizedDescription)")
-                    self.apply(.setError(reviewError.errorDescription ?? L10n.tr("Localizable", "review.error.deleteFailed")))
+                    self.apply(.setError(reviewError.errorDescription ?? "리뷰를 삭제하지 못했습니다."))
                 }
             }
         }

@@ -2,7 +2,6 @@ import Foundation
 
 enum ProfileEditMutation {
     case setNickname(String)
-    case setSelectedTitleKey(String?)
     case setNicknameValidationMessage(String?)
     case setSelectedImage(ProfileImageDraft?)
     case setPhotoRemoved(Bool)
