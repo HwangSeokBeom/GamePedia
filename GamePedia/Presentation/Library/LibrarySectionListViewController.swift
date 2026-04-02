@@ -568,23 +568,7 @@ final class LibrarySectionListViewController: UIViewController {
             recentPlaytimeMinutes: summary.recentPlaytimeMinutes,
             fallbackReason: summary.recentPlayFallbackReason
         )
-        let recentPlayMetadataText = display.finalText
-        let timestampUsedForRelativeText = display.relativeTimeText == nil
-            ? "nil"
-            : (summary.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")
-        print(
-            "[RecentPlayDisplay] " +
-            "screen=Library.fullList.\(route.kind.title) " +
-            "title=\(summary.displayTitle) " +
-            "lastPlayedAt=\(summary.lastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
-            "recentPlaytimeMinutes=\(summary.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
-            "hasReliableLastPlayedAt=\(summary.hasReliableLastPlayedAt) " +
-            "timestampUsedForRelativeText=\(timestampUsedForRelativeText) " +
-            "relativeTime=\(display.relativeTimeText ?? "nil") " +
-            "fallbackReason=\(summary.recentPlayFallbackReason ?? "nil") " +
-            "finalText=\(recentPlayMetadataText)"
-        )
-        return recentPlayMetadataText
+        return display.finalText
     }
 
     private func logRatingMapping(summary: LibraryGameSummary, context: String) {

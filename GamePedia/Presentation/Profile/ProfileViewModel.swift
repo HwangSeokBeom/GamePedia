@@ -389,9 +389,6 @@ final class ProfileViewModel {
                 fallbackReason: resolvedFallbackReason
             )
             let resolvedFormattedLastPlayed = display.finalText
-            let timestampUsedForRelativeText = resolvedHasReliableLastPlayedAt
-                ? (resolvedLastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")
-                : "nil"
             let mergedGame = incomingGame.replacingRecentPlayMetadata(
                 formattedLastPlayed: resolvedFormattedLastPlayed,
                 lastPlayedAt: resolvedLastPlayedAt,
@@ -400,21 +397,6 @@ final class ProfileViewModel {
                 recentPlaytimeMinutes: resolvedRecentPlaytimeMinutes,
                 fallbackReason: resolvedFallbackReason
             )
-            if mergedGame != currentGame {
-                print(
-                    "[RecentPlayDisplay] " +
-                    "screen=\(screen) " +
-                    "title=\(incomingGame.resolvedTitle) " +
-                    "lastPlayedAt=\(resolvedLastPlayedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil") " +
-                    "recentPlaytimeMinutes=\(resolvedRecentPlaytimeMinutes.map(String.init) ?? "nil") " +
-                    "hasReliableLastPlayedAt=\(resolvedHasReliableLastPlayedAt) " +
-                    "timestampUsedForRelativeText=\(timestampUsedForRelativeText) " +
-                    "relativeTime=\(display.relativeTimeText ?? "nil") " +
-                    "fallbackReason=\(resolvedFallbackReason ?? "nil") " +
-                    "finalText=\(resolvedFormattedLastPlayed)"
-                )
-            }
-
             return mergedGame
         }
     }
