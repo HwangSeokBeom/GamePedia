@@ -164,50 +164,77 @@ final class LibraryViewModel {
     func send(_ intent: LibraryIntent) {
         switch intent {
         case .viewDidLoad:
+            print("[LibraryAction] intent=viewDidLoad")
             guard !didTriggerInitialLoad else {
                 print("[Library] viewDidLoad ignored reason=initialLoadAlreadyTriggered")
                 return
             }
             didTriggerInitialLoad = true
             shouldEvaluateAutomaticSilentSteamSyncAfterNextOverviewLoad = true
-            beginSummaryLoading(reason: "viewDidLoad")
-
             let didRestoreCache = restoreCachedStateIfAvailable()
             if !didRestoreCache {
+                beginSummaryLoading(reason: "viewDidLoad", targetTab: state.selectedTab)
                 apply(.setSections(makeLoadingSections()))
             }
 
             loadLibrary(trigger: didRestoreCache ? .refresh : .initial)
 
         case .pullToRefresh:
-            beginSummaryLoading(reason: "pullToRefresh")
+            print("[LibraryAction] intent=pullToRefresh")
+            beginSummaryLoading(reason: "pullToRefresh", targetTab: state.selectedTab)
             loadLibrary(trigger: .refresh)
 
         case .didSelectPrimaryTab(let index):
             guard let selectedTab = LibraryTab(rawValue: index) else { return }
+            print(
+                "[LibraryAction] " +
+                "intent=didSelectPrimaryTab " +
+                "requestedTab=\(selectedTab) " +
+                "currentTab=\(state.selectedTab)"
+            )
             guard selectedTab != state.selectedTab else {
-                apply(.setSelectedTab(selectedTab))
+                print("[LibraryAction] intent=didSelectPrimaryTab skipped reason=sameTab")
                 return
             }
-            beginSummaryLoading(reason: "tabChanged")
             apply(.setSelectedTab(selectedTab))
-            loadTask?.cancel()
-            apply(.setLoading(false))
-            apply(.setRefreshing(false))
-            loadLibrary(trigger: .refresh)
+            if hasStableSummarySnapshot(for: selectedTab, in: state) {
+                print("[LibraryTabCache] reusedCachedSummary tab=\(selectedTab)")
+                completeSummaryLoadingIfNeeded(source: "tabCache")
+                return
+            }
+
+            beginSummaryLoading(reason: "tabChanged", targetTab: selectedTab)
+            if state.isLoading || state.isRefreshing {
+                print("[Library] fetchSkipped trigger=tabSwitch reason=requestInFlight tabDataPending=true")
+            } else {
+                print("[Library] fetchStarted trigger=tabSwitch reason=tabDataMissing tab=\(selectedTab)")
+                loadLibrary(trigger: .refresh)
+            }
 
         case .didSelectHighlightChip(let index):
             guard let selectedHighlightChip = LibraryHighlightChip(rawValue: index) else { return }
+            print(
+                "[LibraryAction] " +
+                "intent=didSelectHighlightChip " +
+                "requestedChip=\(selectedHighlightChip) " +
+                "currentChip=\(state.selectedHighlightChip)"
+            )
             guard selectedHighlightChip != state.selectedHighlightChip else {
-                apply(.setSelectedHighlightChip(selectedHighlightChip))
+                print("[LibraryAction] intent=didSelectHighlightChip skipped reason=sameChip")
                 return
             }
             apply(.setSelectedHighlightChip(selectedHighlightChip))
 
         case .didSelectSort(let index):
             let selectedSort: LibrarySortOption = index == 1 ? .oldest : .latest
+            print(
+                "[LibraryAction] " +
+                "intent=didSelectSort " +
+                "requestedSort=\(selectedSort) " +
+                "currentSort=\(state.selectedSort)"
+            )
             guard selectedSort != state.selectedSort else { return }
-            beginSummaryLoading(reason: "sortChanged")
+            beginSummaryLoading(reason: "sortChanged", targetTab: state.selectedTab)
             apply(.setSort(selectedSort))
             loadLibrary(trigger: .refresh)
 
@@ -298,15 +325,33 @@ final class LibraryViewModel {
     }
 
     private func apply(_ mutation: LibraryMutation) {
-        state = LibraryReducer.reduce(state, mutation)
+        let reducedState = LibraryReducer.reduce(state, mutation)
+        guard reducedState != state else {
+            print("[LibraryState] reducedSkipped mutation=\(mutation.logName) reason=unchanged")
+            return
+        }
+
+        print("[LibraryState] reduced mutation=\(mutation.logName)")
+        state = reducedState
     }
 
-    private func beginSummaryLoading(reason: String) {
+    private func beginSummaryLoading(reason: String, targetTab: LibraryTab? = nil) {
+        let resolvedTab = targetTab ?? state.selectedTab
+        if hasStableSummarySnapshot(for: resolvedTab, in: state) {
+            print(
+                "[LibraryLoadStage] " +
+                "stage=summaryLoadingSkipped " +
+                "reason=\(reason) " +
+                "selectedTab=\(resolvedTab) " +
+                "reuseStableSummary=true"
+            )
+            return
+        }
         print(
             "[LibraryLoadStage] " +
             "stage=summaryLoadingStarted " +
             "reason=\(reason) " +
-            "selectedTab=\(state.selectedTab)"
+            "selectedTab=\(resolvedTab)"
         )
         apply(.setSummaryLoading(true))
     }
@@ -361,7 +406,20 @@ final class LibraryViewModel {
                 reviews: state.reviews
             )
         )
-        refreshSummaryState()
+        if let cachedSummaryByTab = cachedState.summaryByTab,
+           !cachedSummaryByTab.isEmpty {
+            var mergedSummaryByTab = state.summaryByTab
+            cachedSummaryByTab.forEach { tab, summary in
+                mergedSummaryByTab[tab] = summary
+            }
+            print(
+                "[LibraryCache] summaryRestored " +
+                "tabs=\(cachedSummaryByTab.keys.map { "\($0)" }.sorted().joined(separator: ","))"
+            )
+            apply(.setSummaryByTab(mergedSummaryByTab))
+        } else {
+            refreshSummaryState()
+        }
         apply(.setPlaytimeRecommendations(cachedState.playtimeRecommendations))
         apply(
             .setFriendRecommendations(
@@ -382,6 +440,7 @@ final class LibraryViewModel {
             steamSyncStatus: state.steamSyncStatus,
             isSteamSyncAvailable: state.isSteamSyncAvailable,
             steamSyncErrorCode: state.steamSyncErrorCode,
+            summaryByTab: state.summaryByTab,
             recentlyPlayed: state.recentlyPlayed,
             playingGames: state.playingGames,
             ownedGames: state.ownedGames,
@@ -1005,13 +1064,12 @@ final class LibraryViewModel {
         }
 
         let selectedSort = state.selectedSort
-        let requestedTab = state.selectedTab
         let isSteamConnected = state.isSteamConnected
         fetchSequence += 1
         let fetchID = fetchSequence
         print(
             "[Library] fetchStarted id=\(fetchID) trigger=\(trigger.logName) " +
-            "sort=\(selectedSort) tab=\(requestedTab)"
+            "sort=\(selectedSort) tab=\(state.selectedTab)"
         )
         let previousSteamState = (
             steamLinkStatus: state.steamLinkStatus,
@@ -1095,7 +1153,7 @@ final class LibraryViewModel {
                         )
 
                         await MainActor.run {
-                            guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "overview") else { return }
+                            guard self.shouldAcceptResponse(fetchID: fetchID, section: "overview") else { return }
                             self.applyOverviewResult(
                                 result,
                                 trigger: trigger,
@@ -1113,7 +1171,7 @@ final class LibraryViewModel {
                         )
 
                         await MainActor.run {
-                            guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "playtimeRecommendations") else { return }
+                            guard self.shouldAcceptResponse(fetchID: fetchID, section: "playtimeRecommendations") else { return }
                             self.applyPlaytimeRecommendationsResult(
                                 result,
                                 trigger: trigger,
@@ -1130,7 +1188,7 @@ final class LibraryViewModel {
                         )
 
                         await MainActor.run {
-                            guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "friendRecommendations") else { return }
+                            guard self.shouldAcceptResponse(fetchID: fetchID, section: "friendRecommendations") else { return }
                             self.applyFriendRecommendationsResult(
                                 result,
                                 trigger: trigger,
@@ -1147,7 +1205,7 @@ final class LibraryViewModel {
                         )
 
                         await MainActor.run {
-                            guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "wishlist") else { return }
+                            guard self.shouldAcceptResponse(fetchID: fetchID, section: "wishlist") else { return }
                             self.applyWishlistResult(
                                 result,
                                 trigger: trigger,
@@ -1164,7 +1222,7 @@ final class LibraryViewModel {
                         )
 
                         await MainActor.run {
-                            guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "reviewed") else { return }
+                            guard self.shouldAcceptResponse(fetchID: fetchID, section: "reviewed") else { return }
                             self.applyReviewedResult(
                                 result,
                                 trigger: trigger,
@@ -1213,7 +1271,7 @@ final class LibraryViewModel {
             ].contains(true)
 
             await MainActor.run {
-                guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "finalize") else { return }
+                guard self.shouldAcceptResponse(fetchID: fetchID, section: "finalize") else { return }
                 self.logCurrentMappedState(id: fetchID)
                 self.apply(.clearAddingToPlaying)
                 self.apply(.setLoading(false))
@@ -1247,31 +1305,39 @@ final class LibraryViewModel {
     }
 
     @MainActor
-    private func shouldAcceptResponse(fetchID: Int, requestedTab: LibraryTab, section: String) -> Bool {
+    private func shouldAcceptResponse(fetchID: Int, section: String) -> Bool {
         guard fetchID == fetchSequence else {
             print("[Library] responseIgnored id=\(fetchID) section=\(section) reason=staleFetch latest=\(fetchSequence)")
             return false
         }
-
-        guard requestedTab == state.selectedTab else {
-            print(
-                "[Library] responseIgnored id=\(fetchID) section=\(section) " +
-                "reason=tabMismatch requested=\(requestedTab) current=\(state.selectedTab)"
-            )
-            return false
-        }
-
         return true
     }
 
     private func refreshSummaryState() {
-        apply(.setSummaryByTab(makeSummaryByTab(for: state)))
+        let updatedSummaryByTab = makeSummaryByTab(for: state)
+        guard updatedSummaryByTab != state.summaryByTab else {
+            print("[LibraryRender] summaryStateSkipped scope=allTabs reason=unchanged")
+            return
+        }
+        print("[LibraryRender] summaryStateUpdated scope=allTabs reason=changed")
+        apply(.setSummaryByTab(updatedSummaryByTab))
     }
 
     private func refreshSummaryState(for tab: LibraryTab) {
         var summaryByTab = state.summaryByTab
-        summaryByTab[tab] = makeSummaryState(for: tab, from: state)
+        let updatedSummary = makeSummaryState(for: tab, from: state)
+        guard summaryByTab[tab] != updatedSummary else {
+            print("[LibraryRender] summaryStateSkipped scope=\(tab) reason=unchanged")
+            return
+        }
+        print("[LibraryRender] summaryStateUpdated scope=\(tab) reason=changed")
+        summaryByTab[tab] = updatedSummary
         apply(.setSummaryByTab(summaryByTab))
+    }
+
+    private func hasStableSummarySnapshot(for tab: LibraryTab, in state: LibraryState) -> Bool {
+        guard let summary = state.summaryByTab[tab] else { return false }
+        return summary.sourceDescription != "empty"
     }
 
     private func shouldReplaceWithIncomingFullState(generatedAt: Date) -> Bool {
@@ -1983,7 +2049,6 @@ final class LibraryViewModel {
         apply(.setLoading(false))
 
         let selectedSort = state.selectedSort
-        let requestedTab = state.selectedTab
         let previousSteamState = (
             steamLinkStatus: state.steamLinkStatus,
             isConnected: state.isSteamConnected,
@@ -2006,7 +2071,7 @@ final class LibraryViewModel {
             let overviewResult = await self.translatedOverview(from: overviewRawResult)
 
             await MainActor.run {
-                guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncOverview") else { return }
+                guard self.shouldAcceptResponse(fetchID: fetchID, section: "postSyncOverview") else { return }
                 self.applyOverviewResult(
                     overviewResult,
                     trigger: .refresh,
@@ -2029,7 +2094,7 @@ final class LibraryViewModel {
             }
 
             await MainActor.run {
-                guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncPlaytimeRecommendations") else { return }
+                guard self.shouldAcceptResponse(fetchID: fetchID, section: "postSyncPlaytimeRecommendations") else { return }
                 self.applyPlaytimeRecommendationsResult(
                     playtimeResult,
                     trigger: .refresh,
@@ -2046,7 +2111,7 @@ final class LibraryViewModel {
             )
 
             await MainActor.run {
-                guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncFriendRecommendations") else { return }
+                guard self.shouldAcceptResponse(fetchID: fetchID, section: "postSyncFriendRecommendations") else { return }
                 self.applyFriendRecommendationsResult(
                     friendRecommendationsResult,
                     trigger: .refresh,
@@ -2062,7 +2127,7 @@ final class LibraryViewModel {
                 )
 
                 await MainActor.run {
-                    guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncOwned") else { return }
+                    guard self.shouldAcceptResponse(fetchID: fetchID, section: "postSyncOwned") else { return }
                     self.applyOwnedCollectionRefreshResult(ownedCollectionResult)
                 }
 
@@ -2073,13 +2138,13 @@ final class LibraryViewModel {
                 )
 
                 await MainActor.run {
-                    guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncRecentlyPlayed") else { return }
+                    guard self.shouldAcceptResponse(fetchID: fetchID, section: "postSyncRecentlyPlayed") else { return }
                     self.applyRecentlyPlayedRefreshResult(recentlyPlayedResult)
                 }
             }
 
             await MainActor.run {
-                guard self.shouldAcceptResponse(fetchID: fetchID, requestedTab: requestedTab, section: "postSyncFinalize") else { return }
+                guard self.shouldAcceptResponse(fetchID: fetchID, section: "postSyncFinalize") else { return }
                 self.shouldForceOverviewReplacementAfterSteamSync = false
                 self.apply(.setLoading(false))
                 self.apply(.setRefreshing(false))

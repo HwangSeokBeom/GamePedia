@@ -47,3 +47,66 @@ enum LibraryMutation {
     case clearError
     case consumeInitialFocus
 }
+
+extension LibraryMutation {
+    var logName: String {
+        switch self {
+        case .setLoading:
+            return "setLoading"
+        case .setRefreshing:
+            return "setRefreshing"
+        case .setSummaryLoading:
+            return "setSummaryLoading"
+        case .setSelectedTab:
+            return "setSelectedTab"
+        case .setSelectedHighlightChip:
+            return "setSelectedHighlightChip"
+        case .setSort:
+            return "setSort"
+        case .setSummaryByTab:
+            return "setSummaryByTab"
+        case .setServerSummaryByTab:
+            return "setServerSummaryByTab"
+        case .setPreviewGeneratedAt:
+            return "setPreviewGeneratedAt"
+        case .setFullGeneratedAt:
+            return "setFullGeneratedAt"
+        case .setMergedRecentlyPlayedState:
+            return "setMergedRecentlyPlayedState"
+        case .setSteamState:
+            return "setSteamState"
+        case .setLibraryItems:
+            return "setLibraryItems"
+        case .setPlaytimeRecommendations:
+            return "setPlaytimeRecommendations"
+        case .setFriendRecommendations:
+            return "setFriendRecommendations"
+        case .setSteamOwnedSyncErrorCode:
+            return "setSteamOwnedSyncErrorCode"
+        case .setAddingToPlaying:
+            return "setAddingToPlaying"
+        case .clearAddingToPlaying:
+            return "clearAddingToPlaying"
+        case .setSyncingOwnedSteamLibrary:
+            return "setSyncingOwnedSteamLibrary"
+        case .setUnlinkingSteamAccount:
+            return "setUnlinkingSteamAccount"
+        case .setSections:
+            return "setSections"
+        case .setError:
+            return "setError"
+        case .setSuccessMessage:
+            return "setSuccessMessage"
+        case .setSteamConnectionOnboarding:
+            return "setSteamConnectionOnboarding"
+        case .clearSuccessMessage:
+            return "clearSuccessMessage"
+        case .clearSteamConnectionOnboarding:
+            return "clearSteamConnectionOnboarding"
+        case .clearError:
+            return "clearError"
+        case .consumeInitialFocus:
+            return "consumeInitialFocus"
+        }
+    }
+}

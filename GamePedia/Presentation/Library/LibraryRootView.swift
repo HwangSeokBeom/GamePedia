@@ -1,7 +1,7 @@
 import UIKit
 
 final class LibraryRootView: UIView {
-    private struct LibrarySummaryMetrics {
+    private struct LibrarySummaryMetrics: Equatable {
         let primaryTitle: String
         let averageRatingTitle: String
         let gameCountTitle: String
@@ -12,6 +12,20 @@ final class LibraryRootView: UIView {
         let rawReviewsCount: Int
         let rawAverageRating: Double?
         let sourceDescription: String
+    }
+
+    private struct SteamCardRenderSignature: Equatable {
+        let title: String
+        let subtitle: String
+        let message: String
+        let statusText: String
+        let statusColorKey: String
+        let primaryButtonTitle: String
+        let primaryShowsActivity: Bool
+        let primaryEnabled: Bool
+        let secondaryButtonTitle: String?
+        let secondaryHidden: Bool
+        let secondaryEnabled: Bool
     }
 
     var onPrimaryTabSelected: ((Int) -> Void)?
@@ -246,6 +260,10 @@ final class LibraryRootView: UIView {
 
     private var primaryTabButtons: [LibraryPillButton] = []
     private var filterButtons: [LibraryPillButton] = []
+    private var lastRenderedSummaryMetrics: LibrarySummaryMetrics?
+    private var lastRenderedPrimaryTab: LibraryTab?
+    private var lastRenderedHighlightChip: LibraryHighlightChip?
+    private var lastRenderedSteamCardSignature: SteamCardRenderSignature?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -264,37 +282,56 @@ final class LibraryRootView: UIView {
     }
 
     func render(_ state: LibraryState) {
-        setSelectedPrimaryTab(tab: state.selectedTab)
         let summaryMetrics = summaryMetrics(for: state)
+        if lastRenderedPrimaryTab != state.selectedTab {
+            setSelectedPrimaryTab(tab: state.selectedTab)
+            lastRenderedPrimaryTab = state.selectedTab
+        }
 
-        print(
-            "[LibrarySummaryUI] " +
-            "selectedTab=\(state.selectedTab) " +
-            "gameCount=\(summaryMetrics.gameCountText) " +
-            "totalPlaytimeHours=\(summaryMetrics.totalPlaytimeText) " +
-            "source=\(summaryMetrics.sourceDescription)"
-        )
+        if lastRenderedSummaryMetrics != summaryMetrics {
+            print(
+                "[LibrarySummaryUI] " +
+                "selectedTab=\(state.selectedTab) " +
+                "gameCount=\(summaryMetrics.gameCountText) " +
+                "totalPlaytimeHours=\(summaryMetrics.totalPlaytimeText) " +
+                "source=\(summaryMetrics.sourceDescription)"
+            )
 
-        totalPlaySummaryView.configure(
-            value: summaryMetrics.totalPlaytimeText,
-            title: summaryMetrics.primaryTitle,
-            valueColor: .gpTeal
-        )
-        averageRatingSummaryView.configure(
-            value: summaryMetrics.averageRatingText,
-            title: summaryMetrics.averageRatingTitle,
-            valueColor: .gpPrimaryLight
-        )
-        gameCountSummaryView.configure(
-            value: summaryMetrics.gameCountText,
-            title: summaryMetrics.gameCountTitle,
-            valueColor: .gpCoral
-        )
+            totalPlaySummaryView.configure(
+                value: summaryMetrics.totalPlaytimeText,
+                title: summaryMetrics.primaryTitle,
+                valueColor: .gpTeal
+            )
+            averageRatingSummaryView.configure(
+                value: summaryMetrics.averageRatingText,
+                title: summaryMetrics.averageRatingTitle,
+                valueColor: .gpPrimaryLight
+            )
+            gameCountSummaryView.configure(
+                value: summaryMetrics.gameCountText,
+                title: summaryMetrics.gameCountTitle,
+                valueColor: .gpCoral
+            )
+            logSummaryMetrics(summaryMetrics, for: state)
+            lastRenderedSummaryMetrics = summaryMetrics
+            print("[LibraryRender] summaryUpdated reason=changed selectedTab=\(state.selectedTab)")
+        } else {
+            print("[LibraryRender] summarySkipped reason=unchanged selectedTab=\(state.selectedTab)")
+        }
 
-        setSelectedHighlightChip(chip: state.selectedHighlightChip)
-        configureSteamCard(with: state)
+        if lastRenderedHighlightChip != state.selectedHighlightChip {
+            setSelectedHighlightChip(chip: state.selectedHighlightChip)
+            lastRenderedHighlightChip = state.selectedHighlightChip
+        }
+
+        let steamCardSignature = makeSteamCardRenderSignature(for: state)
+        if lastRenderedSteamCardSignature != steamCardSignature {
+            configureSteamCard(with: state)
+            lastRenderedSteamCardSignature = steamCardSignature
+        } else {
+            print("[LibraryRender] steamCardSkipped reason=unchanged")
+        }
         loadingIndicatorView.stopAnimating()
-        logSummaryMetrics(summaryMetrics, for: state)
     }
 
     private func setSelectedPrimaryTab(tab: LibraryTab) {
@@ -478,13 +515,8 @@ final class LibraryRootView: UIView {
 
     private func summaryMetrics(for state: LibraryState) -> LibrarySummaryMetrics {
         let summaryState = state.summaryByTab[state.selectedTab] ?? .empty(for: state.selectedTab)
-        if state.isSummaryLoading {
-            print(
-                "[LibrarySummaryUI] " +
-                "selectedTab=\(state.selectedTab) " +
-                "averageRatingReset=- " +
-                "source=placeholder.summaryLoading"
-            )
+        let shouldRenderPlaceholder = state.isSummaryLoading && summaryState.sourceDescription == "empty"
+        if shouldRenderPlaceholder {
             return LibrarySummaryMetrics(
                 primaryTitle: summaryState.primaryTitle,
                 averageRatingTitle: L10n.Library.Summary.averageRating,
@@ -510,6 +542,39 @@ final class LibraryRootView: UIView {
             rawReviewsCount: summaryState.reviewCount,
             rawAverageRating: summaryState.averageRating,
             sourceDescription: summaryState.sourceDescription
+        )
+    }
+
+    private func makeSteamCardRenderSignature(for state: LibraryState) -> SteamCardRenderSignature {
+        let statusPresentation = steamStatusPresentation(for: state)
+        if state.isSteamConnected {
+            return SteamCardRenderSignature(
+                title: L10n.Library.Steam.Title.connected,
+                subtitle: lastSyncText(for: state),
+                message: state.isSyncingOwnedSteamLibrary ? L10n.Library.Steam.Message.syncing : L10n.Library.Steam.Message.connected,
+                statusText: statusPresentation.text,
+                statusColorKey: statusPresentation.text,
+                primaryButtonTitle: state.isSyncingOwnedSteamLibrary ? L10n.Library.Steam.Button.syncing : L10n.Library.Steam.Button.sync,
+                primaryShowsActivity: state.isSyncingOwnedSteamLibrary,
+                primaryEnabled: state.steamLinkStatus.canSync && !state.isSyncingOwnedSteamLibrary,
+                secondaryButtonTitle: L10n.Library.Steam.Button.disconnect,
+                secondaryHidden: !state.steamLinkStatus.canDisconnect,
+                secondaryEnabled: state.steamLinkStatus.canDisconnect && !state.isUnlinkingSteamAccount
+            )
+        }
+
+        return SteamCardRenderSignature(
+            title: L10n.Library.Steam.Title.guide,
+            subtitle: L10n.Library.Steam.Message.guide,
+            message: L10n.Library.Steam.Message.guide,
+            statusText: statusPresentation.text,
+            statusColorKey: statusPresentation.text,
+            primaryButtonTitle: L10n.Library.Steam.Button.connect,
+            primaryShowsActivity: false,
+            primaryEnabled: true,
+            secondaryButtonTitle: nil,
+            secondaryHidden: true,
+            secondaryEnabled: false
         )
     }
 

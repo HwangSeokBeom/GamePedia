@@ -57,7 +57,7 @@ enum LibraryRecentlyPlayedSource: Hashable {
     case full
 }
 
-enum LibrarySummaryPrimaryValueKind: Hashable {
+enum LibrarySummaryPrimaryValueKind: String, Codable, Hashable {
     case hours
     case count
 }
@@ -115,7 +115,7 @@ struct LibraryTabSummaryState: Hashable {
     }
 }
 
-struct LibraryState {
+struct LibraryState: Equatable {
     var selectedTab: LibraryTab = .playing
     var selectedHighlightChip: LibraryHighlightChip = .recentlyPlayed
     var selectedSort: LibrarySortOption = .latest
