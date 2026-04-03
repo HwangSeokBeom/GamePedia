@@ -46,10 +46,12 @@ jobs:
           echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/GamePedia-Staging.mobileprovision"
 
       - name: Run Fastlane beta lane
+        # staging owns automated TestFlight distribution for pre-release QA.
         env:
           CI: "true"
           APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ env.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ env.APP_STORE_CONNECT_PRIVATE_KEY }}
-          APP_STORE_APP_IDENTIFIER: com.hwb.GamePedia
+          APP_STORE_APP_IDENTIFIER: ${{ secrets.APP_STORE_APP_IDENTIFIER }}
+          APP_STORE_PROVISIONING_PROFILE_NAME: ${{ secrets.APP_STORE_PROVISIONING_PROFILE_NAME }}
         run: bundle exec fastlane ios beta

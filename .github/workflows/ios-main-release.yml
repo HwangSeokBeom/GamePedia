@@ -10,6 +10,10 @@ jobs:
   upload-production-build:
     name: Upload Production Build
     runs-on: macos-latest
+    env:
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
 
     steps:
       - name: Checkout
@@ -46,9 +50,9 @@ jobs:
         # staging owns TestFlight automation; main uploads only on manual or release-tag triggers.
         env:
           CI: "true"
-          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ env.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ env.APP_STORE_CONNECT_PRIVATE_KEY }}
           APP_STORE_APP_IDENTIFIER: ${{ secrets.APP_STORE_APP_IDENTIFIER }}
           APP_STORE_PROVISIONING_PROFILE_NAME: ${{ secrets.APP_STORE_PROVISIONING_PROFILE_NAME }}
         run: bundle exec fastlane ios release_upload
