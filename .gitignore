@@ -16,7 +16,6 @@ AuthKey_*.p8
 .env
 .env.*
 DerivedData/
-
 build/
 *.ipa
 *.xcarchive
