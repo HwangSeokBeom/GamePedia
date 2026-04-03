@@ -330,22 +330,32 @@ struct CurrentUserProfileResponseDTO: Decodable {
             (try? dataContainer.decodeIfPresent(Bool.self, forKey: .isExplicitSelected)) ??
             resolvedProfile?.explicitSelected
 
+        let directSelectedTitle: String? =
+            try? dataContainer.decodeIfPresent(String.self, forKey: .selectedTitle)
+        let selectedBadgeTitle: String? =
+            try? dataContainer.decodeIfPresent(String.self, forKey: .selectedBadgeTitle)
+        let resolvedSelectedTitle: String? = resolvedProfile?.selectedTitle
+        let resolvedTranslatedBadgeTitle: String? = resolvedProfile?.translatedBadgeTitle
+        let resolvedBadgeTitle: String? = resolvedProfile?.badgeTitle
+
         let selectedTitle =
-            (try? dataContainer.decodeIfPresent(String.self, forKey: .selectedTitle)) ??
+            directSelectedTitle ??
             selectedTitleObject ??
             selectedTitleMeta ??
-            (try? dataContainer.decodeIfPresent(String.self, forKey: .selectedBadgeTitle)) ??
-            resolvedProfile?.selectedTitle ??
-            resolvedProfile?.translatedBadgeTitle ??
-            resolvedProfile?.badgeTitle
+            selectedBadgeTitle ??
+            resolvedSelectedTitle ??
+            resolvedTranslatedBadgeTitle ??
+            resolvedBadgeTitle
 
+        let fallbackSelectedTitles: [String]? = selectedTitle.map { [$0] }
+        let resolvedSelectedTitles: [String]? = resolvedProfile?.selectedTitles
         let selectedTitles =
             directSelectedTitles ??
             selectedTitleList ??
             selectedBadgeTitles ??
             selectedTitleItems ??
-            resolvedProfile?.selectedTitles ??
-            selectedTitle.map { [$0] } ??
+            resolvedSelectedTitles ??
+            fallbackSelectedTitles ??
             []
 
         let availableTitles = directAvailableTitles ?? legacyAvailableTitles ?? badgeTitles ?? availableTitleItems ?? resolvedProfile?.availableTitles ?? []
@@ -360,12 +370,20 @@ struct CurrentUserProfileResponseDTO: Decodable {
             resolvedProfile?.friendCount ??
             0
 
+        let directLikeCount: Int? =
+            try? dataContainer.decodeIfPresent(Int.self, forKey: .likeCount)
+        let likesCount: Int? =
+            try? dataContainer.decodeIfPresent(Int.self, forKey: .likesCount)
+        let wishlistLikeCount: Int? =
+            try? dataContainer.decodeIfPresent(Int.self, forKey: .wishlistCount)
+        let resolvedLikeCount: Int? = resolvedProfile?.likeCount
+        let resolvedWishlistCount: Int? = resolvedProfile?.wishlistCount
         let likeCount =
-            (try? dataContainer.decodeIfPresent(Int.self, forKey: .likeCount)) ??
-            (try? dataContainer.decodeIfPresent(Int.self, forKey: .likesCount)) ??
-            (try? dataContainer.decodeIfPresent(Int.self, forKey: .wishlistCount)) ??
-            resolvedProfile?.likeCount ??
-            resolvedProfile?.wishlistCount ??
+            directLikeCount ??
+            likesCount ??
+            wishlistLikeCount ??
+            resolvedLikeCount ??
+            resolvedWishlistCount ??
             0
 
         let playedGameCount =
@@ -599,16 +617,33 @@ struct RecentGameDTO: Decodable {
             Self.decodeString(container, key: .playedAtSource) ??
             Self.decodeString(container, key: .last_played_at_source) ??
             Self.decodeString(container, key: .played_at_source)
+        let hasReliableLastPlayedAtValue: Bool? =
+            try? container.decodeIfPresent(Bool.self, forKey: .hasReliableLastPlayedAt)
+        let isReliableLastPlayedAtValue: Bool? =
+            try? container.decodeIfPresent(Bool.self, forKey: .isReliableLastPlayedAt)
+        let hasReliableLastPlayedAtSnakeCase: Bool? =
+            try? container.decodeIfPresent(Bool.self, forKey: .has_reliable_last_played_at)
+        let isReliableLastPlayedAtSnakeCase: Bool? =
+            try? container.decodeIfPresent(Bool.self, forKey: .is_reliable_last_played_at)
         hasReliableLastPlayedAt =
-            (try? container.decodeIfPresent(Bool.self, forKey: .hasReliableLastPlayedAt)) ??
-            (try? container.decodeIfPresent(Bool.self, forKey: .isReliableLastPlayedAt)) ??
-            (try? container.decodeIfPresent(Bool.self, forKey: .has_reliable_last_played_at)) ??
-            (try? container.decodeIfPresent(Bool.self, forKey: .is_reliable_last_played_at))
+            hasReliableLastPlayedAtValue ??
+            isReliableLastPlayedAtValue ??
+            hasReliableLastPlayedAtSnakeCase ??
+            isReliableLastPlayedAtSnakeCase
+
+        let recentPlaytimeMinutesValue: Int? =
+            try? container.decodeIfPresent(Int.self, forKey: .recentPlaytimeMinutes)
+        let recentPlaytimeMinutesSnakeCase: Int? =
+            try? container.decodeIfPresent(Int.self, forKey: .recent_playtime_minutes)
+        let playtimeMinutesValue: Int? =
+            try? container.decodeIfPresent(Int.self, forKey: .playtimeMinutes)
+        let playtimeMinutesSnakeCase: Int? =
+            try? container.decodeIfPresent(Int.self, forKey: .playtime_minutes)
         recentPlaytimeMinutes =
-            (try? container.decodeIfPresent(Int.self, forKey: .recentPlaytimeMinutes)) ??
-            (try? container.decodeIfPresent(Int.self, forKey: .recent_playtime_minutes)) ??
-            (try? container.decodeIfPresent(Int.self, forKey: .playtimeMinutes)) ??
-            (try? container.decodeIfPresent(Int.self, forKey: .playtime_minutes))
+            recentPlaytimeMinutesValue ??
+            recentPlaytimeMinutesSnakeCase ??
+            playtimeMinutesValue ??
+            playtimeMinutesSnakeCase
         fallbackReason =
             Self.decodeString(container, key: .fallbackReason) ??
             Self.decodeString(container, key: .fallback_reason)
