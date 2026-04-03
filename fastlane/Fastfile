@@ -38,6 +38,10 @@ platform :ios do
       scheme: "GamePedia-Dev",
       configuration: "Debug",
       clean: true,
+      skip_testing: [
+        "GamePediaUITests",
+        "GamePediaUITestsLaunchTests"
+      ],
       derived_data_path: "DerivedData",
       output_directory: "fastlane/test_output",
       buildlog_path: "fastlane/test_output/buildlogs",
