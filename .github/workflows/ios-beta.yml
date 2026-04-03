@@ -1,14 +1,13 @@
-name: iOS Main Release
+name: iOS Beta
 
 on:
-  workflow_dispatch:
   push:
-    tags:
-      - "v*"
+    branches:
+      - staging
 
 jobs:
-  upload-production-build:
-    name: Upload Production Build
+  beta:
+    name: Build and Upload TestFlight
     runs-on: macos-latest
     env:
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -44,10 +43,10 @@ jobs:
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
         run: |
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/GamePedia-Release.mobileprovision"
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/GamePedia-Staging.mobileprovision"
 
-      - name: Upload production build to App Store Connect
-        # staging owns TestFlight automation; main uploads only on manual or release-tag triggers.
+      - name: Run Fastlane beta lane
+        # staging owns automated TestFlight distribution for pre-release QA.
         env:
           CI: "true"
           APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ env.APP_STORE_CONNECT_KEY_ID }}
@@ -55,4 +54,4 @@ jobs:
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ env.APP_STORE_CONNECT_PRIVATE_KEY }}
           APP_STORE_APP_IDENTIFIER: ${{ secrets.APP_STORE_APP_IDENTIFIER }}
           APP_STORE_PROVISIONING_PROFILE_NAME: ${{ secrets.APP_STORE_PROVISIONING_PROFILE_NAME }}
-        run: bundle exec fastlane ios release_upload
+        run: bundle exec fastlane ios beta
