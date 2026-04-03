@@ -164,8 +164,10 @@ final class RecommendationUseCaseTests: XCTestCase {
         let releaseYear = releaseDate.map { Calendar.current.component(.year, from: $0) } ?? 0
         return Game(
             id: id,
-            displayTitle: title,
+            title: title,
+            translatedTitle: nil,
             summary: summary,
+            translatedSummary: nil,
             genre: genre,
             category: genre,
             developer: "Studio",
@@ -193,10 +195,27 @@ private struct StubGameRepository: GameRepository {
     let trending: [Game]
     let latest: [Game]
 
+    func fetchHighlights(limit: Int, filter: HomeContentFilter?) async throws -> [Game] {
+        _ = filter
+        guard let featured else { return [] }
+        return Array([featured].prefix(limit))
+    }
+
     func fetchFeaturedGame() async throws -> Game? { featured }
-    func fetchPopularGames(limit: Int) async throws -> [Game] { Array(popular.prefix(limit)) }
-    func fetchTrendingGames(limit: Int) async throws -> [Game] { Array(trending.prefix(limit)) }
+    func fetchPopularGames(limit: Int, filter: HomeContentFilter?) async throws -> [Game] {
+        _ = filter
+        return Array(popular.prefix(limit))
+    }
+    func fetchTrendingGames(limit: Int, filter: HomeContentFilter?) async throws -> [Game] {
+        _ = filter
+        return Array(trending.prefix(limit))
+    }
     func fetchLatestGames(limit: Int) async throws -> [Game] { Array(latest.prefix(limit)) }
+    func fetchGames(ids: [Int]) async throws -> [Game] {
+        let pool = [featured].compactMap { $0 } + popular + trending + latest
+        let gamesById = Dictionary(pool.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return ids.compactMap { gamesById[$0] }
+    }
 }
 
 private actor InMemoryUserActivityRepository: UserActivityRepository {

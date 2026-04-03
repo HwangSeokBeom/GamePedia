@@ -67,8 +67,10 @@ final class HomeHighlightSelectorTests: XCTestCase {
         let releaseYear = releaseDate.map { Calendar.current.component(.year, from: $0) } ?? 0
         return Game(
             id: id,
-            displayTitle: title,
+            title: title,
+            translatedTitle: nil,
             summary: summary,
+            translatedSummary: nil,
             genre: genre,
             category: genre,
             developer: "Studio",
