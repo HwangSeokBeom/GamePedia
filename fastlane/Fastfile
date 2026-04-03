@@ -106,9 +106,6 @@ platform :ios do
 
   desc "Validate the production archive path on main without uploading"
   lane :release_archive do
-    app_identifier = ENV["APP_STORE_APP_IDENTIFIER"] || ENV["APP_IDENTIFIER"]
-    UI.user_error!("Missing required environment variable: APP_STORE_APP_IDENTIFIER or APP_IDENTIFIER") if app_identifier.to_s.strip.empty?
-
     build_app(
       **xcode_container_options,
       scheme: "GamePedia-Prod",
@@ -116,7 +113,6 @@ platform :ios do
       clean: true,
       export_method: "app-store",
       xcargs: distribution_xcargs,
-      export_options: distribution_export_options(app_identifier),
       archive_path: "build/archives/GamePedia.xcarchive",
       skip_package_ipa: true,
       skip_package_pkg: true
