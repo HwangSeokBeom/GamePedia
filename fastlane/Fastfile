@@ -1,64 +1,136 @@
 default_platform(:ios)
 
-def xcode_container_options
-  if File.exist?("GamePedia.xcworkspace")
-    { workspace: "GamePedia.xcworkspace" }
-  else
-    { project: "GamePedia.xcodeproj" }
-  end
-end
-
-def required_env!(key)
-  value = ENV[key]
-  UI.user_error!("Missing required environment variable: #{key}") if value.to_s.strip.empty?
-  value
-end
-
-def app_store_connect_api_key_from_env
-  raw_key_content = ENV["APP_STORE_CONNECT_API_KEY_CONTENT"]
-  base64_key_content = ENV["APP_STORE_CONNECT_API_KEY_CONTENT_BASE64"]
-  key_content = raw_key_content.to_s.empty? ? base64_key_content : raw_key_content
-
-  UI.user_error!("Missing required environment variable: APP_STORE_CONNECT_API_KEY_CONTENT or APP_STORE_CONNECT_API_KEY_CONTENT_BASE64") if key_content.to_s.strip.empty?
-
-  app_store_connect_api_key(
-    key_id: required_env!("APP_STORE_CONNECT_API_KEY_KEY_ID"),
-    issuer_id: required_env!("APP_STORE_CONNECT_API_KEY_ISSUER_ID"),
-    key_content: key_content,
-    is_key_content_base64: raw_key_content.to_s.strip.empty?,
-    in_house: false
-  )
-end
-
-def distribution_team_id
-  "63SB2B8YJ5"
-end
-
-def distribution_provisioning_profile_name
-  name = ENV["APP_STORE_PROVISIONING_PROFILE_NAME"].to_s.strip
-  name.empty? ? "GamePedia App Store Connect" : name
-end
-
-def distribution_xcargs
-  [
-    "CODE_SIGN_STYLE=Manual",
-    "DEVELOPMENT_TEAM=#{distribution_team_id}",
-    'CODE_SIGN_IDENTITY="Apple Distribution"'
-  ].join(" ")
-end
-
-def distribution_export_options(app_identifier)
-  {
-    signingStyle: "manual",
-    teamID: distribution_team_id,
-    provisioningProfiles: {
-      app_identifier => distribution_provisioning_profile_name
-    }
-  }
-end
-
 platform :ios do
-  desc "Build and test the iOS app for CI on dev"
+  def xcode_container_options
+    if File.exist?("GamePedia.xcworkspace")
+      { workspace: "GamePedia.xcworkspace" }
+    else
+      { project: "GamePedia.xcodeproj" }
+    end
+  end
+
+  def project_path
+    "GamePedia.xcodeproj"
+  end
+
+  def app_target_name
+    "GamePedia"
+  end
+
+  def distribution_team_id
+    "63SB2B8YJ5"
+  end
+
+  def required_env!(key)
+    value = ENV[key]
+    UI.user_error!("Missing required environment variable: #{key}") if value.to_s.strip.empty?
+    value
+  end
+
+  def resolve_app_identifier
+    value = ENV["APP_STORE_APP_IDENTIFIER"] || ENV["APP_IDENTIFIER"]
+    UI.user_error!("Missing required environment variable: APP_STORE_APP_IDENTIFIER or APP_IDENTIFIER") if value.to_s.strip.empty?
+    value
+  end
+
+  def resolve_provisioning_profile_name
+    value = ENV["APP_STORE_PROVISIONING_PROFILE_NAME"].to_s.strip
+    value.empty? ? "GamePedia App Store Connect" : value
+  end
+
+  def app_store_connect_api_key_from_env
+    raw_key_content = ENV["APP_STORE_CONNECT_PRIVATE_KEY"].to_s.strip
+    base64_key_content = ENV["APP_STORE_CONNECT_PRIVATE_KEY_BASE64"].to_s.strip
+
+    UI.user_error!("Missing required environment variable: APP_STORE_CONNECT_PRIVATE_KEY or APP_STORE_CONNECT_PRIVATE_KEY_BASE64") if raw_key_content.empty? && base64_key_content.empty?
+
+    app_store_connect_api_key(
+      key_id: required_env!("APP_STORE_CONNECT_KEY_ID"),
+      issuer_id: required_env!("APP_STORE_CONNECT_ISSUER_ID"),
+      key_content: raw_key_content.empty? ? base64_key_content : raw_key_content,
+      is_key_content_base64: raw_key_content.empty?,
+      in_house: false
+    )
+  end
+
+  def distribution_xcargs(profile_name)
+    [
+      'CODE_SIGN_STYLE=Manual',
+      "DEVELOPMENT_TEAM=#{distribution_team_id}",
+      'CODE_SIGN_IDENTITY="Apple Distribution"',
+      "PROVISIONING_PROFILE_SPECIFIER=\"#{profile_name}\""
+    ].join(" ")
+  end
+
+  def distribution_export_options(app_identifier, profile_name)
+    {
+      signingStyle: "manual",
+      teamID: distribution_team_id,
+      provisioningProfiles: {
+        app_identifier => profile_name
+      },
+      method: "app-store"
+    }
+  end
+
+  def current_marketing_version
+    get_version_number(
+      xcodeproj: project_path,
+      target: app_target_name
+    )
+  end
+
+  def updated_marketing_version(options)
+    explicit_version_number = options[:version_number].to_s.strip
+    bump_marketing = options[:bump_marketing].to_s == "true"
+    bump_type = options[:bump_type].to_s.strip
+    normalized_bump_type = %w[patch minor major].include?(bump_type) ? bump_type : "patch"
+
+    if !explicit_version_number.empty?
+      new_version = increment_version_number(
+        version_number: explicit_version_number,
+        xcodeproj: project_path
+      )
+      UI.message("Set MARKETING_VERSION to #{new_version}")
+      return new_version
+    end
+
+    unless bump_marketing
+      version = current_marketing_version
+      UI.message("Keep existing MARKETING_VERSION #{version}")
+      return version
+    end
+
+    new_version = increment_version_number(
+      bump_type: normalized_bump_type,
+      xcodeproj: project_path
+    )
+    UI.message("Auto bumped MARKETING_VERSION to #{new_version} (#{normalized_bump_type})")
+    new_version
+  end
+
+  def sync_next_testflight_build_number!(api_key:, app_identifier:, version:)
+    latest_build_number = latest_testflight_build_number(
+      api_key: api_key,
+      app_identifier: app_identifier,
+      version: version,
+      initial_build_number: 1
+    )
+
+    next_build_number = latest_build_number.to_i + 1
+
+    increment_build_number(
+      build_number: next_build_number,
+      xcodeproj: project_path
+    )
+
+    UI.message("Using MARKETING_VERSION #{version}")
+    UI.message("Using CURRENT_PROJECT_VERSION #{next_build_number}")
+
+    next_build_number
+  end
+
+  desc "Build and test the iOS app for CI"
   lane :ci_build do
     run_tests(
       **xcode_container_options,
@@ -78,11 +150,19 @@ platform :ios do
     )
   end
 
-  desc "Build the staging app and upload it to TestFlight for pre-release QA"
-  lane :beta do
+  desc "Build the staging app and upload it to TestFlight"
+  lane :beta do |options|
     api_key = app_store_connect_api_key_from_env
-    app_identifier = ENV["APP_STORE_APP_IDENTIFIER"] || ENV["APP_IDENTIFIER"]
-    UI.user_error!("Missing required environment variable: APP_STORE_APP_IDENTIFIER or APP_IDENTIFIER") if app_identifier.to_s.strip.empty?
+    app_identifier = resolve_app_identifier
+    provisioning_profile_name = resolve_provisioning_profile_name
+
+    selected_marketing_version = updated_marketing_version(options)
+
+    sync_next_testflight_build_number!(
+      api_key: api_key,
+      app_identifier: app_identifier,
+      version: selected_marketing_version
+    )
 
     ipa_path = build_app(
       **xcode_container_options,
@@ -90,8 +170,8 @@ platform :ios do
       configuration: "Staging",
       clean: true,
       export_method: "app-store",
-      xcargs: distribution_xcargs,
-      export_options: distribution_export_options(app_identifier),
+      xcargs: distribution_xcargs(provisioning_profile_name),
+      export_options: distribution_export_options(app_identifier, provisioning_profile_name),
       output_directory: "build/ios",
       output_name: "GamePedia-Staging.ipa"
     )
@@ -106,24 +186,44 @@ platform :ios do
 
   desc "Validate the production archive path on main without uploading"
   lane :release_archive do
+    provisioning_profile_name = resolve_provisioning_profile_name
+
     build_app(
       **xcode_container_options,
       scheme: "GamePedia-Prod",
       configuration: "Release",
       clean: true,
       export_method: "app-store",
-      xcargs: distribution_xcargs,
+      xcargs: distribution_xcargs(provisioning_profile_name),
       archive_path: "build/archives/GamePedia.xcarchive",
       skip_package_ipa: true,
       skip_package_pkg: true
     )
   end
 
-  desc "Build the production app and upload it to App Store Connect only when explicitly triggered"
-  lane :release_upload do
+  desc "Build the production app and upload it to App Store Connect"
+  lane :release_upload do |options|
     api_key = app_store_connect_api_key_from_env
-    app_identifier = ENV["APP_STORE_APP_IDENTIFIER"] || ENV["APP_IDENTIFIER"]
-    UI.user_error!("Missing required environment variable: APP_STORE_APP_IDENTIFIER or APP_IDENTIFIER") if app_identifier.to_s.strip.empty?
+    app_identifier = resolve_app_identifier
+    provisioning_profile_name = resolve_provisioning_profile_name
+
+    selected_marketing_version = options[:version_number].to_s.strip
+    if !selected_marketing_version.empty?
+      increment_version_number(
+        version_number: selected_marketing_version,
+        xcodeproj: project_path
+      )
+      UI.message("Set production MARKETING_VERSION to #{selected_marketing_version}")
+    end
+
+    if options[:build_number].to_s.strip.empty?
+      UI.user_error!("release_upload requires build_number:<number>")
+    end
+
+    increment_build_number(
+      build_number: options[:build_number].to_s.strip,
+      xcodeproj: project_path
+    )
 
     ipa_path = build_app(
       **xcode_container_options,
@@ -131,8 +231,8 @@ platform :ios do
       configuration: "Release",
       clean: true,
       export_method: "app-store",
-      xcargs: distribution_xcargs,
-      export_options: distribution_export_options(app_identifier),
+      xcargs: distribution_xcargs(provisioning_profile_name),
+      export_options: distribution_export_options(app_identifier, provisioning_profile_name),
       output_directory: "build/ios",
       output_name: "GamePedia-Prod.ipa"
     )
@@ -144,8 +244,7 @@ platform :ios do
       skip_metadata: true,
       skip_screenshots: true,
       submit_for_review: false,
-      automatic_release: false,
-      run_precheck_before_submit: false
+      automatic_release: false
     )
   end
 end
