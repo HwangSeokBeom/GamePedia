@@ -48,6 +48,4 @@ jobs:
         # main push validates the release archive only; uploads stay explicit.
         env:
           CI: "true"
-          APP_STORE_APP_IDENTIFIER: ${{ secrets.APP_STORE_APP_IDENTIFIER }}
-          APP_STORE_PROVISIONING_PROFILE_NAME: ${{ secrets.APP_STORE_PROVISIONING_PROFILE_NAME }}
         run: bundle exec fastlane ios release_archive
