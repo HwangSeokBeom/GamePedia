@@ -47,6 +47,20 @@ final class HomeCoordinator {
         showDetail(gameId: gameID)
     }
 
+    func navigateToReviewDiscussion(gameID: Int, reviewID: String?, commentID: String?) {
+        guard let reviewID else {
+            showDetail(gameId: gameID)
+            return
+        }
+        showReviewDiscussion(
+            gameId: gameID,
+            gameTitle: nil,
+            reviewID: reviewID,
+            reviewSeed: nil,
+            highlightCommentID: commentID
+        )
+    }
+
     func navigateToNotifications() {
         showNotifications()
     }
@@ -173,8 +187,8 @@ final class HomeCoordinator {
             showFriendProfile(userID: userID)
         case .gameDetail(let gameID):
             showDetail(gameId: gameID)
-        case .review(let gameID, _):
-            showDetail(gameId: gameID)
+        case .review(let gameID, let reviewID, let commentID):
+            navigateToReviewDiscussion(gameID: gameID, reviewID: reviewID, commentID: commentID)
         }
     }
 
@@ -225,6 +239,40 @@ final class HomeCoordinator {
         reviewsViewController.onReviewsChanged = { [weak detailViewController] in
             detailViewController?.reload()
         }
+        reviewsViewController.onReviewSelected = { [weak self] review in
+            self?.showReviewDiscussion(
+                gameId: game.id,
+                gameTitle: game.displayTitle,
+                reviewID: review.id,
+                reviewSeed: review,
+                highlightCommentID: nil
+            )
+        }
         navigationController.pushViewController(reviewsViewController, animated: true)
+    }
+
+    private func showReviewDiscussion(
+        gameId: Int,
+        gameTitle: String?,
+        reviewID: String,
+        reviewSeed: Review?,
+        highlightCommentID: String?
+    ) {
+        let viewController = ReviewDiscussionViewController(
+            rootView: ReviewDiscussionRootView(),
+            viewModel: ReviewDiscussionViewModel(
+                gameId: gameId,
+                gameTitle: gameTitle,
+                reviewId: reviewID,
+                reviewSeed: reviewSeed,
+                highlightCommentId: highlightCommentID
+            )
+        )
+        viewController.onAuthenticationRequired = { [weak self, weak viewController] context, action in
+            guard let self else { return }
+            let presenter = viewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
+        }
+        navigationController.pushViewController(viewController, animated: true)
     }
 }

@@ -114,6 +114,8 @@ final class ProfileViewModel {
             onRoute?(.showFriendSearch)
         case .didTapFriendActivity:
             onRoute?(.showFriendActivity)
+        case .didTapMyComments:
+            onRoute?(.showMyComments)
         case .didTapSocialPrivacySettings:
             onRoute?(.showSocialPrivacySettings)
         case .didTapTermsOfService:

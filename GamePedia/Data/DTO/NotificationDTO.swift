@@ -31,6 +31,8 @@ struct NotificationItemDTO: Decodable {
     let message: String
     let relatedGameId: String?
     let relatedUserId: String?
+    let relatedReviewId: String?
+    let relatedCommentId: String?
     let isRead: Bool
     let readAt: Date?
     let createdAt: Date
@@ -43,6 +45,12 @@ struct NotificationItemDTO: Decodable {
         message = (try? container.decode(String.self, forKey: .message)) ?? ""
         relatedGameId = try container.decodeLossyStringIfPresent(forKey: .relatedGameId)
         relatedUserId = try container.decodeLossyStringIfPresent(forKey: .relatedUserId)
+        let directRelatedReviewId = try container.decodeLossyStringIfPresent(forKey: .relatedReviewId)
+        let fallbackReviewId = try container.decodeLossyStringIfPresent(forKey: .reviewId)
+        relatedReviewId = directRelatedReviewId ?? fallbackReviewId
+        let directRelatedCommentId = try container.decodeLossyStringIfPresent(forKey: .relatedCommentId)
+        let fallbackCommentId = try container.decodeLossyStringIfPresent(forKey: .commentId)
+        relatedCommentId = directRelatedCommentId ?? fallbackCommentId
         isRead = (try? container.decode(Bool.self, forKey: .isRead)) ?? false
         readAt = try container.decodeDateIfPresent(forKey: .readAt)
         createdAt = (try container.decodeDateIfPresent(forKey: .createdAt)) ?? Date()
@@ -55,6 +63,10 @@ struct NotificationItemDTO: Decodable {
         case message
         case relatedGameId
         case relatedUserId
+        case relatedReviewId
+        case relatedCommentId
+        case reviewId
+        case commentId
         case isRead
         case readAt
         case createdAt

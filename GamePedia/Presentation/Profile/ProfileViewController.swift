@@ -50,6 +50,7 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
     var onShowFriendRequests: (() -> Void)?
     var onShowFriendSearch: (() -> Void)?
     var onShowFriendActivity: (() -> Void)?
+    var onShowMyComments: (() -> Void)?
     var onShowSocialPrivacySettings: (() -> Void)?
     var onShowTermsOfService: (() -> Void)?
     var onShowPrivacyPolicy: (() -> Void)?
@@ -99,6 +100,7 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
         rootView.steamUnlinkButton.addTarget(self, action: #selector(didTapSteamUnlink), for: .touchUpInside)
         rootView.friendsListButton.addTarget(self, action: #selector(didTapFriendsList), for: .touchUpInside)
         rootView.friendActivityButton.addTarget(self, action: #selector(didTapFriendActivity), for: .touchUpInside)
+        rootView.myCommentsButton.addTarget(self, action: #selector(didTapMyComments), for: .touchUpInside)
         rootView.sectionHeader.seeMoreButton.addTarget(
             self, action: #selector(didTapSeeMoreRecentPlay), for: .touchUpInside
         )
@@ -152,6 +154,8 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
                 self?.onShowFriendSearch?()
             case .showFriendActivity:
                 self?.onShowFriendActivity?()
+            case .showMyComments:
+                self?.onShowMyComments?()
             case .showSocialPrivacySettings:
                 self?.onShowSocialPrivacySettings?()
             case .showTermsOfService:
@@ -253,6 +257,10 @@ final class ProfileViewController: BaseViewController<ProfileRootView, ProfileSt
 
     @objc private func didTapFavoriteGames() {
         viewModel.send(.didTapFavoriteGames)
+    }
+
+    @objc private func didTapMyComments() {
+        viewModel.send(.didTapMyComments)
     }
 
     @objc private func didTapFriendsList() {

@@ -137,6 +137,15 @@ final class NotificationCell: UITableViewCell {
         case .friendReviewUpdated:
             iconName = "pencil.line"
             tintColor = .gpPrimaryLight
+        case .reviewCommentReply:
+            iconName = "arrowshape.turn.up.left.fill"
+            tintColor = .gpPrimary
+        case .reviewCommentLike:
+            iconName = "hand.thumbsup.fill"
+            tintColor = .gpTeal
+        case .reviewCommentDislike:
+            iconName = "hand.thumbsdown.fill"
+            tintColor = .gpCoral
         case .friendLikedGameAdded:
             iconName = "heart.fill"
             tintColor = .gpRed

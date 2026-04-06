@@ -7,6 +7,9 @@ struct AppNotification: Hashable {
         case friendReviewReaction
         case friendReviewCreated
         case friendReviewUpdated
+        case reviewCommentReply
+        case reviewCommentLike
+        case reviewCommentDislike
         case friendLikedGameAdded
         case friendLikedGameRemoved
         case friendRatingChanged
@@ -22,6 +25,8 @@ struct AppNotification: Hashable {
     let message: String
     let relatedGameID: Int?
     let relatedUserID: String?
+    let relatedReviewID: String?
+    let relatedCommentID: String?
     let isRead: Bool
     let createdAt: Date
 
@@ -37,6 +42,12 @@ struct AppNotification: Hashable {
             return .friendReviewCreated
         case "friend_review_updated", "review_updated":
             return .friendReviewUpdated
+        case "review_comment_reply":
+            return .reviewCommentReply
+        case "review_comment_like":
+            return .reviewCommentLike
+        case "review_comment_dislike":
+            return .reviewCommentDislike
         case "friend_liked_game_added", "liked_game_added", "friend_wishlisted_game":
             return .friendLikedGameAdded
         case "friend_liked_game_removed", "liked_game_removed":
@@ -67,7 +78,17 @@ struct AppNotification: Hashable {
              .friendReviewCreated,
              .friendReviewUpdated:
             if let relatedGameID {
-                return .review(gameID: relatedGameID, reviewID: nil)
+                return .review(gameID: relatedGameID, reviewID: relatedReviewID, commentID: relatedCommentID)
+            }
+            if let relatedUserID {
+                return .friendProfile(relatedUserID)
+            }
+            return .friendActivityFeed
+        case .reviewCommentReply,
+             .reviewCommentLike,
+             .reviewCommentDislike:
+            if let relatedGameID {
+                return .review(gameID: relatedGameID, reviewID: relatedReviewID, commentID: relatedCommentID)
             }
             if let relatedUserID {
                 return .friendProfile(relatedUserID)

@@ -22,7 +22,6 @@ enum GameDetailReducer {
         case .setReviewFeed(let reviewFeed):
             state.reviews = reviewFeed.reviews
             state.reviewSummary = reviewFeed.summary
-            state.myReview = reviewFeed.myReview
         case .setFavorite(let v):
             state.isFavorite = v
         case .setFavoriteLoading(let isFavoriteLoading):

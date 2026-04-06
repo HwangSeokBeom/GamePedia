@@ -32,6 +32,7 @@ enum ReportReason: String, CaseIterable, Equatable {
 
 enum ReportTargetType: String, Equatable {
     case review
+    case comment
 }
 
 struct ReportRequest: Equatable {

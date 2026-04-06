@@ -19,6 +19,7 @@ enum ProfileIntent {
     case didTapFriendRequests
     case didTapFriendSearch
     case didTapFriendActivity
+    case didTapMyComments
     case didTapSocialPrivacySettings
     case didTapTermsOfService
     case didTapPrivacyPolicy
@@ -40,6 +41,7 @@ enum ProfileRoute {
     case showFriendRequests
     case showFriendSearch
     case showFriendActivity
+    case showMyComments
     case showSocialPrivacySettings
     case showTermsOfService
     case showPrivacyPolicy

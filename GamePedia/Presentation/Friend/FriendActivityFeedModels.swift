@@ -113,7 +113,7 @@ enum FriendActivityFeedItemFormatter {
     private static func primaryRoute(for item: FriendActivityItem) -> SocialActivityRoute {
         switch item.type {
         case .reviewCreated, .reviewUpdated:
-            return .review(gameID: item.game.id, reviewID: item.metadata?.reviewID)
+            return .review(gameID: item.game.id, reviewID: item.metadata?.reviewID, commentID: nil)
         case .likedGameAdded,
              .likedGameRemoved,
              .ratingChanged,

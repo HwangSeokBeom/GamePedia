@@ -244,6 +244,18 @@ final class ProfileRootView: UIView {
         tintColor: .gpTeal
     )
 
+    private let myCommentsRowView = SocialTasteRowView(
+        systemImageName: "bubble.left.and.bubble.right.fill",
+        title: L10n.tr("Localizable", "profile.comments.title"),
+        tintColor: .gpPrimaryLight
+    )
+
+    let myCommentsButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     private let tasteSummaryRowView = SocialTasteRowView(
         systemImageName: "sparkles",
         title: L10n.Profile.Social.tasteTags,
@@ -480,12 +492,14 @@ final class ProfileRootView: UIView {
         accountActionContainerView.addSubview(deleteAccountButton)
 
         friendActionContainerView.addSubview(friendActionRowsStackView)
-        [socialManagementRowView, socialActivityRowView, tasteSummaryRowView].forEach {
+        [socialManagementRowView, socialActivityRowView, myCommentsRowView, tasteSummaryRowView].forEach {
             friendActionRowsStackView.addArrangedSubview($0)
         }
 
         socialManagementRowView.actionButton = friendsListButton
         socialActivityRowView.actionButton = friendActivityButton
+        myCommentsRowView.actionButton = myCommentsButton
+        myCommentsRowView.setSecondaryText(L10n.tr("Localizable", "profile.comments.subtitle"))
 
         supportActionContainerView.addSubview(termsOfServiceButton)
         supportActionContainerView.addSubview(supportActionDividerTop)
@@ -587,6 +601,7 @@ final class ProfileRootView: UIView {
 
             socialManagementRowView.heightAnchor.constraint(equalToConstant: 60),
             socialActivityRowView.heightAnchor.constraint(equalToConstant: 60),
+            myCommentsRowView.heightAnchor.constraint(equalToConstant: 60),
             tasteSummaryRowView.heightAnchor.constraint(equalToConstant: 60),
 
             sectionHeader.heightAnchor.constraint(equalToConstant: 34),

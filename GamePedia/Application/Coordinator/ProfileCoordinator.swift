@@ -103,6 +103,9 @@ final class ProfileCoordinator: NSObject {
         profileVC.onShowFriendActivity = { [weak self] in
             self?.showFriendActivity()
         }
+        profileVC.onShowMyComments = { [weak self] in
+            self?.showMyComments()
+        }
         profileVC.onShowSocialPrivacySettings = { [weak self] in
             self?.showSocialPrivacySettings()
         }
@@ -204,6 +207,15 @@ final class ProfileCoordinator: NSObject {
         reviewsViewController.onReviewsChanged = { [weak detailViewController] in
             detailViewController?.reload()
         }
+        reviewsViewController.onReviewSelected = { [weak self] review in
+            self?.showReviewDiscussion(
+                gameId: game.id,
+                gameTitle: game.displayTitle,
+                reviewID: review.id,
+                reviewSeed: review,
+                highlightCommentID: nil
+            )
+        }
         navigationController.pushViewController(reviewsViewController, animated: true)
     }
 
@@ -253,6 +265,23 @@ final class ProfileCoordinator: NSObject {
         let viewController = FriendsListViewController()
         viewController.onFriendSelected = { [weak self] userID in
             self?.showFriendProfile(userID: userID)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showMyComments() {
+        let viewController = ProfileCommentsViewController(
+            rootView: ProfileCommentsRootView(),
+            viewModel: ProfileCommentsViewModel()
+        )
+        viewController.onCommentSelected = { [weak self] item in
+            self?.showReviewDiscussion(
+                gameId: item.gameId,
+                gameTitle: item.gameTitle,
+                reviewID: item.reviewId,
+                reviewSeed: nil,
+                highlightCommentID: item.id
+            )
         }
         navigationController.pushViewController(viewController, animated: true)
     }
@@ -447,9 +476,44 @@ final class ProfileCoordinator: NSObject {
             showFriendProfile(userID: userID)
         case .gameDetail(let gameID):
             showDetail(gameId: gameID)
-        case .review(let gameID, _):
-            showDetail(gameId: gameID)
+        case .review(let gameID, let reviewID, let commentID):
+            guard let reviewID else {
+                showDetail(gameId: gameID)
+                return
+            }
+            showReviewDiscussion(
+                gameId: gameID,
+                gameTitle: nil,
+                reviewID: reviewID,
+                reviewSeed: nil,
+                highlightCommentID: commentID
+            )
         }
+    }
+
+    private func showReviewDiscussion(
+        gameId: Int,
+        gameTitle: String?,
+        reviewID: String,
+        reviewSeed: Review?,
+        highlightCommentID: String?
+    ) {
+        let viewController = ReviewDiscussionViewController(
+            rootView: ReviewDiscussionRootView(),
+            viewModel: ReviewDiscussionViewModel(
+                gameId: gameId,
+                gameTitle: gameTitle,
+                reviewId: reviewID,
+                reviewSeed: reviewSeed,
+                highlightCommentId: highlightCommentID
+            )
+        )
+        viewController.onAuthenticationRequired = { [weak self, weak viewController] context, action in
+            guard let self else { return }
+            let presenter = viewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
+        }
+        navigationController.pushViewController(viewController, animated: true)
     }
 
     private func showSteamLink(url: URL, presenter: UIViewController?) {

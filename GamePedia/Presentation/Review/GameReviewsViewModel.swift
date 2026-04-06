@@ -71,7 +71,8 @@ final class GameReviewsViewModel {
     }
 
     func didTapCompose() {
-        onComposeRequested?(state.myReview)
+        // The top-level compose action always creates a new review. Editing is only available from an explicit review action.
+        onComposeRequested?(nil)
     }
 
     func didTapEdit(review: Review) {

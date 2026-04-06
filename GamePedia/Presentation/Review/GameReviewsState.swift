@@ -13,8 +13,8 @@ struct GameReviewsState {
     var errorMessage: String? = nil
     var successMessage: String? = nil
 
-    var myReview: Review? {
-        reviews.first(where: { $0.isMine })
+    var hasWrittenReview: Bool {
+        reviews.contains(where: \.isMine)
     }
 
     var isModerationActionInProgress: Bool {
@@ -22,7 +22,9 @@ struct GameReviewsState {
     }
 
     var composeButtonTitle: String {
-        myReview == nil ? L10n.Review.Compose.create : L10n.Review.Compose.edit
+        hasWrittenReview
+            ? L10n.tr("Localizable", "review.compose.createAnother")
+            : L10n.Review.Compose.create
     }
 
     var summaryText: String {

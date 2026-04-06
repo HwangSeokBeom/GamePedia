@@ -7,7 +7,6 @@ struct GameDetailState {
     var game: GameDetail? = nil
     var reviews: [Review] = []
     var reviewSummary: ReviewSummary? = nil
-    var myReview: Review? = nil
     var isFavorite: Bool = false
     var isFavoriteLoading: Bool = false
     var errorMessage: String? = nil
@@ -71,11 +70,26 @@ struct GameDetailState {
     }
 
     var previewReviews: [Review] {
-        Array(reviews.prefix(3))
+        let myReviews = reviews.filter(\.isMine)
+        guard !myReviews.isEmpty else {
+            return Array(reviews.prefix(3))
+        }
+
+        var preview = Array(myReviews.prefix(3))
+        let selectedReviewIDs = Set(preview.map(\.id))
+        let remainingSlots = max(0, 3 - preview.count)
+
+        if remainingSlots > 0 {
+            preview.append(contentsOf: reviews.filter { !selectedReviewIDs.contains($0.id) }.prefix(remainingSlots))
+        }
+
+        return preview
     }
 
     var writeReviewButtonTitle: String {
-        myReview == nil ? L10n.Detail.Button.writeReview : L10n.Detail.Button.editReview
+        reviews.contains(where: \.isMine)
+            ? L10n.tr("Localizable", "detail.button.writeAnotherReview")
+            : L10n.Detail.Button.writeReview
     }
 
     var reviewSummaryText: String {

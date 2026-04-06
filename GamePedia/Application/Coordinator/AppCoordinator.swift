@@ -178,9 +178,9 @@ final class AppCoordinator {
         case .gameDetail(let gameID):
             ensureMainInterface(selectedIndex: 0)
             homeCoordinator?.navigateToGameDetail(gameID: gameID)
-        case .review(let gameID, _):
+        case .review(let gameID, let reviewID, let commentID):
             ensureMainInterface(selectedIndex: 0)
-            homeCoordinator?.navigateToGameDetail(gameID: gameID)
+            homeCoordinator?.navigateToReviewDiscussion(gameID: gameID, reviewID: reviewID, commentID: commentID)
         }
     }
 

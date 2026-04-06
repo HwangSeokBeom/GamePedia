@@ -10,6 +10,7 @@ final class GameReviewsViewController: BaseViewController<GameReviewsRootView, G
     var onComposeRequested: ((Review?) -> Void)?
     var onReviewsChanged: (() -> Void)?
     var onAuthenticationRequired: ((RestrictedActionContext, @escaping () -> Void) -> Void)?
+    var onReviewSelected: ((Review) -> Void)?
 
     init(rootView: GameReviewsRootView, viewModel: GameReviewsViewModel) {
         self.viewModel = viewModel
@@ -238,5 +239,6 @@ extension GameReviewsViewController: UITableViewDataSource, UITableViewDelegate 
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+        onReviewSelected?(reviews[indexPath.row])
     }
 }

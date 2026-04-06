@@ -502,7 +502,7 @@ final class LibrarySectionListViewController: UIViewController {
             LibraryGameRowViewState(
                 identifier: LibraryGameIdentifier(
                     source: .igdb,
-                    sourceID: String(reviewedGame.gameId),
+                    sourceID: reviewedGame.reviewId,
                     canonicalGameID: reviewedGame.gameId
                 ),
                 detailDestination: .igdb(reviewedGame.gameId),

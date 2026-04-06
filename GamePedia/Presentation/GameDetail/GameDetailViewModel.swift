@@ -66,7 +66,8 @@ final class GameDetailViewModel {
             toggleFavorite()
         case .didTapWriteReview:
             guard let game = state.game else { return }
-            onWriteReview?(game, state.myReview)
+            // Compose from detail always starts a brand-new review. Editing remains explicit per review item.
+            onWriteReview?(game, nil)
         case .didTapShare:
             guard let game = state.game else { return }
             onShare?(game)
