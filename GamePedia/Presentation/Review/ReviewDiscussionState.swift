@@ -1,5 +1,40 @@
 import Foundation
 
+struct ReviewDiscussionHeaderState: Equatable {
+    let review: Review
+    let gameId: Int
+    let gameTitle: String
+}
+
+enum ReviewDiscussionContentState: Equatable {
+    case loading
+    case empty
+    case populated
+
+    var isEmpty: Bool {
+        if case .empty = self {
+            return true
+        }
+        return false
+    }
+}
+
+struct ReviewDiscussionSectionState: Equatable {
+    let commentCount: Int
+    let contentState: ReviewDiscussionContentState
+    let sortTitle: String
+}
+
+struct ReviewDiscussionComposerState: Equatable {
+    let text: String
+    let mode: ReviewDiscussionComposerMode
+    let isSubmitting: Bool
+    let canSubmit: Bool
+    let placeholder: String
+    let contextText: String?
+    let submitTitle: String
+}
+
 struct ReviewDiscussionState: Equatable {
     let gameId: Int
     let initialGameTitle: String?
@@ -9,7 +44,9 @@ struct ReviewDiscussionState: Equatable {
     var review: Review? = nil
     var resolvedGameTitle: String? = nil
     var isLoading: Bool = false
+    var allComments: [ReviewComment] = []
     var comments: [ReviewComment] = []
+    var sortOption: ReviewCommentSortOption = .latest
     var expandedParentCommentIds: Set<String> = []
     var composerText: String = ""
     var composerMode: ReviewDiscussionComposerMode = .comment
@@ -49,12 +86,57 @@ struct ReviewDiscussionState: Equatable {
         )
     }
 
+    var reviewHeaderState: ReviewDiscussionHeaderState? {
+        guard let review else { return nil }
+        return ReviewDiscussionHeaderState(
+            review: review,
+            gameId: gameId,
+            gameTitle: navigationTitle
+        )
+    }
+
+    var discussionContentState: ReviewDiscussionContentState {
+        guard review != nil else { return .loading }
+        return comments.isEmpty ? .empty : .populated
+    }
+
+    var totalDiscussionCount: Int {
+        max(review?.commentCount ?? 0, comments.count)
+    }
+
+    var discussionSectionState: ReviewDiscussionSectionState? {
+        guard review != nil else { return nil }
+        return ReviewDiscussionSectionState(
+            commentCount: totalDiscussionCount,
+            contentState: discussionContentState,
+            sortTitle: sortOption.displayTitle
+        )
+    }
+
+    var composerState: ReviewDiscussionComposerState {
+        ReviewDiscussionComposerState(
+            text: composerText,
+            mode: composerMode,
+            isSubmitting: isSubmitting,
+            canSubmit: canSubmit,
+            placeholder: composerPlaceholder,
+            contextText: composerContextText,
+            submitTitle: composerSubmitTitle
+        )
+    }
+
     var canSubmit: Bool {
         !isSubmitting && !composerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && review != nil
     }
 
     var emptyMessage: String {
         L10n.tr("Localizable", "review.comment.empty")
+    }
+
+    var emptyStateActionTitle: String {
+        totalDiscussionCount == 0
+            ? L10n.tr("Localizable", "review.comment.empty.cta")
+            : L10n.tr("Localizable", "review.comment.empty.nonEmptyCta")
     }
 
     var composerContextText: String? {

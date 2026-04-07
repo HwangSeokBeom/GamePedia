@@ -32,14 +32,20 @@ struct GameReviewFeed: Equatable {
     let reviews: [Review]
     let summary: ReviewSummary
 
-    var myReview: Review? {
-        reviews.first(where: { $0.isMine })
+    var myReviews: [Review] {
+        reviews.filter(\.isMine)
     }
 }
 
 struct ReviewDeletionResult: Equatable {
     let deleted: Bool
     let reviewId: String
+}
+
+struct ReviewLikeMutationResult: Equatable {
+    let reviewId: String
+    let likeCount: Int
+    let isLikedByCurrentUser: Bool
 }
 
 // MARK: - Review
@@ -53,6 +59,9 @@ struct Review: Equatable {
     let updatedAt: String
     let author: ReviewAuthor
     let isMine: Bool
+    let likeCount: Int
+    let commentCount: Int
+    let isLikedByCurrentUser: Bool
 
     var authorName: String {
         author.nickname
@@ -68,5 +77,50 @@ struct Review: Equatable {
 
     var formattedDate: String {
         updatedAt.toRelativeDateString()
+    }
+
+    func updatingCommentCount(_ commentCount: Int) -> Review {
+        Review(
+            id: id,
+            gameId: gameId,
+            rating: rating,
+            content: content,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            author: author,
+            isMine: isMine,
+            likeCount: likeCount,
+            commentCount: max(0, commentCount),
+            isLikedByCurrentUser: isLikedByCurrentUser
+        )
+    }
+
+    func updatingLikeState(likeCount: Int, isLikedByCurrentUser: Bool) -> Review {
+        Review(
+            id: id,
+            gameId: gameId,
+            rating: rating,
+            content: content,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            author: author,
+            isMine: isMine,
+            likeCount: max(0, likeCount),
+            commentCount: commentCount,
+            isLikedByCurrentUser: isLikedByCurrentUser
+        )
+    }
+
+    func togglingLikeOptimistically() -> Review {
+        let nextLikedState = !isLikedByCurrentUser
+        let nextLikeCount = max(0, likeCount + (nextLikedState ? 1 : -1))
+        return updatingLikeState(
+            likeCount: nextLikeCount,
+            isLikedByCurrentUser: nextLikedState
+        )
+    }
+
+    func mergingDiscussionCount(localCount: Int) -> Review {
+        updatingCommentCount(max(commentCount, localCount))
     }
 }

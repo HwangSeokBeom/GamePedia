@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 final class ReviewDiscussionViewModel {
@@ -16,6 +17,7 @@ final class ReviewDiscussionViewModel {
     private let submitReportUseCase: SubmitReportUseCase
     private let moderationRepository: any ModerationRepository
     private let reviewSeed: Review?
+    private var cancellables = Set<AnyCancellable>()
 
     init(
         gameId: Int,
@@ -42,6 +44,8 @@ final class ReviewDiscussionViewModel {
         self.reactToReviewCommentUseCase = ReactToReviewCommentUseCase(repository: reviewCommentRepository)
         self.moderationRepository = moderationRepository
         self.submitReportUseCase = SubmitReportUseCase(moderationRepository: moderationRepository)
+        observeCommentSync()
+        observeReviewLikeSync()
     }
 
     func send(_ intent: ReviewDiscussionIntent) {
@@ -53,7 +57,7 @@ final class ReviewDiscussionViewModel {
             apply(.setComposerMode(.reply(
                 parentCommentId: comment.parentCommentId ?? comment.id,
                 parentNickname: comment.author.nickname,
-                isSelfReply: comment.author.id == comment.author.id && comment.isMine
+                isSelfReply: comment.isMine
             )))
         case .didTapEdit(let commentId):
             guard let comment = state.comments.first(where: { $0.id == commentId }) else { return }
@@ -75,6 +79,8 @@ final class ReviewDiscussionViewModel {
                 expanded.insert(parentCommentId)
             }
             apply(.setExpandedParentCommentIds(expanded))
+        case .didChangeSort(let sortOption):
+            apply(.setSortOption(sortOption))
         case .didChangeComposerText(let text):
             apply(.setComposerText(text))
         case .didTapCancelComposerMode:
@@ -259,6 +265,8 @@ final class ReviewDiscussionViewModel {
               let comment = state.comments.first(where: { $0.id == commentId }) else { return }
 
         let nextReaction: ReviewCommentReaction? = comment.myReaction == desiredReaction ? nil : desiredReaction
+        let optimisticComment = optimisticallyUpdatedComment(comment, nextReaction: nextReaction)
+        apply(.replaceComment(optimisticComment))
         apply(.setReactionLoading(commentId: commentId, isLoading: true))
 
         Task {
@@ -274,11 +282,91 @@ final class ReviewDiscussionViewModel {
                 }
             } catch {
                 await MainActor.run {
+                    self.apply(.replaceComment(comment))
                     self.apply(.setReactionLoading(commentId: commentId, isLoading: false))
                     let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                     self.apply(.setInlineNotice(message))
                 }
             }
         }
+    }
+
+    private func optimisticallyUpdatedComment(_ comment: ReviewComment, nextReaction: ReviewCommentReaction?) -> ReviewComment {
+        var likeCount = comment.likeCount
+        var dislikeCount = comment.dislikeCount
+
+        switch comment.myReaction {
+        case .like:
+            likeCount = max(0, likeCount - 1)
+        case .dislike:
+            dislikeCount = max(0, dislikeCount - 1)
+        case .none:
+            break
+        }
+
+        switch nextReaction {
+        case .like:
+            likeCount += 1
+        case .dislike:
+            dislikeCount += 1
+        case .none:
+            break
+        }
+
+        return ReviewComment(
+            id: comment.id,
+            reviewId: comment.reviewId,
+            gameId: comment.gameId,
+            gameTitle: comment.gameTitle,
+            reviewSnippet: comment.reviewSnippet,
+            parentCommentId: comment.parentCommentId,
+            depth: comment.depth,
+            author: comment.author,
+            content: comment.content,
+            createdAt: comment.createdAt,
+            updatedAt: comment.updatedAt,
+            isMine: comment.isMine,
+            isReviewAuthor: comment.isReviewAuthor,
+            isDeleted: comment.isDeleted,
+            isEdited: comment.isEdited,
+            replyCount: comment.replyCount,
+            likeCount: likeCount,
+            dislikeCount: dislikeCount,
+            myReaction: nextReaction
+        )
+    }
+
+    private func observeCommentSync() {
+        ReviewCommentSyncCenter.events
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self, event.reviewId == self.state.reviewId else { return }
+
+                switch event.action {
+                case .created, .updated, .deleted:
+                    Task {
+                        try? await self.refreshComments()
+                    }
+                case .reacted:
+                    guard let comment = event.comment else { return }
+                    self.apply(.replaceComment(comment))
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func observeReviewLikeSync() {
+        ReviewLikeSyncCenter.events
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self, event.reviewId == self.state.reviewId, let currentReview = self.state.review else { return }
+                let updatedReview = currentReview.updatingLikeState(
+                    likeCount: event.likeCount,
+                    isLikedByCurrentUser: event.isLikedByCurrentUser
+                )
+                guard updatedReview != currentReview else { return }
+                self.apply(.setReview(updatedReview, gameTitle: self.state.navigationTitle))
+            }
+            .store(in: &cancellables)
     }
 }

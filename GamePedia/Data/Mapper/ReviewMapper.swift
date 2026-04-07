@@ -15,7 +15,10 @@ enum ReviewMapper {
                 nickname: dto.author.nickname,
                 profileImageUrl: dto.author.profileImageUrl
             ),
-            isMine: dto.isMine
+            isMine: dto.isMine,
+            likeCount: dto.likeCount,
+            commentCount: dto.commentCount,
+            isLikedByCurrentUser: dto.isLikedByCurrentUser
         )
     }
 
@@ -37,6 +40,14 @@ enum ReviewMapper {
         ReviewDeletionResult(
             deleted: dto.deleted,
             reviewId: dto.reviewId
+        )
+    }
+
+    static func toLikeMutationResult(_ dto: ReviewLikeResponseDataDTO) -> ReviewLikeMutationResult {
+        ReviewLikeMutationResult(
+            reviewId: dto.reviewId,
+            likeCount: dto.likeCount,
+            isLikedByCurrentUser: dto.isLikedByCurrentUser
         )
     }
 }

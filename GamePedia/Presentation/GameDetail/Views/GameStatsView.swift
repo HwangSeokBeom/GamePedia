@@ -59,7 +59,7 @@ private final class StatItemView: UIView {
 
     private let valueLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 28, weight: .bold)
+        label.font = .systemFont(ofSize: 22, weight: .bold)
         label.textColor = .gpTextPrimary
         label.textAlignment = .center
         return label

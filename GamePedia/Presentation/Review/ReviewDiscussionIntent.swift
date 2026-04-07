@@ -10,6 +10,7 @@ enum ReviewDiscussionIntent {
     case didTapLike(commentId: String)
     case didTapDislike(commentId: String)
     case didTapToggleReplies(parentCommentId: String)
+    case didChangeSort(ReviewCommentSortOption)
     case didChangeComposerText(String)
     case didTapCancelComposerMode
     case didTapSubmit

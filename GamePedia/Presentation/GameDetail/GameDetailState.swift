@@ -2,6 +2,10 @@ import Foundation
 
 // MARK: - GameDetailState
 
+private enum GameDetailPreviewLimit {
+    static let reviews = 5
+}
+
 struct GameDetailState {
     var isLoading: Bool = false
     var game: GameDetail? = nil
@@ -72,12 +76,12 @@ struct GameDetailState {
     var previewReviews: [Review] {
         let myReviews = reviews.filter(\.isMine)
         guard !myReviews.isEmpty else {
-            return Array(reviews.prefix(3))
+            return Array(reviews.prefix(GameDetailPreviewLimit.reviews))
         }
 
-        var preview = Array(myReviews.prefix(3))
+        var preview = Array(myReviews.prefix(GameDetailPreviewLimit.reviews))
         let selectedReviewIDs = Set(preview.map(\.id))
-        let remainingSlots = max(0, 3 - preview.count)
+        let remainingSlots = max(0, GameDetailPreviewLimit.reviews - preview.count)
 
         if remainingSlots > 0 {
             preview.append(contentsOf: reviews.filter { !selectedReviewIDs.contains($0.id) }.prefix(remainingSlots))
@@ -86,8 +90,20 @@ struct GameDetailState {
         return preview
     }
 
+    var myReviews: [Review] {
+        reviews.filter(\.isMine)
+    }
+
+    var communityPreviewReviews: [Review] {
+        Array(reviews.filter { !$0.isMine }.prefix(GameDetailPreviewLimit.reviews))
+    }
+
+    var hasMyReviews: Bool {
+        !myReviews.isEmpty
+    }
+
     var writeReviewButtonTitle: String {
-        reviews.contains(where: \.isMine)
+        hasMyReviews
             ? L10n.tr("Localizable", "detail.button.writeAnotherReview")
             : L10n.Detail.Button.writeReview
     }
@@ -100,7 +116,7 @@ struct GameDetailState {
     }
 
     var shouldShowReviewSeeMore: Bool {
-        !reviews.isEmpty
+        !communityPreviewReviews.isEmpty
     }
 
     var showSteamReviewLinkage: Bool {

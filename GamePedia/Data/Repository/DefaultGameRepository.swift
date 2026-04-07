@@ -43,8 +43,16 @@ final class DefaultGameRepository: GameRepository {
     func fetchGames(ids: [Int]) async throws -> [Game] {
         guard !ids.isEmpty else { return [] }
 
+        let uniqueRequestedIDs = MappingSafety.orderedUniqueElements(
+            ids,
+            logPrefix: "[GameRepository]",
+            keyName: "gameId",
+            countLabel: "requestCount",
+            screen: "DefaultGameRepository.fetchGames"
+        )
+
         let games = try await withThrowingTaskGroup(of: Game.self) { group in
-            for id in ids {
+            for id in uniqueRequestedIDs {
                 group.addTask { [apiClient] in
                     let response = try await apiClient.request(
                         .gameDetail(id: id),
@@ -61,9 +69,20 @@ final class DefaultGameRepository: GameRepository {
             return collectedGames
         }
 
-        let gamesByID = Dictionary(uniqueKeysWithValues: games.map { ($0.id, $0) })
-        let orderedGames = ids.compactMap { gamesByID[$0] }
-        print("[GameRepository] details count=\(orderedGames.count)")
+        let gamesByID = MappingSafety.dictionary(
+            pairs: games.map { ($0.id, $0) },
+            logPrefix: "[GameRepository]",
+            keyName: "gameId",
+            countLabel: "gameCount",
+            screen: "DefaultGameRepository.fetchGames",
+            mergePolicy: .keepFirst
+        )
+        let orderedGames = uniqueRequestedIDs.compactMap { gamesByID[$0] }
+        print(
+            "[GameRepository] details count=\(orderedGames.count) " +
+            "requestedCount=\(ids.count) " +
+            "uniqueRequestedCount=\(uniqueRequestedIDs.count)"
+        )
         return orderedGames
     }
 

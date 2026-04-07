@@ -28,7 +28,7 @@ final class InteractiveStarRatingView: UIView {
     private func setup() {
         let stack = UIStackView()
         stack.axis = .horizontal
-        stack.spacing = 8
+        stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
@@ -39,13 +39,13 @@ final class InteractiveStarRatingView: UIView {
             stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor)
         ])
 
-        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 30, weight: .bold)
         for index in 0..<starCount {
             let button = UIButton()
             button.setImage(UIImage(systemName: "star", withConfiguration: symbolConfig), for: .normal)
             button.tintColor = .gpTextTertiary
-            button.widthAnchor.constraint(equalToConstant: 44).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 44).isActive = true
+            button.widthAnchor.constraint(equalToConstant: 36).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 36).isActive = true
             button.tag = index
             button.accessibilityLabel = L10n.tr("Localizable", "review.accessibility.starLabel", index + 1)
             button.accessibilityHint = L10n.tr("Localizable", "review.accessibility.starHint")
@@ -82,7 +82,7 @@ final class InteractiveStarRatingView: UIView {
     // MARK: - Private
 
     private func updateStarAppearance() {
-        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .bold)
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 30, weight: .bold)
         for (index, button) in starButtons.enumerated() {
             let threshold = Float(index + 1)
             let name: String

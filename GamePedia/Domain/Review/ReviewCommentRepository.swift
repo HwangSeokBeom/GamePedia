@@ -6,6 +6,8 @@ protocol ReviewCommentRepository {
     func updateComment(commentId: String, content: String, in context: ReviewDiscussionContext) async throws -> ReviewComment
     func deleteComment(commentId: String, in context: ReviewDiscussionContext) async throws -> ReviewComment
     func react(to commentId: String, reaction: ReviewCommentReaction?, in context: ReviewDiscussionContext) async throws -> ReviewComment
+    func react(to commentId: String, reaction: ReviewCommentReaction?) async throws -> ReviewComment
+    func fetchCommentCounts(reviewIds: [String]) async throws -> [String: Int]
     func fetchMyComments() async throws -> [MyReviewCommentEntry]
     func fetchLocalNotifications() async -> [AppNotification]
     func markAllLocalNotificationsRead() async

@@ -170,6 +170,14 @@ extension Endpoint {
         .delete("/reviews/\(reviewId)", userAuth: true)
     }
 
+    static func likeReview(reviewId: String) -> Endpoint {
+        .post("/reviews/\(reviewId)/like", userAuth: true)
+    }
+
+    static func removeReviewLike(reviewId: String) -> Endpoint {
+        .delete("/reviews/\(reviewId)/like", userAuth: true)
+    }
+
     static func myReviews(sort: String? = nil) -> Endpoint {
         let queryItems = sort.map { [URLQueryItem(name: "sort", value: $0)] } ?? []
         return .get("/users/me/reviews", query: queryItems, userAuth: true)

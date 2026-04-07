@@ -19,6 +19,7 @@ final class ProfileCommentsViewController: BaseViewController<ProfileCommentsRoo
         rootView.tableView.dataSource = self
         rootView.tableView.delegate = self
         rootView.retryButton.addTarget(self, action: #selector(didTapRetry), for: .touchUpInside)
+        configureSortMenu(selected: viewModel.state.sortOption)
         bindViewModel()
         viewModel.loadIfNeeded()
     }
@@ -26,6 +27,7 @@ final class ProfileCommentsViewController: BaseViewController<ProfileCommentsRoo
     override func render(_ state: ProfileCommentsState) {
         items = state.items
         rootView.render(state)
+        configureSortMenu(selected: state.sortOption)
         rootView.tableView.reloadData()
     }
 
@@ -41,6 +43,19 @@ final class ProfileCommentsViewController: BaseViewController<ProfileCommentsRoo
     @objc private func didTapRetry() {
         viewModel.reload()
     }
+
+    private func configureSortMenu(selected: ReviewCommentSortOption) {
+        let actions = ReviewCommentSortOption.allCases.map { option in
+            UIAction(title: option.displayTitle, state: option == selected ? .on : .off) { [weak self] _ in
+                self?.viewModel.updateSort(option)
+            }
+        }
+        rootView.sortButton.menu = UIMenu(children: actions)
+        rootView.sortButton.showsMenuAsPrimaryAction = true
+        var configuration = rootView.sortButton.configuration
+        configuration?.title = selected.displayTitle
+        rootView.sortButton.configuration = configuration
+    }
 }
 
 extension ProfileCommentsViewController: UITableViewDataSource, UITableViewDelegate {
@@ -50,7 +65,11 @@ extension ProfileCommentsViewController: UITableViewDataSource, UITableViewDeleg
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: ProfileCommentCell.reuseIdentifier, for: indexPath) as! ProfileCommentCell
-        cell.configure(with: items[indexPath.row])
+        let item = items[indexPath.row]
+        cell.configure(with: item, isReactionLoading: viewModel.state.reactingCommentIds.contains(item.id))
+        cell.onLikeTapped = { [weak self] in
+            self?.viewModel.toggleLike(commentId: item.id)
+        }
         return cell
     }
 
@@ -61,10 +80,40 @@ extension ProfileCommentsViewController: UITableViewDataSource, UITableViewDeleg
 }
 
 final class ProfileCommentsRootView: UIView {
+    private let countLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextSecondary
+        return label
+    }()
+
+    let sortButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .gpTextSecondary
+        configuration.image = UIImage(
+            systemName: "chevron.down",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        )
+        configuration.imagePlacement = .trailing
+        configuration.imagePadding = 4
+        configuration.contentInsets = .zero
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var updated = incoming
+            updated.font = .systemFont(ofSize: 12, weight: .medium)
+            return updated
+        }
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     let tableView: UITableView = {
         let tableView = UITableView(frame: .zero, style: .plain)
         tableView.backgroundColor = .gpBackground
         tableView.separatorStyle = .none
+        tableView.showsVerticalScrollIndicator = false
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = 128
         tableView.translatesAutoresizingMaskIntoConstraints = false
         return tableView
     }()
@@ -108,10 +157,12 @@ final class ProfileCommentsRootView: UIView {
     }
 
     func render(_ state: ProfileCommentsState) {
+        countLabel.text = state.countText
         tableView.isHidden = state.isEmpty || state.errorMessage != nil
         emptyLabel.text = state.errorMessage ?? L10n.tr("Localizable", "profile.comments.empty")
         emptyLabel.isHidden = !state.isEmpty && state.errorMessage == nil
         retryButton.isHidden = state.errorMessage == nil
+        sortButton.isHidden = state.isEmpty || state.errorMessage != nil
         if state.isLoading {
             loadingIndicatorView.startAnimating()
         } else {
@@ -122,13 +173,23 @@ final class ProfileCommentsRootView: UIView {
     private func setup() {
         backgroundColor = .gpBackground
         tableView.register(ProfileCommentCell.self, forCellReuseIdentifier: ProfileCommentCell.reuseIdentifier)
+        let headerStack = UIStackView(arrangedSubviews: [countLabel, UIView(), sortButton])
+        headerStack.axis = .horizontal
+        headerStack.alignment = .center
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
+
+        addSubview(headerStack)
         addSubview(tableView)
         addSubview(emptyLabel)
         addSubview(retryButton)
         addSubview(loadingIndicatorView)
 
         NSLayoutConstraint.activate([
-            tableView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
+            headerStack.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 8),
+            headerStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            headerStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+
+            tableView.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 8),
             tableView.leadingAnchor.constraint(equalTo: leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -149,6 +210,8 @@ final class ProfileCommentsRootView: UIView {
 
 private final class ProfileCommentCell: UITableViewCell {
     static let reuseIdentifier = "ProfileCommentCell"
+
+    var onLikeTapped: (() -> Void)?
 
     private let gameLabel: UILabel = {
         let label = UILabel()
@@ -180,6 +243,16 @@ private final class ProfileCommentCell: UITableViewCell {
         return label
     }()
 
+    private let likeButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0)
+        configuration.imagePadding = 4
+        configuration.baseForegroundColor = .gpTextTertiary
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setup()
@@ -190,17 +263,23 @@ private final class ProfileCommentCell: UITableViewCell {
         setup()
     }
 
-    func configure(with item: MyReviewCommentEntry) {
+    func configure(with item: MyReviewCommentEntry, isReactionLoading: Bool) {
         gameLabel.text = item.gameTitle
         reviewSnippetLabel.text = item.reviewSnippet
         commentLabel.text = item.commentContent
-        metaLabel.text = L10n.tr(
-            "Localizable",
-            "profile.comments.meta",
-            item.formattedDate,
-            String(item.likeCount),
-            String(item.dislikeCount)
+        metaLabel.text = item.formattedDate
+
+        let isLiked = item.myReaction == .like
+        var configuration = likeButton.configuration
+        configuration?.title = String(item.likeCount)
+        configuration?.image = UIImage(
+            systemName: isLiked ? "heart.fill" : "heart",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)
         )
+        configuration?.baseForegroundColor = isLiked ? .gpCoral : .gpTextTertiary
+        likeButton.configuration = configuration
+        likeButton.isEnabled = !isReactionLoading && !item.isDeleted
+        likeButton.alpha = item.likeCount == 0 && !isLiked ? 0.72 : 1
     }
 
     private func setup() {
@@ -214,13 +293,19 @@ private final class ProfileCommentCell: UITableViewCell {
         cardView.layer.cornerCurve = .continuous
         cardView.translatesAutoresizingMaskIntoConstraints = false
 
-        let stackView = UIStackView(arrangedSubviews: [gameLabel, reviewSnippetLabel, commentLabel, metaLabel])
+        let metaRow = UIStackView(arrangedSubviews: [metaLabel, UIView(), likeButton])
+        metaRow.axis = .horizontal
+        metaRow.alignment = .center
+        metaRow.spacing = 8
+
+        let stackView = UIStackView(arrangedSubviews: [gameLabel, reviewSnippetLabel, commentLabel, metaRow])
         stackView.axis = .vertical
         stackView.spacing = 8
         stackView.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(cardView)
         cardView.addSubview(stackView)
+        likeButton.addTarget(self, action: #selector(didTapLike), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
             cardView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
@@ -233,5 +318,14 @@ private final class ProfileCommentCell: UITableViewCell {
             stackView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -14),
             stackView.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -14)
         ])
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        onLikeTapped = nil
+    }
+
+    @objc private func didTapLike() {
+        onLikeTapped?()
     }
 }

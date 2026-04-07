@@ -21,7 +21,15 @@ final class DefaultReviewCommentRepository: ReviewCommentRepository {
             throw ReviewCommentError.unauthorized
         }
         let comment = try localDataSource.createComment(draft: draft, in: context, currentUser: currentUser)
-        notifyCommentChange(context: context, commentId: comment.id, action: .created)
+        ReviewCommentSyncCenter.send(
+            ReviewCommentSyncEvent(
+                action: .created,
+                reviewId: context.reviewId,
+                gameId: context.gameId,
+                commentId: comment.id,
+                comment: comment
+            )
+        )
         return comment
     }
 
@@ -30,7 +38,15 @@ final class DefaultReviewCommentRepository: ReviewCommentRepository {
             throw ReviewCommentError.unauthorized
         }
         let comment = try localDataSource.updateComment(commentId: commentId, content: content, in: context, currentUser: currentUser)
-        notifyCommentChange(context: context, commentId: comment.id, action: .updated)
+        ReviewCommentSyncCenter.send(
+            ReviewCommentSyncEvent(
+                action: .updated,
+                reviewId: context.reviewId,
+                gameId: context.gameId,
+                commentId: comment.id,
+                comment: comment
+            )
+        )
         return comment
     }
 
@@ -39,7 +55,15 @@ final class DefaultReviewCommentRepository: ReviewCommentRepository {
             throw ReviewCommentError.unauthorized
         }
         let comment = try localDataSource.deleteComment(commentId: commentId, in: context, currentUser: currentUser)
-        notifyCommentChange(context: context, commentId: comment.id, action: .deleted)
+        ReviewCommentSyncCenter.send(
+            ReviewCommentSyncEvent(
+                action: .deleted,
+                reviewId: context.reviewId,
+                gameId: context.gameId,
+                commentId: comment.id,
+                comment: comment
+            )
+        )
         return comment
     }
 
@@ -48,8 +72,37 @@ final class DefaultReviewCommentRepository: ReviewCommentRepository {
             throw ReviewCommentError.unauthorized
         }
         let comment = try localDataSource.react(to: commentId, reaction: reaction, in: context, currentUser: currentUser)
-        notifyCommentChange(context: context, commentId: comment.id, action: .reacted)
+        ReviewCommentSyncCenter.send(
+            ReviewCommentSyncEvent(
+                action: .reacted,
+                reviewId: context.reviewId,
+                gameId: context.gameId,
+                commentId: comment.id,
+                comment: comment
+            )
+        )
         return comment
+    }
+
+    func react(to commentId: String, reaction: ReviewCommentReaction?) async throws -> ReviewComment {
+        guard let currentUser = userSessionStore.fetchUser() else {
+            throw ReviewCommentError.unauthorized
+        }
+        let comment = try localDataSource.react(to: commentId, reaction: reaction, currentUser: currentUser)
+        ReviewCommentSyncCenter.send(
+            ReviewCommentSyncEvent(
+                action: .reacted,
+                reviewId: comment.reviewId,
+                gameId: comment.gameId,
+                commentId: comment.id,
+                comment: comment
+            )
+        )
+        return comment
+    }
+
+    func fetchCommentCounts(reviewIds: [String]) async throws -> [String: Int] {
+        try localDataSource.fetchCommentCounts(reviewIds: reviewIds)
     }
 
     func fetchMyComments() async throws -> [MyReviewCommentEntry] {
@@ -64,16 +117,4 @@ final class DefaultReviewCommentRepository: ReviewCommentRepository {
         try? localDataSource.markAllNotificationsRead()
     }
 
-    private func notifyCommentChange(context: ReviewDiscussionContext, commentId: String, action: ReviewCommentChangeAction) {
-        NotificationCenter.default.post(
-            name: .reviewCommentsDidChange,
-            object: nil,
-            userInfo: [
-                ReviewCommentChangeUserInfoKey.reviewId: context.reviewId,
-                ReviewCommentChangeUserInfoKey.commentId: commentId,
-                ReviewCommentChangeUserInfoKey.gameId: context.gameId,
-                ReviewCommentChangeUserInfoKey.action: action.rawValue
-            ]
-        )
-    }
 }

@@ -64,8 +64,13 @@ enum SteamLinkCallbackParser {
         guard isSteamCallbackURL(url) else { return nil }
 
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        let queryItems = Dictionary(
-            uniqueKeysWithValues: (components?.queryItems ?? []).map { ($0.name.lowercased(), $0.value) }
+        let queryItems = MappingSafety.dictionary(
+            pairs: (components?.queryItems ?? []).map { ($0.name.lowercased(), $0.value) },
+            logPrefix: "[SteamLinkCallback]",
+            keyName: "queryItem",
+            countLabel: "queryCount",
+            screen: "SteamLinkCallback.parse",
+            mergePolicy: .keepFirst
         )
 
         let linked = parseBoolean(queryItems["linked"] ?? nil)

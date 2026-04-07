@@ -15,9 +15,11 @@ final class ProfileBadgeSelectionStore {
         "Hardcore Gamer": "hardcore_gamer"
     ]
 
-    static let titleByTitleKey: [String: String] = Dictionary(
-        uniqueKeysWithValues: titleKeyByTitle.map { ($1, $0) }
-    )
+    static let titleByTitleKey: [String: String] = [
+        "pro_reviewer": "Pro Reviewer",
+        "rpg_lover": "RPG Lover",
+        "hardcore_gamer": "Hardcore Gamer"
+    ]
 
     private let userDefaults: UserDefaults
     private let storageKeyPrefix = "profile.badges."

@@ -63,7 +63,7 @@ final class GameReviewsViewController: BaseViewController<GameReviewsRootView, G
             action: #selector(didTapComposeButton)
         )
 
-        if reviews.map(\.id) != state.reviews.map(\.id) {
+        if reviews != state.reviews {
             reviews = state.reviews
             rootView.tableView.reloadData()
         } else {

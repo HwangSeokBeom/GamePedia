@@ -67,6 +67,15 @@ final class LibraryCoordinator {
         detailVC.onShowAllReviews = { [weak self, weak detailVC] game in
             self?.showGameReviews(game: game, detailViewController: detailVC)
         }
+        detailVC.onReviewSelected = { [weak self] game, review in
+            self?.showReviewDiscussion(
+                gameId: game.id,
+                gameTitle: game.displayTitle,
+                reviewID: review.id,
+                reviewSeed: review,
+                highlightCommentID: nil
+            )
+        }
         detailVC.onShare = { [weak self] game in
             guard let topVC = self?.navigationController.topViewController else { return }
             let items: [Any] = [L10n.tr("Localizable", "common.share.gameInvitation", game.displayTitle)]

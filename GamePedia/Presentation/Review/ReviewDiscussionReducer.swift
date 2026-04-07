@@ -15,7 +15,11 @@ enum ReviewDiscussionReducer {
             state.resolvedGameTitle = gameTitle
             state.errorMessage = nil
         case .setComments(let comments):
-            state.comments = comments
+            state.allComments = comments
+            state.comments = sortComments(comments, by: state.sortOption)
+        case .setSortOption(let sortOption):
+            state.sortOption = sortOption
+            state.comments = sortComments(state.allComments, by: sortOption)
         case .setExpandedParentCommentIds(let ids):
             state.expandedParentCommentIds = ids
         case .setComposerText(let text):
@@ -34,9 +38,10 @@ enum ReviewDiscussionReducer {
                 state.reactingCommentIds.remove(commentId)
             }
         case .replaceComment(let updatedComment):
-            if let index = state.comments.firstIndex(where: { $0.id == updatedComment.id }) {
-                state.comments[index] = updatedComment
+            if let index = state.allComments.firstIndex(where: { $0.id == updatedComment.id }) {
+                state.allComments[index] = updatedComment
             }
+            state.comments = sortComments(state.allComments, by: state.sortOption)
         case .setError(let message):
             state.errorMessage = message
             state.isLoading = false
@@ -49,5 +54,34 @@ enum ReviewDiscussionReducer {
         }
 
         return state
+    }
+
+    private static func sortComments(_ comments: [ReviewComment], by option: ReviewCommentSortOption) -> [ReviewComment] {
+        let rootComments = comments.filter { $0.parentCommentId == nil }
+        let repliesByParentId = Dictionary(grouping: comments.filter { $0.parentCommentId != nil }, by: { $0.parentCommentId ?? "" })
+
+        let sortedRoots = rootComments.sorted { lhs, rhs in
+            switch option {
+            case .latest:
+                if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
+            case .oldest:
+                if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+            case .likeDescending:
+                if lhs.likeCount != rhs.likeCount { return lhs.likeCount > rhs.likeCount }
+                if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
+            case .likeAscending:
+                if lhs.likeCount != rhs.likeCount { return lhs.likeCount < rhs.likeCount }
+                if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+            }
+            return lhs.id < rhs.id
+        }
+
+        return sortedRoots.flatMap { comment in
+            let replies = (repliesByParentId[comment.id] ?? []).sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+                return lhs.id < rhs.id
+            }
+            return [comment] + replies
+        }
     }
 }

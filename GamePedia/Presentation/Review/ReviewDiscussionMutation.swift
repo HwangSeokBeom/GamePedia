@@ -21,6 +21,7 @@ enum ReviewDiscussionMutation {
     case setLoading(Bool)
     case setReview(Review, gameTitle: String)
     case setComments([ReviewComment])
+    case setSortOption(ReviewCommentSortOption)
     case setExpandedParentCommentIds(Set<String>)
     case setComposerText(String)
     case setComposerMode(ReviewDiscussionComposerMode)

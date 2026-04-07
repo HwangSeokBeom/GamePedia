@@ -63,8 +63,8 @@
 "detail.stats.playtime" = "游玩时长";
 "detail.stats.reviews" = "评论";
 "detail.button.writeReview" = "写评论";
-"detail.button.favorite" = "收藏";
-"detail.button.favorited" = "已收藏";
+"detail.button.favorite" = "愿望单";
+"detail.button.favorited" = "愿望单";
 "detail.button.editReview" = "编辑评论";
 "detail.review.none" = "暂无评论";
 "detail.review.userReviews" = "用户评论";

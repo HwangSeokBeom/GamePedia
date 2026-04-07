@@ -6,6 +6,8 @@ protocol ReviewCommentLocalDataSource {
     func updateComment(commentId: String, content: String, in context: ReviewDiscussionContext, currentUser: AuthUser) throws -> ReviewComment
     func deleteComment(commentId: String, in context: ReviewDiscussionContext, currentUser: AuthUser) throws -> ReviewComment
     func react(to commentId: String, reaction: ReviewCommentReaction?, in context: ReviewDiscussionContext, currentUser: AuthUser) throws -> ReviewComment
+    func react(to commentId: String, reaction: ReviewCommentReaction?, currentUser: AuthUser) throws -> ReviewComment
+    func fetchCommentCounts(reviewIds: [String]) throws -> [String: Int]
     func fetchMyComments(currentUser: AuthUser?) throws -> [MyReviewCommentEntry]
     func fetchNotifications() throws -> [AppNotification]
     func markAllNotificationsRead() throws
@@ -66,7 +68,7 @@ final class DefaultReviewCommentLocalDataSource: ReviewCommentLocalDataSource {
 
         if let parentId = normalizedParentId,
            let parentRecord = records.first(where: { $0.id == parentId }),
-           parentRecord.authorId == currentUser.id {
+           parentRecord.authorId != currentUser.id {
             try appendNotification(
                 StoredReviewCommentNotificationRecord(
                     id: UUID().uuidString,
@@ -122,8 +124,87 @@ final class DefaultReviewCommentLocalDataSource: ReviewCommentLocalDataSource {
     }
 
     func react(to commentId: String, reaction: ReviewCommentReaction?, in context: ReviewDiscussionContext, currentUser: AuthUser) throws -> ReviewComment {
+        try reactInternal(to: commentId, reaction: reaction, currentUser: currentUser, notificationGameTitle: context.gameTitle)
+    }
+
+    func react(to commentId: String, reaction: ReviewCommentReaction?, currentUser: AuthUser) throws -> ReviewComment {
+        try reactInternal(to: commentId, reaction: reaction, currentUser: currentUser, notificationGameTitle: nil)
+    }
+
+    func fetchCommentCounts(reviewIds: [String]) throws -> [String: Int] {
+        guard !reviewIds.isEmpty else { return [:] }
+
+        let reviewIdSet = Set(reviewIds)
+        return loadComments()
+            .filter { reviewIdSet.contains($0.reviewId) }
+            .reduce(into: [String: Int]()) { partialResult, record in
+                partialResult[record.reviewId, default: 0] += 1
+            }
+    }
+
+    func fetchMyComments(currentUser: AuthUser?) throws -> [MyReviewCommentEntry] {
+        guard let currentUser else { return [] }
+
+        let allRecords = loadComments()
+        let reviewAuthorByReviewId = allRecords.reduce(into: [String: ReviewAuthor]()) { partialResult, record in
+            guard partialResult[record.reviewId] == nil else { return }
+            partialResult[record.reviewId] = ReviewAuthor(
+                id: record.reviewAuthorId,
+                nickname: record.reviewAuthorNickname,
+                profileImageUrl: record.reviewAuthorProfileImageUrl
+            )
+        }
+        let groupedReplies = Dictionary(grouping: allRecords.filter { $0.parentCommentId != nil }, by: { $0.parentCommentId ?? "" })
+
+        return allRecords
+            .filter { $0.authorId == currentUser.id }
+            .sorted { lhs, rhs in
+                (lhs.updatedAt ?? lhs.createdAt) > (rhs.updatedAt ?? rhs.createdAt)
+            }
+            .compactMap { record in
+                guard let reviewAuthor = reviewAuthorByReviewId[record.reviewId] else { return nil }
+                let myReaction = reaction(for: record, currentUser: currentUser)
+                let context = ReviewDiscussionContext(
+                    gameId: record.gameId,
+                    gameTitle: record.gameTitle,
+                    reviewId: record.reviewId,
+                    reviewSnippet: record.reviewSnippet,
+                    reviewAuthor: reviewAuthor
+                )
+                let comment = makeComment(
+                    from: record,
+                    context: context,
+                    groupedReplies: groupedReplies,
+                    currentUser: currentUser
+                )
+
+                return MyReviewCommentEntry(
+                    id: record.id,
+                    reviewId: record.reviewId,
+                    gameId: record.gameId,
+                    gameTitle: record.gameTitle,
+                    reviewSnippet: record.reviewSnippet,
+                    commentContent: comment.content,
+                    createdAt: record.createdAt,
+                    updatedAt: record.updatedAt,
+                    depth: record.parentCommentId == nil ? 0 : 1,
+                    isDeleted: record.isDeleted,
+                    likeCount: record.likeUserIds.count,
+                    dislikeCount: record.dislikeUserIds.count,
+                    myReaction: myReaction,
+                    comment: comment
+                )
+            }
+    }
+
+    private func reactInternal(
+        to commentId: String,
+        reaction: ReviewCommentReaction?,
+        currentUser: AuthUser,
+        notificationGameTitle: String?
+    ) throws -> ReviewComment {
         var records = loadComments()
-        guard let index = records.firstIndex(where: { $0.id == commentId && $0.reviewId == context.reviewId }) else {
+        guard let index = records.firstIndex(where: { $0.id == commentId }) else {
             throw ReviewCommentError.commentNotFound
         }
 
@@ -141,7 +222,9 @@ final class DefaultReviewCommentLocalDataSource: ReviewCommentLocalDataSource {
 
         try saveComments(records)
 
-        if records[index].authorId == currentUser.id, let reaction {
+        if records[index].authorId != currentUser.id,
+           let reaction,
+           let notificationGameTitle {
             let type = reaction == .like ? "review_comment_like" : "review_comment_dislike"
             let titleKey = reaction == .like
                 ? "review.comment.notification.likeTitle"
@@ -154,9 +237,9 @@ final class DefaultReviewCommentLocalDataSource: ReviewCommentLocalDataSource {
                     id: UUID().uuidString,
                     type: type,
                     title: L10n.tr("Localizable", titleKey),
-                    message: L10n.tr("Localizable", bodyKey, context.gameTitle),
-                    relatedGameId: context.gameId,
-                    relatedReviewId: context.reviewId,
+                    message: L10n.tr("Localizable", bodyKey, notificationGameTitle),
+                    relatedGameId: records[index].gameId,
+                    relatedReviewId: records[index].reviewId,
                     relatedCommentId: commentId,
                     isRead: false,
                     createdAt: Date()
@@ -164,43 +247,20 @@ final class DefaultReviewCommentLocalDataSource: ReviewCommentLocalDataSource {
             )
         }
 
+        let record = records[index]
+        let reviewAuthor = ReviewAuthor(
+            id: record.reviewAuthorId,
+            nickname: record.reviewAuthorNickname,
+            profileImageUrl: record.reviewAuthorProfileImageUrl
+        )
+        let context = ReviewDiscussionContext(
+            gameId: record.gameId,
+            gameTitle: record.gameTitle,
+            reviewId: record.reviewId,
+            reviewSnippet: record.reviewSnippet,
+            reviewAuthor: reviewAuthor
+        )
         return try requireComment(id: commentId, in: context, currentUser: currentUser)
-    }
-
-    func fetchMyComments(currentUser: AuthUser?) throws -> [MyReviewCommentEntry] {
-        guard let currentUser else { return [] }
-
-        return loadComments()
-            .filter { $0.authorId == currentUser.id }
-            .sorted { lhs, rhs in
-                (lhs.updatedAt ?? lhs.createdAt) > (rhs.updatedAt ?? rhs.createdAt)
-            }
-            .map {
-                let myReaction: ReviewCommentReaction?
-                if $0.likeUserIds.contains(currentUser.id) {
-                    myReaction = .like
-                } else if $0.dislikeUserIds.contains(currentUser.id) {
-                    myReaction = .dislike
-                } else {
-                    myReaction = nil
-                }
-
-                return MyReviewCommentEntry(
-                    id: $0.id,
-                    reviewId: $0.reviewId,
-                    gameId: $0.gameId,
-                    gameTitle: $0.gameTitle,
-                    reviewSnippet: $0.reviewSnippet,
-                    commentContent: $0.isDeleted ? L10n.tr("Localizable", "review.comment.deletedPlaceholder") : $0.content,
-                    createdAt: $0.createdAt,
-                    updatedAt: $0.updatedAt,
-                    depth: $0.parentCommentId == nil ? 0 : 1,
-                    isDeleted: $0.isDeleted,
-                    likeCount: $0.likeUserIds.count,
-                    dislikeCount: $0.dislikeUserIds.count,
-                    myReaction: myReaction
-                )
-            }
     }
 
     func fetchNotifications() throws -> [AppNotification] {
@@ -261,53 +321,82 @@ final class DefaultReviewCommentLocalDataSource: ReviewCommentLocalDataSource {
             grouping: records.filter { $0.parentCommentId != nil },
             by: { $0.parentCommentId ?? "" }
         )
-        let rootCommentById = Dictionary(uniqueKeysWithValues: records.map { ($0.id, $0) })
-        let rootCreatedAtByThreadId = Dictionary(uniqueKeysWithValues: records.map { record in
-            let rootId = record.parentCommentId ?? record.id
-            let rootCreatedAt = rootCommentById[rootId]?.createdAt ?? record.createdAt
-            return (record.id, rootCreatedAt)
-        })
+        let rootCommentById = MappingSafety.dictionary(
+            pairs: records.map { ($0.id, $0) },
+            logPrefix: "[ReviewCommentMapping]",
+            keyName: "commentId",
+            countLabel: "recordCount",
+            screen: "ReviewCommentLocalDataSource.mapComments.rootCommentById",
+            mergePolicy: .keepFirst
+        )
+        let rootCreatedAtByThreadId = MappingSafety.dictionary(
+            pairs: records.map { record in
+                let rootId = record.parentCommentId ?? record.id
+                let rootCreatedAt = rootCommentById[rootId]?.createdAt ?? record.createdAt
+                return (record.id, rootCreatedAt)
+            },
+            logPrefix: "[ReviewCommentMapping]",
+            keyName: "commentId",
+            countLabel: "recordCount",
+            screen: "ReviewCommentLocalDataSource.mapComments.rootCreatedAtByThreadId",
+            mergePolicy: .keepFirst
+        )
 
         return records
             .sorted { lhs, rhs in
                 commentSort(lhs: lhs, rhs: rhs, rootCreatedAtByThreadId: rootCreatedAtByThreadId)
             }
             .map { record in
-                let myReaction: ReviewCommentReaction?
-                if let currentUser, record.likeUserIds.contains(currentUser.id) {
-                    myReaction = .like
-                } else if let currentUser, record.dislikeUserIds.contains(currentUser.id) {
-                    myReaction = .dislike
-                } else {
-                    myReaction = nil
-                }
-
-                return ReviewComment(
-                    id: record.id,
-                    reviewId: record.reviewId,
-                    gameId: record.gameId,
-                    gameTitle: record.gameTitle,
-                    reviewSnippet: record.reviewSnippet,
-                    parentCommentId: record.parentCommentId,
-                    depth: record.parentCommentId == nil ? 0 : 1,
-                    author: ReviewCommentAuthor(
-                        id: record.authorId,
-                        nickname: record.authorNickname,
-                        profileImageUrl: record.authorProfileImageUrl
-                    ),
-                    content: record.isDeleted ? L10n.tr("Localizable", "review.comment.deletedPlaceholder") : record.content,
-                    createdAt: record.createdAt,
-                    updatedAt: record.updatedAt,
-                    isMine: record.authorId == currentUser?.id,
-                    isReviewAuthor: record.authorId == context.reviewAuthor.id,
-                    isDeleted: record.isDeleted,
-                    isEdited: record.updatedAt != nil,
-                    replyCount: groupedReplies[record.id]?.count ?? 0,
-                    likeCount: record.likeUserIds.count,
-                    dislikeCount: record.dislikeUserIds.count,
-                    myReaction: myReaction
+                makeComment(
+                    from: record,
+                    context: context,
+                    groupedReplies: groupedReplies,
+                    currentUser: currentUser
                 )
             }
+    }
+
+    private func makeComment(
+        from record: StoredReviewCommentRecord,
+        context: ReviewDiscussionContext,
+        groupedReplies: [String: [StoredReviewCommentRecord]],
+        currentUser: AuthUser?
+    ) -> ReviewComment {
+        ReviewComment(
+            id: record.id,
+            reviewId: record.reviewId,
+            gameId: record.gameId,
+            gameTitle: record.gameTitle,
+            reviewSnippet: record.reviewSnippet,
+            parentCommentId: record.parentCommentId,
+            depth: record.parentCommentId == nil ? 0 : 1,
+            author: ReviewCommentAuthor(
+                id: record.authorId,
+                nickname: record.authorNickname,
+                profileImageUrl: record.authorProfileImageUrl
+            ),
+            content: record.isDeleted ? L10n.tr("Localizable", "review.comment.deletedPlaceholder") : record.content,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+            isMine: record.authorId == currentUser?.id,
+            isReviewAuthor: record.authorId == context.reviewAuthor.id,
+            isDeleted: record.isDeleted,
+            isEdited: record.updatedAt != nil,
+            replyCount: groupedReplies[record.id]?.count ?? 0,
+            likeCount: record.likeUserIds.count,
+            dislikeCount: record.dislikeUserIds.count,
+            myReaction: reaction(for: record, currentUser: currentUser)
+        )
+    }
+
+    private func reaction(for record: StoredReviewCommentRecord, currentUser: AuthUser?) -> ReviewCommentReaction? {
+        if let currentUser, record.likeUserIds.contains(currentUser.id) {
+            return .like
+        }
+        if let currentUser, record.dislikeUserIds.contains(currentUser.id) {
+            return .dislike
+        }
+        return nil
     }
 
     private func commentSort(

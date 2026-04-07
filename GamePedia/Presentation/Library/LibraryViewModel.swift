@@ -511,7 +511,14 @@ final class LibraryViewModel {
         _ section: LibrarySectionViewState,
         in currentSections: [LibrarySectionViewState]
     ) -> [LibrarySectionViewState] {
-        var sectionsByKind = Dictionary(uniqueKeysWithValues: currentSections.map { ($0.kind, $0) })
+        var sectionsByKind = MappingSafety.dictionary(
+            pairs: currentSections.map { ($0.kind, $0) },
+            logPrefix: "[LibraryMapping]",
+            keyName: "sectionKind",
+            countLabel: "sectionCount",
+            screen: "LibraryViewModel.replacingSection",
+            mergePolicy: .keepLast
+        )
         sectionsByKind[section.kind] = section
         return LibrarySectionKind.displayOrder.compactMap { sectionsByKind[$0] }
     }
@@ -1146,7 +1153,10 @@ final class LibraryViewModel {
                 group.addTask { [weak self] in
                     guard let self else { return .wishlist(.failure(CancellationError())) }
                     let rawResult = await self.captureResult {
-                        try await self.fetchFavoriteGamesUseCase.execute(sort: selectedSort.favoriteSort)
+                        try await self.fetchFavoriteGamesUseCase.execute(
+                            sort: selectedSort.favoriteSort,
+                            screen: "Library.Wishlist"
+                        )
                     }
                     return .wishlist(await self.translatedWishlist(from: rawResult))
                 }
@@ -1154,7 +1164,10 @@ final class LibraryViewModel {
                 group.addTask { [weak self] in
                     guard let self else { return .reviewed(.failure(CancellationError())) }
                     let rawResult = await self.captureResult {
-                        try await self.fetchMyReviewedGamesUseCase.execute(sort: selectedSort.reviewSort)
+                        try await self.fetchMyReviewedGamesUseCase.execute(
+                            sort: selectedSort.reviewSort,
+                            screen: "Library.Reviewed"
+                        )
                     }
                     return .reviewed(await self.translatedReviewed(from: rawResult))
                 }
@@ -1373,7 +1386,14 @@ final class LibraryViewModel {
     ) -> [LibraryGameSummary] {
         guard !incoming.isEmpty else { return [] }
 
-        let currentByIdentifier = Dictionary(uniqueKeysWithValues: current.map { ($0.identifier, $0) })
+        let currentByIdentifier = MappingSafety.dictionary(
+            pairs: current.map { ($0.identifier, $0) },
+            logPrefix: "[LibraryMapping]",
+            keyName: "identifier",
+            countLabel: "itemCount",
+            screen: "LibraryViewModel.mergeRecentlyPlayed",
+            mergePolicy: .keepFirst
+        )
         return incoming.map { incomingSummary in
             let normalizedIncomingSummary = mergeSummaryForDisplay(
                 current: currentByIdentifier[incomingSummary.identifier],
@@ -1437,7 +1457,14 @@ final class LibraryViewModel {
         incoming: [LibraryGameSummary],
         context: String
     ) -> [LibraryGameSummary] {
-        let currentByIdentifier = Dictionary(uniqueKeysWithValues: current.map { ($0.identifier, $0) })
+        let currentByIdentifier = MappingSafety.dictionary(
+            pairs: current.map { ($0.identifier, $0) },
+            logPrefix: "[LibraryMapping]",
+            keyName: "identifier",
+            countLabel: "itemCount",
+            screen: "LibraryViewModel.mergeSummariesForDisplay.\(context)",
+            mergePolicy: .keepFirst
+        )
         return incoming.map { incomingSummary in
             mergeSummaryForDisplay(
                 current: currentByIdentifier[incomingSummary.identifier],
@@ -2422,8 +2449,13 @@ final class LibraryViewModel {
                 payload.recommendations.map(\.game),
                 context: "Library.friendRecommendations"
             )
-            let translatedGamesByKey = Dictionary(
-                uniqueKeysWithValues: translatedGames.map { ($0.identifier.uniqueKey, $0) }
+            let translatedGamesByKey = MappingSafety.dictionary(
+                pairs: translatedGames.map { ($0.identifier.uniqueKey, $0) },
+                logPrefix: "[LibraryMapping]",
+                keyName: "identifier",
+                countLabel: "gameCount",
+                screen: "LibraryViewModel.translatedFriendRecommendations",
+                mergePolicy: .keepFirst
             )
 
             return .success(
@@ -2453,8 +2485,13 @@ final class LibraryViewModel {
                 recommendations.map(\.game),
                 context: "Library.playtimeRecommendations"
             )
-            let translatedGamesByKey = Dictionary(
-                uniqueKeysWithValues: translatedGames.map { ($0.identifier.uniqueKey, $0) }
+            let translatedGamesByKey = MappingSafety.dictionary(
+                pairs: translatedGames.map { ($0.identifier.uniqueKey, $0) },
+                logPrefix: "[LibraryMapping]",
+                keyName: "identifier",
+                countLabel: "gameCount",
+                screen: "LibraryViewModel.translatedPlaytimeRecommendations",
+                mergePolicy: .keepFirst
             )
 
             return .success(

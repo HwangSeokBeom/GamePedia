@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 // MARK: - GameDetailViewModel
@@ -19,6 +20,8 @@ final class GameDetailViewModel {
     // MARK: Dependencies
     private let apiClient: APIClient
     private let fetchGameReviewsUseCase: FetchGameReviewsUseCase
+    private let fetchReviewCommentCountsUseCase: FetchReviewCommentCountsUseCase
+    private let toggleReviewLikeUseCase: ToggleReviewLikeUseCase
     private let fetchFavoriteStatusUseCase: FetchFavoriteStatusUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let moderationRepository: any ModerationRepository
@@ -26,6 +29,8 @@ final class GameDetailViewModel {
     private let translationProvider: any TranslationProviding
     private let translationCache: any TranslationCaching
     private let seedStore: GameDetailSeedStore
+    private var reactingReviewIds = Set<String>()
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: Init
     init(
@@ -33,6 +38,10 @@ final class GameDetailViewModel {
         fetchGameReviewsUseCase: FetchGameReviewsUseCase = FetchGameReviewsUseCase(
             reviewRepository: DefaultReviewRepository()
         ),
+        toggleReviewLikeUseCase: ToggleReviewLikeUseCase = ToggleReviewLikeUseCase(
+            reviewRepository: DefaultReviewRepository()
+        ),
+        reviewCommentRepository: any ReviewCommentRepository = DefaultReviewCommentRepository(),
         fetchFavoriteStatusUseCase: FetchFavoriteStatusUseCase = FetchFavoriteStatusUseCase(
             favoriteRepository: DefaultFavoriteRepository()
         ),
@@ -47,6 +56,8 @@ final class GameDetailViewModel {
     ) {
         self.apiClient = apiClient
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
+        self.fetchReviewCommentCountsUseCase = FetchReviewCommentCountsUseCase(repository: reviewCommentRepository)
+        self.toggleReviewLikeUseCase = toggleReviewLikeUseCase
         self.fetchFavoriteStatusUseCase = fetchFavoriteStatusUseCase
         self.toggleFavoriteUseCase = toggleFavoriteUseCase
         self.moderationRepository = moderationRepository
@@ -54,6 +65,8 @@ final class GameDetailViewModel {
         self.translationProvider = translationProvider
         self.translationCache = translationCache
         self.seedStore = seedStore
+        observeCommentChanges()
+        observeReviewLikeChanges()
     }
 
     // MARK: - Intent Processing
@@ -68,6 +81,8 @@ final class GameDetailViewModel {
             guard let game = state.game else { return }
             // Compose from detail always starts a brand-new review. Editing remains explicit per review item.
             onWriteReview?(game, nil)
+        case .didTapReviewLike(let reviewId):
+            toggleReviewLike(reviewId: reviewId)
         case .didTapShare:
             guard let game = state.game else { return }
             onShare?(game)
@@ -160,13 +175,17 @@ final class GameDetailViewModel {
                 gameId: String(gameId),
                 sort: .latest
             )
+            let visibleReviews = self.visibleReviews(from: reviewFeed.reviews)
+            let mergedReviews = await self.mergedReviewsWithDiscussionCounts(
+                visibleReviews,
+                screen: "GameDetail.fetchReviews"
+            )
             await MainActor.run {
-                let visibleReviews = self.visibleReviews(from: reviewFeed.reviews)
                 self.apply(
                     .setReviewFeed(
                         GameReviewFeed(
-                            reviews: visibleReviews,
-                            summary: self.makeReviewSummary(from: visibleReviews)
+                            reviews: mergedReviews,
+                            summary: self.makeReviewSummary(from: mergedReviews)
                         )
                     )
                 )
@@ -368,6 +387,165 @@ final class GameDetailViewModel {
         return reviews.filter { review in
             !hiddenReviewIDs.contains(review.id) && !blockedUserIDs.contains(review.author.id)
         }
+    }
+
+    private func mergedReviewsWithDiscussionCounts(_ reviews: [Review], screen: String) async -> [Review] {
+        guard !reviews.isEmpty else { return reviews }
+
+        do {
+            let localCounts = try await fetchReviewCommentCountsUseCase.execute(reviewIds: reviews.map(\.id))
+            return reviews.map { review in
+                review.mergingDiscussionCount(localCount: localCounts[review.id] ?? 0)
+            }
+        } catch {
+            print("[ReviewDiscussionCount] mergeSkipped screen=\(screen) error=\(error.localizedDescription)")
+            return reviews
+        }
+    }
+
+    private func observeCommentChanges() {
+        ReviewCommentSyncCenter.events
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self else { return }
+                let hasMatchingReview = self.state.reviews.contains(where: { $0.id == event.reviewId })
+                let hasMatchingGame = self.state.game?.id == event.gameId
+                guard hasMatchingReview || hasMatchingGame else { return }
+                self.refreshVisibleReviewCommentCounts(reason: "commentSync")
+            }
+            .store(in: &cancellables)
+    }
+
+    private func refreshVisibleReviewCommentCounts(reason: String) {
+        let currentReviews = state.reviews
+        guard !currentReviews.isEmpty else { return }
+
+        Task {
+            let mergedReviews = await mergedReviewsWithDiscussionCounts(
+                currentReviews,
+                screen: "GameDetail.\(reason)"
+            )
+
+            await MainActor.run {
+                guard self.state.reviews.map(\.id) == currentReviews.map(\.id) else { return }
+                self.apply(
+                    .setReviewFeed(
+                        GameReviewFeed(
+                            reviews: mergedReviews,
+                            summary: self.makeReviewSummary(from: mergedReviews)
+                        )
+                    )
+                )
+            }
+        }
+    }
+
+    private func observeReviewLikeChanges() {
+        ReviewLikeSyncCenter.events
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self else { return }
+                guard self.state.reviews.contains(where: { $0.id == event.reviewId }) else { return }
+                self.applyReviewLikeState(
+                    reviewId: event.reviewId,
+                    likeCount: event.likeCount,
+                    isLikedByCurrentUser: event.isLikedByCurrentUser
+                )
+            }
+            .store(in: &cancellables)
+    }
+
+    private func toggleReviewLike(reviewId: String) {
+        guard !reactingReviewIds.contains(reviewId),
+              let originalReview = state.reviews.first(where: { $0.id == reviewId }) else {
+            return
+        }
+
+        let optimisticReview = originalReview.togglingLikeOptimistically()
+        reactingReviewIds.insert(reviewId)
+        applyReviewUpdate(optimisticReview)
+        ReviewLikeSyncCenter.send(
+            ReviewLikeSyncEvent(
+                reviewId: optimisticReview.id,
+                gameId: optimisticReview.gameId,
+                likeCount: optimisticReview.likeCount,
+                isLikedByCurrentUser: optimisticReview.isLikedByCurrentUser
+            )
+        )
+
+        Task {
+            do {
+                let result = try await toggleReviewLikeUseCase.execute(
+                    reviewId: reviewId,
+                    isCurrentlyLiked: originalReview.isLikedByCurrentUser
+                )
+
+                await MainActor.run {
+                    self.reactingReviewIds.remove(reviewId)
+                    self.applyReviewLikeState(
+                        reviewId: reviewId,
+                        likeCount: result.likeCount,
+                        isLikedByCurrentUser: result.isLikedByCurrentUser
+                    )
+                    ReviewLikeSyncCenter.send(
+                        ReviewLikeSyncEvent(
+                            reviewId: reviewId,
+                            gameId: originalReview.gameId,
+                            likeCount: result.likeCount,
+                            isLikedByCurrentUser: result.isLikedByCurrentUser
+                        )
+                    )
+                }
+            } catch {
+                let reviewError = ReviewError.from(error: error)
+                await MainActor.run {
+                    self.reactingReviewIds.remove(reviewId)
+                    self.applyReviewUpdate(originalReview)
+                    ReviewLikeSyncCenter.send(
+                        ReviewLikeSyncEvent(
+                            reviewId: originalReview.id,
+                            gameId: originalReview.gameId,
+                            likeCount: originalReview.likeCount,
+                            isLikedByCurrentUser: originalReview.isLikedByCurrentUser
+                        )
+                    )
+                    self.apply(
+                        .setError(
+                            reviewError.errorDescription
+                                ?? L10n.tr("Localizable", "review.error.requestFailed")
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private func applyReviewLikeState(
+        reviewId: String,
+        likeCount: Int,
+        isLikedByCurrentUser: Bool
+    ) {
+        guard let currentReview = state.reviews.first(where: { $0.id == reviewId }) else { return }
+        let updatedReview = currentReview.updatingLikeState(
+            likeCount: likeCount,
+            isLikedByCurrentUser: isLikedByCurrentUser
+        )
+        applyReviewUpdate(updatedReview)
+    }
+
+    private func applyReviewUpdate(_ updatedReview: Review) {
+        let updatedReviews = state.reviews.map { review in
+            review.id == updatedReview.id ? updatedReview : review
+        }
+        guard updatedReviews != state.reviews else { return }
+        apply(
+            .setReviewFeed(
+                GameReviewFeed(
+                    reviews: updatedReviews,
+                    summary: makeReviewSummary(from: updatedReviews)
+                )
+            )
+        )
     }
 
     private func makeReviewSummary(from reviews: [Review]) -> ReviewSummary {

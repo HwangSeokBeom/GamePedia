@@ -63,8 +63,8 @@
 "detail.stats.playtime" = "플레이 시간";
 "detail.stats.reviews" = "리뷰";
 "detail.button.writeReview" = "리뷰 작성";
-"detail.button.favorite" = "찜하기";
-"detail.button.favorited" = "찜됨";
+"detail.button.favorite" = "위시리스트";
+"detail.button.favorited" = "위시리스트";
 "detail.button.editReview" = "리뷰 수정";
 "detail.review.none" = "아직 리뷰가 없어요";
 "detail.review.userReviews" = "유저 리뷰";

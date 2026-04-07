@@ -1,10 +1,32 @@
 import UIKit
 
 final class GameDetailRootView: UIView {
+    private enum PreviewLimit {
+        static let reviews = 5
+    }
+
+    private let heroGradientLayer: CAGradientLayer = {
+        let layer = CAGradientLayer()
+        layer.locations = [0.5, 1.0]
+        return layer
+    }()
+
+    private let myReviewCountBadgeView = UIView()
+    private let myReviewCountBadgeLabel = UILabel()
+    private let myReviewCardsStackView = UIStackView()
+    private let contentStackView = UIStackView()
+    private let descriptionSectionStackView = UIStackView()
+    private let myReviewSectionStackView = UIStackView()
+    private let communitySectionStackView = UIStackView()
+    private let actionStackView = UIStackView()
+    private let translationMetaStackView = UIStackView()
+    private var heroHeightConstraint: NSLayoutConstraint!
+    var onEditMyReview: ((Review) -> Void)?
 
     let scrollView: UIScrollView = {
         let scrollView = UIScrollView()
         scrollView.backgroundColor = .gpBackground
+        scrollView.alwaysBounceVertical = true
         scrollView.showsVerticalScrollIndicator = false
         scrollView.contentInsetAdjustmentBehavior = .never
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -20,15 +42,9 @@ final class GameDetailRootView: UIView {
         return imageView
     }()
 
-    private let heroGradientLayer: CAGradientLayer = {
-        let layer = CAGradientLayer()
-        layer.locations = [0.55, 1.0]
-        return layer
-    }()
-
     let titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 22, weight: .bold)
+        label.font = .gpSerif(ofSize: 22, weight: .semibold)
         label.textColor = .gpTextPrimary
         label.numberOfLines = 2
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -37,7 +53,7 @@ final class GameDetailRootView: UIView {
 
     let developerLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 13)
+        label.font = .systemFont(ofSize: 13, weight: .medium)
         label.textColor = .gpTextSecondary
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -48,7 +64,6 @@ final class GameDetailRootView: UIView {
         configuration.image = UIImage(systemName: "heart")
         configuration.baseForegroundColor = .gpRed
         configuration.contentInsets = .zero
-
         let button = UIButton(configuration: configuration)
         button.backgroundColor = .gpSurface
         button.layer.cornerRadius = 20
@@ -67,38 +82,70 @@ final class GameDetailRootView: UIView {
     let haveItButton: UIButton = {
         var configuration = UIButton.Configuration.filled()
         configuration.title = L10n.Detail.Button.favorite
-        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
-        configuration.image = UIImage(systemName: "bookmark", withConfiguration: symbolConfiguration)
+        configuration.image = UIImage(
+            systemName: "bookmark",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        )
         configuration.imagePadding = 8
         configuration.baseBackgroundColor = .gpPrimary
         configuration.baseForegroundColor = .gpOnPrimary
         configuration.cornerStyle = .capsule
-        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
-            var updated = attributes
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var updated = incoming
             updated.font = .systemFont(ofSize: 14, weight: .semibold)
             return updated
         }
-        return UIButton(configuration: configuration)
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
     }()
 
     let writeReviewButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
-        let symbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         configuration.title = L10n.Detail.Button.writeReview
-        configuration.image = UIImage(systemName: "pencil", withConfiguration: symbolConfiguration)
+        configuration.image = UIImage(
+            systemName: "square.and.pencil",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        )
         configuration.imagePadding = 8
         configuration.baseForegroundColor = .gpTextPrimary
         configuration.cornerStyle = .capsule
         configuration.background.backgroundColor = .gpSurfaceElevated
         configuration.background.strokeColor = .gpSeparator
         configuration.background.strokeWidth = 1
-        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
-            var updated = attributes
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var updated = incoming
             updated.font = .systemFont(ofSize: 14, weight: .semibold)
             return updated
         }
-        return UIButton(configuration: configuration)
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
     }()
+
+    let myReviewNewButton: UIButton = {
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = L10n.tr("Localizable", "detail.button.writeAnotherReview")
+        configuration.image = UIImage(
+            systemName: "plus",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .bold)
+        )
+        configuration.imagePadding = 4
+        configuration.baseBackgroundColor = UIColor.gpPrimary.withAlphaComponent(0.14)
+        configuration.baseForegroundColor = .gpPrimary
+        configuration.cornerStyle = .capsule
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 14)
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var updated = incoming
+            updated.font = .systemFont(ofSize: 12, weight: .semibold)
+            return updated
+        }
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    let emptyStateView = MyReviewEmptyStateView()
 
     let steamReviewBannerView: SteamReviewLinkageBannerView = {
         let view = SteamReviewLinkageBannerView()
@@ -110,7 +157,7 @@ final class GameDetailRootView: UIView {
     let descriptionTitleLabel: UILabel = {
         let label = UILabel()
         label.text = L10n.Detail.Section.description
-        label.font = .systemFont(ofSize: 18, weight: .bold)
+        label.font = .gpSerif(ofSize: 18, weight: .semibold)
         label.textColor = .gpTextPrimary
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -149,8 +196,8 @@ final class GameDetailRootView: UIView {
         configuration.title = L10n.Translation.Action.showOriginal
         configuration.baseForegroundColor = .gpPrimary
         configuration.contentInsets = .zero
-        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
-            var updated = attributes
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var updated = incoming
             updated.font = .systemFont(ofSize: 12, weight: .semibold)
             return updated
         }
@@ -171,27 +218,24 @@ final class GameDetailRootView: UIView {
 
     let reviewSectionHeader = SectionHeaderView()
 
-    private let reviewSummaryLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 13, weight: .medium)
-        label.textColor = .gpTextSecondary
-        label.numberOfLines = 0
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-
     let reviewTableView: UITableView = {
-        let tableView = UITableView()
+        let tableView = SelfSizingTableView()
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
         tableView.isScrollEnabled = false
         tableView.rowHeight = UITableView.automaticDimension
-        tableView.estimatedRowHeight = 120
+        tableView.estimatedRowHeight = 108
         tableView.translatesAutoresizingMaskIntoConstraints = false
         return tableView
     }()
 
-    private var reviewTableHeightConstraint: NSLayoutConstraint!
+    private let myReviewTitleLabel: UILabel = {
+        let label = UILabel()
+        label.font = .gpSerif(ofSize: 18, weight: .semibold)
+        label.textColor = .gpTextPrimary
+        label.text = L10n.tr("Localizable", "detail.section.myRecords")
+        return label
+    }()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -211,12 +255,25 @@ final class GameDetailRootView: UIView {
 
     private func setup() {
         backgroundColor = .gpBackground
-
         reviewTableView.register(ReviewCardCell.self, forCellReuseIdentifier: ReviewCardCell.reuseId)
+
+        myReviewCountBadgeView.backgroundColor = UIColor.gpPrimary.withAlphaComponent(0.14)
+        myReviewCountBadgeView.layer.cornerRadius = 12
+        myReviewCountBadgeView.layer.cornerCurve = .continuous
+        myReviewCountBadgeView.translatesAutoresizingMaskIntoConstraints = false
+        myReviewCountBadgeView.isHidden = true
+
+        myReviewCountBadgeLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        myReviewCountBadgeLabel.textColor = .gpPrimary
+        myReviewCountBadgeLabel.translatesAutoresizingMaskIntoConstraints = false
+        myReviewCountBadgeView.addSubview(myReviewCountBadgeLabel)
 
         reviewSectionHeader.translatesAutoresizingMaskIntoConstraints = false
         reviewSectionHeader.configure(title: L10n.Detail.Section.userReviews)
-        reviewSectionHeader.titleLabel.font = .systemFont(ofSize: 18, weight: .bold)
+        reviewSectionHeader.titleLabel.font = .gpSerif(ofSize: 18, weight: .semibold)
+        var seeMoreConfiguration = reviewSectionHeader.seeMoreButton.configuration
+        seeMoreConfiguration?.title = L10n.tr("Localizable", "common.button.viewAll")
+        reviewSectionHeader.seeMoreButton.configuration = seeMoreConfiguration
 
         heroImageView.layer.addSublayer(heroGradientLayer)
         applyDynamicLayerColors()
@@ -231,49 +288,68 @@ final class GameDetailRootView: UIView {
         titleRowStackView.spacing = 12
         titleRowStackView.translatesAutoresizingMaskIntoConstraints = false
 
-        let actionStackView = UIStackView(arrangedSubviews: [haveItButton, writeReviewButton])
         actionStackView.axis = .horizontal
         actionStackView.spacing = 12
         actionStackView.distribution = .fillEqually
         actionStackView.translatesAutoresizingMaskIntoConstraints = false
+        actionStackView.addArrangedSubview(haveItButton)
+        actionStackView.addArrangedSubview(writeReviewButton)
 
-        let translationMetaStackView = UIStackView(arrangedSubviews: [translationIndicatorLabel, translationToggleButton, UIView()])
         translationMetaStackView.axis = .horizontal
         translationMetaStackView.alignment = .center
         translationMetaStackView.spacing = 8
         translationMetaStackView.translatesAutoresizingMaskIntoConstraints = false
+        translationMetaStackView.addArrangedSubview(translationIndicatorLabel)
+        translationMetaStackView.addArrangedSubview(translationToggleButton)
+        translationMetaStackView.addArrangedSubview(UIView())
 
-        let contentStackView = UIStackView(arrangedSubviews: [
-            titleRowStackView,
-            statsView,
-            actionStackView,
-            steamReviewBannerView,
-            descriptionTitleLabel,
-            inlineNoticeLabel,
-            translationMetaStackView,
-            descriptionLabel,
-            reviewSectionHeader,
-            reviewSummaryLabel,
-            reviewTableView
-        ])
+        descriptionSectionStackView.axis = .vertical
+        descriptionSectionStackView.spacing = 10
+        descriptionSectionStackView.addArrangedSubview(descriptionTitleLabel)
+        descriptionSectionStackView.addArrangedSubview(inlineNoticeLabel)
+        descriptionSectionStackView.addArrangedSubview(translationMetaStackView)
+        descriptionSectionStackView.addArrangedSubview(descriptionLabel)
+
+        let myReviewHeaderLeadingStackView = UIStackView(arrangedSubviews: [myReviewTitleLabel, myReviewCountBadgeView])
+        myReviewHeaderLeadingStackView.axis = .horizontal
+        myReviewHeaderLeadingStackView.alignment = .center
+        myReviewHeaderLeadingStackView.spacing = 8
+
+        let myReviewHeaderStackView = UIStackView(arrangedSubviews: [myReviewHeaderLeadingStackView, UIView(), myReviewNewButton])
+        myReviewHeaderStackView.axis = .horizontal
+        myReviewHeaderStackView.alignment = .center
+
+        myReviewCardsStackView.axis = .vertical
+        myReviewCardsStackView.spacing = 14
+
+        myReviewSectionStackView.axis = .vertical
+        myReviewSectionStackView.spacing = 16
+        myReviewSectionStackView.addArrangedSubview(myReviewHeaderStackView)
+        myReviewSectionStackView.addArrangedSubview(emptyStateView)
+        myReviewSectionStackView.addArrangedSubview(myReviewCardsStackView)
+
+        communitySectionStackView.axis = .vertical
+        communitySectionStackView.spacing = 12
+        communitySectionStackView.addArrangedSubview(reviewSectionHeader)
+        communitySectionStackView.addArrangedSubview(reviewTableView)
+
         contentStackView.axis = .vertical
         contentStackView.spacing = 20
-        contentStackView.isLayoutMarginsRelativeArrangement = true
-        contentStackView.layoutMargins = UIEdgeInsets(top: 20, left: 0, bottom: 0, right: 0)
         contentStackView.translatesAutoresizingMaskIntoConstraints = false
-
-        contentStackView.setCustomSpacing(10, after: descriptionTitleLabel)
-        contentStackView.setCustomSpacing(10, after: inlineNoticeLabel)
-        contentStackView.setCustomSpacing(10, after: translationMetaStackView)
-        contentStackView.setCustomSpacing(12, after: reviewSectionHeader)
-        contentStackView.setCustomSpacing(12, after: reviewSummaryLabel)
+        contentStackView.addArrangedSubview(titleRowStackView)
+        contentStackView.addArrangedSubview(statsView)
+        contentStackView.addArrangedSubview(actionStackView)
+        contentStackView.addArrangedSubview(steamReviewBannerView)
+        contentStackView.addArrangedSubview(descriptionSectionStackView)
+        contentStackView.addArrangedSubview(myReviewSectionStackView)
+        contentStackView.addArrangedSubview(communitySectionStackView)
 
         addSubview(scrollView)
         scrollView.addSubview(heroImageView)
         scrollView.addSubview(contentStackView)
 
-        reviewTableHeightConstraint = reviewTableView.heightAnchor.constraint(equalToConstant: 0)
-        reviewTableHeightConstraint.isActive = true
+        heroHeightConstraint = heroImageView.heightAnchor.constraint(equalToConstant: 240)
+        heroHeightConstraint.isActive = true
 
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: topAnchor),
@@ -281,24 +357,28 @@ final class GameDetailRootView: UIView {
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            heroImageView.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            heroImageView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            heroImageView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            heroImageView.heightAnchor.constraint(equalToConstant: 280),
+            heroImageView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            heroImageView.leadingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.leadingAnchor),
+            heroImageView.trailingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.trailingAnchor),
 
-            contentStackView.topAnchor.constraint(equalTo: heroImageView.bottomAnchor),
-            contentStackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
-            contentStackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
-            contentStackView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -24),
-            
+            contentStackView.topAnchor.constraint(equalTo: heroImageView.bottomAnchor, constant: 0),
+            contentStackView.leadingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.leadingAnchor, constant: 20),
+            contentStackView.trailingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.trailingAnchor, constant: -20),
+            contentStackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -24),
+
             heartButton.widthAnchor.constraint(equalToConstant: 40),
             heartButton.heightAnchor.constraint(equalToConstant: 40),
             translationIndicatorLabel.heightAnchor.constraint(equalToConstant: 20),
 
-            statsView.heightAnchor.constraint(equalToConstant: 80),
-
+            statsView.heightAnchor.constraint(equalToConstant: 72),
             haveItButton.heightAnchor.constraint(equalToConstant: 44),
-            writeReviewButton.heightAnchor.constraint(equalToConstant: 44)
+            writeReviewButton.heightAnchor.constraint(equalToConstant: 44),
+            myReviewNewButton.heightAnchor.constraint(equalToConstant: 32),
+
+            myReviewCountBadgeLabel.topAnchor.constraint(equalTo: myReviewCountBadgeView.topAnchor, constant: 4),
+            myReviewCountBadgeLabel.leadingAnchor.constraint(equalTo: myReviewCountBadgeView.leadingAnchor, constant: 10),
+            myReviewCountBadgeLabel.trailingAnchor.constraint(equalTo: myReviewCountBadgeView.trailingAnchor, constant: -10),
+            myReviewCountBadgeLabel.bottomAnchor.constraint(equalTo: myReviewCountBadgeView.bottomAnchor, constant: -4)
         ])
     }
 
@@ -309,6 +389,7 @@ final class GameDetailRootView: UIView {
 
     func render(_ state: GameDetailState) {
         guard let game = state.game else { return }
+
         heroImageView.loadImage(url: game.heroImageURL)
         titleLabel.text = state.title
         developerLabel.text = game.developerLine
@@ -321,22 +402,43 @@ final class GameDetailRootView: UIView {
         var translationToggleConfiguration = translationToggleButton.configuration
         translationToggleConfiguration?.title = state.translationToggleTitle
         translationToggleButton.configuration = translationToggleConfiguration
-        reviewSummaryLabel.text = state.reviewSummaryText
-        reviewSectionHeader.seeMoreButton.isHidden = !state.shouldShowReviewSeeMore
         steamReviewBannerView.isHidden = !state.showSteamReviewLinkage
-        print("[UI] rendered resolvedTitle:", state.title)
-        print("[UI] rendered resolvedSummary:", state.summary)
-        print(
-            "[TranslationDisplay] " +
-            "isShowingTranslated=\(state.isShowingTranslated) " +
-            "hasTranslation=\(state.hasTranslation) " +
-            "isTranslationAvailable=\(state.isTranslationAvailable)"
-        )
+
+        heroHeightConstraint.constant = state.hasMyReviews ? 220 : 240
+        writeReviewButton.isHidden = state.hasMyReviews
+        myReviewNewButton.isHidden = !state.hasMyReviews
+
+        let myReviews = Array(state.myReviews.prefix(PreviewLimit.reviews))
+        emptyStateView.isHidden = !myReviews.isEmpty
+        myReviewCardsStackView.isHidden = myReviews.isEmpty
+        myReviewCountBadgeView.isHidden = myReviews.isEmpty
+        myReviewCountBadgeLabel.text = String(state.myReviews.count)
+        rebuildMyReviewCards(with: myReviews)
+
+        reviewSectionHeader.isHidden = state.communityPreviewReviews.isEmpty
+        reviewTableView.isHidden = state.communityPreviewReviews.isEmpty
+        reviewSectionHeader.seeMoreButton.isHidden = !state.shouldShowReviewSeeMore
     }
 
     func updateReviewTableHeight() {
         layoutIfNeeded()
-        reviewTableHeightConstraint.constant = reviewTableView.contentSize.height
+        reviewTableView.invalidateIntrinsicContentSize()
+    }
+
+    private func rebuildMyReviewCards(with reviews: [Review]) {
+        myReviewCardsStackView.arrangedSubviews.forEach { view in
+            myReviewCardsStackView.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+
+        reviews.forEach { review in
+            let cardView = MyReviewCardView()
+            cardView.configure(with: review)
+            cardView.onEditTapped = { [weak self] in
+                self?.onEditMyReview?(review)
+            }
+            myReviewCardsStackView.addArrangedSubview(cardView)
+        }
     }
 
     private func applyDynamicLayerColors() {
@@ -345,5 +447,20 @@ final class GameDetailRootView: UIView {
             UIColor.gpHeroGradientEnd.resolvedCGColor(with: traitCollection)
         ]
         heartButton.layer.borderColor = UIColor.gpBorder.resolvedCGColor(with: traitCollection)
+    }
+}
+
+private final class SelfSizingTableView: UITableView {
+    override var contentSize: CGSize {
+        didSet {
+            guard oldValue != contentSize else { return }
+            invalidateIntrinsicContentSize()
+            setNeedsLayout()
+        }
+    }
+
+    override var intrinsicContentSize: CGSize {
+        layoutIfNeeded()
+        return CGSize(width: UIView.noIntrinsicMetric, height: contentSize.height)
     }
 }

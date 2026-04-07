@@ -11,25 +11,21 @@ final class ReviewCommentCell: UITableViewCell {
         let dateText: String
         let depth: Int
         let isMine: Bool
-        let isSelfReply: Bool
-        let isReviewAuthor: Bool
         let isDeleted: Bool
-        let likeCountText: String?
-        let dislikeCountText: String?
+        let likeCount: Int
         let myReaction: ReviewCommentReaction?
-        let replyButtonTitle: String
         let showsActions: Bool
+        let canReply: Bool
         let isReactionLoading: Bool
     }
 
     var onReplyTapped: (() -> Void)?
     var onLikeTapped: (() -> Void)?
-    var onDislikeTapped: (() -> Void)?
     var onMoreTapped: (() -> Void)?
 
-    private let cardView: UIView = {
+    private let highlightBackgroundView: UIView = {
         let view = UIView()
-        view.layer.cornerRadius = 16
+        view.backgroundColor = .clear
         view.layer.cornerCurve = .continuous
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
@@ -39,7 +35,6 @@ final class ReviewCommentCell: UITableViewCell {
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 14
         imageView.backgroundColor = .gpSurface
         imageView.translatesAutoresizingMaskIntoConstraints = false
         return imageView
@@ -47,7 +42,6 @@ final class ReviewCommentCell: UITableViewCell {
 
     private let avatarInitialLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 11, weight: .semibold)
         label.textColor = .gpAvatarInitialText
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -55,41 +49,79 @@ final class ReviewCommentCell: UITableViewCell {
 
     private let authorLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
         label.textColor = .gpTextPrimary
         return label
     }()
 
-    private let dateLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 11, weight: .medium)
-        label.textColor = .gpTextTertiary
+    private let mineBadgeLabel: UILabel = {
+        let label = InsetLabel(insets: UIEdgeInsets(top: 2, left: 6, bottom: 2, right: 6))
+        label.font = .systemFont(ofSize: 10, weight: .semibold)
+        label.textColor = .white
+        label.backgroundColor = .gpPrimary
+        label.layer.cornerRadius = 9
+        label.layer.cornerCurve = .continuous
+        label.layer.masksToBounds = true
+        label.text = L10n.tr("Localizable", "review.comment.badge.mine")
+        label.isHidden = true
         return label
+    }()
+
+    private let moreButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.image = UIImage(
+            systemName: "ellipsis",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        )
+        configuration.baseForegroundColor = .gpTextTertiary
+        configuration.contentInsets = .zero
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
     }()
 
     private let bodyLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 14)
         label.textColor = .gpTextSecondary
         label.numberOfLines = 0
         return label
     }()
 
-    private let badgeStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.spacing = 6
-        stackView.alignment = .center
-        return stackView
+    private let timeLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextTertiary
+        return label
+    }()
+
+    private let firstMetaDot: UILabel = {
+        let label = UILabel()
+        label.text = "·"
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextTertiary
+        return label
+    }()
+
+    private let secondMetaDot: UILabel = {
+        let label = UILabel()
+        label.text = "·"
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextTertiary
+        return label
     }()
 
     private let likeButton = UIButton(type: .system)
-    private let dislikeButton = UIButton(type: .system)
     private let replyButton = UIButton(type: .system)
-    private let moreButton = UIButton(type: .system)
-    private let actionsStackView = UIStackView()
+    private let separatorView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpSeparator
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
     private var leadingConstraint: NSLayoutConstraint?
-    private var currentViewStateId: String?
+    private var avatarSizeConstraint: NSLayoutConstraint?
+    private var contentTopConstraint: NSLayoutConstraint?
+    private var metaBottomConstraint: NSLayoutConstraint?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -102,20 +134,44 @@ final class ReviewCommentCell: UITableViewCell {
     }
 
     func configure(with viewState: ViewState) {
-        currentViewStateId = viewState.id
-        let indent: CGFloat = viewState.depth == 0 ? 20 : 56
-        leadingConstraint?.constant = indent
+        let isReply = viewState.depth > 0
+        let leadingInset: CGFloat = isReply ? 56 : 20
+        let avatarSize: CGFloat = isReply ? 24 : 28
+        let topBottomInset: CGFloat = isReply ? 10 : 14
 
+        leadingConstraint?.constant = leadingInset
+        avatarSizeConstraint?.constant = avatarSize
+        contentTopConstraint?.constant = topBottomInset
+        metaBottomConstraint?.constant = topBottomInset
+
+        avatarView.layer.cornerRadius = avatarSize / 2
+        highlightBackgroundView.layer.cornerRadius = isReply ? 12 : 14
+
+        avatarView.backgroundColor = ReviewCommentAvatarPalette.color(for: viewState.authorName)
         avatarView.loadImage(url: viewState.authorAvatarURL)
         avatarInitialLabel.text = String(viewState.authorName.first ?? " ")
+        avatarInitialLabel.font = .systemFont(ofSize: isReply ? 10 : 11, weight: .semibold)
+
         authorLabel.text = viewState.authorName
-        dateLabel.text = viewState.dateText
+        authorLabel.font = .systemFont(ofSize: isReply ? 13 : 14, weight: .semibold)
+
         bodyLabel.text = viewState.bodyText
+        bodyLabel.font = .systemFont(ofSize: isReply ? 13 : 14)
         bodyLabel.textColor = viewState.isDeleted ? .gpTextTertiary : .gpTextSecondary
 
-        configureBadges(for: viewState)
-        configureActions(for: viewState)
-        configureCardAppearance(for: viewState)
+        timeLabel.text = viewState.dateText
+        mineBadgeLabel.isHidden = !viewState.isMine
+        moreButton.isHidden = !viewState.showsActions
+
+        configureLikeButton(with: viewState)
+        configureReplyButton(with: viewState)
+
+        let hidesMeta = viewState.isDeleted
+        timeLabel.isHidden = hidesMeta
+        firstMetaDot.isHidden = hidesMeta
+        secondMetaDot.isHidden = hidesMeta
+        likeButton.isHidden = hidesMeta
+        replyButton.isHidden = hidesMeta
     }
 
     override func prepareForReuse() {
@@ -125,17 +181,15 @@ final class ReviewCommentCell: UITableViewCell {
         avatarInitialLabel.text = nil
         onReplyTapped = nil
         onLikeTapped = nil
-        onDislikeTapped = nil
         onMoreTapped = nil
     }
 
     func animateHighlight() {
-        let originalColor = cardView.backgroundColor
         UIView.animate(withDuration: 0.18, animations: {
-            self.cardView.backgroundColor = UIColor.gpPrimary.withAlphaComponent(0.22)
+            self.highlightBackgroundView.backgroundColor = UIColor.gpPrimary.withAlphaComponent(0.18)
         }, completion: { _ in
             UIView.animate(withDuration: 0.4) {
-                self.cardView.backgroundColor = originalColor
+                self.highlightBackgroundView.backgroundColor = .clear
             }
         })
     }
@@ -147,171 +201,101 @@ final class ReviewCommentCell: UITableViewCell {
 
         avatarView.addSubview(avatarInitialLabel)
 
-        let authorRow = UIStackView(arrangedSubviews: [authorLabel, badgeStackView, UIView(), dateLabel])
-        authorRow.axis = .horizontal
-        authorRow.alignment = .center
-        authorRow.spacing = 6
+        let leftHeaderStack = UIStackView(arrangedSubviews: [avatarView, authorLabel, mineBadgeLabel])
+        leftHeaderStack.axis = .horizontal
+        leftHeaderStack.alignment = .center
+        leftHeaderStack.spacing = 8
 
-        configureActionButton(likeButton, symbolName: "hand.thumbsup", selector: #selector(didTapLike))
-        configureActionButton(dislikeButton, symbolName: "hand.thumbsdown", selector: #selector(didTapDislike))
-        configureActionButton(replyButton, symbolName: "arrowshape.turn.up.left", selector: #selector(didTapReply))
-        configureActionButton(moreButton, symbolName: "ellipsis", selector: #selector(didTapMore))
+        let headerRow = UIStackView(arrangedSubviews: [leftHeaderStack, UIView(), moreButton])
+        headerRow.axis = .horizontal
+        headerRow.alignment = .center
 
-        actionsStackView.axis = .horizontal
-        actionsStackView.spacing = 6
-        actionsStackView.alignment = .center
-        [likeButton, dislikeButton, replyButton, moreButton].forEach(actionsStackView.addArrangedSubview)
+        configureMetaButton(likeButton, selector: #selector(didTapLike))
+        configureMetaButton(replyButton, selector: #selector(didTapReply))
 
-        let contentStack = UIStackView(arrangedSubviews: [authorRow, bodyLabel, actionsStackView])
+        let metaRow = UIStackView(arrangedSubviews: [timeLabel, firstMetaDot, likeButton, secondMetaDot, replyButton, UIView()])
+        metaRow.axis = .horizontal
+        metaRow.alignment = .center
+        metaRow.spacing = 6
+
+        let contentStack = UIStackView(arrangedSubviews: [headerRow, bodyLabel, metaRow])
         contentStack.axis = .vertical
-        contentStack.spacing = 10
+        contentStack.spacing = 8
         contentStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let horizontalStack = UIStackView(arrangedSubviews: [avatarView, contentStack])
-        horizontalStack.axis = .horizontal
-        horizontalStack.alignment = .top
-        horizontalStack.spacing = 10
-        horizontalStack.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(highlightBackgroundView)
+        highlightBackgroundView.addSubview(contentStack)
+        highlightBackgroundView.addSubview(separatorView)
 
-        contentView.addSubview(cardView)
-        cardView.addSubview(horizontalStack)
+        leadingConstraint = highlightBackgroundView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20)
+        avatarSizeConstraint = avatarView.widthAnchor.constraint(equalToConstant: 28)
+        contentTopConstraint = contentStack.topAnchor.constraint(equalTo: highlightBackgroundView.topAnchor, constant: 14)
+        metaBottomConstraint = separatorView.topAnchor.constraint(equalTo: contentStack.bottomAnchor, constant: 14)
 
-        leadingConstraint = cardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20)
         leadingConstraint?.isActive = true
+        avatarSizeConstraint?.isActive = true
+        contentTopConstraint?.isActive = true
+        metaBottomConstraint?.isActive = true
 
         NSLayoutConstraint.activate([
-            avatarView.widthAnchor.constraint(equalToConstant: 28),
-            avatarView.heightAnchor.constraint(equalToConstant: 28),
+            highlightBackgroundView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            highlightBackgroundView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            highlightBackgroundView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+
+            avatarView.heightAnchor.constraint(equalTo: avatarView.widthAnchor),
             avatarInitialLabel.centerXAnchor.constraint(equalTo: avatarView.centerXAnchor),
             avatarInitialLabel.centerYAnchor.constraint(equalTo: avatarView.centerYAnchor),
 
-            cardView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
-            cardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            cardView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
+            contentStack.leadingAnchor.constraint(equalTo: highlightBackgroundView.leadingAnchor),
+            contentStack.trailingAnchor.constraint(equalTo: highlightBackgroundView.trailingAnchor),
 
-            horizontalStack.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 14),
-            horizontalStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 14),
-            horizontalStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -14),
-            horizontalStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -14),
+            moreButton.widthAnchor.constraint(equalToConstant: 32),
+            moreButton.heightAnchor.constraint(equalToConstant: 32),
+
+            separatorView.leadingAnchor.constraint(equalTo: highlightBackgroundView.leadingAnchor),
+            separatorView.trailingAnchor.constraint(equalTo: highlightBackgroundView.trailingAnchor),
+            separatorView.bottomAnchor.constraint(equalTo: highlightBackgroundView.bottomAnchor),
+            separatorView.heightAnchor.constraint(equalToConstant: 1)
         ])
+
+        moreButton.addTarget(self, action: #selector(didTapMore), for: .touchUpInside)
     }
 
-    private func configureCardAppearance(for viewState: ViewState) {
-        if viewState.isDeleted {
-            cardView.backgroundColor = .gpSurfaceElevated
-            cardView.layer.borderWidth = 0
-            return
-        }
-
-        if viewState.isSelfReply {
-            cardView.backgroundColor = UIColor.gpTeal.withAlphaComponent(0.12)
-            cardView.layer.borderWidth = 1
-            cardView.layer.borderColor = UIColor.gpTeal.withAlphaComponent(0.24).cgColor
-            return
-        }
-
-        if viewState.isMine {
-            cardView.backgroundColor = UIColor.gpPrimary.withAlphaComponent(0.10)
-            cardView.layer.borderWidth = 1
-            cardView.layer.borderColor = UIColor.gpPrimary.withAlphaComponent(0.2).cgColor
-            return
-        }
-
-        if viewState.isReviewAuthor {
-            cardView.backgroundColor = UIColor.gpCoral.withAlphaComponent(0.08)
-            cardView.layer.borderWidth = 1
-            cardView.layer.borderColor = UIColor.gpCoral.withAlphaComponent(0.18).cgColor
-            return
-        }
-
-        cardView.backgroundColor = .gpCardBackground
-        cardView.layer.borderWidth = 1
-        cardView.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.18).cgColor
-    }
-
-    private func configureBadges(for viewState: ViewState) {
-        badgeStackView.arrangedSubviews.forEach {
-            badgeStackView.removeArrangedSubview($0)
-            $0.removeFromSuperview()
-        }
-
-        if viewState.isSelfReply {
-            badgeStackView.addArrangedSubview(makeBadge(text: L10n.tr("Localizable", "review.comment.badge.selfReply"), tintColor: .gpTeal))
-        } else if viewState.isMine {
-            let key = viewState.depth == 0 ? "review.comment.badge.mine" : "review.comment.badge.myReply"
-            badgeStackView.addArrangedSubview(makeBadge(text: L10n.tr("Localizable", key), tintColor: .gpPrimary))
-        }
-
-        if viewState.isReviewAuthor {
-            badgeStackView.addArrangedSubview(makeBadge(text: L10n.tr("Localizable", "review.comment.badge.reviewAuthor"), tintColor: .gpCoral))
-        }
-
-        if viewState.isDeleted {
-            badgeStackView.addArrangedSubview(makeBadge(text: L10n.tr("Localizable", "review.comment.badge.deleted"), tintColor: .gpTextSecondary))
-        }
-    }
-
-    private func configureActions(for viewState: ViewState) {
-        likeButton.isEnabled = !viewState.isReactionLoading && !viewState.isDeleted
-        dislikeButton.isEnabled = !viewState.isReactionLoading && !viewState.isDeleted
-        replyButton.isEnabled = !viewState.isDeleted
-
-        var likeConfiguration = likeButton.configuration
-        likeConfiguration?.title = viewState.likeCountText
-        likeButton.configuration = likeConfiguration
-
-        var dislikeConfiguration = dislikeButton.configuration
-        dislikeConfiguration?.title = viewState.dislikeCountText
-        dislikeButton.configuration = dislikeConfiguration
-
-        var replyConfiguration = replyButton.configuration
-        replyConfiguration?.title = viewState.replyButtonTitle
-        replyButton.configuration = replyConfiguration
-        moreButton.isHidden = !viewState.showsActions
-
-        let likeTint: UIColor = viewState.myReaction == .like ? .gpTeal : .gpTextSecondary
-        let dislikeTint: UIColor = viewState.myReaction == .dislike ? .gpCoral : .gpTextSecondary
-        updateActionButtonAppearance(button: likeButton, tintColor: likeTint, selected: viewState.myReaction == .like)
-        updateActionButtonAppearance(button: dislikeButton, tintColor: dislikeTint, selected: viewState.myReaction == .dislike)
-        updateActionButtonAppearance(button: replyButton, tintColor: .gpTextSecondary, selected: false)
-        updateActionButtonAppearance(button: moreButton, tintColor: .gpTextSecondary, selected: false)
-
-        let likeCountText = viewState.likeCountText ?? "0"
-        let dislikeCountText = viewState.dislikeCountText ?? "0"
-        likeButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.like", likeCountText)
-        dislikeButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.dislike", dislikeCountText)
-        replyButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.reply")
-        moreButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.more")
-    }
-
-    private func configureActionButton(_ button: UIButton, symbolName: String, selector: Selector) {
-        var configuration = UIButton.Configuration.plain()
-        configuration.image = UIImage(systemName: symbolName)
-        configuration.imagePadding = 4
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 8, bottom: 5, trailing: 8)
-        button.configuration = configuration
-        button.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
-        button.addTarget(self, action: selector, for: .touchUpInside)
-    }
-
-    private func updateActionButtonAppearance(button: UIButton, tintColor: UIColor, selected: Bool) {
-        var configuration = button.configuration
+    private func configureLikeButton(with viewState: ViewState) {
+        let isLiked = viewState.myReaction == .like
+        let tintColor: UIColor = isLiked ? .gpCoral : .gpTextTertiary
+        var configuration = likeButton.configuration
+        configuration?.title = String(viewState.likeCount)
+        configuration?.image = UIImage(
+            systemName: isLiked ? "heart.fill" : "heart",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+        )
         configuration?.baseForegroundColor = tintColor
-        configuration?.baseBackgroundColor = selected ? tintColor.withAlphaComponent(0.12) : .clear
-        configuration?.cornerStyle = .capsule
-        button.configuration = configuration
+        configuration?.imagePadding = 4
+        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0)
+        likeButton.configuration = configuration
+        likeButton.isEnabled = !viewState.isReactionLoading && !viewState.isDeleted
+        likeButton.alpha = viewState.likeCount == 0 && !isLiked ? 0.72 : 1
+        likeButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.like", String(viewState.likeCount))
     }
 
-    private func makeBadge(text: String, tintColor: UIColor) -> UIView {
-        let label = InsetLabel(insets: UIEdgeInsets(top: 3, left: 7, bottom: 3, right: 7))
-        label.text = text
-        label.font = .systemFont(ofSize: 10, weight: .semibold)
-        label.textColor = tintColor
-        label.backgroundColor = tintColor.withAlphaComponent(0.12)
-        label.layer.cornerRadius = 9
-        label.layer.cornerCurve = .continuous
-        label.layer.masksToBounds = true
-        return label
+    private func configureReplyButton(with viewState: ViewState) {
+        var configuration = replyButton.configuration
+        configuration?.title = L10n.tr("Localizable", "review.comment.action.reply")
+        configuration?.baseForegroundColor = .gpTextSecondary
+        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0)
+        replyButton.configuration = configuration
+        replyButton.isEnabled = viewState.canReply && !viewState.isDeleted
+        replyButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.reply")
+    }
+
+    private func configureMetaButton(_ button: UIButton, selector: Selector) {
+        var configuration = UIButton.Configuration.plain()
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0)
+        configuration.imagePadding = 4
+        button.configuration = configuration
+        button.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
+        button.addTarget(self, action: selector, for: .touchUpInside)
     }
 
     @objc private func didTapReply() {
@@ -322,12 +306,23 @@ final class ReviewCommentCell: UITableViewCell {
         onLikeTapped?()
     }
 
-    @objc private func didTapDislike() {
-        onDislikeTapped?()
-    }
-
     @objc private func didTapMore() {
         onMoreTapped?()
+    }
+}
+
+private enum ReviewCommentAvatarPalette {
+    private static let colors: [UIColor] = [
+        UIColor(hex: "#6366F1"),
+        UIColor(hex: "#3B5998"),
+        UIColor(hex: "#2E8B57"),
+        UIColor(hex: "#8B5CF6"),
+        UIColor(hex: "#E85A4F"),
+        UIColor(hex: "#FFB547")
+    ]
+
+    static func color(for seed: String) -> UIColor {
+        colors[abs(seed.hashValue) % colors.count]
     }
 }
 

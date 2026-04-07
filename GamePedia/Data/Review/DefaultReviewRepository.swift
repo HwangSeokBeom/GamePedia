@@ -70,4 +70,22 @@ final class DefaultReviewRepository: ReviewRepository {
             throw ReviewError.from(error: error)
         }
     }
+
+    func likeReview(reviewId: String) async throws -> ReviewLikeMutationResult {
+        do {
+            let data = try await reviewRemoteDataSource.likeReview(reviewId: reviewId)
+            return ReviewMapper.toLikeMutationResult(data)
+        } catch {
+            throw ReviewError.from(error: error)
+        }
+    }
+
+    func removeReviewLike(reviewId: String) async throws -> ReviewLikeMutationResult {
+        do {
+            let data = try await reviewRemoteDataSource.removeReviewLike(reviewId: reviewId)
+            return ReviewMapper.toLikeMutationResult(data)
+        } catch {
+            throw ReviewError.from(error: error)
+        }
+    }
 }

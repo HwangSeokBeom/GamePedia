@@ -80,7 +80,14 @@ final class FriendActivityFeedViewModel {
                 await MainActor.run {
                     let newItems = page.activities.map(FriendActivityFeedItemFormatter.makeViewState(from:))
                     self.activityItemsByID.merge(
-                        Dictionary(uniqueKeysWithValues: page.activities.map { ($0.stableIdentity, $0) })
+                        MappingSafety.dictionary(
+                            pairs: page.activities.map { ($0.stableIdentity, $0) },
+                            logPrefix: "[FriendActivity]",
+                            keyName: "stableIdentity",
+                            countLabel: "activityCount",
+                            screen: "FriendActivityFeedViewController.loadFeed",
+                            mergePolicy: .keepLast
+                        )
                     ) { _, new in new }
                     let mergedItems = self.mergeItems(
                         currentItems: reset ? [] : currentItems,

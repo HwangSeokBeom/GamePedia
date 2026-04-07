@@ -22,6 +22,20 @@ struct ReviewDiscussionContext: Equatable {
     let reviewSnippet: String
     let reviewAuthor: ReviewAuthor
 
+    init(
+        gameId: Int,
+        gameTitle: String,
+        reviewId: String,
+        reviewSnippet: String,
+        reviewAuthor: ReviewAuthor
+    ) {
+        self.gameId = gameId
+        self.gameTitle = gameTitle
+        self.reviewId = reviewId
+        self.reviewSnippet = reviewSnippet
+        self.reviewAuthor = reviewAuthor
+    }
+
     init(gameId: Int, gameTitle: String, review: Review) {
         self.gameId = gameId
         self.gameTitle = gameTitle
@@ -97,9 +111,17 @@ struct MyReviewCommentEntry: Equatable, Hashable, Identifiable {
     let likeCount: Int
     let dislikeCount: Int
     let myReaction: ReviewCommentReaction?
+    let comment: ReviewComment
 
     var formattedDate: String {
-        let baseDate = updatedAt ?? createdAt
-        return RelativeDateTimeFormatter().localizedString(for: baseDate, relativeTo: Date())
+        comment.formattedDate
+    }
+
+    var isMine: Bool {
+        comment.isMine
+    }
+
+    var isReviewAuthor: Bool {
+        comment.isReviewAuthor
     }
 }

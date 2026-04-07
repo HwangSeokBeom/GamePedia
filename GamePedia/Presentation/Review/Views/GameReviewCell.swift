@@ -49,6 +49,29 @@ final class GameReviewCell: UITableViewCell {
         return label
     }()
 
+    private let commentIconView: UIImageView = {
+        let imageView = UIImageView(
+            image: UIImage(systemName: "message", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+        )
+        imageView.tintColor = .gpTextTertiary
+        return imageView
+    }()
+
+    private let commentLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextSecondary
+        return label
+    }()
+
+    private let disclosureView: UIImageView = {
+        let imageView = UIImageView(
+            image: UIImage(systemName: "chevron.right", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+        )
+        imageView.tintColor = .gpTextTertiary
+        return imageView
+    }()
+
     private let moreButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
         configuration.image = UIImage(
@@ -97,9 +120,14 @@ final class GameReviewCell: UITableViewCell {
         topRow.alignment = .center
         topRow.spacing = 8
 
-        let contentStack = UIStackView(arrangedSubviews: [topRow, contentLabel])
+        let footerRow = UIStackView(arrangedSubviews: [commentIconView, commentLabel, UIView(), disclosureView])
+        footerRow.axis = .horizontal
+        footerRow.alignment = .center
+        footerRow.spacing = 6
+
+        let contentStack = UIStackView(arrangedSubviews: [topRow, contentLabel, footerRow])
         contentStack.axis = .vertical
-        contentStack.spacing = 12
+        contentStack.spacing = 10
         contentStack.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(cardView)
@@ -144,6 +172,10 @@ final class GameReviewCell: UITableViewCell {
         dateLabel.text = review.formattedDate
         starView.configure(rating: review.rating)
         contentLabel.text = review.content
+        commentLabel.text = review.commentCount > 0
+            ? L10n.tr("Localizable", "review.card.commentCta", review.commentCount)
+            : L10n.tr("Localizable", "review.card.commentEmptyCta")
+        commentLabel.textColor = review.commentCount > 0 ? .gpTextSecondary : .gpPrimary
         moreButton.isHidden = false
     }
 
@@ -152,6 +184,10 @@ final class GameReviewCell: UITableViewCell {
         avatarView.cancelLoad()
         avatarView.image = nil
         avatarInitialLabel.text = nil
+        authorLabel.text = nil
+        dateLabel.text = nil
+        contentLabel.text = nil
+        commentLabel.text = nil
         onMoreButtonTapped = nil
     }
 

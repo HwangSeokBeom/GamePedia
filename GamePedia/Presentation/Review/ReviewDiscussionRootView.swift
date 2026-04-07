@@ -1,30 +1,16 @@
 import UIKit
 
 final class ReviewDiscussionRootView: UIView {
-    private struct HeaderViewState: Equatable {
-        let review: Review?
-        let gameTitle: String
-        let commentCount: Int
-    }
-
     let tableView: UITableView = {
         let tableView = UITableView(frame: .zero, style: .plain)
         tableView.backgroundColor = .gpBackground
         tableView.separatorStyle = .none
         tableView.keyboardDismissMode = .interactive
+        tableView.showsVerticalScrollIndicator = false
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = 112
         tableView.translatesAutoresizingMaskIntoConstraints = false
         return tableView
-    }()
-
-    let emptyLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 15, weight: .medium)
-        label.textColor = .gpTextSecondary
-        label.textAlignment = .center
-        label.numberOfLines = 0
-        label.isHidden = true
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
     }()
 
     let loadingIndicatorView: UIActivityIndicatorView = {
@@ -51,27 +37,22 @@ final class ReviewDiscussionRootView: UIView {
         label.textColor = .gpTextSecondary
         label.numberOfLines = 0
         label.isHidden = true
-        label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
 
     let composerModeLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 12, weight: .semibold)
-        label.textColor = .gpPrimaryLight
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
         label.numberOfLines = 1
-        label.isHidden = true
-        label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
 
     let cancelComposerModeButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
-        configuration.image = UIImage(systemName: "xmark.circle.fill")
+        configuration.title = L10n.Common.Button.cancel
         configuration.baseForegroundColor = .gpTextSecondary
         configuration.contentInsets = .zero
         let button = UIButton(configuration: configuration)
-        button.isHidden = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -82,7 +63,8 @@ final class ReviewDiscussionRootView: UIView {
         textView.textColor = .gpTextPrimary
         textView.backgroundColor = .clear
         textView.isScrollEnabled = false
-        textView.textContainerInset = UIEdgeInsets(top: 10, left: 0, bottom: 10, right: 0)
+        textView.textContainerInset = UIEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)
+        textView.textContainer.lineFragmentPadding = 0
         textView.translatesAutoresizingMaskIntoConstraints = false
         return textView
     }()
@@ -91,46 +73,98 @@ final class ReviewDiscussionRootView: UIView {
         let label = UILabel()
         label.font = .systemFont(ofSize: 14)
         label.textColor = .gpTextTertiary
-        label.numberOfLines = 0
+        label.numberOfLines = 1
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
 
     let submitButton: UIButton = {
-        var configuration = UIButton.Configuration.filled()
-        configuration.cornerStyle = .capsule
-        configuration.baseBackgroundColor = .gpPrimary
-        configuration.baseForegroundColor = .white
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14)
-        let button = UIButton(configuration: configuration)
+        let button = UIButton(type: .system)
+        button.backgroundColor = .gpPrimary
+        button.tintColor = .white
+        button.layer.cornerRadius = 14
+        button.layer.cornerCurve = .continuous
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
 
+    private let emptyLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 15, weight: .medium)
+        label.textColor = .gpTextSecondary
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.isHidden = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
     private let composerContainerView: UIView = {
         let view = UIView()
-        view.backgroundColor = .gpCardBackground
-        view.layer.cornerRadius = 20
-        view.layer.cornerCurve = .continuous
-        view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        view.layer.borderWidth = 1
-        view.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.22).cgColor
+        view.backgroundColor = .gpBackground
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
 
-    private let composerTextContainerView: UIView = {
+    private let composerTopBorderView: UIView = {
         let view = UIView()
-        view.backgroundColor = .gpSurfaceElevated.withAlphaComponent(0.78)
+        view.backgroundColor = .gpSeparator
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let composerStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.spacing = 8
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+
+    private let composerContextContainerView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpSurfaceElevated
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let composerContextIconView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.tintColor = .gpPrimaryLight
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let composerAvatarView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpPrimary
         view.layer.cornerRadius = 16
         view.layer.cornerCurve = .continuous
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
 
+    private let composerAvatarIconView: UIImageView = {
+        let imageView = UIImageView(image: UIImage(systemName: "person.fill"))
+        imageView.tintColor = .white
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let composerTextContainerView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpSurfaceElevated
+        view.layer.cornerRadius = 19
+        view.layer.cornerCurve = .continuous
+        view.layer.borderWidth = 1
+        view.layer.borderColor = UIColor.gpSeparator.cgColor
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
     private var composerBottomConstraint: NSLayoutConstraint?
-    private let headerView = ReviewDiscussionHeaderView()
-    private var headerViewState: HeaderViewState?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -143,44 +177,34 @@ final class ReviewDiscussionRootView: UIView {
     }
 
     func render(_ state: ReviewDiscussionState) {
-        headerViewState = HeaderViewState(
-            review: state.review,
-            gameTitle: state.navigationTitle,
-            commentCount: state.comments.count
-        )
-        updateTableHeaderIfNeeded()
+        emptyLabel.text = state.errorMessage
+        emptyLabel.isHidden = !(state.errorMessage != nil && state.review == nil)
+        retryButton.isHidden = !(state.errorMessage != nil && state.review == nil)
 
-        emptyLabel.text = state.emptyMessage
-        emptyLabel.isHidden = !(state.review != nil && !state.isLoading && state.comments.isEmpty && state.errorMessage == nil)
+        let composerState = state.composerState
+        composerPlaceholderLabel.text = composerState.placeholder
+        composerPlaceholderLabel.isHidden = !composerState.text.isEmpty
 
-        composerPlaceholderLabel.text = state.composerPlaceholder
-        composerPlaceholderLabel.isHidden = !state.composerText.isEmpty
-        composerModeLabel.text = state.composerContextText
-        composerModeLabel.isHidden = state.composerContextText == nil
-        cancelComposerModeButton.isHidden = state.composerContextText == nil
-        if composerTextView.text != state.composerText {
-            composerTextView.text = state.composerText
+        let contextText = composerState.contextText
+        composerModeLabel.text = contextText
+        composerContextContainerView.isHidden = contextText == nil
+        cancelComposerModeButton.isHidden = contextText == nil
+
+        if composerTextView.text != composerState.text {
+            composerTextView.text = composerState.text
         }
-        composerTextView.isEditable = !state.isSubmitting
-        submitButton.isEnabled = state.canSubmit
-        var submitConfiguration = submitButton.configuration
-        submitConfiguration?.title = state.composerSubmitTitle
-        submitButton.configuration = submitConfiguration
-        submitButton.alpha = state.canSubmit ? 1.0 : 0.55
+        composerTextView.isEditable = !composerState.isSubmitting
 
         noticeLabel.text = state.inlineNoticeMessage
         noticeLabel.isHidden = state.inlineNoticeMessage == nil
-        retryButton.isHidden = state.errorMessage == nil
-        if let errorMessage = state.errorMessage, state.review == nil {
-            emptyLabel.text = errorMessage
-            emptyLabel.isHidden = false
-        }
 
         if state.isLoading && state.review == nil {
             loadingIndicatorView.startAnimating()
         } else {
             loadingIndicatorView.stopAnimating()
         }
+
+        applyComposerStyle(for: composerState)
     }
 
     func setComposerBottomInset(_ inset: CGFloat) {
@@ -188,14 +212,40 @@ final class ReviewDiscussionRootView: UIView {
         layoutIfNeeded()
     }
 
+    func focusComposer() {
+        composerTextView.becomeFirstResponder()
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        updateTableHeaderIfNeeded()
     }
 
     private func setup() {
         backgroundColor = .gpBackground
         tableView.register(ReviewCommentCell.self, forCellReuseIdentifier: ReviewCommentCell.reuseIdentifier)
+
+        let composerContextRow = UIStackView(arrangedSubviews: [composerContextIconView, composerModeLabel, UIView(), cancelComposerModeButton])
+        composerContextRow.axis = .horizontal
+        composerContextRow.alignment = .center
+        composerContextRow.spacing = 8
+        composerContextRow.translatesAutoresizingMaskIntoConstraints = false
+
+        composerContextContainerView.addSubview(composerContextRow)
+        composerAvatarView.addSubview(composerAvatarIconView)
+
+        let composerRow = UIStackView(arrangedSubviews: [composerAvatarView, composerTextContainerView])
+        composerRow.axis = .horizontal
+        composerRow.alignment = .center
+        composerRow.spacing = 10
+        composerRow.translatesAutoresizingMaskIntoConstraints = false
+
+        composerTextContainerView.addSubview(composerTextView)
+        composerTextContainerView.addSubview(composerPlaceholderLabel)
+        composerTextContainerView.addSubview(submitButton)
+
+        composerStackView.addArrangedSubview(noticeLabel)
+        composerStackView.addArrangedSubview(composerContextContainerView)
+        composerStackView.addArrangedSubview(composerRow)
 
         addSubview(tableView)
         addSubview(emptyLabel)
@@ -203,13 +253,8 @@ final class ReviewDiscussionRootView: UIView {
         addSubview(retryButton)
         addSubview(composerContainerView)
 
-        composerContainerView.addSubview(noticeLabel)
-        composerContainerView.addSubview(composerModeLabel)
-        composerContainerView.addSubview(cancelComposerModeButton)
-        composerContainerView.addSubview(composerTextContainerView)
-        composerContainerView.addSubview(submitButton)
-        composerTextContainerView.addSubview(composerTextView)
-        composerTextContainerView.addSubview(composerPlaceholderLabel)
+        composerContainerView.addSubview(composerTopBorderView)
+        composerContainerView.addSubview(composerStackView)
 
         composerBottomConstraint = composerContainerView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor)
         composerBottomConstraint?.isActive = true
@@ -234,102 +279,161 @@ final class ReviewDiscussionRootView: UIView {
             composerContainerView.leadingAnchor.constraint(equalTo: leadingAnchor),
             composerContainerView.trailingAnchor.constraint(equalTo: trailingAnchor),
 
-            noticeLabel.topAnchor.constraint(equalTo: composerContainerView.topAnchor, constant: 10),
-            noticeLabel.leadingAnchor.constraint(equalTo: composerContainerView.leadingAnchor, constant: 20),
-            noticeLabel.trailingAnchor.constraint(equalTo: composerContainerView.trailingAnchor, constant: -20),
+            composerTopBorderView.topAnchor.constraint(equalTo: composerContainerView.topAnchor),
+            composerTopBorderView.leadingAnchor.constraint(equalTo: composerContainerView.leadingAnchor),
+            composerTopBorderView.trailingAnchor.constraint(equalTo: composerContainerView.trailingAnchor),
+            composerTopBorderView.heightAnchor.constraint(equalToConstant: 1),
 
-            composerModeLabel.topAnchor.constraint(equalTo: noticeLabel.bottomAnchor, constant: 6),
-            composerModeLabel.leadingAnchor.constraint(equalTo: composerContainerView.leadingAnchor, constant: 20),
-            composerModeLabel.trailingAnchor.constraint(lessThanOrEqualTo: cancelComposerModeButton.leadingAnchor, constant: -8),
+            composerStackView.topAnchor.constraint(equalTo: composerContainerView.topAnchor, constant: 8),
+            composerStackView.leadingAnchor.constraint(equalTo: composerContainerView.leadingAnchor, constant: 16),
+            composerStackView.trailingAnchor.constraint(equalTo: composerContainerView.trailingAnchor, constant: -16),
+            composerStackView.bottomAnchor.constraint(equalTo: composerContainerView.bottomAnchor, constant: -12),
 
-            cancelComposerModeButton.centerYAnchor.constraint(equalTo: composerModeLabel.centerYAnchor),
-            cancelComposerModeButton.trailingAnchor.constraint(equalTo: composerContainerView.trailingAnchor, constant: -20),
+            composerContextRow.topAnchor.constraint(equalTo: composerContextContainerView.topAnchor, constant: 8),
+            composerContextRow.leadingAnchor.constraint(equalTo: composerContextContainerView.leadingAnchor, constant: 16),
+            composerContextRow.trailingAnchor.constraint(equalTo: composerContextContainerView.trailingAnchor, constant: -16),
+            composerContextRow.bottomAnchor.constraint(equalTo: composerContextContainerView.bottomAnchor, constant: -8),
 
-            submitButton.trailingAnchor.constraint(equalTo: composerContainerView.trailingAnchor, constant: -20),
-            submitButton.bottomAnchor.constraint(equalTo: composerContainerView.bottomAnchor, constant: -16),
+            composerContextIconView.widthAnchor.constraint(equalToConstant: 12),
+            composerContextIconView.heightAnchor.constraint(equalToConstant: 12),
 
-            composerTextContainerView.topAnchor.constraint(equalTo: composerModeLabel.bottomAnchor, constant: 10),
-            composerTextContainerView.leadingAnchor.constraint(equalTo: composerContainerView.leadingAnchor, constant: 20),
-            composerTextContainerView.trailingAnchor.constraint(equalTo: submitButton.leadingAnchor, constant: -12),
-            composerTextContainerView.bottomAnchor.constraint(equalTo: composerContainerView.bottomAnchor, constant: -12),
-            composerTextContainerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 46),
+            composerAvatarView.widthAnchor.constraint(equalToConstant: 32),
+            composerAvatarView.heightAnchor.constraint(equalToConstant: 32),
+            composerAvatarIconView.centerXAnchor.constraint(equalTo: composerAvatarView.centerXAnchor),
+            composerAvatarIconView.centerYAnchor.constraint(equalTo: composerAvatarView.centerYAnchor),
+            composerAvatarIconView.widthAnchor.constraint(equalToConstant: 14),
+            composerAvatarIconView.heightAnchor.constraint(equalToConstant: 14),
+
+            composerTextContainerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 38),
 
             composerTextView.topAnchor.constraint(equalTo: composerTextContainerView.topAnchor),
-            composerTextView.leadingAnchor.constraint(equalTo: composerTextContainerView.leadingAnchor, constant: 12),
-            composerTextView.trailingAnchor.constraint(equalTo: composerTextContainerView.trailingAnchor, constant: -12),
+            composerTextView.leadingAnchor.constraint(equalTo: composerTextContainerView.leadingAnchor, constant: 14),
+            composerTextView.trailingAnchor.constraint(equalTo: submitButton.leadingAnchor, constant: -8),
             composerTextView.bottomAnchor.constraint(equalTo: composerTextContainerView.bottomAnchor),
 
-            composerPlaceholderLabel.topAnchor.constraint(equalTo: composerTextContainerView.topAnchor, constant: 11),
-            composerPlaceholderLabel.leadingAnchor.constraint(equalTo: composerTextContainerView.leadingAnchor, constant: 16),
-            composerPlaceholderLabel.trailingAnchor.constraint(equalTo: composerTextContainerView.trailingAnchor, constant: -16)
+            composerPlaceholderLabel.leadingAnchor.constraint(equalTo: composerTextContainerView.leadingAnchor, constant: 14),
+            composerPlaceholderLabel.trailingAnchor.constraint(lessThanOrEqualTo: submitButton.leadingAnchor, constant: -8),
+            composerPlaceholderLabel.centerYAnchor.constraint(equalTo: composerTextContainerView.centerYAnchor),
+
+            submitButton.trailingAnchor.constraint(equalTo: composerTextContainerView.trailingAnchor, constant: -6),
+            submitButton.centerYAnchor.constraint(equalTo: composerTextContainerView.centerYAnchor),
+            submitButton.widthAnchor.constraint(equalToConstant: 28),
+            submitButton.heightAnchor.constraint(equalToConstant: 28)
         ])
     }
 
-    private func updateTableHeaderIfNeeded() {
-        guard let headerViewState else { return }
+    private func applyComposerStyle(for state: ReviewDiscussionComposerState) {
+        let symbolName: String
+        let contextIconName: String
+        let accentColor: UIColor
 
-        headerView.configure(
-            review: headerViewState.review,
-            gameTitle: headerViewState.gameTitle,
-            commentCount: headerViewState.commentCount
-        )
-
-        if tableView.tableHeaderView !== headerView {
-            tableView.tableHeaderView = headerView
+        switch state.mode {
+        case .comment:
+            symbolName = "arrow.up"
+            contextIconName = "arrow.turn.up.left"
+            accentColor = .gpSeparator
+        case .reply:
+            symbolName = "arrow.up"
+            contextIconName = "arrow.turn.up.left"
+            accentColor = .gpPrimary
+        case .edit:
+            symbolName = "checkmark"
+            contextIconName = "pencil.line"
+            accentColor = .gpOrange
         }
 
-        let targetWidth = tableView.bounds.width > 0 ? tableView.bounds.width : bounds.width
-        guard targetWidth > 0 else { return }
-
-        headerView.frame = CGRect(origin: .zero, size: CGSize(width: targetWidth, height: headerView.frame.height))
-        headerView.setNeedsLayout()
-        headerView.layoutIfNeeded()
-
-        let headerSize = headerView.systemLayoutSizeFitting(
-            CGSize(width: targetWidth, height: UIView.layoutFittingCompressedSize.height),
-            withHorizontalFittingPriority: .required,
-            verticalFittingPriority: .fittingSizeLevel
+        composerContextIconView.image = UIImage(
+            systemName: contextIconName,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
         )
-        let resolvedHeight = ceil(headerSize.height)
-        let resolvedSize = CGSize(width: targetWidth, height: resolvedHeight)
-        guard headerView.frame.size != resolvedSize else { return }
+        composerContextIconView.tintColor = accentColor == .gpSeparator ? .gpPrimaryLight : accentColor
+        composerModeLabel.textColor = accentColor == .gpSeparator ? .gpPrimaryLight : accentColor
 
-        headerView.frame = CGRect(origin: .zero, size: resolvedSize)
-        tableView.tableHeaderView = headerView
+        let showsContext = state.contextText != nil
+        composerTextContainerView.layer.borderColor = (showsContext ? accentColor : UIColor.gpSeparator).cgColor
+        composerTextContainerView.layer.borderWidth = showsContext ? 1.5 : 1
+
+        submitButton.isEnabled = state.canSubmit
+        submitButton.accessibilityLabel = state.submitTitle
+        submitButton.setImage(
+            UIImage(
+                systemName: symbolName,
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .bold)
+            ),
+            for: .normal
+        )
+        submitButton.backgroundColor = state.canSubmit ? (showsContext && accentColor != .gpSeparator ? accentColor : .gpPrimary) : .gpSurfaceElevated
+        submitButton.tintColor = state.canSubmit ? .white : .gpTextTertiary
     }
 }
 
-private final class ReviewDiscussionHeaderView: UIView {
-    private let gameTitleLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 13, weight: .medium)
-        label.textColor = .gpTextSecondary
-        label.numberOfLines = 2
-        return label
-    }()
-
+final class ReviewDiscussionHeaderView: UIView {
     private let cardView: UIView = {
         let view = UIView()
         view.backgroundColor = .gpCardBackground
-        view.layer.cornerRadius = 14
+        view.layer.cornerRadius = 18
         view.layer.cornerCurve = .continuous
+        view.layer.borderWidth = 1
+        view.layer.borderColor = UIColor.gpSeparator.cgColor
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
 
-    private let avatarView: UIImageView = {
+    private let contentStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.spacing = 12
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+
+    private let coverImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 14
+        imageView.layer.cornerRadius = 10
+        imageView.backgroundColor = .gpSurfaceElevated
+        imageView.tintColor = .gpTextTertiary
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let gameTitleLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 15, weight: .semibold)
+        label.textColor = .gpTextPrimary
+        label.numberOfLines = 2
+        return label
+    }()
+
+    private let dateLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextTertiary
+        return label
+    }()
+
+    private let bodyLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 14)
+        label.textColor = .gpTextSecondary
+        label.numberOfLines = 0
+        return label
+    }()
+
+    private let authorAvatarView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.layer.cornerRadius = 12
         imageView.backgroundColor = .gpSurfaceElevated
         imageView.translatesAutoresizingMaskIntoConstraints = false
         return imageView
     }()
 
-    private let avatarInitialLabel: UILabel = {
+    private let authorAvatarInitialLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 12, weight: .semibold)
+        label.font = .systemFont(ofSize: 11, weight: .semibold)
         label.textColor = .gpAvatarInitialText
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -337,31 +441,259 @@ private final class ReviewDiscussionHeaderView: UIView {
 
     private let authorLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
-        label.textColor = .gpTextPrimary
-        return label
-    }()
-
-    private let dateLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 11)
-        label.textColor = .gpTextTertiary
-        return label
-    }()
-
-    private let bodyLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 13)
+        label.font = .systemFont(ofSize: 13, weight: .medium)
         label.textColor = .gpTextSecondary
-        label.numberOfLines = 0
+        return label
+    }()
+
+    private let likeMetaButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.contentInsets = .zero
+        configuration.imagePadding = 4
+        configuration.baseForegroundColor = .gpTextTertiary
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var updated = incoming
+            updated.font = .systemFont(ofSize: 12, weight: .medium)
+            return updated
+        }
+        let button = UIButton(configuration: configuration)
+        button.isUserInteractionEnabled = false
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    private let mineBadgeLabel: UILabel = {
+        let label = InsetLabel(insets: UIEdgeInsets(top: 2, left: 6, bottom: 2, right: 6))
+        label.font = .systemFont(ofSize: 10, weight: .semibold)
+        label.textColor = .white
+        label.backgroundColor = .gpPrimary
+        label.layer.cornerRadius = 9
+        label.layer.cornerCurve = .continuous
+        label.layer.masksToBounds = true
+        label.text = L10n.tr("Localizable", "review.comment.badge.mine")
+        label.isHidden = true
         return label
     }()
 
     private let starView = StarRatingView()
-    private let commentCountLabel: UILabel = {
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setup()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setup()
+    }
+
+    override func systemLayoutSizeFitting(
+        _ targetSize: CGSize,
+        withHorizontalFittingPriority horizontalFittingPriority: UILayoutPriority,
+        verticalFittingPriority: UILayoutPriority
+    ) -> CGSize {
+        let fittingWidth = targetSize.width > 0 ? targetSize.width : bounds.width
+        guard fittingWidth > 0 else {
+            print("[ReviewDiscussionHeaderView] systemLayoutSizeFitting width=0 returningZero")
+            return .zero
+        }
+        let resolvedSize = super.systemLayoutSizeFitting(
+            CGSize(width: fittingWidth, height: targetSize.height),
+            withHorizontalFittingPriority: horizontalFittingPriority,
+            verticalFittingPriority: verticalFittingPriority
+        )
+        print("[ReviewDiscussionHeaderView] systemLayoutSizeFitting width=\(fittingWidth) height=\(resolvedSize.height)")
+        return resolvedSize
+    }
+
+    func configure(with state: ReviewDiscussionHeaderState) {
+        let review = state.review
+        print("[ReviewDiscussionHeaderView] configure reviewId=\(review.id) gameId=\(state.gameId) title=\(state.gameTitle)")
+
+        coverImageView.cancelLoad()
+        coverImageView.loadImage(
+            url: GameDetailSeedStore.shared.seed(for: state.gameId)?.coverImageURL,
+            placeholder: UIImage(systemName: "gamecontroller.fill")
+        )
+
+        gameTitleLabel.text = state.gameTitle
+        let absoluteDate = review.updatedAt.toAbsoluteDateString()
+        dateLabel.text = absoluteDate.isEmpty ? review.createdAt.toAbsoluteDateString() : absoluteDate
+        bodyLabel.text = review.body
+        starView.configure(rating: review.rating)
+
+        let avatarColor = ReviewAvatarPalette.color(for: review.authorName)
+        authorAvatarView.backgroundColor = avatarColor
+        authorAvatarInitialLabel.text = String(review.authorName.first ?? " ")
+        authorAvatarView.loadImage(url: review.authorAvatarURL)
+        authorLabel.text = review.authorName
+        mineBadgeLabel.isHidden = !review.isMine
+
+        var likeConfiguration = likeMetaButton.configuration
+        likeConfiguration?.title = String(review.likeCount)
+        likeConfiguration?.image = UIImage(
+            systemName: review.isLikedByCurrentUser ? "heart.fill" : "heart",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .medium)
+        )
+        likeConfiguration?.baseForegroundColor = review.isLikedByCurrentUser ? .gpCoral : .gpTextTertiary
+        likeMetaButton.configuration = likeConfiguration
+        likeMetaButton.alpha = review.likeCount == 0 && !review.isLikedByCurrentUser ? 0.72 : 1
+    }
+
+    private func setup() {
+        backgroundColor = .clear
+        preservesSuperviewLayoutMargins = true
+        directionalLayoutMargins = NSDirectionalEdgeInsets(top: 8, leading: 20, bottom: 4, trailing: 20)
+        cardView.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
+
+        authorAvatarView.addSubview(authorAvatarInitialLabel)
+
+        let infoStack = UIStackView(arrangedSubviews: [gameTitleLabel, makeMetaRow()])
+        infoStack.axis = .vertical
+        infoStack.spacing = 3
+        infoStack.alignment = .fill
+        infoStack.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let topRow = UIStackView(arrangedSubviews: [coverImageView, infoStack])
+        topRow.axis = .horizontal
+        topRow.alignment = .top
+        topRow.spacing = 12
+
+        let authorInfoRow = UIStackView(arrangedSubviews: [authorAvatarView, authorLabel, mineBadgeLabel])
+        authorInfoRow.axis = .horizontal
+        authorInfoRow.alignment = .center
+        authorInfoRow.spacing = 8
+        authorInfoRow.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let authorRow = UIStackView(arrangedSubviews: [authorInfoRow, likeMetaButton])
+        authorRow.axis = .horizontal
+        authorRow.alignment = .center
+        authorRow.distribution = .equalSpacing
+        authorRow.spacing = 8
+
+        contentStackView.addArrangedSubview(topRow)
+        contentStackView.addArrangedSubview(bodyLabel)
+        contentStackView.addArrangedSubview(authorRow)
+
+        addSubview(cardView)
+        cardView.addSubview(contentStackView)
+
+        gameTitleLabel.lineBreakMode = .byTruncatingTail
+        dateLabel.lineBreakMode = .byTruncatingTail
+        authorLabel.lineBreakMode = .byTruncatingTail
+        mineBadgeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        likeMetaButton.setContentHuggingPriority(.required, for: .horizontal)
+        likeMetaButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        coverImageView.setContentHuggingPriority(.required, for: .horizontal)
+        coverImageView.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        let cardTopConstraint = cardView.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor)
+        let cardLeadingConstraint = cardView.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor)
+        let cardTrailingConstraint = cardView.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor)
+        let cardBottomConstraint = cardView.bottomAnchor.constraint(equalTo: layoutMarginsGuide.bottomAnchor)
+
+        [cardTopConstraint, cardLeadingConstraint, cardTrailingConstraint, cardBottomConstraint].forEach {
+            $0.priority = UILayoutPriority(999)
+        }
+
+        NSLayoutConstraint.activate([
+            cardTopConstraint,
+            cardLeadingConstraint,
+            cardTrailingConstraint,
+            cardBottomConstraint,
+
+            coverImageView.widthAnchor.constraint(equalToConstant: 48),
+            coverImageView.heightAnchor.constraint(equalToConstant: 48),
+
+            authorAvatarView.widthAnchor.constraint(equalToConstant: 24),
+            authorAvatarView.heightAnchor.constraint(equalToConstant: 24),
+            authorAvatarInitialLabel.centerXAnchor.constraint(equalTo: authorAvatarView.centerXAnchor),
+            authorAvatarInitialLabel.centerYAnchor.constraint(equalTo: authorAvatarView.centerYAnchor),
+        ])
+
+        let contentTopConstraint = contentStackView.topAnchor.constraint(equalTo: cardView.layoutMarginsGuide.topAnchor)
+        let contentLeadingConstraint = contentStackView.leadingAnchor.constraint(equalTo: cardView.layoutMarginsGuide.leadingAnchor)
+        let contentTrailingConstraint = contentStackView.trailingAnchor.constraint(equalTo: cardView.layoutMarginsGuide.trailingAnchor)
+        let contentBottomConstraint = contentStackView.bottomAnchor.constraint(equalTo: cardView.layoutMarginsGuide.bottomAnchor)
+
+        [contentTopConstraint, contentLeadingConstraint, contentTrailingConstraint, contentBottomConstraint].forEach {
+            $0.priority = UILayoutPriority(999)
+        }
+
+        NSLayoutConstraint.activate([
+            contentTopConstraint,
+            contentLeadingConstraint,
+            contentTrailingConstraint,
+            contentBottomConstraint
+        ])
+    }
+
+    private func makeMetaRow() -> UIStackView {
+        let metaRow = UIStackView(arrangedSubviews: [starView, dateLabel])
+        metaRow.axis = .horizontal
+        metaRow.alignment = .center
+        metaRow.spacing = 6
+        return metaRow
+    }
+}
+
+final class ReviewDiscussionEmptyStateView: UIView {
+    let actionButton: UIButton = {
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = L10n.tr("Localizable", "review.comment.empty.cta")
+        configuration.baseBackgroundColor = .gpPrimary
+        configuration.baseForegroundColor = .white
+        configuration.cornerStyle = .capsule
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16)
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    private let cardView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpCardBackground
+        view.layer.cornerRadius = 16
+        view.layer.cornerCurve = .continuous
+        view.layer.borderWidth = 1
+        view.layer.borderColor = UIColor.gpSeparator.cgColor
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let contentStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.alignment = .center
+        stackView.spacing = 12
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+
+    private let iconView: UIImageView = {
+        let imageView = UIImageView(
+            image: UIImage(systemName: "message.circle", withConfiguration: UIImage.SymbolConfiguration(pointSize: 28, weight: .medium))
+        )
+        imageView.tintColor = .gpTextTertiary
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 12, weight: .semibold)
+        label.font = .systemFont(ofSize: 15, weight: .medium)
+        label.textColor = .gpTextPrimary
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        return label
+    }()
+
+    private let messageLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 13)
         label.textColor = .gpTextSecondary
+        label.textAlignment = .center
+        label.numberOfLines = 0
         return label
     }()
 
@@ -375,71 +707,277 @@ private final class ReviewDiscussionHeaderView: UIView {
         setup()
     }
 
-    func configure(review: Review?, gameTitle: String, commentCount: Int) {
-        gameTitleLabel.text = gameTitle
-        if let review {
-            let avatarColors: [UIColor] = [
-                UIColor(hex: "#6C63FF"), UIColor(hex: "#4ECDC4"),
-                UIColor(hex: "#FF6B6B"), UIColor(hex: "#45B7D1"),
-                UIColor(hex: "#96CEB4"), UIColor(hex: "#FFEAA7")
-            ]
-            let colorIndex = abs(review.authorName.hashValue) % avatarColors.count
-            avatarView.backgroundColor = avatarColors[colorIndex]
-            avatarInitialLabel.text = String(review.authorName.first ?? " ")
-            avatarView.loadImage(url: review.authorAvatarURL)
-            authorLabel.text = review.authorName
-            dateLabel.text = review.formattedDate
-            bodyLabel.text = review.body
-            starView.configure(rating: review.rating)
-        }
-        commentCountLabel.text = L10n.tr("Localizable", "review.comment.count", commentCount)
+    func configure(title: String, message: String, buttonTitle: String) {
+        titleLabel.text = title
+        messageLabel.text = message
+        var configuration = actionButton.configuration
+        configuration?.title = buttonTitle
+        actionButton.configuration = configuration
     }
 
     private func setup() {
         backgroundColor = .clear
-        avatarView.addSubview(avatarInitialLabel)
+        directionalLayoutMargins = NSDirectionalEdgeInsets(top: 8, leading: 20, bottom: 12, trailing: 20)
 
-        let authorInfoStack = UIStackView(arrangedSubviews: [authorLabel, dateLabel])
-        authorInfoStack.axis = .vertical
-        authorInfoStack.spacing = 2
+        titleLabel.setContentCompressionResistancePriority(.defaultHigh, for: .vertical)
+        messageLabel.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
-        let userStack = UIStackView(arrangedSubviews: [avatarView, authorInfoStack])
-        userStack.axis = .horizontal
-        userStack.alignment = .center
-        userStack.spacing = 8
+        contentStackView.addArrangedSubview(iconView)
+        contentStackView.addArrangedSubview(titleLabel)
+        contentStackView.addArrangedSubview(messageLabel)
+        contentStackView.addArrangedSubview(actionButton)
 
-        let headerRow = UIStackView(arrangedSubviews: [userStack, UIView(), starView])
-        headerRow.axis = .horizontal
-        headerRow.alignment = .center
+        addSubview(cardView)
+        cardView.addSubview(contentStackView)
 
-        let cardStack = UIStackView(arrangedSubviews: [headerRow, bodyLabel])
-        cardStack.axis = .vertical
-        cardStack.spacing = 8
-        cardStack.translatesAutoresizingMaskIntoConstraints = false
+        let cardTopConstraint = cardView.topAnchor.constraint(equalTo: layoutMarginsGuide.topAnchor)
+        let cardLeadingConstraint = cardView.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor)
+        let cardTrailingConstraint = cardView.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor)
+        let cardBottomConstraint = cardView.bottomAnchor.constraint(equalTo: layoutMarginsGuide.bottomAnchor)
 
-        cardView.addSubview(cardStack)
-
-        let stackView = UIStackView(arrangedSubviews: [gameTitleLabel, cardView, commentCountLabel])
-        stackView.axis = .vertical
-        stackView.spacing = 10
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stackView)
+        [cardTopConstraint, cardLeadingConstraint, cardTrailingConstraint, cardBottomConstraint].forEach {
+            $0.priority = UILayoutPriority(999)
+        }
 
         NSLayoutConstraint.activate([
-            stackView.topAnchor.constraint(equalTo: topAnchor, constant: 12),
-            stackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
-            stackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
+            cardTopConstraint,
+            cardLeadingConstraint,
+            cardTrailingConstraint,
+            cardBottomConstraint,
 
-            avatarView.widthAnchor.constraint(equalToConstant: 28),
-            avatarView.heightAnchor.constraint(equalToConstant: 28),
-            avatarInitialLabel.centerXAnchor.constraint(equalTo: avatarView.centerXAnchor),
-            avatarInitialLabel.centerYAnchor.constraint(equalTo: avatarView.centerYAnchor),
+            contentStackView.centerXAnchor.constraint(equalTo: cardView.centerXAnchor),
+            contentStackView.centerYAnchor.constraint(equalTo: cardView.centerYAnchor),
+            contentStackView.topAnchor.constraint(greaterThanOrEqualTo: cardView.topAnchor, constant: 32),
+            contentStackView.leadingAnchor.constraint(greaterThanOrEqualTo: cardView.leadingAnchor, constant: 20),
+            contentStackView.trailingAnchor.constraint(lessThanOrEqualTo: cardView.trailingAnchor, constant: -20),
+            contentStackView.bottomAnchor.constraint(lessThanOrEqualTo: cardView.bottomAnchor, constant: -32),
 
-            cardStack.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 14),
-            cardStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 14),
-            cardStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -14),
-            cardStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -14)
+            actionButton.heightAnchor.constraint(equalToConstant: 38)
         ])
+    }
+}
+
+final class ReviewDiscussionHeaderCardCell: UITableViewCell {
+    static let reuseIdentifier = "ReviewDiscussionHeaderCardCell"
+
+    private let headerView = ReviewDiscussionHeaderView()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setup()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setup()
+    }
+
+    func configure(with state: ReviewDiscussionHeaderState) {
+        headerView.configure(with: state)
+    }
+
+    override func systemLayoutSizeFitting(
+        _ targetSize: CGSize,
+        withHorizontalFittingPriority horizontalFittingPriority: UILayoutPriority,
+        verticalFittingPriority: UILayoutPriority
+    ) -> CGSize {
+        let resolvedSize = super.systemLayoutSizeFitting(
+            targetSize,
+            withHorizontalFittingPriority: horizontalFittingPriority,
+            verticalFittingPriority: verticalFittingPriority
+        )
+        print("[ReviewDiscussionHeaderCardCell] systemLayoutSizeFitting width=\(targetSize.width) height=\(resolvedSize.height)")
+        return resolvedSize
+    }
+
+    private func setup() {
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
+        selectionStyle = .none
+        headerView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(headerView)
+
+        NSLayoutConstraint.activate([
+            headerView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            headerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            headerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            headerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+        ])
+    }
+}
+
+final class ReviewDiscussionSectionHeaderCell: UITableViewCell {
+    static let reuseIdentifier = "ReviewDiscussionSectionHeaderCell"
+
+    let sortButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .gpTextTertiary
+        configuration.image = UIImage(
+            systemName: "chevron.down",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        )
+        configuration.imagePlacement = .trailing
+        configuration.imagePadding = 4
+        configuration.contentInsets = .zero
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var updated = incoming
+            updated.font = .systemFont(ofSize: 12, weight: .medium)
+            return updated
+        }
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.font = .gpSerif(ofSize: 18, weight: .semibold)
+        label.textColor = .gpTextPrimary
+        label.text = L10n.tr("Localizable", "review.comment.section.title")
+        return label
+    }()
+
+    private let commentCountBadgeLabel: UILabel = {
+        let label = InsetLabel(insets: UIEdgeInsets(top: 3, left: 8, bottom: 3, right: 8))
+        label.font = .systemFont(ofSize: 12, weight: .semibold)
+        label.textColor = .gpTextSecondary
+        label.backgroundColor = .gpSurfaceElevated
+        label.layer.cornerRadius = 11
+        label.layer.cornerCurve = .continuous
+        label.layer.borderWidth = 1
+        label.layer.borderColor = UIColor.gpSeparator.cgColor
+        label.layer.masksToBounds = true
+        return label
+    }()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setup()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setup()
+    }
+
+    func configure(with state: ReviewDiscussionSectionState, sortMenu: UIMenu?) {
+        commentCountBadgeLabel.text = "\(state.commentCount)"
+        var configuration = sortButton.configuration
+        configuration?.title = state.sortTitle
+        sortButton.configuration = configuration
+        sortButton.menu = sortMenu
+        sortButton.showsMenuAsPrimaryAction = true
+        sortButton.isHidden = state.contentState.isEmpty
+    }
+
+    private func setup() {
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
+        selectionStyle = .none
+
+        let titleRow = UIStackView(arrangedSubviews: [titleLabel, commentCountBadgeLabel])
+        titleRow.axis = .horizontal
+        titleRow.alignment = .center
+        titleRow.spacing = 8
+
+        let rowStack = UIStackView(arrangedSubviews: [titleRow, sortButton])
+        rowStack.axis = .horizontal
+        rowStack.alignment = .center
+        rowStack.distribution = .equalSpacing
+        rowStack.spacing = 12
+        rowStack.translatesAutoresizingMaskIntoConstraints = false
+
+        contentView.addSubview(rowStack)
+
+        NSLayoutConstraint.activate([
+            rowStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            rowStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            rowStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            rowStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4)
+        ])
+    }
+}
+
+final class ReviewDiscussionEmptyStateCell: UITableViewCell {
+    static let reuseIdentifier = "ReviewDiscussionEmptyStateCell"
+
+    private let emptyStateView = ReviewDiscussionEmptyStateView()
+    var onActionTapped: (() -> Void)?
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setup()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setup()
+    }
+
+    func configure(title: String, message: String, buttonTitle: String) {
+        emptyStateView.configure(title: title, message: message, buttonTitle: buttonTitle)
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        onActionTapped = nil
+    }
+
+    private func setup() {
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
+        selectionStyle = .none
+
+        emptyStateView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(emptyStateView)
+        emptyStateView.actionButton.addTarget(self, action: #selector(didTapAction), for: .touchUpInside)
+
+        NSLayoutConstraint.activate([
+            emptyStateView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            emptyStateView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            emptyStateView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            emptyStateView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+        ])
+    }
+
+    @objc private func didTapAction() {
+        onActionTapped?()
+    }
+}
+
+private enum ReviewAvatarPalette {
+    private static let colors: [UIColor] = [
+        UIColor(hex: "#6366F1"),
+        UIColor(hex: "#3B5998"),
+        UIColor(hex: "#2E8B57"),
+        UIColor(hex: "#8B5CF6"),
+        UIColor(hex: "#E85A4F"),
+        UIColor(hex: "#FFB547")
+    ]
+
+    static func color(for seed: String) -> UIColor {
+        colors[abs(seed.hashValue) % colors.count]
+    }
+}
+
+private final class InsetLabel: UILabel {
+    private let insets: UIEdgeInsets
+
+    init(insets: UIEdgeInsets) {
+        self.insets = insets
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func drawText(in rect: CGRect) {
+        super.drawText(in: rect.inset(by: insets))
+    }
+
+    override var intrinsicContentSize: CGSize {
+        let size = super.intrinsicContentSize
+        return CGSize(width: size.width + insets.left + insets.right, height: size.height + insets.top + insets.bottom)
     }
 }

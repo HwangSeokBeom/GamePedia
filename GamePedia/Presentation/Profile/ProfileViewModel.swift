@@ -361,11 +361,18 @@ final class ProfileViewModel {
     private func mergeRecentGames(
         current: [RecentGame],
         incoming: [RecentGame],
-        screen _: String
+        screen: String
     ) -> [RecentGame] {
         guard incoming.isEmpty == false else { return current }
 
-        let currentByGameID = Dictionary(uniqueKeysWithValues: current.map { ($0.gameId, $0) })
+        let currentByGameID = MappingSafety.dictionary(
+            pairs: current.map { ($0.gameId, $0) },
+            logPrefix: "[ProfileMapping]",
+            keyName: "gameId",
+            countLabel: "currentCount",
+            screen: screen,
+            mergePolicy: .keepFirst
+        )
         return incoming.map { incomingGame in
             guard let currentGame = currentByGameID[incomingGame.gameId] else { return incomingGame }
 

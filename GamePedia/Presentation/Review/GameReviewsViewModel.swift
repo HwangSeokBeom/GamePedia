@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 final class GameReviewsViewModel {
@@ -11,11 +12,13 @@ final class GameReviewsViewModel {
     var onReviewsChanged: (() -> Void)?
 
     private let fetchGameReviewsUseCase: FetchGameReviewsUseCase
+    private let fetchReviewCommentCountsUseCase: FetchReviewCommentCountsUseCase
     private let deleteReviewUseCase: DeleteReviewUseCase
     private let submitReportUseCase: SubmitReportUseCase
     private let blockUserUseCase: BlockUserUseCase
     private let moderationRepository: any ModerationRepository
     private let reviewSortOption: ReviewSortOption
+    private var cancellables = Set<AnyCancellable>()
 
     init(
         gameId: Int,
@@ -24,6 +27,7 @@ final class GameReviewsViewModel {
         fetchGameReviewsUseCase: FetchGameReviewsUseCase = FetchGameReviewsUseCase(
             reviewRepository: DefaultReviewRepository()
         ),
+        reviewCommentRepository: any ReviewCommentRepository = DefaultReviewCommentRepository(),
         deleteReviewUseCase: DeleteReviewUseCase = DeleteReviewUseCase(
             reviewRepository: DefaultReviewRepository()
         ),
@@ -32,10 +36,13 @@ final class GameReviewsViewModel {
         self.state = GameReviewsState(gameId: gameId, gameTitle: gameTitle)
         self.reviewSortOption = reviewSortOption
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
+        self.fetchReviewCommentCountsUseCase = FetchReviewCommentCountsUseCase(repository: reviewCommentRepository)
         self.deleteReviewUseCase = deleteReviewUseCase
         self.moderationRepository = moderationRepository
         self.submitReportUseCase = SubmitReportUseCase(moderationRepository: moderationRepository)
         self.blockUserUseCase = BlockUserUseCase(moderationRepository: moderationRepository)
+        observeCommentChanges()
+        observeReviewLikeChanges()
     }
 
     func loadReviews() {
@@ -48,11 +55,15 @@ final class GameReviewsViewModel {
                     gameId: String(state.gameId),
                     sort: reviewSortOption
                 )
+                let visibleReviews = self.visibleReviews(from: reviewFeed.reviews)
+                let mergedReviews = await self.mergedReviewsWithDiscussionCounts(
+                    visibleReviews,
+                    screen: "GameReviews.loadReviews"
+                )
                 await MainActor.run {
-                    let visibleReviews = self.visibleReviews(from: reviewFeed.reviews)
                     self.state.isLoading = false
-                    self.state.reviews = visibleReviews
-                    self.state.reviewSummary = self.makeReviewSummary(from: visibleReviews)
+                    self.state.reviews = mergedReviews
+                    self.state.reviewSummary = self.makeReviewSummary(from: mergedReviews)
                 }
             } catch {
                 await MainActor.run {
@@ -226,5 +237,68 @@ final class GameReviewsViewModel {
         return reviews.filter { review in
             !hiddenReviewIDs.contains(review.id) && !blockedUserIDs.contains(review.author.id)
         }
+    }
+
+    private func mergedReviewsWithDiscussionCounts(_ reviews: [Review], screen: String) async -> [Review] {
+        guard !reviews.isEmpty else { return reviews }
+
+        do {
+            let localCounts = try await fetchReviewCommentCountsUseCase.execute(reviewIds: reviews.map(\.id))
+            return reviews.map { review in
+                review.mergingDiscussionCount(localCount: localCounts[review.id] ?? 0)
+            }
+        } catch {
+            print("[ReviewDiscussionCount] mergeSkipped screen=\(screen) error=\(error.localizedDescription)")
+            return reviews
+        }
+    }
+
+    private func observeCommentChanges() {
+        ReviewCommentSyncCenter.events
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self else { return }
+                guard event.gameId == self.state.gameId || self.state.reviews.contains(where: { $0.id == event.reviewId }) else {
+                    return
+                }
+                self.refreshVisibleReviewCommentCounts(reason: "commentSync")
+            }
+            .store(in: &cancellables)
+    }
+
+    private func refreshVisibleReviewCommentCounts(reason: String) {
+        let currentReviews = state.reviews
+        guard !currentReviews.isEmpty else { return }
+
+        Task {
+            let mergedReviews = await mergedReviewsWithDiscussionCounts(
+                currentReviews,
+                screen: "GameReviews.\(reason)"
+            )
+
+            await MainActor.run {
+                guard self.state.reviews.map(\.id) == currentReviews.map(\.id) else { return }
+                self.state.reviews = mergedReviews
+                self.state.reviewSummary = self.makeReviewSummary(from: mergedReviews)
+            }
+        }
+    }
+
+    private func observeReviewLikeChanges() {
+        ReviewLikeSyncCenter.events
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self else { return }
+                guard let currentReview = self.state.reviews.first(where: { $0.id == event.reviewId }) else { return }
+                let updatedReview = currentReview.updatingLikeState(
+                    likeCount: event.likeCount,
+                    isLikedByCurrentUser: event.isLikedByCurrentUser
+                )
+                guard updatedReview != currentReview else { return }
+                self.state.reviews = self.state.reviews.map { review in
+                    review.id == event.reviewId ? updatedReview : review
+                }
+            }
+            .store(in: &cancellables)
     }
 }

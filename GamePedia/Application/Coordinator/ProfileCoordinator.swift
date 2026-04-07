@@ -86,7 +86,7 @@ final class ProfileCoordinator: NSObject {
             self?.showLibrary(tab: .favorites)
         }
         profileVC.onShowWrittenReviews = { [weak self] in
-            self?.showLibrary(tab: .reviewed)
+            self?.showMyReviews()
         }
         profileVC.onShowFriendsList = { [weak self] in
             self?.showFriendsList()
@@ -151,6 +151,15 @@ final class ProfileCoordinator: NSObject {
         detailVC.onShowAllReviews = { [weak self, weak detailVC] game in
             self?.showGameReviews(game: game, detailViewController: detailVC)
         }
+        detailVC.onReviewSelected = { [weak self] game, review in
+            self?.showReviewDiscussion(
+                gameId: game.id,
+                gameTitle: game.displayTitle,
+                reviewID: review.id,
+                reviewSeed: review,
+                highlightCommentID: nil
+            )
+        }
         detailVC.onShare = { [weak self] game in
             guard let topVC = self?.navigationController.topViewController else { return }
             let items: [Any] = [L10n.tr("Localizable", "common.share.gameInvitation", game.displayTitle)]
@@ -179,6 +188,43 @@ final class ProfileCoordinator: NSObject {
         reviewVC.onReviewSubmitted = { [weak detailViewController, weak reviewsViewController] in
             detailViewController?.reload()
             reviewsViewController?.reload()
+        }
+        navigationController.pushViewController(reviewVC, animated: true)
+    }
+
+    private func showReview(
+        reviewedGame: ReviewedGame,
+        profileReviewsViewController: ProfileReviewsViewController?
+    ) {
+        let existingReview = Review(
+            id: reviewedGame.reviewId,
+            gameId: String(reviewedGame.gameId),
+            rating: reviewedGame.rating,
+            content: reviewedGame.content,
+            createdAt: reviewedGame.createdAt,
+            updatedAt: reviewedGame.createdAt,
+            author: ReviewAuthor(id: "current-user", nickname: "", profileImageUrl: nil),
+            isMine: true,
+            likeCount: 0,
+            commentCount: 0,
+            isLikedByCurrentUser: false
+        )
+
+        let subtitleParts = [reviewedGame.game.developer, reviewedGame.game.category]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let reviewVC = ReviewViewController(
+            rootView: ReviewRootView(),
+            viewModel: ReviewViewModel(
+                gameId: reviewedGame.gameId,
+                gameName: reviewedGame.game.displayTitle,
+                gameSubtitle: subtitleParts.joined(separator: " · "),
+                gameThumbnailURL: reviewedGame.game.coverImageURL?.absoluteString ?? "",
+                existingReview: existingReview
+            )
+        )
+        reviewVC.onReviewSubmitted = { [weak profileReviewsViewController] in
+            profileReviewsViewController?.reload()
         }
         navigationController.pushViewController(reviewVC, animated: true)
     }
@@ -334,6 +380,20 @@ final class ProfileCoordinator: NSObject {
         )
         viewController.onGameSelected = { [weak self] gameID in
             self?.showDetail(gameId: gameID)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showMyReviews() {
+        let viewController = ProfileReviewsViewController(
+            rootView: ProfileReviewsRootView(),
+            viewModel: ProfileReviewsViewModel()
+        )
+        viewController.onReviewSelected = { [weak self] reviewedGame in
+            self?.showDetail(gameId: reviewedGame.gameId)
+        }
+        viewController.onEditReviewSelected = { [weak self, weak viewController] reviewedGame in
+            self?.showReview(reviewedGame: reviewedGame, profileReviewsViewController: viewController)
         }
         navigationController.pushViewController(viewController, animated: true)
     }

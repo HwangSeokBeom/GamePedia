@@ -18,10 +18,12 @@ struct ReviewState {
     let gameThumbnailURL: String
     let maxChars: Int
     let mode: ReviewComposerMode
+    let bannerDateText: String?
 
     var rating: Float
     var reviewText: String
     var charCount: Int
+    var isSpoilerEnabled: Bool
     var isSubmitting: Bool
     var isDeleting: Bool
     var submitEnabled: Bool
@@ -43,9 +45,11 @@ struct ReviewState {
         self.gameThumbnailURL = gameThumbnailURL
         self.maxChars = maxChars
         self.mode = existingReview.map { .edit(reviewId: $0.id) } ?? .create
+        self.bannerDateText = existingReview?.createdAt.toAbsoluteDateString()
         self.rating = Float(existingReview?.rating ?? 0)
         self.reviewText = existingReview?.content ?? ""
         self.charCount = self.reviewText.count
+        self.isSpoilerEnabled = existingReview != nil
         self.isSubmitting = false
         self.isDeleting = false
         self.submitEnabled = self.rating > 0
@@ -109,12 +113,19 @@ struct ReviewState {
         isEditing ? L10n.Review.Navigation.edit : L10n.Review.Navigation.create
     }
 
+    var modeBannerText: String {
+        if isEditing, let bannerDateText, !bannerDateText.isEmpty {
+            return L10n.tr("Localizable", "review.banner.edit", bannerDateText)
+        }
+        return L10n.tr("Localizable", "review.banner.create")
+    }
+
     var submitButtonTitle: String {
-        isEditing ? L10n.Review.Button.save : L10n.Review.Button.submit
+        isEditing ? L10n.tr("Localizable", "review.button.completeEdit") : L10n.Review.Button.submit
     }
 
     var submitLoadingTitle: String {
-        isEditing ? L10n.Review.Button.saving : L10n.Review.Button.submitting
+        isEditing ? L10n.tr("Localizable", "review.button.updating") : L10n.Review.Button.submitting
     }
 
     var deleteButtonTitle: String {
