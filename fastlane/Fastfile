@@ -1,4 +1,5 @@
 require "shellwords"
+require "xcodeproj"
 
 default_platform(:ios)
 
@@ -27,6 +28,26 @@ platform :ios do
     "com.hwb.GamePedia.widget"
   end
 
+  def widget_extension_target_name
+    "GamePediaWidgetExtension"
+  end
+
+  def versioned_target_names
+    [app_target_name, widget_extension_target_name]
+  end
+
+  def version_format_regex
+    /^\d+(\.\d+){0,2}$/
+  end
+
+  def xcodebuild_container_arguments
+    if File.exist?("GamePedia.xcworkspace")
+      "-workspace #{Shellwords.escape("GamePedia.xcworkspace")}"
+    else
+      "-project #{Shellwords.escape(project_path)}"
+    end
+  end
+
   def required_env!(key)
     value = ENV[key]
     UI.user_error!("Missing required environment variable: #{key}") if value.to_s.strip.empty?
@@ -47,6 +68,152 @@ platform :ios do
   def resolve_widget_provisioning_profile_name
     value = ENV["APP_STORE_WIDGET_PROVISIONING_PROFILE_NAME"].to_s.strip
     value.empty? ? "GamePedia Widget App Store Connect" : value
+  end
+
+  def option_or_env_value(options, option_key, env_key)
+    option_value = options[option_key].to_s.strip
+    return option_value unless option_value.empty?
+
+    ENV[env_key].to_s.strip
+  end
+
+  def target_named!(project, target_name)
+    target = project.targets.find { |item| item.name == target_name }
+    UI.user_error!("Missing target #{target_name} in #{project_path}") unless target
+    target
+  end
+
+  def configuration_named!(target, configuration_name)
+    configuration = target.build_configurations.find { |item| item.name == configuration_name }
+    UI.user_error!("Missing configuration #{configuration_name} for target #{target.name}") unless configuration
+    configuration
+  end
+
+  def read_target_versioning(target_name:, configuration_name:)
+    project = Xcodeproj::Project.open(project_path)
+    target = target_named!(project, target_name)
+    configuration = configuration_named!(target, configuration_name)
+
+    {
+      marketing_version: configuration.build_settings["MARKETING_VERSION"].to_s.strip,
+      build_number: configuration.build_settings["CURRENT_PROJECT_VERSION"].to_s.strip
+    }
+  end
+
+  def validate_marketing_version!(version)
+    UI.user_error!("MARKETING_VERSION must use A, A.B, or A.B.C format") unless version.match?(version_format_regex)
+    version
+  end
+
+  def validate_build_number!(build_number)
+    UI.user_error!("CURRENT_PROJECT_VERSION must be a positive integer") unless build_number.match?(/^\d+$/)
+    build_number
+  end
+
+  def current_marketing_version(configuration_name:)
+    settings = read_target_versioning(
+      target_name: app_target_name,
+      configuration_name: configuration_name
+    )
+    validate_marketing_version!(settings[:marketing_version])
+  end
+
+  def current_build_number(configuration_name:)
+    settings = read_target_versioning(
+      target_name: app_target_name,
+      configuration_name: configuration_name
+    )
+    validate_build_number!(settings[:build_number])
+  end
+
+  def bumped_marketing_version(current_version, bump_type)
+    validate_marketing_version!(current_version)
+
+    version_parts = current_version.split(".").map(&:to_i)
+
+    case bump_type
+    when "patch"
+      UI.user_error!("Patch bump requires MARKETING_VERSION in A.B.C format") if version_parts.count < 3
+      version_parts[2] += 1
+    when "minor"
+      UI.user_error!("Minor bump requires MARKETING_VERSION in A.B or A.B.C format") if version_parts.count < 2
+      version_parts[1] += 1
+      version_parts[2] = 0 if version_parts[2]
+    when "major"
+      version_parts[0] += 1
+      version_parts[1] = 0 if version_parts[1]
+      version_parts[2] = 0 if version_parts[2]
+    else
+      UI.user_error!("Unsupported bump type: #{bump_type}")
+    end
+
+    version_parts.join(".")
+  end
+
+  def update_managed_versioning!(marketing_version: nil, build_number: nil)
+    normalized_marketing_version = marketing_version.to_s.strip
+    normalized_build_number = build_number.to_s.strip
+
+    UI.user_error!("Nothing to update in versioning state") if normalized_marketing_version.empty? && normalized_build_number.empty?
+
+    project = Xcodeproj::Project.open(project_path)
+
+    versioned_target_names.each do |target_name|
+      target = target_named!(project, target_name)
+
+      target.build_configurations.each do |configuration|
+        configuration.build_settings["MARKETING_VERSION"] = normalized_marketing_version unless normalized_marketing_version.empty?
+        configuration.build_settings["CURRENT_PROJECT_VERSION"] = normalized_build_number unless normalized_build_number.empty?
+      end
+    end
+
+    project.save
+  end
+
+  def log_project_versioning!(label:, configuration_name:)
+    UI.message(label)
+
+    versioned_target_names.each do |target_name|
+      settings = read_target_versioning(
+        target_name: target_name,
+        configuration_name: configuration_name
+      )
+
+      UI.message("[project] #{target_name} #{configuration_name}: MARKETING_VERSION=#{settings[:marketing_version]} CURRENT_PROJECT_VERSION=#{settings[:build_number]}")
+    end
+  end
+
+  def log_effective_xcodebuild_versioning!(configuration_name:)
+    versioned_target_names.each do |target_name|
+      output = sh(
+        [
+          "xcodebuild",
+          xcodebuild_container_arguments,
+          "-target #{Shellwords.escape(target_name)}",
+          "-configuration #{Shellwords.escape(configuration_name)}",
+          "-showBuildSettings"
+        ].join(" "),
+        log: false
+      )
+
+      output.lines.grep(/TARGET_NAME =|MARKETING_VERSION =|CURRENT_PROJECT_VERSION =/).each do |line|
+        UI.message("[xcodebuild] #{line.strip}")
+      end
+    end
+  end
+
+  def apply_versioning_and_log!(marketing_version:, build_number:, configuration_name:, context_label:)
+    update_managed_versioning!(
+      marketing_version: marketing_version,
+      build_number: build_number
+    )
+
+    log_project_versioning!(
+      label: "#{context_label} versioning prepared",
+      configuration_name: configuration_name
+    )
+
+    log_effective_xcodebuild_versioning!(configuration_name: configuration_name)
   end
 
   def app_store_connect_api_key_from_env
@@ -90,61 +257,70 @@ platform :ios do
     }
   end
 
-  def current_marketing_version
-    get_version_number(
-      xcodeproj: project_path,
-      target: app_target_name
-    )
-  end
-
-  def updated_marketing_version(options)
+  def resolved_beta_marketing_version(options)
     explicit_version_number = options[:version_number].to_s.strip
     bump_marketing = options[:bump_marketing].to_s == "true"
     bump_type = options[:bump_type].to_s.strip
     normalized_bump_type = %w[patch minor major].include?(bump_type) ? bump_type : "patch"
+    current_version = current_marketing_version(configuration_name: "Staging")
 
     if !explicit_version_number.empty?
-      new_version = increment_version_number(
-        version_number: explicit_version_number,
-        xcodeproj: project_path
-      )
-      UI.message("Set MARKETING_VERSION to #{new_version}")
-      return new_version
+      validate_marketing_version!(explicit_version_number)
+      UI.message("Using explicit MARKETING_VERSION #{explicit_version_number} for staging beta")
+      return explicit_version_number
     end
 
     unless bump_marketing
-      version = current_marketing_version
-      UI.message("Keep existing MARKETING_VERSION #{version}")
-      return version
+      UI.message("Keeping existing MARKETING_VERSION #{current_version} for staging beta")
+      return current_version
     end
 
-    new_version = increment_version_number(
-      bump_type: normalized_bump_type,
-      xcodeproj: project_path
-    )
-    UI.message("Auto bumped MARKETING_VERSION to #{new_version} (#{normalized_bump_type})")
+    new_version = bumped_marketing_version(current_version, normalized_bump_type)
+    UI.message("Auto bumped MARKETING_VERSION to #{new_version} (#{normalized_bump_type}) for staging beta")
     new_version
   end
 
-  def sync_next_testflight_build_number!(api_key:, app_identifier:, version:)
+  def next_app_store_build_number(api_key:, app_identifier:, version:)
     latest_build_number = latest_testflight_build_number(
       api_key: api_key,
       app_identifier: app_identifier,
       version: version,
-      initial_build_number: 1
+      initial_build_number: 0
     )
 
     next_build_number = latest_build_number.to_i + 1
+    UI.message("Resolved CURRENT_PROJECT_VERSION #{next_build_number} from App Store Connect for MARKETING_VERSION #{version}")
+    next_build_number.to_s
+  end
 
-    increment_build_number(
-      build_number: next_build_number,
-      xcodeproj: project_path
+  def resolved_release_marketing_version(options)
+    explicit_version_number = option_or_env_value(options, :version_number, "RELEASE_VERSION_NUMBER")
+
+    if explicit_version_number.empty?
+      version = current_marketing_version(configuration_name: "Release")
+      UI.message("Keeping committed MARKETING_VERSION #{version} for production release")
+      return version
+    end
+
+    validate_marketing_version!(explicit_version_number)
+    UI.message("Using explicit MARKETING_VERSION #{explicit_version_number} for production release")
+    explicit_version_number
+  end
+
+  def resolved_release_build_number(options, api_key:, app_identifier:, version:)
+    explicit_build_number = option_or_env_value(options, :build_number, "RELEASE_BUILD_NUMBER")
+
+    unless explicit_build_number.empty?
+      validate_build_number!(explicit_build_number)
+      UI.message("Using explicit CURRENT_PROJECT_VERSION #{explicit_build_number} for production release")
+      return explicit_build_number
+    end
+
+    next_app_store_build_number(
+      api_key: api_key,
+      app_identifier: app_identifier,
+      version: version
     )
-
-    UI.message("Using MARKETING_VERSION #{version}")
-    UI.message("Using CURRENT_PROJECT_VERSION #{next_build_number}")
-
-    next_build_number
   end
 
   desc "Build and test the iOS app for CI"
@@ -174,12 +350,18 @@ platform :ios do
     app_provisioning_profile_name = resolve_app_provisioning_profile_name
     widget_provisioning_profile_name = resolve_widget_provisioning_profile_name
 
-    selected_marketing_version = updated_marketing_version(options)
-
-    sync_next_testflight_build_number!(
+    selected_marketing_version = resolved_beta_marketing_version(options)
+    selected_build_number = next_app_store_build_number(
       api_key: api_key,
       app_identifier: app_identifier,
       version: selected_marketing_version
+    )
+
+    apply_versioning_and_log!(
+      marketing_version: selected_marketing_version,
+      build_number: selected_build_number,
+      configuration_name: "Staging",
+      context_label: "Staging beta"
     )
 
     ipa_path = build_app(
@@ -207,8 +389,14 @@ platform :ios do
   end
 
   desc "Validate the production archive path on main without uploading"
-  lane :release_archive do
+  lane :release_archive do |_options|
     widget_provisioning_profile_name = resolve_widget_provisioning_profile_name
+
+    log_project_versioning!(
+      label: "Release archive validation using committed project versioning",
+      configuration_name: "Release"
+    )
+    log_effective_xcodebuild_versioning!(configuration_name: "Release")
 
     build_app(
       **xcode_container_options,
@@ -230,22 +418,19 @@ platform :ios do
     app_provisioning_profile_name = resolve_app_provisioning_profile_name
     widget_provisioning_profile_name = resolve_widget_provisioning_profile_name
 
-    selected_marketing_version = options[:version_number].to_s.strip
-    unless selected_marketing_version.empty?
-      increment_version_number(
-        version_number: selected_marketing_version,
-        xcodeproj: project_path
-      )
-      UI.message("Set production MARKETING_VERSION to #{selected_marketing_version}")
-    end
+    selected_marketing_version = resolved_release_marketing_version(options)
+    selected_build_number = resolved_release_build_number(
+      options,
+      api_key: api_key,
+      app_identifier: app_identifier,
+      version: selected_marketing_version
+    )
 
-    if options[:build_number].to_s.strip.empty?
-      UI.user_error!("release_upload requires build_number:<number>")
-    end
-
-    increment_build_number(
-      build_number: options[:build_number].to_s.strip,
-      xcodeproj: project_path
+    apply_versioning_and_log!(
+      marketing_version: selected_marketing_version,
+      build_number: selected_build_number,
+      configuration_name: "Release",
+      context_label: "Production release"
     )
 
     ipa_path = build_app(
