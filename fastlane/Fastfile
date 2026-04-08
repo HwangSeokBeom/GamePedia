@@ -1,3 +1,5 @@
+require "shellwords"
+
 default_platform(:ios)
 
 platform :ios do
@@ -21,6 +23,10 @@ platform :ios do
     "63SB2B8YJ5"
   end
 
+  def widget_extension_app_identifier
+    "com.hwb.GamePedia.widget"
+  end
+
   def required_env!(key)
     value = ENV[key]
     UI.user_error!("Missing required environment variable: #{key}") if value.to_s.strip.empty?
@@ -33,9 +39,14 @@ platform :ios do
     value
   end
 
-  def resolve_provisioning_profile_name
+  def resolve_app_provisioning_profile_name
     value = ENV["APP_STORE_PROVISIONING_PROFILE_NAME"].to_s.strip
     value.empty? ? "GamePedia App Store Connect" : value
+  end
+
+  def resolve_widget_provisioning_profile_name
+    value = ENV["APP_STORE_WIDGET_PROVISIONING_PROFILE_NAME"].to_s.strip
+    value.empty? ? "GamePedia Widget App Store Connect" : value
   end
 
   def app_store_connect_api_key_from_env
@@ -58,20 +69,22 @@ platform :ios do
     )
   end
 
-  def distribution_xcargs(_profile_name)
+  def distribution_xcargs(widget_profile_name)
     [
       'CODE_SIGN_STYLE=Manual',
       "DEVELOPMENT_TEAM=#{distribution_team_id}",
-      'CODE_SIGN_IDENTITY="Apple Distribution"'
+      'CODE_SIGN_IDENTITY="Apple Distribution"',
+      "WIDGET_PROVISIONING_PROFILE_SPECIFIER=#{Shellwords.escape(widget_profile_name)}"
     ].join(" ")
   end
 
-  def distribution_export_options(app_identifier, profile_name)
+  def distribution_export_options(app_identifier, app_profile_name, widget_profile_name)
     {
       signingStyle: "manual",
       teamID: distribution_team_id,
       provisioningProfiles: {
-        app_identifier => profile_name
+        app_identifier => app_profile_name,
+        widget_extension_app_identifier => widget_profile_name
       },
       method: "app-store"
     }
@@ -158,7 +171,8 @@ platform :ios do
   lane :beta do |options|
     api_key = app_store_connect_api_key_from_env
     app_identifier = resolve_app_identifier
-    provisioning_profile_name = resolve_provisioning_profile_name
+    app_provisioning_profile_name = resolve_app_provisioning_profile_name
+    widget_provisioning_profile_name = resolve_widget_provisioning_profile_name
 
     selected_marketing_version = updated_marketing_version(options)
 
@@ -174,8 +188,12 @@ platform :ios do
       configuration: "Staging",
       clean: true,
       export_method: "app-store",
-      xcargs: distribution_xcargs(provisioning_profile_name),
-      export_options: distribution_export_options(app_identifier, provisioning_profile_name),
+      xcargs: distribution_xcargs(widget_provisioning_profile_name),
+      export_options: distribution_export_options(
+        app_identifier,
+        app_provisioning_profile_name,
+        widget_provisioning_profile_name
+      ),
       output_directory: "build/ios",
       output_name: "GamePedia-Staging.ipa"
     )
@@ -190,7 +208,7 @@ platform :ios do
 
   desc "Validate the production archive path on main without uploading"
   lane :release_archive do
-    provisioning_profile_name = resolve_provisioning_profile_name
+    widget_provisioning_profile_name = resolve_widget_provisioning_profile_name
 
     build_app(
       **xcode_container_options,
@@ -198,7 +216,7 @@ platform :ios do
       configuration: "Release",
       clean: true,
       export_method: "app-store",
-      xcargs: distribution_xcargs(provisioning_profile_name),
+      xcargs: distribution_xcargs(widget_provisioning_profile_name),
       archive_path: "build/archives/GamePedia.xcarchive",
       skip_package_ipa: true,
       skip_package_pkg: true
@@ -209,7 +227,8 @@ platform :ios do
   lane :release_upload do |options|
     api_key = app_store_connect_api_key_from_env
     app_identifier = resolve_app_identifier
-    provisioning_profile_name = resolve_provisioning_profile_name
+    app_provisioning_profile_name = resolve_app_provisioning_profile_name
+    widget_provisioning_profile_name = resolve_widget_provisioning_profile_name
 
     selected_marketing_version = options[:version_number].to_s.strip
     unless selected_marketing_version.empty?
@@ -235,8 +254,12 @@ platform :ios do
       configuration: "Release",
       clean: true,
       export_method: "app-store",
-      xcargs: distribution_xcargs(provisioning_profile_name),
-      export_options: distribution_export_options(app_identifier, provisioning_profile_name),
+      xcargs: distribution_xcargs(widget_provisioning_profile_name),
+      export_options: distribution_export_options(
+        app_identifier,
+        app_provisioning_profile_name,
+        widget_provisioning_profile_name
+      ),
       output_directory: "build/ios",
       output_name: "GamePedia-Prod.ipa"
     )

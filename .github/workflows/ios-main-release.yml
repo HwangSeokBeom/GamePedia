@@ -39,12 +39,38 @@ jobs:
           p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.P12_PASSWORD }}
 
-      - name: Install provisioning profile
+      - name: Install provisioning profiles
         env:
-          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          BUILD_PROVISION_PROFILE_BASE64_APP: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64_APP }}
+          BUILD_PROVISION_PROFILE_BASE64_WIDGET: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64_WIDGET }}
         run: |
+          set -euo pipefail
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/GamePedia-Release.mobileprovision"
+
+          install_profile() {
+            local encoded_profile="$1"
+            local label="$2"
+            local temp_profile="$RUNNER_TEMP/${label}.mobileprovision"
+            local temp_plist="$RUNNER_TEMP/${label}.plist"
+            local profile_uuid
+            local profile_name
+
+            echo -n "$encoded_profile" | base64 --decode > "$temp_profile"
+            security cms -D -i "$temp_profile" > "$temp_plist"
+
+            profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$temp_plist")"
+            profile_name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$temp_plist")"
+
+            cp "$temp_profile" "$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
+
+            printf '%s\n' "$profile_name"
+          }
+
+          APP_PROFILE_NAME="$(install_profile "$BUILD_PROVISION_PROFILE_BASE64_APP" "GamePedia-App")"
+          WIDGET_PROFILE_NAME="$(install_profile "$BUILD_PROVISION_PROFILE_BASE64_WIDGET" "GamePedia-Widget")"
+
+          echo "APP_STORE_PROVISIONING_PROFILE_NAME=$APP_PROFILE_NAME" >> "$GITHUB_ENV"
+          echo "APP_STORE_WIDGET_PROVISIONING_PROFILE_NAME=$WIDGET_PROFILE_NAME" >> "$GITHUB_ENV"
 
       - name: Upload production build to App Store Connect
         # staging owns TestFlight automation; main uploads only on manual or release-tag triggers.
@@ -54,5 +80,4 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ env.APP_STORE_CONNECT_PRIVATE_KEY }}
           APP_STORE_APP_IDENTIFIER: ${{ secrets.APP_STORE_APP_IDENTIFIER }}
-          APP_STORE_PROVISIONING_PROFILE_NAME: ${{ secrets.APP_STORE_PROVISIONING_PROFILE_NAME }}
         run: bundle exec fastlane ios release_upload
