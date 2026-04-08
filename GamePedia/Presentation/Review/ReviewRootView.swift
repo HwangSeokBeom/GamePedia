@@ -324,7 +324,8 @@ final class ReviewRootView: UIView {
             reviewPlaceholderLabel.leadingAnchor.constraint(equalTo: reviewTextContainerView.leadingAnchor, constant: 18),
             reviewPlaceholderLabel.trailingAnchor.constraint(equalTo: reviewTextContainerView.trailingAnchor, constant: -18),
 
-            submitButton.heightAnchor.constraint(equalToConstant: UIConstants.submitButtonHeight)
+            submitButton.heightAnchor.constraint(equalToConstant: UIConstants.submitButtonHeight),
+            deleteButton.heightAnchor.constraint(equalToConstant: UIConstants.submitButtonHeight)
         ])
 
         applyDynamicLayerColors(isTextViewFocused: false)
@@ -367,7 +368,7 @@ final class ReviewRootView: UIView {
         spoilerToggleControl.setOn(state.isSpoilerEnabled, animated: false)
 
         updateSubmitButton(using: state, accentColor: accentColor)
-        deleteButton.isHidden = true
+        updateDeleteButton(using: state)
     }
 
     func setReviewTextInputFocused(_ isFocused: Bool) {
@@ -398,6 +399,25 @@ final class ReviewRootView: UIView {
         submitButton.alpha = state.submitEnabled || state.isSubmitting ? 1 : 0.76
         submitButton.layer.shadowOpacity = state.submitEnabled ? 0.3 : 0
         submitButton.layer.shadowColor = accentColor.resolvedCGColor(with: traitCollection)
+    }
+
+    private func updateDeleteButton(using state: ReviewState) {
+        var configuration = deleteButton.configuration
+        configuration?.title = state.deleteButtonTitle
+        configuration?.image = state.isDeleting
+            ? nil
+            : UIImage(
+                systemName: "trash",
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+            )
+        configuration?.imagePadding = 8
+        configuration?.showsActivityIndicator = state.isDeleting
+        configuration?.baseBackgroundColor = UIColor.gpCoral.withAlphaComponent(0.12)
+        configuration?.baseForegroundColor = .gpCoral
+        deleteButton.configuration = configuration
+        deleteButton.isHidden = !state.isEditing
+        deleteButton.isEnabled = state.isEditing && !state.isProcessing
+        deleteButton.alpha = state.isProcessing && !state.isDeleting ? 0.72 : 1
     }
 
     private func applyDynamicLayerColors(isTextViewFocused: Bool) {

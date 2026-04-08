@@ -85,11 +85,28 @@ final class ProfileReviewsViewModel {
     private func observeReviewChanges() {
         NotificationCenter.default.publisher(for: .reviewDidChange)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
+            .sink { [weak self] notification in
                 guard let self, self.didLoad else { return }
+                self.applyReviewChange(notification)
                 self.load(reason: "reviewChangeNotification")
             }
             .store(in: &cancellables)
+    }
+
+    private func applyReviewChange(_ notification: Notification) {
+        guard let actionRawValue = notification.userInfo?[ReviewChangeUserInfoKey.action] as? String,
+              let action = ReviewChangeAction(rawValue: actionRawValue) else {
+            return
+        }
+
+        switch action {
+        case .deleted:
+            guard let reviewId = notification.userInfo?[ReviewChangeUserInfoKey.reviewId] as? String else { return }
+            state.deletingReviewId = nil
+            state.items.removeAll { $0.reviewId == reviewId }
+        case .created, .updated:
+            break
+        }
     }
 
     private func load(reason: String) {
