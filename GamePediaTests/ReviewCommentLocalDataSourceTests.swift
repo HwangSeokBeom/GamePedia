@@ -148,7 +148,7 @@ final class ReviewCommentLocalDataSourceTests: XCTestCase {
         XCTAssertEqual(notifications.last?.relatedCommentID, reply.id)
     }
 
-    func testFetchCommentCounts_includesRepliesAndDeletedComments() throws {
+    func testFetchCommentCounts_excludesDeletedCommentsButKeepsActiveReplies() throws {
         let reviewAuthor = makeUser(id: "review-author", nickname: "리뷰작성자")
         let otherUser = makeUser(id: "reply-user", nickname: "답글유저")
         let context = makeContext(reviewAuthor: reviewAuthor)
@@ -172,7 +172,27 @@ final class ReviewCommentLocalDataSourceTests: XCTestCase {
         )
 
         let counts = try dataSource.fetchCommentCounts(reviewIds: [context.reviewId])
-        XCTAssertEqual(counts[context.reviewId], 2)
+        XCTAssertEqual(counts[context.reviewId], 1)
+    }
+
+    func testFetchCommentCounts_returnsZeroWhenOnlyDeletedCommentsRemain() throws {
+        let reviewAuthor = makeUser(id: "review-author", nickname: "리뷰작성자")
+        let context = makeContext(reviewAuthor: reviewAuthor)
+
+        let rootComment = try dataSource.createComment(
+            draft: ReviewCommentDraft(parentCommentId: nil, content: "root-comment"),
+            in: context,
+            currentUser: reviewAuthor
+        )
+
+        _ = try dataSource.deleteComment(
+            commentId: rootComment.id,
+            in: context,
+            currentUser: reviewAuthor
+        )
+
+        let counts = try dataSource.fetchCommentCounts(reviewIds: [context.reviewId])
+        XCTAssertEqual(counts[context.reviewId], 0)
     }
 
     private func makeContext(reviewAuthor: AuthUser) -> ReviewDiscussionContext {

@@ -52,6 +52,7 @@ final class ReviewCardCell: UITableViewCell {
         label.font = .systemFont(ofSize: 13)
         label.textColor = .gpTextSecondary
         label.numberOfLines = 2
+        label.lineBreakMode = .byTruncatingTail
         return label
     }()
 
@@ -171,6 +172,10 @@ final class ReviewCardCell: UITableViewCell {
 
         likeButton.setContentHuggingPriority(.required, for: .horizontal)
         likeButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        bodyLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        bodyLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        authorLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        dateLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     }
 
     // MARK: Configure
@@ -189,6 +194,10 @@ final class ReviewCardCell: UITableViewCell {
         starView.configure(rating: review.rating)
         dateLabel.text = review.formattedDate
         bodyLabel.text = review.body
+        if review.body.count > 40,
+           review.body.rangeOfCharacter(from: .whitespacesAndNewlines) == nil {
+            print("[TextLayout] view=ReviewCardCell reviewId=\(review.id) length=\(review.body.count) unbroken=true")
+        }
         commentLabel.text = review.commentCount > 0
             ? L10n.tr("Localizable", "review.card.commentCta", review.commentCount)
             : L10n.tr("Localizable", "review.card.commentEmptyCta")

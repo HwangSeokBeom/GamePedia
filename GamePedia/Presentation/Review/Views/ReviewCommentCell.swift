@@ -14,14 +14,15 @@ final class ReviewCommentCell: UITableViewCell {
         let isDeleted: Bool
         let likeCount: Int
         let myReaction: ReviewCommentReaction?
-        let showsActions: Bool
-        let canReply: Bool
         let isReactionLoading: Bool
+        let canReply: Bool
+        let showsMoreAction: Bool
     }
 
-    var onReplyTapped: (() -> Void)?
     var onLikeTapped: (() -> Void)?
+    var onReplyTapped: (() -> Void)?
     var onMoreTapped: (() -> Void)?
+    private var currentCommentId: String?
 
     private let highlightBackgroundView: UIView = {
         let view = UIView()
@@ -66,23 +67,11 @@ final class ReviewCommentCell: UITableViewCell {
         return label
     }()
 
-    private let moreButton: UIButton = {
-        var configuration = UIButton.Configuration.plain()
-        configuration.image = UIImage(
-            systemName: "ellipsis",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
-        )
-        configuration.baseForegroundColor = .gpTextTertiary
-        configuration.contentInsets = .zero
-        let button = UIButton(configuration: configuration)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-
     private let bodyLabel: UILabel = {
         let label = UILabel()
         label.textColor = .gpTextSecondary
         label.numberOfLines = 0
+        label.lineBreakMode = .byCharWrapping
         return label
     }()
 
@@ -101,16 +90,9 @@ final class ReviewCommentCell: UITableViewCell {
         return label
     }()
 
-    private let secondMetaDot: UILabel = {
-        let label = UILabel()
-        label.text = "·"
-        label.font = .systemFont(ofSize: 12, weight: .medium)
-        label.textColor = .gpTextTertiary
-        return label
-    }()
-
     private let likeButton = UIButton(type: .system)
     private let replyButton = UIButton(type: .system)
+    private let moreButton = UIButton(type: .system)
     private let separatorView: UIView = {
         let view = UIView()
         view.backgroundColor = .gpSeparator
@@ -134,6 +116,10 @@ final class ReviewCommentCell: UITableViewCell {
     }
 
     func configure(with viewState: ViewState) {
+        currentCommentId = viewState.id
+        ReviewDiscussionTrace.log(
+            "[ReviewCommentCell] configure cellClass=\(String(describing: type(of: self))) commentId=\(viewState.id) depth=\(viewState.depth) likeCount=\(viewState.likeCount)"
+        )
         let isReply = viewState.depth > 0
         let leadingInset: CGFloat = isReply ? 56 : 20
         let avatarSize: CGFloat = isReply ? 24 : 28
@@ -161,17 +147,16 @@ final class ReviewCommentCell: UITableViewCell {
 
         timeLabel.text = viewState.dateText
         mineBadgeLabel.isHidden = !viewState.isMine
-        moreButton.isHidden = !viewState.showsActions
-
         configureLikeButton(with: viewState)
         configureReplyButton(with: viewState)
+        configureMoreButton(with: viewState)
 
         let hidesMeta = viewState.isDeleted
         timeLabel.isHidden = hidesMeta
         firstMetaDot.isHidden = hidesMeta
-        secondMetaDot.isHidden = hidesMeta
         likeButton.isHidden = hidesMeta
-        replyButton.isHidden = hidesMeta
+        replyButton.isHidden = hidesMeta || !viewState.canReply
+        moreButton.isHidden = hidesMeta || !viewState.showsMoreAction
     }
 
     override func prepareForReuse() {
@@ -179,9 +164,10 @@ final class ReviewCommentCell: UITableViewCell {
         avatarView.cancelLoad()
         avatarView.image = nil
         avatarInitialLabel.text = nil
-        onReplyTapped = nil
         onLikeTapped = nil
+        onReplyTapped = nil
         onMoreTapped = nil
+        currentCommentId = nil
     }
 
     func animateHighlight() {
@@ -206,14 +192,15 @@ final class ReviewCommentCell: UITableViewCell {
         leftHeaderStack.alignment = .center
         leftHeaderStack.spacing = 8
 
-        let headerRow = UIStackView(arrangedSubviews: [leftHeaderStack, UIView(), moreButton])
+        let headerRow = UIStackView(arrangedSubviews: [leftHeaderStack, UIView()])
         headerRow.axis = .horizontal
         headerRow.alignment = .center
 
         configureMetaButton(likeButton, selector: #selector(didTapLike))
         configureMetaButton(replyButton, selector: #selector(didTapReply))
+        configureMetaButton(moreButton, selector: #selector(didTapMore))
 
-        let metaRow = UIStackView(arrangedSubviews: [timeLabel, firstMetaDot, likeButton, secondMetaDot, replyButton, UIView()])
+        let metaRow = UIStackView(arrangedSubviews: [timeLabel, firstMetaDot, likeButton, replyButton, moreButton, UIView()])
         metaRow.axis = .horizontal
         metaRow.alignment = .center
         metaRow.spacing = 6
@@ -248,17 +235,15 @@ final class ReviewCommentCell: UITableViewCell {
 
             contentStack.leadingAnchor.constraint(equalTo: highlightBackgroundView.leadingAnchor),
             contentStack.trailingAnchor.constraint(equalTo: highlightBackgroundView.trailingAnchor),
-
-            moreButton.widthAnchor.constraint(equalToConstant: 32),
-            moreButton.heightAnchor.constraint(equalToConstant: 32),
-
             separatorView.leadingAnchor.constraint(equalTo: highlightBackgroundView.leadingAnchor),
             separatorView.trailingAnchor.constraint(equalTo: highlightBackgroundView.trailingAnchor),
             separatorView.bottomAnchor.constraint(equalTo: highlightBackgroundView.bottomAnchor),
             separatorView.heightAnchor.constraint(equalToConstant: 1)
         ])
 
-        moreButton.addTarget(self, action: #selector(didTapMore), for: .touchUpInside)
+        bodyLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        bodyLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        authorLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     }
 
     private func configureLikeButton(with viewState: ViewState) {
@@ -272,41 +257,65 @@ final class ReviewCommentCell: UITableViewCell {
         )
         configuration?.baseForegroundColor = tintColor
         configuration?.imagePadding = 4
-        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0)
+        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
         likeButton.configuration = configuration
         likeButton.isEnabled = !viewState.isReactionLoading && !viewState.isDeleted
         likeButton.alpha = viewState.likeCount == 0 && !isLiked ? 0.72 : 1
         likeButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.like", String(viewState.likeCount))
+        likeButton.accessibilityIdentifier = "reviewComment.likeButton"
     }
 
     private func configureReplyButton(with viewState: ViewState) {
         var configuration = replyButton.configuration
         configuration?.title = L10n.tr("Localizable", "review.comment.action.reply")
-        configuration?.baseForegroundColor = .gpTextSecondary
-        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0)
+        configuration?.image = UIImage(
+            systemName: "arrowshape.turn.up.left",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+        )
+        configuration?.baseForegroundColor = .gpPrimary
+        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
         replyButton.configuration = configuration
-        replyButton.isEnabled = viewState.canReply && !viewState.isDeleted
+        replyButton.isEnabled = viewState.canReply
         replyButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.reply")
+        replyButton.accessibilityIdentifier = "reviewComment.replyButton"
+    }
+
+    private func configureMoreButton(with viewState: ViewState) {
+        var configuration = moreButton.configuration
+        configuration?.title = nil
+        configuration?.image = UIImage(
+            systemName: "ellipsis",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        )
+        configuration?.baseForegroundColor = .gpTextTertiary
+        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+        moreButton.configuration = configuration
+        moreButton.isEnabled = viewState.showsMoreAction
+        moreButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.more")
+        moreButton.accessibilityIdentifier = "reviewComment.moreButton"
     }
 
     private func configureMetaButton(_ button: UIButton, selector: Selector) {
         var configuration = UIButton.Configuration.plain()
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0)
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
         configuration.imagePadding = 4
         button.configuration = configuration
         button.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
         button.addTarget(self, action: selector, for: .touchUpInside)
     }
 
-    @objc private func didTapReply() {
-        onReplyTapped?()
-    }
-
     @objc private func didTapLike() {
+        ReviewDiscussionTrace.log("[ReviewCommentCell] likeTapped commentId=\(currentCommentId ?? "nil")")
         onLikeTapped?()
     }
 
+    @objc private func didTapReply() {
+        ReviewDiscussionTrace.log("[ReviewCommentCell] replyTapped commentId=\(currentCommentId ?? "nil")")
+        onReplyTapped?()
+    }
+
     @objc private func didTapMore() {
+        ReviewDiscussionTrace.log("[ReviewCommentCell] moreTapped commentId=\(currentCommentId ?? "nil")")
         onMoreTapped?()
     }
 }

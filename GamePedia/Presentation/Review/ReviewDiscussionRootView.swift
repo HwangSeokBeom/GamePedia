@@ -368,6 +368,9 @@ final class ReviewDiscussionRootView: UIView {
 }
 
 final class ReviewDiscussionHeaderView: UIView {
+    var onLikeTapped: (() -> Void)?
+    private var currentReviewId: String?
+
     private let cardView: UIView = {
         let view = UIView()
         view.backgroundColor = .gpCardBackground
@@ -418,6 +421,7 @@ final class ReviewDiscussionHeaderView: UIView {
         label.font = .systemFont(ofSize: 14)
         label.textColor = .gpTextSecondary
         label.numberOfLines = 0
+        label.lineBreakMode = .byCharWrapping
         return label
     }()
 
@@ -450,6 +454,7 @@ final class ReviewDiscussionHeaderView: UIView {
         var configuration = UIButton.Configuration.plain()
         configuration.contentInsets = .zero
         configuration.imagePadding = 4
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8)
         configuration.baseForegroundColor = .gpTextTertiary
         configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
             var updated = incoming
@@ -457,7 +462,6 @@ final class ReviewDiscussionHeaderView: UIView {
             return updated
         }
         let button = UIButton(configuration: configuration)
-        button.isUserInteractionEnabled = false
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -487,28 +491,9 @@ final class ReviewDiscussionHeaderView: UIView {
         setup()
     }
 
-    override func systemLayoutSizeFitting(
-        _ targetSize: CGSize,
-        withHorizontalFittingPriority horizontalFittingPriority: UILayoutPriority,
-        verticalFittingPriority: UILayoutPriority
-    ) -> CGSize {
-        let fittingWidth = targetSize.width > 0 ? targetSize.width : bounds.width
-        guard fittingWidth > 0 else {
-            print("[ReviewDiscussionHeaderView] systemLayoutSizeFitting width=0 returningZero")
-            return .zero
-        }
-        let resolvedSize = super.systemLayoutSizeFitting(
-            CGSize(width: fittingWidth, height: targetSize.height),
-            withHorizontalFittingPriority: horizontalFittingPriority,
-            verticalFittingPriority: verticalFittingPriority
-        )
-        print("[ReviewDiscussionHeaderView] systemLayoutSizeFitting width=\(fittingWidth) height=\(resolvedSize.height)")
-        return resolvedSize
-    }
-
     func configure(with state: ReviewDiscussionHeaderState) {
         let review = state.review
-        print("[ReviewDiscussionHeaderView] configure reviewId=\(review.id) gameId=\(state.gameId) title=\(state.gameTitle)")
+        currentReviewId = review.id
 
         coverImageView.cancelLoad()
         coverImageView.loadImage(
@@ -537,7 +522,13 @@ final class ReviewDiscussionHeaderView: UIView {
         )
         likeConfiguration?.baseForegroundColor = review.isLikedByCurrentUser ? .gpCoral : .gpTextTertiary
         likeMetaButton.configuration = likeConfiguration
+        likeMetaButton.isEnabled = !state.isLikeLoading
         likeMetaButton.alpha = review.likeCount == 0 && !review.isLikedByCurrentUser ? 0.72 : 1
+        likeMetaButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.like", String(review.likeCount))
+    }
+
+    func containsCard(at point: CGPoint) -> Bool {
+        return cardView.frame.contains(point)
     }
 
     private func setup() {
@@ -571,6 +562,8 @@ final class ReviewDiscussionHeaderView: UIView {
         authorRow.distribution = .equalSpacing
         authorRow.spacing = 8
 
+        likeMetaButton.addTarget(self, action: #selector(didTapLike), for: .touchUpInside)
+
         contentStackView.addArrangedSubview(topRow)
         contentStackView.addArrangedSubview(bodyLabel)
         contentStackView.addArrangedSubview(authorRow)
@@ -581,6 +574,9 @@ final class ReviewDiscussionHeaderView: UIView {
         gameTitleLabel.lineBreakMode = .byTruncatingTail
         dateLabel.lineBreakMode = .byTruncatingTail
         authorLabel.lineBreakMode = .byTruncatingTail
+        bodyLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        bodyLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        authorLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         mineBadgeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         likeMetaButton.setContentHuggingPriority(.required, for: .horizontal)
         likeMetaButton.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -633,7 +629,14 @@ final class ReviewDiscussionHeaderView: UIView {
         metaRow.axis = .horizontal
         metaRow.alignment = .center
         metaRow.spacing = 6
+        dateLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        starView.setContentCompressionResistancePriority(.required, for: .horizontal)
         return metaRow
+    }
+
+    @objc private func didTapLike() {
+        ReviewDiscussionTrace.log("[ReviewDiscussionHeaderView] likeTapped reviewId=\(currentReviewId ?? "nil")")
+        onLikeTapped?()
     }
 }
 
@@ -760,6 +763,12 @@ final class ReviewDiscussionEmptyStateView: UIView {
 final class ReviewDiscussionHeaderCardCell: UITableViewCell {
     static let reuseIdentifier = "ReviewDiscussionHeaderCardCell"
 
+    var onLikeTapped: (() -> Void)? {
+        didSet {
+            headerView.onLikeTapped = onLikeTapped
+        }
+    }
+
     private let headerView = ReviewDiscussionHeaderView()
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -773,21 +782,20 @@ final class ReviewDiscussionHeaderCardCell: UITableViewCell {
     }
 
     func configure(with state: ReviewDiscussionHeaderState) {
+        ReviewDiscussionTrace.log(
+            "[ReviewDiscussionHeaderCardCell] configure cellClass=\(String(describing: type(of: self))) reviewId=\(state.review.id) likeCount=\(state.review.likeCount)"
+        )
         headerView.configure(with: state)
     }
 
-    override func systemLayoutSizeFitting(
-        _ targetSize: CGSize,
-        withHorizontalFittingPriority horizontalFittingPriority: UILayoutPriority,
-        verticalFittingPriority: UILayoutPriority
-    ) -> CGSize {
-        let resolvedSize = super.systemLayoutSizeFitting(
-            targetSize,
-            withHorizontalFittingPriority: horizontalFittingPriority,
-            verticalFittingPriority: verticalFittingPriority
-        )
-        print("[ReviewDiscussionHeaderCardCell] systemLayoutSizeFitting width=\(targetSize.width) height=\(resolvedSize.height)")
-        return resolvedSize
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        onLikeTapped = nil
+    }
+
+    func containsCard(at point: CGPoint) -> Bool {
+        let headerPoint = convert(point, to: headerView)
+        return headerView.containsCard(at: headerPoint)
     }
 
     private func setup() {
@@ -808,6 +816,7 @@ final class ReviewDiscussionHeaderCardCell: UITableViewCell {
 
 final class ReviewDiscussionSectionHeaderCell: UITableViewCell {
     static let reuseIdentifier = "ReviewDiscussionSectionHeaderCell"
+    var onSortButtonTouchDown: (() -> Void)?
 
     let sortButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
@@ -825,6 +834,7 @@ final class ReviewDiscussionSectionHeaderCell: UITableViewCell {
             return updated
         }
         let button = UIButton(configuration: configuration)
+        button.accessibilityIdentifier = "reviewDiscussion.sortButton"
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -860,6 +870,11 @@ final class ReviewDiscussionSectionHeaderCell: UITableViewCell {
         setup()
     }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        onSortButtonTouchDown = nil
+    }
+
     func configure(with state: ReviewDiscussionSectionState, sortMenu: UIMenu?) {
         commentCountBadgeLabel.text = "\(state.commentCount)"
         var configuration = sortButton.configuration
@@ -888,6 +903,7 @@ final class ReviewDiscussionSectionHeaderCell: UITableViewCell {
         rowStack.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(rowStack)
+        sortButton.addTarget(self, action: #selector(didTouchDownSortButton), for: .touchDown)
 
         NSLayoutConstraint.activate([
             rowStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
@@ -895,6 +911,10 @@ final class ReviewDiscussionSectionHeaderCell: UITableViewCell {
             rowStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             rowStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4)
         ])
+    }
+
+    @objc private func didTouchDownSortButton() {
+        onSortButtonTouchDown?()
     }
 }
 

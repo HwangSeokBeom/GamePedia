@@ -176,11 +176,31 @@ final class GameDetailViewModel {
                 sort: .latest
             )
             let visibleReviews = self.visibleReviews(from: reviewFeed.reviews)
+            print(
+                "[GameDetailPreview] fetchReviews " +
+                "gameId=\(gameId) " +
+                "responseCount=\(reviewFeed.reviews.count) " +
+                "visibleCount=\(visibleReviews.count)"
+            )
             let mergedReviews = await self.mergedReviewsWithDiscussionCounts(
                 visibleReviews,
                 screen: "GameDetail.fetchReviews"
             )
+            var previewState = GameDetailState()
+            previewState.reviews = mergedReviews
+            let myReviewCount = previewState.myReviews.count
+            let communityCount = previewState.communityPreviewReviews.count
+            let finalRenderedCount = previewState.previewReviews.count
             await MainActor.run {
+                print(
+                    "[GameDetailPreview] mapped " +
+                    "gameId=\(gameId) " +
+                    "fetchReviewsCount=\(mergedReviews.count) " +
+                    "myReviewCount=\(myReviewCount) " +
+                    "communityCount=\(communityCount) " +
+                    "finalRenderedCount=\(finalRenderedCount) " +
+                    "previewLimit=\(GameDetailState.reviewPreviewLimit)"
+                )
                 self.apply(
                     .setReviewFeed(
                         GameReviewFeed(
@@ -395,7 +415,7 @@ final class GameDetailViewModel {
         do {
             let localCounts = try await fetchReviewCommentCountsUseCase.execute(reviewIds: reviews.map(\.id))
             return reviews.map { review in
-                review.mergingDiscussionCount(localCount: localCounts[review.id] ?? 0)
+                review.resolvingDiscussionCount(localCount: localCounts[review.id])
             }
         } catch {
             print("[ReviewDiscussionCount] mergeSkipped screen=\(screen) error=\(error.localizedDescription)")

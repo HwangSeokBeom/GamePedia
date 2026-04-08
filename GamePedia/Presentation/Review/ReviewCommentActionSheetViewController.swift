@@ -3,7 +3,7 @@ import UIKit
 final class ReviewCommentActionSheetViewController: UIViewController {
     struct Context {
         struct Action {
-            enum Kind {
+            enum Kind: Equatable {
                 case reply
                 case edit
                 case delete
@@ -25,6 +25,7 @@ final class ReviewCommentActionSheetViewController: UIViewController {
     }
 
     var onActionSelected: ((Context.Action.Kind) -> Void)?
+    var onDismissed: (() -> Void)?
 
     private let context: Context
     private let dimView: UIControl = {
@@ -112,6 +113,7 @@ final class ReviewCommentActionSheetViewController: UIViewController {
     private var containerBottomConstraint: NSLayoutConstraint?
     private var sheetContentBottomConstraint: NSLayoutConstraint?
     private var hasAnimatedIn = false
+    private var hasNotifiedDismissal = false
 
     init(context: Context) {
         self.context = context
@@ -256,6 +258,7 @@ final class ReviewCommentActionSheetViewController: UIViewController {
         button.contentHorizontalAlignment = .leading
         button.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
         button.heightAnchor.constraint(equalToConstant: 52).isActive = true
+        button.accessibilityLabel = action.title
         button.addTarget(self, action: #selector(didTapAction(_:)), for: .touchUpInside)
         return button
     }
@@ -283,7 +286,13 @@ final class ReviewCommentActionSheetViewController: UIViewController {
             self.dimView.alpha = 0
             self.view.layoutIfNeeded()
         }, completion: { _ in
-            self.dismiss(animated: false, completion: completion)
+            self.dismiss(animated: false) {
+                if self.hasNotifiedDismissal == false {
+                    self.hasNotifiedDismissal = true
+                    self.onDismissed?()
+                }
+                completion?()
+            }
         })
     }
 

@@ -3,6 +3,8 @@ import Foundation
 enum ReviewDiscussionIntent {
     case viewDidLoad
     case didTapRetry
+    case didTapReviewLike(reviewId: String)
+    case didTapDiscussionArea
     case didTapReply(commentId: String)
     case didTapEdit(commentId: String)
     case didTapDelete(commentId: String)

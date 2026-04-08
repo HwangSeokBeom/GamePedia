@@ -689,6 +689,8 @@
 "review.comment.sheet.mineTitle" = "내 댓글";
 "review.comment.sheet.otherTitle" = "%@의 댓글";
 "review.comment.sheet.meta" = "%@ · 좋아요 %d";
+"review.comment.alert.deleteTitle" = "댓글을 삭제하시겠습니까?";
+"review.comment.alert.deleteMessage" = "삭제한 댓글은 복구할 수 없습니다.";
 "review.comment.notice.created" = "댓글을 남겼어요.";
 "review.comment.notice.replied" = "답글을 남겼어요.";
 "review.comment.notice.updated" = "댓글을 수정했어요.";

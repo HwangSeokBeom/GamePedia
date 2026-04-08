@@ -135,11 +135,18 @@ final class DefaultReviewCommentLocalDataSource: ReviewCommentLocalDataSource {
         guard !reviewIds.isEmpty else { return [:] }
 
         let reviewIdSet = Set(reviewIds)
-        return loadComments()
-            .filter { reviewIdSet.contains($0.reviewId) }
-            .reduce(into: [String: Int]()) { partialResult, record in
-                partialResult[record.reviewId, default: 0] += 1
-            }
+        let matchingRecords = loadComments().filter { reviewIdSet.contains($0.reviewId) }
+        guard !matchingRecords.isEmpty else { return [:] }
+
+        var countsByReviewId = Dictionary(
+            uniqueKeysWithValues: Set(matchingRecords.map(\.reviewId)).map { ($0, 0) }
+        )
+
+        for record in matchingRecords where !record.isDeleted {
+            countsByReviewId[record.reviewId, default: 0] += 1
+        }
+
+        return countsByReviewId
     }
 
     func fetchMyComments(currentUser: AuthUser?) throws -> [MyReviewCommentEntry] {

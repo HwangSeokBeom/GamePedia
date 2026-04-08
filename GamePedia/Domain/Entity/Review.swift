@@ -123,4 +123,9 @@ struct Review: Equatable {
     func mergingDiscussionCount(localCount: Int) -> Review {
         updatingCommentCount(max(commentCount, localCount))
     }
+
+    func resolvingDiscussionCount(localCount: Int?) -> Review {
+        guard let localCount else { return self }
+        return updatingCommentCount(localCount)
+    }
 }

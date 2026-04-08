@@ -689,6 +689,8 @@
 "review.comment.sheet.mineTitle" = "自分のコメント";
 "review.comment.sheet.otherTitle" = "%@さんのコメント";
 "review.comment.sheet.meta" = "%@ ・ いいね %d";
+"review.comment.alert.deleteTitle" = "このコメントを削除しますか？";
+"review.comment.alert.deleteMessage" = "削除したコメントは元に戻せません。";
 "review.comment.notice.created" = "コメントを投稿しました。";
 "review.comment.notice.replied" = "返信を投稿しました。";
 "review.comment.notice.updated" = "コメントを更新しました。";

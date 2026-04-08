@@ -46,6 +46,7 @@ final class GameReviewCell: UITableViewCell {
         label.font = .systemFont(ofSize: 14)
         label.textColor = .gpTextSecondary
         label.numberOfLines = 0
+        label.lineBreakMode = .byCharWrapping
         return label
     }()
 
@@ -155,6 +156,11 @@ final class GameReviewCell: UITableViewCell {
             contentStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
             contentStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -16)
         ])
+
+        contentLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        contentLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        authorLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        dateLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     }
 
     func configure(with review: Review) {
@@ -172,6 +178,10 @@ final class GameReviewCell: UITableViewCell {
         dateLabel.text = review.formattedDate
         starView.configure(rating: review.rating)
         contentLabel.text = review.content
+        if review.content.count > 40,
+           review.content.rangeOfCharacter(from: .whitespacesAndNewlines) == nil {
+            print("[TextLayout] view=GameReviewCell reviewId=\(review.id) length=\(review.content.count) unbroken=true")
+        }
         commentLabel.text = review.commentCount > 0
             ? L10n.tr("Localizable", "review.card.commentCta", review.commentCount)
             : L10n.tr("Localizable", "review.card.commentEmptyCta")

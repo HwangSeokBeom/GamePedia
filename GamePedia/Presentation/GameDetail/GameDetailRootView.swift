@@ -1,10 +1,6 @@
 import UIKit
 
 final class GameDetailRootView: UIView {
-    private enum PreviewLimit {
-        static let reviews = 5
-    }
-
     private let heroGradientLayer: CAGradientLayer = {
         let layer = CAGradientLayer()
         layer.locations = [0.5, 1.0]
@@ -408,21 +404,23 @@ final class GameDetailRootView: UIView {
         writeReviewButton.isHidden = state.hasMyReviews
         myReviewNewButton.isHidden = !state.hasMyReviews
 
-        let myReviews = Array(state.myReviews.prefix(PreviewLimit.reviews))
+        let myReviews = Array(state.myReviews.prefix(GameDetailState.reviewPreviewLimit))
         emptyStateView.isHidden = !myReviews.isEmpty
         myReviewCardsStackView.isHidden = myReviews.isEmpty
         myReviewCountBadgeView.isHidden = myReviews.isEmpty
         myReviewCountBadgeLabel.text = String(state.myReviews.count)
         rebuildMyReviewCards(with: myReviews)
 
-        reviewSectionHeader.isHidden = state.communityPreviewReviews.isEmpty
-        reviewTableView.isHidden = state.communityPreviewReviews.isEmpty
+        reviewSectionHeader.isHidden = state.previewReviews.isEmpty
+        reviewTableView.isHidden = state.previewReviews.isEmpty
         reviewSectionHeader.seeMoreButton.isHidden = !state.shouldShowReviewSeeMore
     }
 
     func updateReviewTableHeight() {
+        reviewTableView.layoutIfNeeded()
         layoutIfNeeded()
         reviewTableView.invalidateIntrinsicContentSize()
+        setNeedsLayout()
     }
 
     private func rebuildMyReviewCards(with reviews: [Review]) {
@@ -451,9 +449,22 @@ final class GameDetailRootView: UIView {
 }
 
 private final class SelfSizingTableView: UITableView {
+    private var heightConstraint: NSLayoutConstraint?
+
+    override init(frame: CGRect, style: UITableView.Style) {
+        super.init(frame: frame, style: style)
+        configureHeightConstraintIfNeeded()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configureHeightConstraintIfNeeded()
+    }
+
     override var contentSize: CGSize {
         didSet {
             guard oldValue != contentSize else { return }
+            updateHeightConstraint()
             invalidateIntrinsicContentSize()
             setNeedsLayout()
         }
@@ -461,6 +472,23 @@ private final class SelfSizingTableView: UITableView {
 
     override var intrinsicContentSize: CGSize {
         layoutIfNeeded()
-        return CGSize(width: UIView.noIntrinsicMetric, height: contentSize.height)
+        return CGSize(width: UIView.noIntrinsicMetric, height: max(1, contentSize.height))
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateHeightConstraint()
+    }
+
+    private func configureHeightConstraintIfNeeded() {
+        guard heightConstraint == nil else { return }
+        let constraint = heightAnchor.constraint(equalToConstant: 1)
+        constraint.priority = .required
+        constraint.isActive = true
+        heightConstraint = constraint
+    }
+
+    private func updateHeightConstraint() {
+        heightConstraint?.constant = max(1, contentSize.height)
     }
 }

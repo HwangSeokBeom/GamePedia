@@ -689,6 +689,8 @@
 "review.comment.sheet.mineTitle" = "我的评论";
 "review.comment.sheet.otherTitle" = "%@ 的评论";
 "review.comment.sheet.meta" = "%@ · %d 个赞";
+"review.comment.alert.deleteTitle" = "要删除这条评论吗？";
+"review.comment.alert.deleteMessage" = "已删除的评论无法恢复。";
 "review.comment.notice.created" = "评论已发布。";
 "review.comment.notice.replied" = "回复已发布。";
 "review.comment.notice.updated" = "评论已更新。";

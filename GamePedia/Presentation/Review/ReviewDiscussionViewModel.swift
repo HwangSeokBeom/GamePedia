@@ -10,6 +10,7 @@ final class ReviewDiscussionViewModel {
 
     private let fetchGameReviewsUseCase: FetchGameReviewsUseCase
     private let fetchReviewCommentsUseCase: FetchReviewCommentsUseCase
+    private let toggleReviewLikeUseCase: ToggleReviewLikeUseCase
     private let createReviewCommentUseCase: CreateReviewCommentUseCase
     private let updateReviewCommentUseCase: UpdateReviewCommentUseCase
     private let deleteReviewCommentUseCase: DeleteReviewCommentUseCase
@@ -26,6 +27,7 @@ final class ReviewDiscussionViewModel {
         reviewSeed: Review? = nil,
         highlightCommentId: String? = nil,
         fetchGameReviewsUseCase: FetchGameReviewsUseCase = FetchGameReviewsUseCase(reviewRepository: DefaultReviewRepository()),
+        toggleReviewLikeUseCase: ToggleReviewLikeUseCase = ToggleReviewLikeUseCase(reviewRepository: DefaultReviewRepository()),
         reviewCommentRepository: any ReviewCommentRepository = DefaultReviewCommentRepository(),
         moderationRepository: any ModerationRepository = DefaultModerationRepository()
     ) {
@@ -37,6 +39,7 @@ final class ReviewDiscussionViewModel {
         )
         self.reviewSeed = reviewSeed
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
+        self.toggleReviewLikeUseCase = toggleReviewLikeUseCase
         self.fetchReviewCommentsUseCase = FetchReviewCommentsUseCase(repository: reviewCommentRepository)
         self.createReviewCommentUseCase = CreateReviewCommentUseCase(repository: reviewCommentRepository)
         self.updateReviewCommentUseCase = UpdateReviewCommentUseCase(repository: reviewCommentRepository)
@@ -49,9 +52,17 @@ final class ReviewDiscussionViewModel {
     }
 
     func send(_ intent: ReviewDiscussionIntent) {
+        ReviewDiscussionTrace.log("[ReviewDiscussionVM] send \(intent.logDescription)")
         switch intent {
         case .viewDidLoad, .didTapRetry:
             load()
+        case .didTapReviewLike(let reviewId):
+            toggleReviewLike(reviewId: reviewId)
+        case .didTapDiscussionArea:
+            if case .comment = state.composerMode {
+                break
+            }
+            apply(.setComposerModePreservingText(.comment))
         case .didTapReply(let commentId):
             guard let comment = state.comments.first(where: { $0.id == commentId }) else { return }
             apply(.setComposerMode(.reply(
@@ -98,6 +109,7 @@ final class ReviewDiscussionViewModel {
     }
 
     private func load() {
+        ReviewDiscussionTrace.log("[ReviewDiscussionVM] load reviewId=\(state.reviewId)")
         apply(.setLoading(true))
         apply(.setError(nil))
 
@@ -265,6 +277,9 @@ final class ReviewDiscussionViewModel {
               let comment = state.comments.first(where: { $0.id == commentId }) else { return }
 
         let nextReaction: ReviewCommentReaction? = comment.myReaction == desiredReaction ? nil : desiredReaction
+        ReviewDiscussionTrace.log(
+            "[ReviewDiscussionVM] toggleReaction commentId=\(commentId) desired=\(desiredReaction.rawValue) next=\(nextReaction?.rawValue ?? "none")"
+        )
         let optimisticComment = optimisticallyUpdatedComment(comment, nextReaction: nextReaction)
         apply(.replaceComment(optimisticComment))
         apply(.setReactionLoading(commentId: commentId, isLoading: true))
@@ -284,6 +299,69 @@ final class ReviewDiscussionViewModel {
                 await MainActor.run {
                     self.apply(.replaceComment(comment))
                     self.apply(.setReactionLoading(commentId: commentId, isLoading: false))
+                    let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    self.apply(.setInlineNotice(message))
+                }
+            }
+        }
+    }
+
+    private func toggleReviewLike(reviewId: String) {
+        guard !state.reactingReviewIds.contains(reviewId),
+              let originalReview = state.review,
+              originalReview.id == reviewId else {
+            return
+        }
+
+        let optimisticReview = originalReview.togglingLikeOptimistically()
+        ReviewDiscussionTrace.log(
+            "[ReviewDiscussionVM] toggleReviewLike reviewId=\(reviewId) nextLiked=\(optimisticReview.isLikedByCurrentUser) likeCount=\(optimisticReview.likeCount)"
+        )
+        apply(.replaceReview(optimisticReview))
+        apply(.setReviewReactionLoading(reviewId: reviewId, isLoading: true))
+        ReviewLikeSyncCenter.send(
+            ReviewLikeSyncEvent(
+                reviewId: optimisticReview.id,
+                gameId: optimisticReview.gameId,
+                likeCount: optimisticReview.likeCount,
+                isLikedByCurrentUser: optimisticReview.isLikedByCurrentUser
+            )
+        )
+
+        Task {
+            do {
+                let result = try await toggleReviewLikeUseCase.execute(
+                    reviewId: reviewId,
+                    isCurrentlyLiked: originalReview.isLikedByCurrentUser
+                )
+                let resolvedReview = originalReview.updatingLikeState(
+                    likeCount: result.likeCount,
+                    isLikedByCurrentUser: result.isLikedByCurrentUser
+                )
+                await MainActor.run {
+                    self.apply(.replaceReview(resolvedReview))
+                    self.apply(.setReviewReactionLoading(reviewId: reviewId, isLoading: false))
+                    ReviewLikeSyncCenter.send(
+                        ReviewLikeSyncEvent(
+                            reviewId: reviewId,
+                            gameId: originalReview.gameId,
+                            likeCount: result.likeCount,
+                            isLikedByCurrentUser: result.isLikedByCurrentUser
+                        )
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    self.apply(.replaceReview(originalReview))
+                    self.apply(.setReviewReactionLoading(reviewId: reviewId, isLoading: false))
+                    ReviewLikeSyncCenter.send(
+                        ReviewLikeSyncEvent(
+                            reviewId: originalReview.id,
+                            gameId: originalReview.gameId,
+                            likeCount: originalReview.likeCount,
+                            isLikedByCurrentUser: originalReview.isLikedByCurrentUser
+                        )
+                    )
                     let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                     self.apply(.setInlineNotice(message))
                 }
@@ -365,8 +443,45 @@ final class ReviewDiscussionViewModel {
                     isLikedByCurrentUser: event.isLikedByCurrentUser
                 )
                 guard updatedReview != currentReview else { return }
-                self.apply(.setReview(updatedReview, gameTitle: self.state.navigationTitle))
+                self.apply(.replaceReview(updatedReview))
             }
             .store(in: &cancellables)
+    }
+}
+
+private extension ReviewDiscussionIntent {
+    var logDescription: String {
+        switch self {
+        case .viewDidLoad:
+            return "intent=viewDidLoad"
+        case .didTapRetry:
+            return "intent=didTapRetry"
+        case .didTapReviewLike(let reviewId):
+            return "intent=didTapReviewLike reviewId=\(reviewId)"
+        case .didTapDiscussionArea:
+            return "intent=didTapDiscussionArea"
+        case .didTapReply(let commentId):
+            return "intent=didTapReply commentId=\(commentId)"
+        case .didTapEdit(let commentId):
+            return "intent=didTapEdit commentId=\(commentId)"
+        case .didTapDelete(let commentId):
+            return "intent=didTapDelete commentId=\(commentId)"
+        case .didTapReport(let commentId):
+            return "intent=didTapReport commentId=\(commentId)"
+        case .didTapLike(let commentId):
+            return "intent=didTapLike commentId=\(commentId)"
+        case .didTapDislike(let commentId):
+            return "intent=didTapDislike commentId=\(commentId)"
+        case .didTapToggleReplies(let parentCommentId):
+            return "intent=didTapToggleReplies parentCommentId=\(parentCommentId)"
+        case .didChangeSort(let sortOption):
+            return "intent=didChangeSort sort=\(sortOption)"
+        case .didChangeComposerText(let text):
+            return "intent=didChangeComposerText length=\(text.count)"
+        case .didTapCancelComposerMode:
+            return "intent=didTapCancelComposerMode"
+        case .didTapSubmit:
+            return "intent=didTapSubmit"
+        }
     }
 }

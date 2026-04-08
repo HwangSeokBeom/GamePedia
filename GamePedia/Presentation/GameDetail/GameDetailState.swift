@@ -2,11 +2,9 @@ import Foundation
 
 // MARK: - GameDetailState
 
-private enum GameDetailPreviewLimit {
-    static let reviews = 5
-}
-
 struct GameDetailState {
+    static let reviewPreviewLimit = 5
+
     var isLoading: Bool = false
     var game: GameDetail? = nil
     var reviews: [Review] = []
@@ -73,21 +71,24 @@ struct GameDetailState {
         isShowingTranslated ? L10n.Translation.Action.showOriginal : L10n.Translation.Action.showTranslated
     }
 
+    /// Game Detail preview policy:
+    /// 1. Show community reviews first in the lower "유저 리뷰" section.
+    /// 2. If community reviews are fewer than the preview limit, backfill with the
+    ///    remaining review feed so the section can still render up to 5 cards.
+    /// 3. Duplicates are avoided within the preview section itself, but the same
+    ///    review can still appear in "나의 기록" and the lower preview when used
+    ///    as fallback content.
     var previewReviews: [Review] {
-        let myReviews = reviews.filter(\.isMine)
-        guard !myReviews.isEmpty else {
-            return Array(reviews.prefix(GameDetailPreviewLimit.reviews))
+        let communityReviews = communityPreviewReviews
+        guard communityReviews.count < Self.reviewPreviewLimit else {
+            return communityReviews
         }
 
-        var preview = Array(myReviews.prefix(GameDetailPreviewLimit.reviews))
-        let selectedReviewIDs = Set(preview.map(\.id))
-        let remainingSlots = max(0, GameDetailPreviewLimit.reviews - preview.count)
+        let selectedReviewIDs = Set(communityReviews.map(\.id))
+        let remainingSlots = max(0, Self.reviewPreviewLimit - communityReviews.count)
+        let fallbackReviews = reviews.filter { !selectedReviewIDs.contains($0.id) }
 
-        if remainingSlots > 0 {
-            preview.append(contentsOf: reviews.filter { !selectedReviewIDs.contains($0.id) }.prefix(remainingSlots))
-        }
-
-        return preview
+        return communityReviews + Array(fallbackReviews.prefix(remainingSlots))
     }
 
     var myReviews: [Review] {
@@ -95,7 +96,7 @@ struct GameDetailState {
     }
 
     var communityPreviewReviews: [Review] {
-        Array(reviews.filter { !$0.isMine }.prefix(GameDetailPreviewLimit.reviews))
+        Array(reviews.filter { !$0.isMine }.prefix(Self.reviewPreviewLimit))
     }
 
     var hasMyReviews: Bool {
@@ -116,7 +117,7 @@ struct GameDetailState {
     }
 
     var shouldShowReviewSeeMore: Bool {
-        !communityPreviewReviews.isEmpty
+        !previewReviews.isEmpty
     }
 
     var showSteamReviewLinkage: Bool {

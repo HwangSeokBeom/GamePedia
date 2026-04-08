@@ -4,6 +4,7 @@ struct ReviewDiscussionHeaderState: Equatable {
     let review: Review
     let gameId: Int
     let gameTitle: String
+    let isLikeLoading: Bool
 }
 
 enum ReviewDiscussionContentState: Equatable {
@@ -51,6 +52,7 @@ struct ReviewDiscussionState: Equatable {
     var composerText: String = ""
     var composerMode: ReviewDiscussionComposerMode = .comment
     var isSubmitting: Bool = false
+    var reactingReviewIds: Set<String> = []
     var reactingCommentIds: Set<String> = []
     var errorMessage: String? = nil
     var inlineNoticeMessage: String? = nil
@@ -91,17 +93,32 @@ struct ReviewDiscussionState: Equatable {
         return ReviewDiscussionHeaderState(
             review: review,
             gameId: gameId,
-            gameTitle: navigationTitle
+            gameTitle: navigationTitle,
+            isLikeLoading: reactingReviewIds.contains(review.id)
         )
     }
 
     var discussionContentState: ReviewDiscussionContentState {
         guard review != nil else { return .loading }
-        return comments.isEmpty ? .empty : .populated
+        if isLoading && allComments.isEmpty {
+            return .loading
+        }
+        return activeDiscussionCount == 0 ? .empty : .populated
     }
 
     var totalDiscussionCount: Int {
-        max(review?.commentCount ?? 0, comments.count)
+        if isLoading && allComments.isEmpty {
+            return review?.commentCount ?? 0
+        }
+        return activeDiscussionCount
+    }
+
+    private var activeDiscussionCount: Int {
+        comments.reduce(into: 0) { count, comment in
+            if !comment.isDeleted {
+                count += 1
+            }
+        }
     }
 
     var discussionSectionState: ReviewDiscussionSectionState? {

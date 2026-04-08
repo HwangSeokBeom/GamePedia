@@ -8,6 +8,14 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         case comments
     }
 
+    private enum TableTapTarget {
+        case background
+        case reviewHeaderCard
+        case discussionArea
+        case commentCell(String)
+        case toggleReplies(String)
+    }
+
     private enum Row: Hashable {
         case reviewHeaderCard(String)
         case discussionHeader(String)
@@ -33,6 +41,8 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
     private var currentDiscussionSectionState: ReviewDiscussionSectionState?
     private var currentSortMenu: UIMenu?
     private var lastHighlightToken: Int = 0
+    private var keyboardDismissTapGestureRecognizer: UITapGestureRecognizer?
+    private var navigationBarTapGestureRecognizer: UITapGestureRecognizer?
 
     var onAuthenticationRequired: ((RestrictedActionContext, @escaping () -> Void) -> Void)?
 
@@ -45,19 +55,39 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        ReviewDiscussionTrace.log(
+            "[ReviewDiscussionVC] viewDidLoad viewController=\(String(describing: type(of: self))) viewModel=\(String(describing: type(of: viewModel))) rootView=\(String(describing: type(of: rootView)))"
+        )
         navigationItem.largeTitleDisplayMode = .never
         setupTableView()
         setupComposer()
+        setupKeyboardDismissGesture()
         setupKeyboardObservers()
         bindViewModel()
         viewModel.send(.viewDidLoad)
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        setupNavigationBarDismissGesture()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        view.endEditing(true)
+    }
+
     deinit {
+        if let navigationBarTapGestureRecognizer {
+            navigationController?.navigationBar.removeGestureRecognizer(navigationBarTapGestureRecognizer)
+        }
         NotificationCenter.default.removeObserver(self)
     }
 
     override func render(_ state: ReviewDiscussionState) {
+        ReviewDiscussionTrace.log(
+            "[ReviewDiscussionVC] render comments=\(state.comments.count) composerMode=\(state.composerMode.traceName) reacting=\(state.reactingCommentIds.count)"
+        )
         navigationItem.title = state.navigationTitle
         rootView.render(state)
         applySnapshotIfNeeded(for: state)
@@ -89,12 +119,21 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
                 let cell = tableView.dequeueReusableCell(withIdentifier: ReviewDiscussionHeaderCardCell.reuseIdentifier, for: indexPath) as! ReviewDiscussionHeaderCardCell
                 if let headerState = self.currentReviewHeaderState {
                     cell.configure(with: headerState)
+                    cell.onLikeTapped = { [weak self] in
+                        self?.performAuthenticatedAction {
+                            ReviewDiscussionTrace.log("[ReviewDiscussionVC] didTapReviewLike reviewId=\(headerState.review.id)")
+                            self?.viewModel.send(.didTapReviewLike(reviewId: headerState.review.id))
+                        }
+                    }
                 }
                 return cell
             case .discussionHeader:
                 let cell = tableView.dequeueReusableCell(withIdentifier: ReviewDiscussionSectionHeaderCell.reuseIdentifier, for: indexPath) as! ReviewDiscussionSectionHeaderCell
                 if let sectionState = self.currentDiscussionSectionState {
                     cell.configure(with: sectionState, sortMenu: self.currentSortMenu)
+                    cell.onSortButtonTouchDown = { [weak self] in
+                        self?.keyboardDismissOnly()
+                    }
                 }
                 return cell
             case .emptyState:
@@ -163,9 +202,6 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
             mergePolicy: .keepFirst
         )
         let signature = makeSnapshotSignature(for: state, commentRows: commentRows)
-        print(
-            "[ReviewDiscussionSnapshot] reviewHeaderStateNil=\(state.reviewHeaderState == nil) contentState=\(state.discussionContentState) sections=\(signature.sections.map { $0.section.rawValue })"
-        )
         guard signature != lastRenderedSnapshotSignature else { return }
         lastRenderedSnapshotSignature = signature
 
@@ -252,18 +288,25 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
     }
 
     private func refreshVisibleRows(for state: ReviewDiscussionState) {
-        print("[ReviewDiscussionRender] reviewHeaderStateNil=\(state.reviewHeaderState == nil) discussionSectionStateNil=\(state.discussionSectionState == nil)")
-
         if let headerState = state.reviewHeaderState,
            let indexPath = dataSource.indexPath(for: .reviewHeaderCard(headerState.review.id)),
            let cell = rootView.tableView.cellForRow(at: indexPath) as? ReviewDiscussionHeaderCardCell {
             cell.configure(with: headerState)
+            cell.onLikeTapped = { [weak self] in
+                self?.performAuthenticatedAction {
+                    ReviewDiscussionTrace.log("[ReviewDiscussionVC] didTapReviewLike reviewId=\(headerState.review.id)")
+                    self?.viewModel.send(.didTapReviewLike(reviewId: headerState.review.id))
+                }
+            }
         }
 
         if let discussionSectionState = state.discussionSectionState,
            let indexPath = dataSource.indexPath(for: .discussionHeader(state.reviewId)),
            let cell = rootView.tableView.cellForRow(at: indexPath) as? ReviewDiscussionSectionHeaderCell {
             cell.configure(with: discussionSectionState, sortMenu: currentSortMenu)
+            cell.onSortButtonTouchDown = { [weak self] in
+                self?.keyboardDismissOnly()
+            }
         }
 
         if let indexPath = dataSource.indexPath(for: .emptyState(state.reviewId)),
@@ -301,23 +344,23 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
             isDeleted: comment.isDeleted,
             likeCount: comment.likeCount,
             myReaction: comment.myReaction,
-            showsActions: !comment.isDeleted,
+            isReactionLoading: reactingCommentIds.contains(comment.id),
             canReply: comment.canReply,
-            isReactionLoading: reactingCommentIds.contains(comment.id)
+            showsMoreAction: availableCommentActionKinds(for: comment).isEmpty == false
         ))
-        cell.onReplyTapped = { [weak self] in
-            self?.performAuthenticatedAction {
-                self?.viewModel.send(.didTapReply(commentId: comment.id))
-                self?.rootView.focusComposer()
-            }
-        }
         cell.onLikeTapped = { [weak self] in
             self?.performAuthenticatedAction {
+                ReviewDiscussionTrace.log("[ReviewDiscussionVC] didTapLike commentId=\(comment.id)")
                 self?.viewModel.send(.didTapLike(commentId: comment.id))
             }
         }
+        cell.onReplyTapped = { [weak self] in
+            self?.performAuthenticatedAction { [weak self] in
+                self?.activateReplyMode(for: comment)
+            }
+        }
         cell.onMoreTapped = { [weak self] in
-            self?.presentActionSheet(for: comment)
+            self?.presentCommentActionSheet(for: comment)
         }
     }
 
@@ -332,114 +375,25 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         onAuthenticationRequired(context, action)
     }
 
-    private func presentActionSheet(for comment: ReviewComment) {
-        let title = comment.isMine
-            ? L10n.tr("Localizable", "review.comment.sheet.mineTitle")
-            : L10n.tr("Localizable", "review.comment.sheet.otherTitle", comment.author.nickname)
-        let metadata = L10n.tr("Localizable", "review.comment.sheet.meta", comment.formattedDate, comment.likeCount)
-
-        var actions: [ReviewCommentActionSheetViewController.Context.Action] = [
-            .init(kind: .reply, title: L10n.tr("Localizable", "review.comment.action.reply"), systemImageName: "message", tintColor: .gpTextPrimary)
-        ]
-
-        if comment.canEdit {
-            actions.append(.init(kind: .edit, title: L10n.Review.Action.edit, systemImageName: "pencil", tintColor: .gpTextPrimary))
-        }
-
-        if comment.canDelete {
-            actions.append(.init(kind: .delete, title: L10n.Review.Action.delete, systemImageName: "trash", tintColor: .gpCoral))
-        }
-
-        if comment.canReport {
-            actions.append(.init(kind: .report, title: L10n.Review.Action.report, systemImageName: "flag", tintColor: .gpCoral))
-        }
-
-        let viewController = ReviewCommentActionSheetViewController(
-            context: .init(
-                title: title,
-                metadata: metadata,
-                avatarURL: comment.author.avatarURL,
-                avatarText: String(comment.author.nickname.first ?? " "),
-                avatarBackgroundColor: commentAvatarColor(for: comment.author.nickname),
-                actions: actions
-            )
-        )
-        viewController.onActionSelected = { [weak self] action in
-            switch action {
-            case .reply:
-                self?.performAuthenticatedAction {
-                    self?.viewModel.send(.didTapReply(commentId: comment.id))
-                    self?.rootView.focusComposer()
-                }
-            case .edit:
-                self?.performAuthenticatedAction {
-                    self?.viewModel.send(.didTapEdit(commentId: comment.id))
-                    self?.rootView.focusComposer()
-                }
-            case .delete:
-                self?.performAuthenticatedAction {
-                    self?.presentDeleteConfirmationAlert(for: comment)
-                }
-            case .report:
-                self?.performAuthenticatedAction(for: .moderation) {
-                    self?.presentReportReasonSheet(for: comment)
-                }
-            }
-        }
-        present(viewController, animated: false)
+    private func setupKeyboardDismissGesture() {
+        let gestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleKeyboardDismissTap(_:)))
+        gestureRecognizer.cancelsTouchesInView = true
+        gestureRecognizer.delegate = self
+        rootView.tableView.addGestureRecognizer(gestureRecognizer)
+        keyboardDismissTapGestureRecognizer = gestureRecognizer
     }
 
-    private func presentDeleteConfirmationAlert(for comment: ReviewComment) {
-        let alertController = UIAlertController(
-            title: L10n.Review.Alert.deleteTitle,
-            message: L10n.Review.Alert.deleteMessage,
-            preferredStyle: .alert
-        )
-        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
-        alertController.addAction(UIAlertAction(title: L10n.Review.Button.delete, style: .destructive) { [weak self] _ in
-            self?.viewModel.send(.didTapDelete(commentId: comment.id))
-        })
-        present(alertController, animated: true)
-    }
-
-    private func presentReportReasonSheet(for comment: ReviewComment) {
-        let alertController = UIAlertController(
-            title: L10n.Review.Report.selectReason,
-            message: L10n.Review.Report.message,
-            preferredStyle: .actionSheet
-        )
-
-        ReportReason.allCases.forEach { reason in
-            alertController.addAction(UIAlertAction(title: reason.title, style: .default) { [weak self] _ in
-                guard let self else { return }
-                if reason.requiresDetailInput {
-                    self.presentOtherReasonAlert(for: comment)
-                } else {
-                    self.viewModel.report(commentId: comment.id, reason: reason, detail: nil)
-                }
-            })
+    private func setupNavigationBarDismissGesture() {
+        guard navigationBarTapGestureRecognizer == nil,
+              let navigationBar = navigationController?.navigationBar else {
+            return
         }
 
-        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
-        present(alertController, animated: true)
-    }
-
-    private func presentOtherReasonAlert(for comment: ReviewComment) {
-        let alertController = UIAlertController(
-            title: L10n.Review.Report.otherTitle,
-            message: L10n.Review.Report.otherMessage,
-            preferredStyle: .alert
-        )
-        alertController.addTextField { textField in
-            textField.placeholder = L10n.Review.Report.otherPlaceholder
-            textField.clearButtonMode = .whileEditing
-        }
-        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
-        alertController.addAction(UIAlertAction(title: L10n.Review.Report.submit, style: .destructive) { [weak self, weak alertController] _ in
-            let detail = alertController?.textFields?.first?.text
-            self?.viewModel.report(commentId: comment.id, reason: .other, detail: detail)
-        })
-        present(alertController, animated: true)
+        let gestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleNavigationBarTap(_:)))
+        gestureRecognizer.cancelsTouchesInView = false
+        gestureRecognizer.delegate = self
+        navigationBar.addGestureRecognizer(gestureRecognizer)
+        navigationBarTapGestureRecognizer = gestureRecognizer
     }
 
     @objc private func didTapRetry() {
@@ -447,7 +401,7 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
     }
 
     @objc private func didTapEmptyStateAction() {
-        rootView.focusComposer()
+        handleTapTarget(.discussionArea)
     }
 
     @objc private func didTapSubmit() {
@@ -488,6 +442,21 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         updateComposerBottomInset(to: overlap, notification: notification)
     }
 
+    @objc private func handleKeyboardDismissTap(_ gestureRecognizer: UITapGestureRecognizer) {
+        guard gestureRecognizer.state == .ended else { return }
+        let location = gestureRecognizer.location(in: rootView.tableView)
+        handleTableTap(at: location)
+    }
+
+    @objc private func handleNavigationBarTap(_ gestureRecognizer: UITapGestureRecognizer) {
+        guard gestureRecognizer.state == .ended,
+              navigationController?.topViewController === self else {
+            return
+        }
+        ReviewDiscussionTrace.log("[ReviewDiscussionVC] tapHit target=navigationBar")
+        keyboardDismissOnly()
+    }
+
     private func updateComposerBottomInset(to inset: CGFloat, notification: Notification) {
         let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue ?? 0.25
         let curveRawValue = (notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? NSNumber)?.uintValue
@@ -498,35 +467,376 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
             self.view.layoutIfNeeded()
         }
     }
+
+    private func handleTapTarget(_ target: TableTapTarget) {
+        switch target {
+        case .background:
+            ReviewDiscussionTrace.log("[ReviewDiscussionVC] tapHit target=background")
+            keyboardDismissOnly()
+        case .reviewHeaderCard:
+            ReviewDiscussionTrace.log("[ReviewDiscussionVC] tapHit target=reviewHeaderCard")
+            keyboardDismissOnly()
+        case .discussionArea:
+            ReviewDiscussionTrace.log("[ReviewDiscussionVC] tapHit target=discussionArea")
+            viewModel.send(.didTapDiscussionArea)
+            focusComposer(mode: .comment)
+        case .commentCell(let commentId):
+            ReviewDiscussionTrace.log("[ReviewDiscussionVC] tapHit target=commentCell commentId=\(commentId)")
+            keyboardDismissOnly()
+        case .toggleReplies(let parentCommentId):
+            keyboardDismissOnly()
+            viewModel.send(.didTapToggleReplies(parentCommentId: parentCommentId))
+        }
+    }
+
+    private func keyboardDismissOnly() {
+        view.endEditing(true)
+        let shouldResetReplyMode: Bool
+        if case .reply = viewModel.state.composerMode {
+            shouldResetReplyMode = true
+        } else {
+            shouldResetReplyMode = false
+        }
+        if shouldResetReplyMode {
+            viewModel.send(.didTapCancelComposerMode)
+        }
+        ReviewDiscussionTrace.log("[ReviewDiscussionVC] keyboardDismissOnly clearReplyMode=\(shouldResetReplyMode)")
+    }
+
+    private func focusComposer(mode: ReviewDiscussionComposerMode) {
+        ReviewDiscussionTrace.log("[ReviewDiscussionVC] focusComposer mode=\(mode.traceName)")
+        rootView.focusComposer()
+    }
+
+    private func activateReplyMode(for comment: ReviewComment) {
+        guard comment.canReply else { return }
+        ReviewDiscussionTrace.log("[ReviewDiscussionVC] activateReplyMode commentId=\(comment.id)")
+        viewModel.send(.didTapReply(commentId: comment.id))
+        focusComposer(mode: .reply(
+            parentCommentId: comment.parentCommentId ?? comment.id,
+            parentNickname: comment.author.nickname,
+            isSelfReply: comment.isMine
+        ))
+    }
+
+    private func availableCommentActionKinds(for comment: ReviewComment) -> [ReviewCommentActionSheetViewController.Context.Action.Kind] {
+        var kinds: [ReviewCommentActionSheetViewController.Context.Action.Kind] = []
+        if comment.canReply {
+            kinds.append(.reply)
+        }
+        if comment.canEdit {
+            kinds.append(.edit)
+        }
+        if comment.canDelete {
+            kinds.append(.delete)
+        }
+        if comment.canReport {
+            kinds.append(.report)
+        }
+        return kinds
+    }
+
+    private func presentCommentActionSheet(for comment: ReviewComment) {
+        let actionKinds = availableCommentActionKinds(for: comment)
+        guard actionKinds.isEmpty == false else { return }
+
+        keyboardDismissOnly()
+
+        let model = ReviewCommentActionSheetModel(
+            commentId: comment.id,
+            reviewId: comment.reviewId,
+            authorId: comment.author.id,
+            authorNickname: comment.author.nickname,
+            authorProfileImageUrl: comment.author.profileImageUrl,
+            content: comment.content,
+            createdAt: comment.createdAt,
+            likeCount: comment.likeCount,
+            isReply: comment.depth > 0,
+            parentCommentId: comment.parentCommentId,
+            isOwnedByCurrentUser: comment.isMine
+        )
+
+        let context = ReviewCommentActionSheetViewController.Context(
+            title: model.title,
+            metadata: model.metadata,
+            avatarURL: model.avatarURL,
+            avatarText: model.avatarText,
+            avatarBackgroundColor: CommentActionAvatarPalette.color(for: comment.author.nickname),
+            actions: actionKinds.map(makeCommentAction)
+        )
+
+        let viewController = ReviewCommentActionSheetViewController(context: context)
+        viewController.onActionSelected = { [weak self] actionKind in
+            self?.handleCommentActionSelection(actionKind, for: comment)
+        }
+        present(viewController, animated: false)
+    }
+
+    private func makeCommentAction(
+        for kind: ReviewCommentActionSheetViewController.Context.Action.Kind
+    ) -> ReviewCommentActionSheetViewController.Context.Action {
+        switch kind {
+        case .reply:
+            return .init(
+                kind: .reply,
+                title: L10n.tr("Localizable", "review.comment.action.reply"),
+                systemImageName: "arrowshape.turn.up.left",
+                tintColor: .gpPrimary
+            )
+        case .edit:
+            return .init(
+                kind: .edit,
+                title: L10n.Review.Action.edit,
+                systemImageName: "pencil",
+                tintColor: .gpTextPrimary
+            )
+        case .delete:
+            return .init(
+                kind: .delete,
+                title: L10n.Review.Action.delete,
+                systemImageName: "trash",
+                tintColor: .gpCoral
+            )
+        case .report:
+            return .init(
+                kind: .report,
+                title: L10n.Review.Action.report,
+                systemImageName: "exclamationmark.bubble",
+                tintColor: .gpCoral
+            )
+        }
+    }
+
+    private func handleCommentActionSelection(
+        _ actionKind: ReviewCommentActionSheetViewController.Context.Action.Kind,
+        for comment: ReviewComment
+    ) {
+        switch actionKind {
+        case .reply:
+            performAuthenticatedAction { [weak self] in
+                self?.activateReplyMode(for: comment)
+            }
+        case .edit:
+            performAuthenticatedAction { [weak self] in
+                self?.viewModel.send(.didTapEdit(commentId: comment.id))
+                self?.focusComposer(mode: .edit(commentId: comment.id))
+            }
+        case .delete:
+            performAuthenticatedAction { [weak self] in
+                self?.presentCommentDeleteConfirmationAlert(for: comment)
+            }
+        case .report:
+            performAuthenticatedAction(for: .moderation) { [weak self] in
+                self?.presentCommentReportReasonSheet(for: comment)
+            }
+        }
+    }
+
+    private func presentCommentDeleteConfirmationAlert(for comment: ReviewComment) {
+        let alertController = UIAlertController(
+            title: L10n.tr("Localizable", "review.comment.alert.deleteTitle"),
+            message: L10n.tr("Localizable", "review.comment.alert.deleteMessage"),
+            preferredStyle: .alert
+        )
+        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
+        alertController.addAction(UIAlertAction(title: L10n.Review.Button.delete, style: .destructive) { [weak self] _ in
+            self?.viewModel.send(.didTapDelete(commentId: comment.id))
+        })
+        present(alertController, animated: true)
+    }
+
+    private func presentCommentReportReasonSheet(for comment: ReviewComment) {
+        let alertController = UIAlertController(
+            title: L10n.Review.Report.selectReason,
+            message: L10n.Review.Report.message,
+            preferredStyle: .actionSheet
+        )
+
+        ReportReason.allCases.forEach { reason in
+            alertController.addAction(UIAlertAction(title: reason.title, style: .default) { [weak self] _ in
+                guard let self else { return }
+                if reason.requiresDetailInput {
+                    self.presentCommentOtherReasonAlert(for: comment)
+                } else {
+                    self.viewModel.report(commentId: comment.id, reason: reason, detail: nil)
+                }
+            })
+        }
+
+        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
+        present(alertController, animated: true)
+    }
+
+    private func presentCommentOtherReasonAlert(for comment: ReviewComment) {
+        let alertController = UIAlertController(
+            title: L10n.Review.Report.otherTitle,
+            message: L10n.Review.Report.otherMessage,
+            preferredStyle: .alert
+        )
+        alertController.addTextField { textField in
+            textField.placeholder = L10n.Review.Report.otherPlaceholder
+            textField.clearButtonMode = .whileEditing
+        }
+        alertController.addAction(UIAlertAction(title: L10n.Common.Button.cancel, style: .cancel))
+        alertController.addAction(UIAlertAction(title: L10n.Review.Report.submit, style: .destructive) { [weak self, weak alertController] _ in
+            let detail = alertController?.textFields?.first?.text
+            self?.viewModel.report(commentId: comment.id, reason: .other, detail: detail)
+        })
+        present(alertController, animated: true)
+    }
+
+    private func tapTarget(for item: Row) -> TableTapTarget {
+        switch item {
+        case .reviewHeaderCard:
+            return .reviewHeaderCard
+        case .discussionHeader:
+            return .background
+        case .emptyState:
+            return .background
+        case .comment(let commentId):
+            return .commentCell(commentId)
+        case .toggleReplies(let parentCommentId, _, _):
+            return .toggleReplies(parentCommentId)
+        }
+    }
+
+    private func tapTargetForBlankArea(at location: CGPoint) -> TableTapTarget {
+        _ = location
+        return .background
+    }
+
+    private func handleTableTap(at location: CGPoint) {
+        if let indexPath = rootView.tableView.indexPathForRow(at: location),
+           let item = dataSource.itemIdentifier(for: indexPath) {
+            handleTapTarget(tapTarget(for: item, at: location, indexPath: indexPath))
+            return
+        }
+
+        handleTapTarget(tapTargetForBlankArea(at: location))
+    }
+
+    private func tapTarget(for item: Row, at location: CGPoint, indexPath: IndexPath) -> TableTapTarget {
+        switch item {
+        case .reviewHeaderCard:
+            guard let cell = rootView.tableView.cellForRow(at: indexPath) as? ReviewDiscussionHeaderCardCell else {
+                return .background
+            }
+            let pointInCell = rootView.tableView.convert(location, to: cell)
+            return cell.containsCard(at: pointInCell) ? .reviewHeaderCard : .background
+        default:
+            return tapTarget(for: item)
+        }
+    }
+
+    private func hasControlAncestor(_ view: UIView?) -> Bool {
+        var currentView = view
+        while let view = currentView {
+            if view is UIControl {
+                return true
+            }
+            currentView = view.superview
+        }
+        return false
+    }
+
+#if DEBUG
+    func debugHandleTableTap(at location: CGPoint) {
+        handleTableTap(at: location)
+    }
+
+    func debugHandleNavigationBarTap() {
+        keyboardDismissOnly()
+    }
+#endif
 }
 
 extension ReviewDiscussionViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
-        if case .toggleReplies(let parentCommentId, _, _) = item {
-            viewModel.send(.didTapToggleReplies(parentCommentId: parentCommentId))
+        handleTapTarget(tapTarget(for: item))
+    }
+}
+
+extension ReviewDiscussionViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if gestureRecognizer === navigationBarTapGestureRecognizer {
+            return navigationController?.topViewController === self
         }
+
+        guard gestureRecognizer === keyboardDismissTapGestureRecognizer else { return true }
+
+        if hasControlAncestor(touch.view) {
+            return false
+        }
+
+        let location = touch.location(in: rootView.tableView)
+        guard let indexPath = rootView.tableView.indexPathForRow(at: location),
+              let item = dataSource.itemIdentifier(for: indexPath) else {
+            return true
+        }
+
+        switch item {
+        case .reviewHeaderCard:
+            guard let cell = rootView.tableView.cellForRow(at: indexPath) as? ReviewDiscussionHeaderCardCell else {
+                return true
+            }
+            let pointInCell = rootView.tableView.convert(location, to: cell)
+            return !cell.containsCard(at: pointInCell)
+        case .discussionHeader:
+            return true
+        case .emptyState, .comment, .toggleReplies:
+            return false
+        }
+    }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool {
+        gestureRecognizer === navigationBarTapGestureRecognizer
     }
 }
 
 extension ReviewDiscussionViewController: UITextViewDelegate {
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        ReviewDiscussionTrace.log("[ReviewDiscussionVC] composerDidBeginEditing")
+    }
+
     func textViewDidChange(_ textView: UITextView) {
         viewModel.send(.didChangeComposerText(textView.text))
     }
+
+    func textViewDidEndEditing(_ textView: UITextView) {
+        ReviewDiscussionTrace.log("[ReviewDiscussionVC] composerDidEndEditing")
+    }
 }
 
-private extension ReviewDiscussionViewController {
-    func commentAvatarColor(for seed: String) -> UIColor {
-        let colors: [UIColor] = [
-            UIColor(hex: "#6366F1"),
-            UIColor(hex: "#3B5998"),
-            UIColor(hex: "#2E8B57"),
-            UIColor(hex: "#8B5CF6"),
-            UIColor(hex: "#E85A4F"),
-            UIColor(hex: "#FFB547")
-        ]
-        return colors[abs(seed.hashValue) % colors.count]
+private extension ReviewDiscussionComposerMode {
+    var traceName: String {
+        switch self {
+        case .comment:
+            return "comment"
+        case .reply:
+            return "reply"
+        case .edit:
+            return "edit"
+        }
+    }
+}
+
+private enum CommentActionAvatarPalette {
+    private static let colors: [UIColor] = [
+        UIColor(hex: "#6366F1"),
+        UIColor(hex: "#3B5998"),
+        UIColor(hex: "#2E8B57"),
+        UIColor(hex: "#8B5CF6"),
+        UIColor(hex: "#E85A4F"),
+        UIColor(hex: "#FFB547")
+    ]
+
+    static func color(for seed: String) -> UIColor {
+        colors[abs(seed.hashValue) % colors.count]
     }
 }
 

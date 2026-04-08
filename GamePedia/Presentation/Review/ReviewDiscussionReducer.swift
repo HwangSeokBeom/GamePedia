@@ -14,6 +14,8 @@ enum ReviewDiscussionReducer {
             state.review = review
             state.resolvedGameTitle = gameTitle
             state.errorMessage = nil
+        case .replaceReview(let review):
+            state.review = review
         case .setComments(let comments):
             state.allComments = comments
             state.comments = sortComments(comments, by: state.sortOption)
@@ -29,8 +31,16 @@ enum ReviewDiscussionReducer {
             if case .comment = mode {
                 state.composerText = ""
             }
+        case .setComposerModePreservingText(let mode):
+            state.composerMode = mode
         case .setSubmitting(let isSubmitting):
             state.isSubmitting = isSubmitting
+        case .setReviewReactionLoading(let reviewId, let isLoading):
+            if isLoading {
+                state.reactingReviewIds.insert(reviewId)
+            } else {
+                state.reactingReviewIds.remove(reviewId)
+            }
         case .setReactionLoading(let commentId, let isLoading):
             if isLoading {
                 state.reactingCommentIds.insert(commentId)

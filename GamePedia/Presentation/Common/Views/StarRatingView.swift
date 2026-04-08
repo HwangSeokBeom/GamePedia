@@ -5,8 +5,11 @@ import UIKit
 final class StarRatingView: UIView {
 
     // MARK: Properties
+    private let stackView = UIStackView()
     private var starImageViews: [UIImageView] = []
     private let starCount = 5
+    private let starSize: CGFloat = 12
+    private let starSpacing: CGFloat = 2
 
     // MARK: Init
     override init(frame: CGRect) {
@@ -21,27 +24,38 @@ final class StarRatingView: UIView {
 
     // MARK: Setup
     private func setupStars() {
-        let stack = UIStackView()
-        stack.axis = .horizontal
-        stack.spacing = 2
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
+        stackView.axis = .horizontal
+        stackView.alignment = .center
+        stackView.spacing = starSpacing
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stackView)
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor)
+            stackView.topAnchor.constraint(equalTo: topAnchor),
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor)
         ])
+
+        setContentHuggingPriority(.required, for: .horizontal)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
+        stackView.setContentHuggingPriority(.required, for: .horizontal)
+        stackView.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         for _ in 0..<starCount {
             let iv = UIImageView()
             iv.contentMode = .scaleAspectFit
             iv.tintColor = .gpStar
-            iv.widthAnchor.constraint(equalToConstant: 12).isActive = true
-            iv.heightAnchor.constraint(equalToConstant: 12).isActive = true
+            iv.widthAnchor.constraint(equalToConstant: starSize).isActive = true
+            iv.heightAnchor.constraint(equalToConstant: starSize).isActive = true
             starImageViews.append(iv)
-            stack.addArrangedSubview(iv)
+            stackView.addArrangedSubview(iv)
         }
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(
+            width: CGFloat(starCount) * starSize + CGFloat(starCount - 1) * starSpacing,
+            height: starSize
+        )
     }
 
     // MARK: - Configure

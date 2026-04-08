@@ -6,7 +6,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
     private let viewModel: GameDetailViewModel
     let gameId: Int
-    private var communityPreviewReviews: [Review] = []
+    private var renderedPreviewReviews: [Review] = []
     private var lastPresentedErrorMessage: String?
     private var lastPresentedBlockingLoadErrorMessage: String?
     private lazy var translationHostController = TranslationHostContainerViewController { [weak self] results in
@@ -42,6 +42,12 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         setupTranslationHost()
         bindViewModel()
         viewModel.send(.viewDidLoad(gameId: gameId))
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        rootView.updateReviewTableHeight()
+        updateScrollInsets()
     }
 
     // MARK: Setup
@@ -123,10 +129,22 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         rootView.render(state)
         translationHostController.update(request: state.translationRequest)
 
-        if communityPreviewReviews != state.communityPreviewReviews {
-            communityPreviewReviews = state.communityPreviewReviews
+        if renderedPreviewReviews != state.previewReviews {
+            renderedPreviewReviews = state.previewReviews
+            print(
+                "[GameDetailPreview] render " +
+                "fetchReviewsCount=\(state.reviews.count) " +
+                "myReviewCount=\(state.myReviews.count) " +
+                "communityCount=\(state.communityPreviewReviews.count) " +
+                "finalRenderedCount=\(renderedPreviewReviews.count) " +
+                "previewLimit=\(GameDetailState.reviewPreviewLimit)"
+            )
             rootView.reviewTableView.reloadData()
+            rootView.reviewTableView.layoutIfNeeded()
             rootView.updateReviewTableHeight()
+            DispatchQueue.main.async { [weak self] in
+                self?.rootView.updateReviewTableHeight()
+            }
         }
 
         let bookmarkSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
@@ -171,6 +189,41 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         } else if state.blockingLoadErrorMessage == nil {
             lastPresentedBlockingLoadErrorMessage = nil
         }
+    }
+
+    private func updateScrollInsets() {
+        let bottomInset = resolvedBottomScrollInset()
+        let currentVerticalIndicatorInsets = rootView.scrollView.verticalScrollIndicatorInsets
+        guard rootView.scrollView.contentInset.bottom != bottomInset
+                || currentVerticalIndicatorInsets.bottom != bottomInset else {
+            return
+        }
+
+        rootView.scrollView.contentInset.bottom = bottomInset
+        var updatedVerticalIndicatorInsets = currentVerticalIndicatorInsets
+        updatedVerticalIndicatorInsets.bottom = bottomInset
+        rootView.scrollView.verticalScrollIndicatorInsets = updatedVerticalIndicatorInsets
+    }
+
+    private func resolvedBottomScrollInset() -> CGFloat {
+        let safeAreaBottom = view.safeAreaInsets.bottom
+        let tabBarOverlap = visibleTabBarOverlapHeight()
+        let breathingRoom: CGFloat = 28
+        return max(safeAreaBottom, tabBarOverlap) + breathingRoom
+    }
+
+    private func visibleTabBarOverlapHeight() -> CGFloat {
+        guard let tabBar = tabBarController?.tabBar,
+              !tabBar.isHidden,
+              tabBar.alpha > 0.01,
+              let containerView = tabBar.superview else {
+            return 0
+        }
+
+        let convertedFrame = view.convert(tabBar.frame, from: containerView)
+        let overlap = view.bounds.intersection(convertedFrame)
+        guard !overlap.isNull else { return 0 }
+        return overlap.height
     }
 
     // MARK: Public
@@ -236,7 +289,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
 extension GameDetailViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        communityPreviewReviews.count
+        renderedPreviewReviews.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -244,7 +297,7 @@ extension GameDetailViewController: UITableViewDataSource, UITableViewDelegate {
             withIdentifier: ReviewCardCell.reuseId,
             for: indexPath
         ) as! ReviewCardCell
-        let review = communityPreviewReviews[indexPath.row]
+        let review = renderedPreviewReviews[indexPath.row]
         cell.configure(with: review)
         cell.onLikeTapped = { [weak self] in
             self?.performAuthenticatedAction(for: .viewReviews) { [weak self] in
@@ -256,8 +309,8 @@ extension GameDetailViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        guard communityPreviewReviews.indices.contains(indexPath.row),
+        guard renderedPreviewReviews.indices.contains(indexPath.row),
               let game = viewModel.state.game else { return }
-        onReviewSelected?(game, communityPreviewReviews[indexPath.row])
+        onReviewSelected?(game, renderedPreviewReviews[indexPath.row])
     }
 }

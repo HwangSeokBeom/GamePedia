@@ -245,7 +245,7 @@ final class GameReviewsViewModel {
         do {
             let localCounts = try await fetchReviewCommentCountsUseCase.execute(reviewIds: reviews.map(\.id))
             return reviews.map { review in
-                review.mergingDiscussionCount(localCount: localCounts[review.id] ?? 0)
+                review.resolvingDiscussionCount(localCount: localCounts[review.id])
             }
         } catch {
             print("[ReviewDiscussionCount] mergeSkipped screen=\(screen) error=\(error.localizedDescription)")

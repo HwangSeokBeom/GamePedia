@@ -689,6 +689,8 @@
 "review.comment.sheet.mineTitle" = "My comment";
 "review.comment.sheet.otherTitle" = "%@'s comment";
 "review.comment.sheet.meta" = "%@ · %d likes";
+"review.comment.alert.deleteTitle" = "Delete this comment?";
+"review.comment.alert.deleteMessage" = "Deleted comments cannot be restored.";
 "review.comment.notice.created" = "Comment posted.";
 "review.comment.notice.replied" = "Reply posted.";
 "review.comment.notice.updated" = "Comment updated.";
