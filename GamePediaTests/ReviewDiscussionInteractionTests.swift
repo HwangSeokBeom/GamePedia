@@ -238,6 +238,98 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         XCTAssertEqual(repository.reactCallCommentIds, ["root-comment", "reply-comment"])
     }
 
+    func testReviewDiscussionCancelComposerMode_preservesDraftWhileExitingReplyMode() async throws {
+        let repository = MockReviewCommentRepository(
+            comments: [makeComment(id: "root-comment", parentCommentId: nil, depth: 0, likeCount: 0, myReaction: nil)]
+        )
+        let viewModel = makeViewModel(reviewCommentRepository: repository)
+
+        viewModel.send(.viewDidLoad)
+        await waitUntil { viewModel.state.comments.count == 1 }
+
+        viewModel.send(.didTapReply(commentId: "root-comment"))
+        viewModel.send(.didChangeComposerText("답글 초안"))
+        viewModel.send(.didTapCancelComposerMode)
+
+        XCTAssertEqual(viewModel.state.composerMode, .comment)
+        XCTAssertEqual(viewModel.state.composerText, "답글 초안")
+    }
+
+    func testGameReviewsViewModel_reviewLike_optimisticUpdateRollbackAndDiscussionSync() async throws {
+        let initialReview = makeReview(commentCount: 2)
+        let reviewRepository = MockReviewRepository(
+            fetchGameReviewsResult: .success(
+                GameReviewFeed(
+                    reviews: [initialReview],
+                    summary: ReviewSummary(reviewCount: 1, averageRating: initialReview.rating)
+                )
+            ),
+            likeDelayNanoseconds: 50_000_000,
+            likeResult: .success(
+                ReviewLikeMutationResult(
+                    reviewId: "review-1",
+                    likeCount: 1,
+                    isLikedByCurrentUser: true
+                )
+            ),
+            unlikeResult: .failure(MockError.failedReviewLike)
+        )
+        let commentRepository = MockReviewCommentRepository(comments: [])
+        let gameReviewsViewModel = GameReviewsViewModel(
+            gameId: 10,
+            gameTitle: "테스트 게임",
+            fetchGameReviewsUseCase: FetchGameReviewsUseCase(reviewRepository: reviewRepository),
+            toggleReviewLikeUseCase: ToggleReviewLikeUseCase(reviewRepository: reviewRepository),
+            reviewCommentRepository: commentRepository
+        )
+        let discussionViewModel = makeViewModel(
+            reviewCommentRepository: commentRepository,
+            reviewRepository: reviewRepository
+        )
+
+        gameReviewsViewModel.loadReviews()
+        await waitUntil { gameReviewsViewModel.state.reviews.count == 1 }
+
+        discussionViewModel.send(.viewDidLoad)
+        await waitUntil { discussionViewModel.state.review != nil }
+
+        gameReviewsViewModel.toggleReviewLike(reviewId: "review-1")
+        XCTAssertEqual(gameReviewsViewModel.state.reviews.first?.likeCount, 1)
+        XCTAssertEqual(gameReviewsViewModel.state.reviews.first?.isLikedByCurrentUser, true)
+        XCTAssertTrue(gameReviewsViewModel.state.reactingReviewIds.contains("review-1"))
+
+        await waitUntil {
+            discussionViewModel.state.review?.likeCount == 1 &&
+            discussionViewModel.state.review?.isLikedByCurrentUser == true
+        }
+
+        try await Task.sleep(nanoseconds: 120_000_000)
+
+        XCTAssertFalse(gameReviewsViewModel.state.reactingReviewIds.contains("review-1"))
+        XCTAssertEqual(gameReviewsViewModel.state.reviews.first?.likeCount, 1)
+        XCTAssertEqual(gameReviewsViewModel.state.reviews.first?.isLikedByCurrentUser, true)
+
+        gameReviewsViewModel.toggleReviewLike(reviewId: "review-1")
+        XCTAssertEqual(gameReviewsViewModel.state.reviews.first?.likeCount, 0)
+        XCTAssertEqual(gameReviewsViewModel.state.reviews.first?.isLikedByCurrentUser, false)
+        XCTAssertTrue(gameReviewsViewModel.state.reactingReviewIds.contains("review-1"))
+
+        await waitUntil {
+            discussionViewModel.state.review?.likeCount == 0 &&
+            discussionViewModel.state.review?.isLikedByCurrentUser == false
+        }
+
+        try await Task.sleep(nanoseconds: 120_000_000)
+
+        XCTAssertFalse(gameReviewsViewModel.state.reactingReviewIds.contains("review-1"))
+        XCTAssertEqual(gameReviewsViewModel.state.reviews.first?.likeCount, 1)
+        XCTAssertEqual(gameReviewsViewModel.state.reviews.first?.isLikedByCurrentUser, true)
+        XCTAssertEqual(discussionViewModel.state.review?.likeCount, 1)
+        XCTAssertEqual(discussionViewModel.state.review?.isLikedByCurrentUser, true)
+        XCTAssertEqual(reviewRepository.likeReviewCallIds, ["review-1"])
+        XCTAssertEqual(reviewRepository.removeReviewLikeCallIds, ["review-1"])
+    }
+
     private func waitUntil(
         timeout: TimeInterval = 1.5,
         pollIntervalNanoseconds: UInt64 = 10_000_000,
@@ -268,10 +360,16 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         )
     }
 
-    private func makeReview() -> Review {
+    private func makeReview(
+        id: String = "review-1",
+        gameId: String = "10",
+        likeCount: Int = 0,
+        commentCount: Int = 2,
+        isLikedByCurrentUser: Bool = false
+    ) -> Review {
         Review(
-            id: "review-1",
-            gameId: "10",
+            id: id,
+            gameId: gameId,
             rating: 4.5,
             content: "리뷰 본문",
             createdAt: "2026-04-07T00:00:00Z",
@@ -282,9 +380,9 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
                 profileImageUrl: nil
             ),
             isMine: false,
-            likeCount: 0,
-            commentCount: 2,
-            isLikedByCurrentUser: false
+            likeCount: likeCount,
+            commentCount: commentCount,
+            isLikedByCurrentUser: isLikedByCurrentUser
         )
     }
 
@@ -352,6 +450,7 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
 }
 
 private final class MockReviewRepository: ReviewRepository {
+    let fetchGameReviewsResult: Result<GameReviewFeed, Error>?
     let likeDelayNanoseconds: UInt64
     let likeResult: Result<ReviewLikeMutationResult, Error>
     let unlikeResult: Result<ReviewLikeMutationResult, Error>
@@ -359,6 +458,7 @@ private final class MockReviewRepository: ReviewRepository {
     private(set) var removeReviewLikeCallIds: [String] = []
 
     init(
+        fetchGameReviewsResult: Result<GameReviewFeed, Error>? = nil,
         likeDelayNanoseconds: UInt64 = 0,
         likeResult: Result<ReviewLikeMutationResult, Error> = .success(
             ReviewLikeMutationResult(reviewId: "review-1", likeCount: 1, isLikedByCurrentUser: true)
@@ -367,6 +467,7 @@ private final class MockReviewRepository: ReviewRepository {
             ReviewLikeMutationResult(reviewId: "review-1", likeCount: 0, isLikedByCurrentUser: false)
         )
     ) {
+        self.fetchGameReviewsResult = fetchGameReviewsResult
         self.likeDelayNanoseconds = likeDelayNanoseconds
         self.likeResult = likeResult
         self.unlikeResult = unlikeResult
@@ -377,7 +478,15 @@ private final class MockReviewRepository: ReviewRepository {
     }
 
     func fetchGameReviews(gameId: String, sort: ReviewSortOption?) async throws -> GameReviewFeed {
-        throw MockError.unused
+        guard let fetchGameReviewsResult else {
+            throw MockError.unused
+        }
+        switch fetchGameReviewsResult {
+        case .success(let feed):
+            return feed
+        case .failure(let error):
+            throw error
+        }
     }
 
     func updateReview(reviewId: String, rating: Double?, content: String?) async throws -> Review {

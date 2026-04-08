@@ -3,6 +3,30 @@ import UIKit
 final class ReviewCommentCell: UITableViewCell {
     static let reuseIdentifier = "ReviewCommentCell"
 
+    private struct MetaStyle {
+        let labelFontSize: CGFloat
+        let iconPointSize: CGFloat
+        let moreIconPointSize: CGFloat
+        let horizontalInset: CGFloat
+        let imagePadding: CGFloat
+
+        static let standard = MetaStyle(
+            labelFontSize: 12,
+            iconPointSize: 12,
+            moreIconPointSize: 13,
+            horizontalInset: 8,
+            imagePadding: 4
+        )
+
+        static let compact = MetaStyle(
+            labelFontSize: 11,
+            iconPointSize: 11,
+            moreIconPointSize: 12,
+            horizontalInset: 6,
+            imagePadding: 3
+        )
+    }
+
     struct ViewState: Equatable {
         let id: String
         let authorName: String
@@ -124,6 +148,7 @@ final class ReviewCommentCell: UITableViewCell {
         let leadingInset: CGFloat = isReply ? 56 : 20
         let avatarSize: CGFloat = isReply ? 24 : 28
         let topBottomInset: CGFloat = isReply ? 10 : 14
+        let metaStyle = metaStyle(for: viewState.depth)
 
         leadingConstraint?.constant = leadingInset
         avatarSizeConstraint?.constant = avatarSize
@@ -146,10 +171,12 @@ final class ReviewCommentCell: UITableViewCell {
         bodyLabel.textColor = viewState.isDeleted ? .gpTextTertiary : .gpTextSecondary
 
         timeLabel.text = viewState.dateText
+        timeLabel.font = .systemFont(ofSize: metaStyle.labelFontSize, weight: .medium)
+        firstMetaDot.font = .systemFont(ofSize: metaStyle.labelFontSize, weight: .medium)
         mineBadgeLabel.isHidden = !viewState.isMine
-        configureLikeButton(with: viewState)
-        configureReplyButton(with: viewState)
-        configureMoreButton(with: viewState)
+        configureLikeButton(with: viewState, metaStyle: metaStyle)
+        configureReplyButton(with: viewState, metaStyle: metaStyle)
+        configureMoreButton(with: viewState, metaStyle: metaStyle)
 
         let hidesMeta = viewState.isDeleted
         timeLabel.isHidden = hidesMeta
@@ -246,18 +273,22 @@ final class ReviewCommentCell: UITableViewCell {
         authorLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     }
 
-    private func configureLikeButton(with viewState: ViewState) {
+    private func configureLikeButton(with viewState: ViewState, metaStyle: MetaStyle) {
         let isLiked = viewState.myReaction == .like
         let tintColor: UIColor = isLiked ? .gpCoral : .gpTextTertiary
         var configuration = likeButton.configuration
         configuration?.title = String(viewState.likeCount)
         configuration?.image = UIImage(
             systemName: isLiked ? "heart.fill" : "heart",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: metaStyle.iconPointSize, weight: .medium)
         )
         configuration?.baseForegroundColor = tintColor
-        configuration?.imagePadding = 4
-        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+        configuration?.imagePadding = metaStyle.imagePadding
+        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: metaStyle.horizontalInset, bottom: 8, trailing: metaStyle.horizontalInset)
+        configuration?.titleTextAttributesTransformer = makeMetaTitleAttributesTransformer(
+            fontSize: metaStyle.labelFontSize,
+            weight: .medium
+        )
         likeButton.configuration = configuration
         likeButton.isEnabled = !viewState.isReactionLoading && !viewState.isDeleted
         likeButton.alpha = viewState.likeCount == 0 && !isLiked ? 0.72 : 1
@@ -265,30 +296,35 @@ final class ReviewCommentCell: UITableViewCell {
         likeButton.accessibilityIdentifier = "reviewComment.likeButton"
     }
 
-    private func configureReplyButton(with viewState: ViewState) {
+    private func configureReplyButton(with viewState: ViewState, metaStyle: MetaStyle) {
         var configuration = replyButton.configuration
         configuration?.title = L10n.tr("Localizable", "review.comment.action.reply")
         configuration?.image = UIImage(
             systemName: "arrowshape.turn.up.left",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: metaStyle.iconPointSize, weight: .medium)
         )
         configuration?.baseForegroundColor = .gpPrimary
-        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+        configuration?.imagePadding = metaStyle.imagePadding
+        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: metaStyle.horizontalInset, bottom: 8, trailing: metaStyle.horizontalInset)
+        configuration?.titleTextAttributesTransformer = makeMetaTitleAttributesTransformer(
+            fontSize: metaStyle.labelFontSize,
+            weight: .medium
+        )
         replyButton.configuration = configuration
         replyButton.isEnabled = viewState.canReply
         replyButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.reply")
         replyButton.accessibilityIdentifier = "reviewComment.replyButton"
     }
 
-    private func configureMoreButton(with viewState: ViewState) {
+    private func configureMoreButton(with viewState: ViewState, metaStyle: MetaStyle) {
         var configuration = moreButton.configuration
         configuration?.title = nil
         configuration?.image = UIImage(
             systemName: "ellipsis",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: metaStyle.moreIconPointSize, weight: .semibold)
         )
         configuration?.baseForegroundColor = .gpTextTertiary
-        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: metaStyle.horizontalInset, bottom: 8, trailing: metaStyle.horizontalInset)
         moreButton.configuration = configuration
         moreButton.isEnabled = viewState.showsMoreAction
         moreButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.more")
@@ -302,6 +338,21 @@ final class ReviewCommentCell: UITableViewCell {
         button.configuration = configuration
         button.titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
         button.addTarget(self, action: selector, for: .touchUpInside)
+    }
+
+    private func metaStyle(for depth: Int) -> MetaStyle {
+        depth > 0 ? .compact : .standard
+    }
+
+    private func makeMetaTitleAttributesTransformer(
+        fontSize: CGFloat,
+        weight: UIFont.Weight
+    ) -> UIConfigurationTextAttributesTransformer {
+        UIConfigurationTextAttributesTransformer { incoming in
+            var updated = incoming
+            updated.font = .systemFont(ofSize: fontSize, weight: weight)
+            return updated
+        }
     }
 
     @objc private func didTapLike() {

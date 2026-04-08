@@ -13,6 +13,7 @@ final class GameReviewsViewModel {
 
     private let fetchGameReviewsUseCase: FetchGameReviewsUseCase
     private let fetchReviewCommentCountsUseCase: FetchReviewCommentCountsUseCase
+    private let toggleReviewLikeUseCase: ToggleReviewLikeUseCase
     private let deleteReviewUseCase: DeleteReviewUseCase
     private let submitReportUseCase: SubmitReportUseCase
     private let blockUserUseCase: BlockUserUseCase
@@ -27,6 +28,9 @@ final class GameReviewsViewModel {
         fetchGameReviewsUseCase: FetchGameReviewsUseCase = FetchGameReviewsUseCase(
             reviewRepository: DefaultReviewRepository()
         ),
+        toggleReviewLikeUseCase: ToggleReviewLikeUseCase = ToggleReviewLikeUseCase(
+            reviewRepository: DefaultReviewRepository()
+        ),
         reviewCommentRepository: any ReviewCommentRepository = DefaultReviewCommentRepository(),
         deleteReviewUseCase: DeleteReviewUseCase = DeleteReviewUseCase(
             reviewRepository: DefaultReviewRepository()
@@ -36,6 +40,7 @@ final class GameReviewsViewModel {
         self.state = GameReviewsState(gameId: gameId, gameTitle: gameTitle)
         self.reviewSortOption = reviewSortOption
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
+        self.toggleReviewLikeUseCase = toggleReviewLikeUseCase
         self.fetchReviewCommentCountsUseCase = FetchReviewCommentCountsUseCase(repository: reviewCommentRepository)
         self.deleteReviewUseCase = deleteReviewUseCase
         self.moderationRepository = moderationRepository
@@ -88,6 +93,66 @@ final class GameReviewsViewModel {
 
     func didTapEdit(review: Review) {
         onComposeRequested?(review)
+    }
+
+    func toggleReviewLike(reviewId: String) {
+        guard !state.reactingReviewIds.contains(reviewId),
+              let originalReview = state.reviews.first(where: { $0.id == reviewId }) else {
+            return
+        }
+
+        let optimisticReview = originalReview.togglingLikeOptimistically()
+        state.reactingReviewIds.insert(reviewId)
+        applyReviewUpdate(optimisticReview)
+        ReviewLikeSyncCenter.send(
+            ReviewLikeSyncEvent(
+                reviewId: optimisticReview.id,
+                gameId: optimisticReview.gameId,
+                likeCount: optimisticReview.likeCount,
+                isLikedByCurrentUser: optimisticReview.isLikedByCurrentUser
+            )
+        )
+
+        Task {
+            do {
+                let result = try await toggleReviewLikeUseCase.execute(
+                    reviewId: reviewId,
+                    isCurrentlyLiked: originalReview.isLikedByCurrentUser
+                )
+
+                await MainActor.run {
+                    self.state.reactingReviewIds.remove(reviewId)
+                    self.applyReviewLikeState(
+                        reviewId: reviewId,
+                        likeCount: result.likeCount,
+                        isLikedByCurrentUser: result.isLikedByCurrentUser
+                    )
+                    ReviewLikeSyncCenter.send(
+                        ReviewLikeSyncEvent(
+                            reviewId: reviewId,
+                            gameId: originalReview.gameId,
+                            likeCount: result.likeCount,
+                            isLikedByCurrentUser: result.isLikedByCurrentUser
+                        )
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    let reviewError = ReviewError.from(error: error)
+                    self.state.reactingReviewIds.remove(reviewId)
+                    self.applyReviewUpdate(originalReview)
+                    ReviewLikeSyncCenter.send(
+                        ReviewLikeSyncEvent(
+                            reviewId: originalReview.id,
+                            gameId: originalReview.gameId,
+                            likeCount: originalReview.likeCount,
+                            isLikedByCurrentUser: originalReview.isLikedByCurrentUser
+                        )
+                    )
+                    self.state.errorMessage = reviewError.errorDescription ?? L10n.tr("Localizable", "review.error.requestFailed")
+                }
+            }
+        }
     }
 
     func report(review: Review, reason: ReportReason, detail: String?) {
@@ -300,5 +365,26 @@ final class GameReviewsViewModel {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    private func applyReviewLikeState(
+        reviewId: String,
+        likeCount: Int,
+        isLikedByCurrentUser: Bool
+    ) {
+        guard let currentReview = state.reviews.first(where: { $0.id == reviewId }) else { return }
+        let updatedReview = currentReview.updatingLikeState(
+            likeCount: likeCount,
+            isLikedByCurrentUser: isLikedByCurrentUser
+        )
+        applyReviewUpdate(updatedReview)
+    }
+
+    private func applyReviewUpdate(_ updatedReview: Review) {
+        let updatedReviews = state.reviews.map { review in
+            review.id == updatedReview.id ? updatedReview : review
+        }
+        guard updatedReviews != state.reviews else { return }
+        state.reviews = updatedReviews
     }
 }

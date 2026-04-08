@@ -95,8 +95,7 @@ final class ReviewDiscussionViewModel {
         case .didChangeComposerText(let text):
             apply(.setComposerText(text))
         case .didTapCancelComposerMode:
-            apply(.setComposerMode(.comment))
-            apply(.setComposerText(""))
+            apply(.setComposerModePreservingText(.comment))
         case .didTapSubmit:
             submitComposer()
         }

@@ -4,6 +4,7 @@ final class GameReviewsViewController: BaseViewController<GameReviewsRootView, G
 
     private let viewModel: GameReviewsViewModel
     private var reviews: [Review] = []
+    private var reactingReviewIds = Set<String>()
     private var lastPresentedErrorMessage: String?
     private var lastPresentedSuccessMessage: String?
 
@@ -63,11 +64,13 @@ final class GameReviewsViewController: BaseViewController<GameReviewsRootView, G
             action: #selector(didTapComposeButton)
         )
 
-        if reviews != state.reviews {
+        if reviews != state.reviews || reactingReviewIds != state.reactingReviewIds {
             reviews = state.reviews
+            reactingReviewIds = state.reactingReviewIds
             rootView.tableView.reloadData()
         } else {
             reviews = state.reviews
+            reactingReviewIds = state.reactingReviewIds
         }
 
         if let errorMessage = state.errorMessage,
@@ -230,7 +233,12 @@ extension GameReviewsViewController: UITableViewDataSource, UITableViewDelegate 
             for: indexPath
         ) as! GameReviewCell
         let review = reviews[indexPath.row]
-        cell.configure(with: review)
+        cell.configure(with: review, isLikeLoading: viewModel.state.reactingReviewIds.contains(review.id))
+        cell.onLikeTapped = { [weak self] in
+            self?.performAuthenticatedAction(for: .viewReviews) { [weak self] in
+                self?.viewModel.toggleReviewLike(reviewId: review.id)
+            }
+        }
         cell.onMoreButtonTapped = { [weak self] in
             self?.presentReviewActionSheet(for: review)
         }

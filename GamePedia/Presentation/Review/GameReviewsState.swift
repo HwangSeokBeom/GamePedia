@@ -8,6 +8,7 @@ struct GameReviewsState {
     var deletingReviewId: String? = nil
     var reportingReviewId: String? = nil
     var blockingUserId: String? = nil
+    var reactingReviewIds: Set<String> = []
     var reviews: [Review] = []
     var reviewSummary: ReviewSummary? = nil
     var errorMessage: String? = nil
