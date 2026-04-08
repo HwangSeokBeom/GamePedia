@@ -5,5 +5,5 @@ enum SocialActivityRoute: Hashable {
     case friendRequests
     case friendProfile(String)
     case gameDetail(Int)
-    case review(gameID: Int, reviewID: String?)
+    case review(gameID: Int, reviewID: String?, commentID: String?)
 }

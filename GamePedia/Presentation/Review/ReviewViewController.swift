@@ -6,6 +6,7 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
 
     // MARK: Properties
     private let viewModel: ReviewViewModel
+    let gameId: Int
     private let defaultSubmitAreaInset: CGFloat = 0
     private lazy var backgroundTapGestureRecognizer: UITapGestureRecognizer = {
         let gestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
@@ -20,6 +21,7 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
     // MARK: Init
     init(rootView: ReviewRootView, viewModel: ReviewViewModel) {
         self.viewModel = viewModel
+        self.gameId = viewModel.state.gameId
         super.init(rootView: rootView)
         hidesBottomBarWhenPushed = true
         NavigationBarStyler.apply(.opaque, to: navigationItem, buttonTintColor: .gpPrimary)
@@ -33,6 +35,16 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
         setupKeyboardObservers()
         bindViewModel()
         viewModel.send(.viewDidLoad)
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: animated)
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
     }
 
     deinit {
@@ -51,10 +63,12 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
 
     private func setupActions() {
         rootView.reviewTextView.delegate = self
+        rootView.closeButton.addTarget(self, action: #selector(didTapClose), for: .touchUpInside)
         rootView.submitButton.addTarget(self, action: #selector(didTapSubmit), for: .touchUpInside)
         rootView.submitButton.addTarget(self, action: #selector(didTapSubmitTouchDown), for: .touchDown)
         rootView.submitButton.addTarget(self, action: #selector(didTapSubmit), for: .primaryActionTriggered)
         rootView.deleteButton.addTarget(self, action: #selector(didTapDelete), for: .touchUpInside)
+        rootView.spoilerToggleControl.addTarget(self, action: #selector(didToggleSpoiler), for: .valueChanged)
         rootView.starRatingView.onRatingChanged = { [weak self] rating in
             self?.viewModel.send(.ratingChanged(rating))
         }
@@ -127,11 +141,19 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
         present(alert, animated: true)
     }
 
+    @objc private func didTapClose() {
+        navigationController?.popViewController(animated: true)
+    }
+
     @objc private func didTapSubmit() {
         print("[ReviewSubmit] buttonTapped isEnabled=\(rootView.submitButton.isEnabled) isUserInteractionEnabled=\(rootView.submitButton.isUserInteractionEnabled) submitEnabled=\(viewModel.state.submitEnabled) rating=\(viewModel.state.rating) trimmedCount=\(viewModel.state.trimmedReviewText.count)")
         view.endEditing(true)
         print("[ReviewSubmit] ViewController forwarded submit action")
         viewModel.send(.didTapSubmit)
+    }
+
+    @objc private func didToggleSpoiler() {
+        viewModel.send(.spoilerChanged(rootView.spoilerToggleControl.isOn))
     }
 
     @objc private func dismissKeyboard() {

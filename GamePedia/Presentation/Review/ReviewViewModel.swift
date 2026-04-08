@@ -57,6 +57,8 @@ final class ReviewViewModel {
         case .textChanged(let text):
             print("[ReviewSubmit] textChanged rawCount=\(text.count) trimmedCount=\(text.trimmingCharacters(in: .whitespacesAndNewlines).count)")
             apply(.setText(text))
+        case .spoilerChanged(let isSpoilerEnabled):
+            apply(.setSpoiler(isSpoilerEnabled))
         case .didTapSubmit:
             print("[ReviewSubmit] didTapSubmit received by ViewModel")
             submitReview()

@@ -12,6 +12,7 @@ struct SocialActivityPushPayload: Hashable {
     let relatedGameID: Int?
     let relatedUserID: String?
     let reviewID: String?
+    let commentID: String?
 
     var stableIdentity: String {
         if !id.isEmpty {
@@ -22,7 +23,8 @@ struct SocialActivityPushPayload: Hashable {
             type,
             relatedUserID ?? "",
             relatedGameID.map(String.init) ?? "",
-            reviewID ?? ""
+            reviewID ?? "",
+            commentID ?? ""
         ].joined(separator: ":")
     }
 
@@ -34,7 +36,11 @@ struct SocialActivityPushPayload: Hashable {
             return .friendRequests
         case "review_created", "review_updated", "friend_wrote_review", "friend_review_reaction":
             if let relatedGameID {
-                return .review(gameID: relatedGameID, reviewID: reviewID)
+                return .review(gameID: relatedGameID, reviewID: reviewID, commentID: commentID)
+            }
+        case "review_comment_reply", "review_comment_like", "review_comment_dislike":
+            if let relatedGameID {
+                return .review(gameID: relatedGameID, reviewID: reviewID, commentID: commentID)
             }
         default:
             break
@@ -117,7 +123,8 @@ struct SocialActivityPushPayload: Hashable {
             gameCoverURL: string("gameCoverUrl", "gameCoverURL").flatMap(URL.init(string:)),
             relatedGameID: int("relatedGameId", "gameId"),
             relatedUserID: string("relatedUserId", "userId"),
-            reviewID: string("reviewId")
+            reviewID: string("reviewId"),
+            commentID: string("commentId")
         )
     }
 }

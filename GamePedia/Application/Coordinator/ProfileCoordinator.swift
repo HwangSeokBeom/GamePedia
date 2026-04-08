@@ -86,7 +86,7 @@ final class ProfileCoordinator: NSObject {
             self?.showLibrary(tab: .favorites)
         }
         profileVC.onShowWrittenReviews = { [weak self] in
-            self?.showLibrary(tab: .reviewed)
+            self?.showMyReviews()
         }
         profileVC.onShowFriendsList = { [weak self] in
             self?.showFriendsList()
@@ -102,6 +102,9 @@ final class ProfileCoordinator: NSObject {
         }
         profileVC.onShowFriendActivity = { [weak self] in
             self?.showFriendActivity()
+        }
+        profileVC.onShowMyComments = { [weak self] in
+            self?.showMyComments()
         }
         profileVC.onShowSocialPrivacySettings = { [weak self] in
             self?.showSocialPrivacySettings()
@@ -148,6 +151,15 @@ final class ProfileCoordinator: NSObject {
         detailVC.onShowAllReviews = { [weak self, weak detailVC] game in
             self?.showGameReviews(game: game, detailViewController: detailVC)
         }
+        detailVC.onReviewSelected = { [weak self] game, review in
+            self?.showReviewDiscussion(
+                gameId: game.id,
+                gameTitle: game.displayTitle,
+                reviewID: review.id,
+                reviewSeed: review,
+                highlightCommentID: nil
+            )
+        }
         detailVC.onShare = { [weak self] game in
             guard let topVC = self?.navigationController.topViewController else { return }
             let items: [Any] = [L10n.tr("Localizable", "common.share.gameInvitation", game.displayTitle)]
@@ -180,6 +192,43 @@ final class ProfileCoordinator: NSObject {
         navigationController.pushViewController(reviewVC, animated: true)
     }
 
+    private func showReview(
+        reviewedGame: ReviewedGame,
+        profileReviewsViewController: ProfileReviewsViewController?
+    ) {
+        let existingReview = Review(
+            id: reviewedGame.reviewId,
+            gameId: String(reviewedGame.gameId),
+            rating: reviewedGame.rating,
+            content: reviewedGame.content,
+            createdAt: reviewedGame.createdAt,
+            updatedAt: reviewedGame.createdAt,
+            author: ReviewAuthor(id: "current-user", nickname: "", profileImageUrl: nil),
+            isMine: true,
+            likeCount: 0,
+            commentCount: 0,
+            isLikedByCurrentUser: false
+        )
+
+        let subtitleParts = [reviewedGame.game.developer, reviewedGame.game.category]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let reviewVC = ReviewViewController(
+            rootView: ReviewRootView(),
+            viewModel: ReviewViewModel(
+                gameId: reviewedGame.gameId,
+                gameName: reviewedGame.game.displayTitle,
+                gameSubtitle: subtitleParts.joined(separator: " · "),
+                gameThumbnailURL: reviewedGame.game.coverImageURL?.absoluteString ?? "",
+                existingReview: existingReview
+            )
+        )
+        reviewVC.onReviewSubmitted = { [weak profileReviewsViewController] in
+            profileReviewsViewController?.reload()
+        }
+        navigationController.pushViewController(reviewVC, animated: true)
+    }
+
     private func showGameReviews(game: GameDetail, detailViewController: GameDetailViewController?) {
         let reviewsViewController = GameReviewsViewController(
             rootView: GameReviewsRootView(),
@@ -203,6 +252,15 @@ final class ProfileCoordinator: NSObject {
         }
         reviewsViewController.onReviewsChanged = { [weak detailViewController] in
             detailViewController?.reload()
+        }
+        reviewsViewController.onReviewSelected = { [weak self] review in
+            self?.showReviewDiscussion(
+                gameId: game.id,
+                gameTitle: game.displayTitle,
+                reviewID: review.id,
+                reviewSeed: review,
+                highlightCommentID: nil
+            )
         }
         navigationController.pushViewController(reviewsViewController, animated: true)
     }
@@ -257,6 +315,23 @@ final class ProfileCoordinator: NSObject {
         navigationController.pushViewController(viewController, animated: true)
     }
 
+    private func showMyComments() {
+        let viewController = ProfileCommentsViewController(
+            rootView: ProfileCommentsRootView(),
+            viewModel: ProfileCommentsViewModel()
+        )
+        viewController.onCommentSelected = { [weak self] item in
+            self?.showReviewDiscussion(
+                gameId: item.gameId,
+                gameTitle: item.gameTitle,
+                reviewID: item.reviewId,
+                reviewSeed: nil,
+                highlightCommentID: item.id
+            )
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
     private func showSteamFriends() {
         let viewController = SteamFriendsViewController()
         viewController.onLinkedFriendSelected = { [weak self] userID in
@@ -305,6 +380,20 @@ final class ProfileCoordinator: NSObject {
         )
         viewController.onGameSelected = { [weak self] gameID in
             self?.showDetail(gameId: gameID)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showMyReviews() {
+        let viewController = ProfileReviewsViewController(
+            rootView: ProfileReviewsRootView(),
+            viewModel: ProfileReviewsViewModel()
+        )
+        viewController.onReviewSelected = { [weak self] reviewedGame in
+            self?.showDetail(gameId: reviewedGame.gameId)
+        }
+        viewController.onEditReviewSelected = { [weak self, weak viewController] reviewedGame in
+            self?.showReview(reviewedGame: reviewedGame, profileReviewsViewController: viewController)
         }
         navigationController.pushViewController(viewController, animated: true)
     }
@@ -447,9 +536,59 @@ final class ProfileCoordinator: NSObject {
             showFriendProfile(userID: userID)
         case .gameDetail(let gameID):
             showDetail(gameId: gameID)
-        case .review(let gameID, _):
-            showDetail(gameId: gameID)
+        case .review(let gameID, let reviewID, let commentID):
+            guard let reviewID else {
+                showDetail(gameId: gameID)
+                return
+            }
+            showReviewDiscussion(
+                gameId: gameID,
+                gameTitle: nil,
+                reviewID: reviewID,
+                reviewSeed: nil,
+                highlightCommentID: commentID
+            )
         }
+    }
+
+    private func showReviewDiscussion(
+        gameId: Int,
+        gameTitle: String?,
+        reviewID: String,
+        reviewSeed: Review?,
+        highlightCommentID: String?,
+        initialReplyTargetCommentID: String? = nil,
+        autoFocusReplyComposer: Bool = false
+    ) {
+        let viewController = ReviewDiscussionViewController(
+            rootView: ReviewDiscussionRootView(),
+            viewModel: ReviewDiscussionViewModel(
+                gameId: gameId,
+                gameTitle: gameTitle,
+                reviewId: reviewID,
+                reviewSeed: reviewSeed,
+                highlightCommentId: highlightCommentID
+            ),
+            initialReplyTargetCommentId: initialReplyTargetCommentID,
+            autoFocusReplyComposerOnFirstAppearance: autoFocusReplyComposer
+        )
+        viewController.onAuthenticationRequired = { [weak self, weak viewController] context, action in
+            guard let self else { return }
+            let presenter = viewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
+        }
+        viewController.onReplyDetailRequested = { [weak self] comment, reviewSeed in
+            self?.showReviewDiscussion(
+                gameId: comment.gameId,
+                gameTitle: comment.gameTitle,
+                reviewID: comment.reviewId,
+                reviewSeed: reviewSeed,
+                highlightCommentID: comment.id,
+                initialReplyTargetCommentID: comment.id,
+                autoFocusReplyComposer: true
+            )
+        }
+        navigationController.pushViewController(viewController, animated: true)
     }
 
     private func showSteamLink(url: URL, presenter: UIViewController?) {

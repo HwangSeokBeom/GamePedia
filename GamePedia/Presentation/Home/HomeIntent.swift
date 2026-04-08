@@ -12,7 +12,7 @@ enum HomeIntent {
     case didTapNotification
 }
 
-enum HomeSection {
+enum HomeSection: Equatable {
     case todayRecommendation
     case popular
     case trending

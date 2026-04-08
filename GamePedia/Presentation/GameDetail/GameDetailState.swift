@@ -3,11 +3,12 @@ import Foundation
 // MARK: - GameDetailState
 
 struct GameDetailState {
+    static let reviewPreviewLimit = 5
+
     var isLoading: Bool = false
     var game: GameDetail? = nil
     var reviews: [Review] = []
     var reviewSummary: ReviewSummary? = nil
-    var myReview: Review? = nil
     var isFavorite: Bool = false
     var isFavoriteLoading: Bool = false
     var errorMessage: String? = nil
@@ -70,12 +71,42 @@ struct GameDetailState {
         isShowingTranslated ? L10n.Translation.Action.showOriginal : L10n.Translation.Action.showTranslated
     }
 
+    /// Game Detail preview policy:
+    /// 1. Show community reviews first in the lower "유저 리뷰" section.
+    /// 2. If community reviews are fewer than the preview limit, backfill with the
+    ///    remaining review feed so the section can still render up to 5 cards.
+    /// 3. Duplicates are avoided within the preview section itself, but the same
+    ///    review can still appear in "나의 기록" and the lower preview when used
+    ///    as fallback content.
     var previewReviews: [Review] {
-        Array(reviews.prefix(3))
+        let communityReviews = communityPreviewReviews
+        guard communityReviews.count < Self.reviewPreviewLimit else {
+            return communityReviews
+        }
+
+        let selectedReviewIDs = Set(communityReviews.map(\.id))
+        let remainingSlots = max(0, Self.reviewPreviewLimit - communityReviews.count)
+        let fallbackReviews = reviews.filter { !selectedReviewIDs.contains($0.id) }
+
+        return communityReviews + Array(fallbackReviews.prefix(remainingSlots))
+    }
+
+    var myReviews: [Review] {
+        reviews.filter(\.isMine)
+    }
+
+    var communityPreviewReviews: [Review] {
+        Array(reviews.filter { !$0.isMine }.prefix(Self.reviewPreviewLimit))
+    }
+
+    var hasMyReviews: Bool {
+        !myReviews.isEmpty
     }
 
     var writeReviewButtonTitle: String {
-        myReview == nil ? L10n.Detail.Button.writeReview : L10n.Detail.Button.editReview
+        hasMyReviews
+            ? L10n.tr("Localizable", "detail.button.writeAnotherReview")
+            : L10n.Detail.Button.writeReview
     }
 
     var reviewSummaryText: String {
@@ -86,7 +117,7 @@ struct GameDetailState {
     }
 
     var shouldShowReviewSeeMore: Bool {
-        !reviews.isEmpty
+        !previewReviews.isEmpty
     }
 
     var showSteamReviewLinkage: Bool {

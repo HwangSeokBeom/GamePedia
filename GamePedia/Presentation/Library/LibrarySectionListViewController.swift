@@ -247,7 +247,10 @@ final class LibrarySectionListViewController: UIViewController {
                 emptyMessage: emptyMessageViewState(for: .wishlist)
             ) { [weak self] in
                 guard let self else { return [] }
-                let entries = try await self.fetchFavoriteGamesUseCase.execute(sort: sort)
+                let entries = try await self.fetchFavoriteGamesUseCase.execute(
+                    sort: sort,
+                    screen: "Library.SectionList.Wishlist"
+                )
                 return entries.map(self.makeWishlistRowItem)
             }
 
@@ -258,7 +261,10 @@ final class LibrarySectionListViewController: UIViewController {
                 emptyMessage: emptyMessageViewState(for: .reviewed)
             ) { [weak self] in
                 guard let self else { return [] }
-                let reviewedGames = try await self.fetchMyReviewedGamesUseCase.execute(sort: sort)
+                let reviewedGames = try await self.fetchMyReviewedGamesUseCase.execute(
+                    sort: sort,
+                    screen: "Library.SectionList.Reviewed"
+                )
                 return reviewedGames.map(self.makeReviewedRowItem)
             }
 
@@ -502,7 +508,7 @@ final class LibrarySectionListViewController: UIViewController {
             LibraryGameRowViewState(
                 identifier: LibraryGameIdentifier(
                     source: .igdb,
-                    sourceID: String(reviewedGame.gameId),
+                    sourceID: reviewedGame.reviewId,
                     canonicalGameID: reviewedGame.gameId
                 ),
                 detailDestination: .igdb(reviewedGame.gameId),

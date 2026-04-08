@@ -6,7 +6,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
     private let viewModel: GameDetailViewModel
     let gameId: Int
-    private var previewReviews: [Review] = []
+    private var renderedPreviewReviews: [Review] = []
     private var lastPresentedErrorMessage: String?
     private var lastPresentedBlockingLoadErrorMessage: String?
     private lazy var translationHostController = TranslationHostContainerViewController { [weak self] results in
@@ -16,6 +16,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
     // Set by the owning Coordinator before push.
     var onWriteReview: ((GameDetail, Review?) -> Void)?
     var onShowAllReviews: ((GameDetail) -> Void)?
+    var onReviewSelected: ((GameDetail, Review) -> Void)?
     var onShare: ((GameDetail) -> Void)?
     var onAuthenticationRequired: ((RestrictedActionContext, @escaping () -> Void) -> Void)?
 
@@ -43,6 +44,12 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         viewModel.send(.viewDidLoad(gameId: gameId))
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        rootView.updateReviewTableHeight()
+        updateScrollInsets()
+    }
+
     // MARK: Setup
 
     private func configureNavigationItem() {
@@ -64,10 +71,15 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         rootView.haveItButton.addTarget(self, action: #selector(didTapHaveIt), for: .touchUpInside)
         rootView.heartButton.addTarget(self, action: #selector(didTapHaveIt), for: .touchUpInside)
         rootView.writeReviewButton.addTarget(self, action: #selector(didTapWriteReview), for: .touchUpInside)
+        rootView.myReviewNewButton.addTarget(self, action: #selector(didTapWriteReview), for: .touchUpInside)
+        rootView.emptyStateView.actionButton.addTarget(self, action: #selector(didTapWriteReview), for: .touchUpInside)
         rootView.reviewSectionHeader.seeMoreButton.addTarget(self, action: #selector(didTapSeeAllReviews), for: .touchUpInside)
         rootView.translationToggleButton.addTarget(self, action: #selector(didTapTranslationToggle), for: .touchUpInside)
         rootView.steamReviewBannerView.onWriteReviewTapped = { [weak self] in
             self?.didTapWriteReview()
+        }
+        rootView.onEditMyReview = { [weak self] review in
+            self?.didTapEditReview(review)
         }
     }
 
@@ -117,10 +129,22 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         rootView.render(state)
         translationHostController.update(request: state.translationRequest)
 
-        if previewReviews != state.previewReviews {
-            previewReviews = state.previewReviews
+        if renderedPreviewReviews != state.previewReviews {
+            renderedPreviewReviews = state.previewReviews
+            print(
+                "[GameDetailPreview] render " +
+                "fetchReviewsCount=\(state.reviews.count) " +
+                "myReviewCount=\(state.myReviews.count) " +
+                "communityCount=\(state.communityPreviewReviews.count) " +
+                "finalRenderedCount=\(renderedPreviewReviews.count) " +
+                "previewLimit=\(GameDetailState.reviewPreviewLimit)"
+            )
             rootView.reviewTableView.reloadData()
+            rootView.reviewTableView.layoutIfNeeded()
             rootView.updateReviewTableHeight()
+            DispatchQueue.main.async { [weak self] in
+                self?.rootView.updateReviewTableHeight()
+            }
         }
 
         let bookmarkSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
@@ -133,11 +157,13 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         haveItButtonConfiguration?.baseBackgroundColor = state.isFavorite ? .gpSurfaceElevated : .gpPrimary
         rootView.haveItButton.configuration = haveItButtonConfiguration
         rootView.haveItButton.isEnabled = !state.isFavoriteLoading
+        rootView.haveItButton.accessibilityLabel = haveItButtonConfiguration?.title
 
         var heartButtonConfiguration = rootView.heartButton.configuration
         heartButtonConfiguration?.image = UIImage(systemName: state.isFavorite ? "heart.fill" : "heart")
         rootView.heartButton.configuration = heartButtonConfiguration
         rootView.heartButton.isEnabled = !state.isFavoriteLoading
+        rootView.heartButton.accessibilityLabel = haveItButtonConfiguration?.title
 
         var writeReviewButtonConfiguration = rootView.writeReviewButton.configuration
         writeReviewButtonConfiguration?.title = state.writeReviewButtonTitle
@@ -163,6 +189,41 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         } else if state.blockingLoadErrorMessage == nil {
             lastPresentedBlockingLoadErrorMessage = nil
         }
+    }
+
+    private func updateScrollInsets() {
+        let bottomInset = resolvedBottomScrollInset()
+        let currentVerticalIndicatorInsets = rootView.scrollView.verticalScrollIndicatorInsets
+        guard rootView.scrollView.contentInset.bottom != bottomInset
+                || currentVerticalIndicatorInsets.bottom != bottomInset else {
+            return
+        }
+
+        rootView.scrollView.contentInset.bottom = bottomInset
+        var updatedVerticalIndicatorInsets = currentVerticalIndicatorInsets
+        updatedVerticalIndicatorInsets.bottom = bottomInset
+        rootView.scrollView.verticalScrollIndicatorInsets = updatedVerticalIndicatorInsets
+    }
+
+    private func resolvedBottomScrollInset() -> CGFloat {
+        let safeAreaBottom = view.safeAreaInsets.bottom
+        let tabBarOverlap = visibleTabBarOverlapHeight()
+        let breathingRoom: CGFloat = 28
+        return max(safeAreaBottom, tabBarOverlap) + breathingRoom
+    }
+
+    private func visibleTabBarOverlapHeight() -> CGFloat {
+        guard let tabBar = tabBarController?.tabBar,
+              !tabBar.isHidden,
+              tabBar.alpha > 0.01,
+              let containerView = tabBar.superview else {
+            return 0
+        }
+
+        let convertedFrame = view.convert(tabBar.frame, from: containerView)
+        let overlap = view.bounds.intersection(convertedFrame)
+        guard !overlap.isNull else { return 0 }
+        return overlap.height
     }
 
     // MARK: Public
@@ -198,6 +259,17 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         }
     }
 
+    private func didTapEditReview(_ review: Review) {
+        performAuthenticatedAction(for: .writeReview) { [weak self] in
+            guard
+                let self,
+                let game = self.viewModel.state.game
+            else { return }
+
+            self.onWriteReview?(game, review)
+        }
+    }
+
     @objc private func didTapSeeAllReviews() {
         performAuthenticatedAction(for: .viewReviews) { [weak self] in
             self?.viewModel.send(.didTapSeeAllReviews)
@@ -217,7 +289,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
 extension GameDetailViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        previewReviews.count
+        renderedPreviewReviews.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -225,11 +297,20 @@ extension GameDetailViewController: UITableViewDataSource, UITableViewDelegate {
             withIdentifier: ReviewCardCell.reuseId,
             for: indexPath
         ) as! ReviewCardCell
-        cell.configure(with: previewReviews[indexPath.row])
+        let review = renderedPreviewReviews[indexPath.row]
+        cell.configure(with: review)
+        cell.onLikeTapped = { [weak self] in
+            self?.performAuthenticatedAction(for: .viewReviews) { [weak self] in
+                self?.viewModel.send(.didTapReviewLike(reviewId: review.id))
+            }
+        }
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+        guard renderedPreviewReviews.indices.contains(indexPath.row),
+              let game = viewModel.state.game else { return }
+        onReviewSelected?(game, renderedPreviewReviews[indexPath.row])
     }
 }

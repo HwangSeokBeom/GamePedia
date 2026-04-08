@@ -61,6 +61,8 @@
 	<string>$(SUPPORT_EMAIL)</string>
 	<key>TermsOfServiceURL</key>
 	<string>$(TERMS_OF_SERVICE_URL)</string>
+	<key>WidgetAppGroupIdentifier</key>
+	<string>$(WIDGET_APP_GROUP_IDENTIFIER)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

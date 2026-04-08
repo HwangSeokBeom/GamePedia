@@ -5,6 +5,7 @@ import Foundation
 enum ReviewMutation {
     case setRating(Float)
     case setText(String)
+    case setSpoiler(Bool)
     case setSubmitting(Bool)
     case setDeleting(Bool)
     case setSubmitSuccess

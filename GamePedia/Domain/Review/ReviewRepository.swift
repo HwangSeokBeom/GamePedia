@@ -6,4 +6,6 @@ protocol ReviewRepository {
     func updateReview(reviewId: String, rating: Double?, content: String?) async throws -> Review
     func deleteReview(reviewId: String) async throws -> ReviewDeletionResult
     func fetchMyReviews(sort: ReviewSortOption?) async throws -> [Review]
+    func likeReview(reviewId: String) async throws -> ReviewLikeMutationResult
+    func removeReviewLike(reviewId: String) async throws -> ReviewLikeMutationResult
 }

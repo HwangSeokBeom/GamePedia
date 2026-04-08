@@ -71,9 +71,15 @@ final class AppCoordinator {
     private var modalAuthCoordinator: AuthCoordinator?
     private var pendingResetPasswordToken: String?
     private var pendingSteamLinkCallbackURL: URL?
+    private var pendingWidgetDeepLink: WidgetDeepLink?
+    private var pendingWidgetReviewItem: ReviewPromptWidgetSnapshot.Item?
     private var cancellables = Set<AnyCancellable>()
     private let steamLinkFlowController = SteamLinkFlowController()
     private lazy var socialActivityBannerPresenter = SocialActivityBannerPresenter(window: window)
+    private lazy var widgetSnapshotStore = GameWidgetSnapshotStore.shared
+    private lazy var widgetSnapshotRefreshService = GameWidgetSnapshotRefreshService(
+        snapshotStore: widgetSnapshotStore
+    )
 
     private lazy var authRemoteDataSource = AuthRemoteDataSource(tokenStore: tokenStore)
     private lazy var authRepository: any AuthRepository = DefaultAuthRepository(
@@ -107,6 +113,7 @@ final class AppCoordinator {
 
     func start() {
         bindSocialActivityEvents()
+        bindWidgetSnapshotEvents()
         showSplash()
     }
 
@@ -117,6 +124,18 @@ final class AppCoordinator {
                 pendingSteamLinkCallbackURL = url
             } else {
                 _ = steamLinkFlowController.handleIncomingURL(url)
+            }
+            return true
+        }
+
+        if let widgetDeepLink = WidgetDeepLink(url: url) {
+            let reviewItem = reviewPromptItem(for: widgetDeepLink)
+
+            if window.rootViewController is SplashViewController || mainTabBarController == nil {
+                pendingWidgetDeepLink = widgetDeepLink
+                pendingWidgetReviewItem = reviewItem
+            } else {
+                handleWidgetDeepLink(widgetDeepLink, reviewItem: reviewItem)
             }
             return true
         }
@@ -153,6 +172,22 @@ final class AppCoordinator {
             .store(in: &cancellables)
     }
 
+    private func bindWidgetSnapshotEvents() {
+        NotificationCenter.default.publisher(for: .favoriteDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshWidgetSnapshots(reason: "favoriteDidChange")
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .reviewDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshWidgetSnapshots(reason: "reviewDidChange")
+            }
+            .store(in: &cancellables)
+    }
+
     private func handleSocialActivityEvent(_ event: SocialActivityAppEvent) {
         switch event {
         case .showBanner(let payload):
@@ -178,9 +213,9 @@ final class AppCoordinator {
         case .gameDetail(let gameID):
             ensureMainInterface(selectedIndex: 0)
             homeCoordinator?.navigateToGameDetail(gameID: gameID)
-        case .review(let gameID, _):
+        case .review(let gameID, let reviewID, let commentID):
             ensureMainInterface(selectedIndex: 0)
-            homeCoordinator?.navigateToGameDetail(gameID: gameID)
+            homeCoordinator?.navigateToReviewDiscussion(gameID: gameID, reviewID: reviewID, commentID: commentID)
         }
     }
 
@@ -213,6 +248,7 @@ final class AppCoordinator {
                 },
                 receiveValue: { _ in
                     print("[GuestMode] sessionRestored mode=authenticated")
+                    self.refreshWidgetSnapshots(reason: "sessionRestored")
                 }
             )
             .store(in: &cancellables)
@@ -256,6 +292,17 @@ final class AppCoordinator {
                 _ = self.steamLinkFlowController.handleIncomingURL(pendingSteamLinkCallbackURL)
             }
         }
+
+        if let pendingWidgetDeepLink {
+            let pendingReviewItem = pendingWidgetReviewItem
+            self.pendingWidgetDeepLink = nil
+            self.pendingWidgetReviewItem = nil
+            DispatchQueue.main.async { [weak self] in
+                self?.handleWidgetDeepLink(pendingWidgetDeepLink, reviewItem: pendingReviewItem)
+            }
+        }
+
+        refreshWidgetSnapshots(reason: "showMainInterface")
     }
 
     private func makeMainTabBarController(selectedIndex: Int) -> MainTabBarController {
@@ -397,6 +444,7 @@ final class AppCoordinator {
             authNavigationController?.dismiss(animated: true) {
                 self?.modalAuthCoordinator = nil
                 onAuthenticated()
+                self?.refreshWidgetSnapshots(reason: "authCompleted")
             }
         }
         authCoordinator.start()
@@ -410,6 +458,10 @@ final class AppCoordinator {
 
         modalAuthCoordinator = authCoordinator
         presenter.present(navigationController, animated: true)
+    }
+
+    func refreshWidgetSnapshots(reason: String) {
+        widgetSnapshotRefreshService.refresh(reason: reason)
     }
 
     private func presentResetPasswordFlow(token: String) {
@@ -464,6 +516,67 @@ final class AppCoordinator {
 
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         return components?.queryItems?.first(where: { $0.name == "token" })?.value
+    }
+
+    private func handleWidgetDeepLink(
+        _ deepLink: WidgetDeepLink,
+        reviewItem: ReviewPromptWidgetSnapshot.Item?
+    ) {
+        switch deepLink {
+        case .game(let gameID):
+            ensureMainInterface(selectedIndex: 0)
+            homeCoordinator?.navigateToGameDetail(gameID: gameID)
+        case .trending:
+            ensureMainInterface(selectedIndex: 0)
+            guard let items = widgetSnapshotStore.loadTrendingGames()?.items,
+                  items.isEmpty == false else {
+                return
+            }
+            homeCoordinator?.navigateToTrendingGameList(items: items)
+        case .login:
+            guard currentSessionAccessMode() == .guest,
+                  let presenter = topPresenter(from: window.rootViewController) else {
+                return
+            }
+            presentAuthFlow(from: presenter) {}
+        case .reviewNew(let gameID):
+            let resolvedItem = reviewItem ?? reviewPromptItem(forGameID: gameID)
+
+            guard currentSessionAccessMode() == .authenticated else {
+                pendingWidgetDeepLink = deepLink
+                pendingWidgetReviewItem = resolvedItem
+
+                guard let presenter = topPresenter(from: window.rootViewController) else { return }
+                presentAuthFlow(from: presenter) { [weak self] in
+                    guard let self, let pendingWidgetDeepLink = self.pendingWidgetDeepLink else { return }
+                    let pendingReviewItem = self.pendingWidgetReviewItem
+                    self.pendingWidgetDeepLink = nil
+                    self.pendingWidgetReviewItem = nil
+                    self.handleWidgetDeepLink(pendingWidgetDeepLink, reviewItem: pendingReviewItem)
+                }
+                return
+            }
+
+            ensureMainInterface(selectedIndex: 0)
+            if let resolvedItem {
+                homeCoordinator?.navigateToReviewComposer(item: resolvedItem)
+            } else {
+                homeCoordinator?.navigateToGameDetail(gameID: gameID)
+            }
+        }
+    }
+
+    private func reviewPromptItem(for deepLink: WidgetDeepLink) -> ReviewPromptWidgetSnapshot.Item? {
+        guard case .reviewNew(let gameID) = deepLink else { return nil }
+        return reviewPromptItem(forGameID: gameID)
+    }
+
+    private func reviewPromptItem(forGameID gameID: Int) -> ReviewPromptWidgetSnapshot.Item? {
+        guard let item = widgetSnapshotStore.loadReviewPrompt()?.item,
+              item.gameID == gameID else {
+            return nil
+        }
+        return item
     }
 
 #if DEBUG

@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 enum NotificationsIntent {
@@ -15,6 +16,7 @@ final class NotificationsViewModel {
     private let fetchNotificationsUseCase: FetchNotificationsUseCase
     private let markAllNotificationsReadUseCase: MarkAllNotificationsReadUseCase
     private var hasLoaded = false
+    private var cancellables = Set<AnyCancellable>()
 
     init(
         fetchNotificationsUseCase: FetchNotificationsUseCase = FetchNotificationsUseCase(
@@ -26,6 +28,13 @@ final class NotificationsViewModel {
     ) {
         self.fetchNotificationsUseCase = fetchNotificationsUseCase
         self.markAllNotificationsReadUseCase = markAllNotificationsReadUseCase
+        ReviewCommentSyncCenter.events
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.hasLoaded else { return }
+                self.loadNotifications()
+            }
+            .store(in: &cancellables)
     }
 
     func send(_ intent: NotificationsIntent) {

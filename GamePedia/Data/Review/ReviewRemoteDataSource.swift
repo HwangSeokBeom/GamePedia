@@ -6,6 +6,8 @@ protocol ReviewRemoteDataSource {
     func updateReview(reviewId: String, requestDTO: UpdateReviewRequestDTO) async throws -> ReviewObjectResponseDataDTO
     func deleteReview(reviewId: String) async throws -> DeleteReviewResponseDataDTO
     func fetchMyReviews(sort: ReviewSortOption?) async throws -> MyReviewsResponseDataDTO
+    func likeReview(reviewId: String) async throws -> ReviewLikeResponseDataDTO
+    func removeReviewLike(reviewId: String) async throws -> ReviewLikeResponseDataDTO
 }
 
 final class DefaultReviewRemoteDataSource: ReviewRemoteDataSource {
@@ -56,6 +58,22 @@ final class DefaultReviewRemoteDataSource: ReviewRemoteDataSource {
         let response = try await apiClient.request(
             .myReviews(sort: sort?.rawValue),
             as: ReviewResponseEnvelopeDTO<MyReviewsResponseDataDTO>.self
+        )
+        return response.data
+    }
+
+    func likeReview(reviewId: String) async throws -> ReviewLikeResponseDataDTO {
+        let response = try await apiClient.request(
+            .likeReview(reviewId: reviewId),
+            as: ReviewResponseEnvelopeDTO<ReviewLikeResponseDataDTO>.self
+        )
+        return response.data
+    }
+
+    func removeReviewLike(reviewId: String) async throws -> ReviewLikeResponseDataDTO {
+        let response = try await apiClient.request(
+            .removeReviewLike(reviewId: reviewId),
+            as: ReviewResponseEnvelopeDTO<ReviewLikeResponseDataDTO>.self
         )
         return response.data
     }

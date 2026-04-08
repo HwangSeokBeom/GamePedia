@@ -16,6 +16,10 @@ enum ReviewReducer {
             state.charCount = cappedText.count
             state.errorMessage = nil
             state.submitEnabled = canSubmit(state)
+        case .setSpoiler(let isSpoilerEnabled):
+            state.isSpoilerEnabled = isSpoilerEnabled
+            state.errorMessage = nil
+            state.submitEnabled = canSubmit(state)
         case .setSubmitting(let isSubmitting):
             state.isSubmitting = isSubmitting
             state.errorMessage = nil

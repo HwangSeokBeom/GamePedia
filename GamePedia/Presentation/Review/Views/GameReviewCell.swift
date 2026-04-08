@@ -4,6 +4,7 @@ final class GameReviewCell: UITableViewCell {
 
     static let reuseIdentifier = "GameReviewCell"
 
+    var onLikeTapped: (() -> Void)?
     var onMoreButtonTapped: (() -> Void)?
 
     private let avatarView: UIImageView = {
@@ -46,7 +47,47 @@ final class GameReviewCell: UITableViewCell {
         label.font = .systemFont(ofSize: 14)
         label.textColor = .gpTextSecondary
         label.numberOfLines = 0
+        label.lineBreakMode = .byCharWrapping
         return label
+    }()
+
+    private let commentIconView: UIImageView = {
+        let imageView = UIImageView(
+            image: UIImage(systemName: "message", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+        )
+        imageView.tintColor = .gpTextTertiary
+        return imageView
+    }()
+
+    private let commentLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextSecondary
+        return label
+    }()
+
+    private let disclosureView: UIImageView = {
+        let imageView = UIImageView(
+            image: UIImage(systemName: "chevron.right", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+        )
+        imageView.tintColor = .gpTextTertiary
+        return imageView
+    }()
+
+    private let likeButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .gpTextTertiary
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8)
+        configuration.imagePadding = 4
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var updated = incoming
+            updated.font = .systemFont(ofSize: 12, weight: .medium)
+            return updated
+        }
+        let button = UIButton(configuration: configuration)
+        button.accessibilityIdentifier = "gameReview.likeButton"
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
     }()
 
     private let moreButton: UIButton = {
@@ -97,14 +138,20 @@ final class GameReviewCell: UITableViewCell {
         topRow.alignment = .center
         topRow.spacing = 8
 
-        let contentStack = UIStackView(arrangedSubviews: [topRow, contentLabel])
+        let footerRow = UIStackView(arrangedSubviews: [commentIconView, commentLabel, disclosureView, UIView(), likeButton])
+        footerRow.axis = .horizontal
+        footerRow.alignment = .center
+        footerRow.spacing = 6
+
+        let contentStack = UIStackView(arrangedSubviews: [topRow, contentLabel, footerRow])
         contentStack.axis = .vertical
-        contentStack.spacing = 12
+        contentStack.spacing = 10
         contentStack.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(cardView)
         cardView.addSubview(contentStack)
 
+        likeButton.addTarget(self, action: #selector(didTapLikeButton), for: .touchUpInside)
         moreButton.addTarget(self, action: #selector(didTapMoreButton), for: .touchUpInside)
 
         NSLayoutConstraint.activate([
@@ -116,6 +163,7 @@ final class GameReviewCell: UITableViewCell {
 
             moreButton.widthAnchor.constraint(equalToConstant: 28),
             moreButton.heightAnchor.constraint(equalToConstant: 28),
+            likeButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 32),
 
             cardView.topAnchor.constraint(equalTo: contentView.topAnchor),
             cardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
@@ -127,9 +175,16 @@ final class GameReviewCell: UITableViewCell {
             contentStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
             contentStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -16)
         ])
+
+        contentLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        contentLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        authorLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        dateLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        likeButton.setContentHuggingPriority(.required, for: .horizontal)
+        likeButton.setContentCompressionResistancePriority(.required, for: .horizontal)
     }
 
-    func configure(with review: Review) {
+    func configure(with review: Review, isLikeLoading: Bool) {
         let avatarColors: [UIColor] = [
             UIColor(hex: "#6C63FF"), UIColor(hex: "#4ECDC4"),
             UIColor(hex: "#FF6B6B"), UIColor(hex: "#45B7D1"),
@@ -144,6 +199,30 @@ final class GameReviewCell: UITableViewCell {
         dateLabel.text = review.formattedDate
         starView.configure(rating: review.rating)
         contentLabel.text = review.content
+        if review.content.count > 40,
+           review.content.rangeOfCharacter(from: .whitespacesAndNewlines) == nil {
+            print("[TextLayout] view=GameReviewCell reviewId=\(review.id) length=\(review.content.count) unbroken=true")
+        }
+        commentLabel.text = review.commentCount > 0
+            ? L10n.tr("Localizable", "review.card.commentCta", review.commentCount)
+            : L10n.tr("Localizable", "review.card.commentEmptyCta")
+        commentLabel.textColor = review.commentCount > 0 ? .gpTextSecondary : .gpPrimary
+
+        var likeConfiguration = likeButton.configuration
+        likeConfiguration?.title = String(review.likeCount)
+        likeConfiguration?.image = UIImage(
+            systemName: review.isLikedByCurrentUser ? "heart.fill" : "heart",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        )
+        likeConfiguration?.baseForegroundColor = review.isLikedByCurrentUser ? .gpCoral : .gpTextTertiary
+        likeButton.configuration = likeConfiguration
+        likeButton.isEnabled = !isLikeLoading
+        likeButton.alpha = review.likeCount == 0 && !review.isLikedByCurrentUser ? 0.72 : 1
+        likeButton.accessibilityLabel = L10n.tr(
+            "Localizable",
+            "review.card.accessibility.like",
+            String(review.likeCount)
+        )
         moreButton.isHidden = false
     }
 
@@ -152,7 +231,27 @@ final class GameReviewCell: UITableViewCell {
         avatarView.cancelLoad()
         avatarView.image = nil
         avatarInitialLabel.text = nil
+        authorLabel.text = nil
+        dateLabel.text = nil
+        contentLabel.text = nil
+        commentLabel.text = nil
+        var likeConfiguration = likeButton.configuration
+        likeConfiguration?.title = nil
+        likeConfiguration?.image = UIImage(
+            systemName: "heart",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        )
+        likeConfiguration?.baseForegroundColor = .gpTextTertiary
+        likeButton.configuration = likeConfiguration
+        likeButton.isEnabled = true
+        likeButton.alpha = 1
+        likeButton.accessibilityLabel = nil
+        onLikeTapped = nil
         onMoreButtonTapped = nil
+    }
+
+    @objc private func didTapLikeButton() {
+        onLikeTapped?()
     }
 
     @objc private func didTapMoreButton() {

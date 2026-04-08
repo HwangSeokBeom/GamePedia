@@ -3,7 +3,6 @@ import Foundation
 enum ReviewError: Error, LocalizedError, Equatable {
     case unauthorized
     case accountNotFound
-    case reviewAlreadyExists
     case reviewNotFound
     case reviewForbidden
     case invalidRating
@@ -33,8 +32,6 @@ enum ReviewError: Error, LocalizedError, Equatable {
                     return .unauthorized
                 case "ACCOUNT_NOT_FOUND":
                     return .accountNotFound
-                case "REVIEW_ALREADY_EXISTS":
-                    return .reviewAlreadyExists
                 case "REVIEW_NOT_FOUND":
                     return .reviewNotFound
                 case "REVIEW_FORBIDDEN":
@@ -66,8 +63,6 @@ enum ReviewError: Error, LocalizedError, Equatable {
             return L10n.Common.Error.unauthorized
         case .accountNotFound:
             return L10n.tr("Localizable", "review.error.accountNotFound")
-        case .reviewAlreadyExists:
-            return L10n.tr("Localizable", "review.error.alreadyExists")
         case .reviewNotFound:
             return L10n.tr("Localizable", "review.error.notFound")
         case .reviewForbidden:

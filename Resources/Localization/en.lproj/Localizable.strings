@@ -63,8 +63,8 @@
 "detail.stats.playtime" = "Playtime";
 "detail.stats.reviews" = "Reviews";
 "detail.button.writeReview" = "Write Review";
-"detail.button.favorite" = "Favorite";
-"detail.button.favorited" = "Favorited";
+"detail.button.favorite" = "Wishlist";
+"detail.button.favorited" = "Wishlist";
 "detail.button.editReview" = "Edit Review";
 "detail.review.none" = "No reviews yet";
 "detail.review.userReviews" = "User Reviews";

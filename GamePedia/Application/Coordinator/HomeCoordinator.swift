@@ -47,8 +47,37 @@ final class HomeCoordinator {
         showDetail(gameId: gameID)
     }
 
+    func navigateToReviewDiscussion(gameID: Int, reviewID: String?, commentID: String?) {
+        guard let reviewID else {
+            showDetail(gameId: gameID)
+            return
+        }
+        showReviewDiscussion(
+            gameId: gameID,
+            gameTitle: nil,
+            reviewID: reviewID,
+            reviewSeed: nil,
+            highlightCommentID: commentID
+        )
+    }
+
     func navigateToNotifications() {
         showNotifications()
+    }
+
+    func navigateToTrendingGameList(items: [TrendingGamesWidgetSnapshot.Item]) {
+        let games = items.map(Self.makeTrendingGame)
+        guard games.isEmpty == false else { return }
+        showGameList(section: .trending, games: games, wishlistedGameIDs: [])
+    }
+
+    func navigateToReviewComposer(item: ReviewPromptWidgetSnapshot.Item) {
+        showReviewComposer(
+            gameId: item.gameID,
+            gameName: item.title,
+            gameSubtitle: item.subtitleText.replacingOccurrences(of: "\n", with: " · "),
+            gameThumbnailURL: item.coverImageURL?.absoluteString ?? ""
+        )
     }
 
     func navigateToFriendRequests() {
@@ -62,6 +91,10 @@ final class HomeCoordinator {
     // MARK: - Navigation
 
     private func showDetail(gameId: Int) {
+        if reuseGameDetailIfPossible(gameId: gameId) {
+            return
+        }
+
         let detailVC = GameDetailViewController(gameId: gameId)
         detailVC.onAuthenticationRequired = { [weak self, weak detailVC] context, action in
             guard let self else { return }
@@ -73,6 +106,15 @@ final class HomeCoordinator {
         }
         detailVC.onShowAllReviews = { [weak self, weak detailVC] game in
             self?.showGameReviews(game: game, detailViewController: detailVC)
+        }
+        detailVC.onReviewSelected = { [weak self] game, review in
+            self?.showReviewDiscussion(
+                gameId: game.id,
+                gameTitle: game.displayTitle,
+                reviewID: review.id,
+                reviewSeed: review,
+                highlightCommentID: nil
+            )
         }
         detailVC.onShare = { [weak self] game in
             guard let topVC = self?.navigationController.topViewController else { return }
@@ -99,6 +141,10 @@ final class HomeCoordinator {
         games: [Game],
         wishlistedGameIDs: Set<Int>
     ) {
+        if reuseGameListIfPossible(section: section) {
+            return
+        }
+
         let viewModel = HomeGameListViewModel(
             section: section,
             games: games,
@@ -110,6 +156,11 @@ final class HomeCoordinator {
         )
         listViewController.onGameSelected = { [weak self] gameId in
             self?.showDetail(gameId: gameId)
+        }
+        listViewController.onAuthenticationRequired = { [weak self, weak listViewController] context, action in
+            guard let self else { return }
+            let presenter = listViewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
         }
         navigationController.pushViewController(listViewController, animated: true)
     }
@@ -173,8 +224,8 @@ final class HomeCoordinator {
             showFriendProfile(userID: userID)
         case .gameDetail(let gameID):
             showDetail(gameId: gameID)
-        case .review(let gameID, _):
-            showDetail(gameId: gameID)
+        case .review(let gameID, let reviewID, let commentID):
+            navigateToReviewDiscussion(gameID: gameID, reviewID: reviewID, commentID: commentID)
         }
     }
 
@@ -198,6 +249,30 @@ final class HomeCoordinator {
             detailViewController?.reload()
             reviewsViewController?.reload()
         }
+        navigationController.pushViewController(reviewVC, animated: true)
+    }
+
+    private func showReviewComposer(
+        gameId: Int,
+        gameName: String,
+        gameSubtitle: String,
+        gameThumbnailURL: String,
+        existingReview: Review? = nil
+    ) {
+        if reuseReviewComposerIfPossible(gameId: gameId) {
+            return
+        }
+
+        let reviewVC = ReviewViewController(
+            rootView: ReviewRootView(),
+            viewModel: ReviewViewModel(
+                gameId: gameId,
+                gameName: gameName,
+                gameSubtitle: gameSubtitle,
+                gameThumbnailURL: gameThumbnailURL,
+                existingReview: existingReview
+            )
+        )
         navigationController.pushViewController(reviewVC, animated: true)
     }
 
@@ -225,6 +300,130 @@ final class HomeCoordinator {
         reviewsViewController.onReviewsChanged = { [weak detailViewController] in
             detailViewController?.reload()
         }
+        reviewsViewController.onReviewSelected = { [weak self] review in
+            self?.showReviewDiscussion(
+                gameId: game.id,
+                gameTitle: game.displayTitle,
+                reviewID: review.id,
+                reviewSeed: review,
+                highlightCommentID: nil
+            )
+        }
         navigationController.pushViewController(reviewsViewController, animated: true)
+    }
+
+    private func showReviewDiscussion(
+        gameId: Int,
+        gameTitle: String?,
+        reviewID: String,
+        reviewSeed: Review?,
+        highlightCommentID: String?,
+        initialReplyTargetCommentID: String? = nil,
+        autoFocusReplyComposer: Bool = false
+    ) {
+        let viewController = ReviewDiscussionViewController(
+            rootView: ReviewDiscussionRootView(),
+            viewModel: ReviewDiscussionViewModel(
+                gameId: gameId,
+                gameTitle: gameTitle,
+                reviewId: reviewID,
+                reviewSeed: reviewSeed,
+                highlightCommentId: highlightCommentID
+            ),
+            initialReplyTargetCommentId: initialReplyTargetCommentID,
+            autoFocusReplyComposerOnFirstAppearance: autoFocusReplyComposer
+        )
+        viewController.onAuthenticationRequired = { [weak self, weak viewController] context, action in
+            guard let self else { return }
+            let presenter = viewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
+        }
+        viewController.onReplyDetailRequested = { [weak self] comment, reviewSeed in
+            self?.showReviewDiscussion(
+                gameId: comment.gameId,
+                gameTitle: comment.gameTitle,
+                reviewID: comment.reviewId,
+                reviewSeed: reviewSeed,
+                highlightCommentID: comment.id,
+                initialReplyTargetCommentID: comment.id,
+                autoFocusReplyComposer: true
+            )
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func reuseGameDetailIfPossible(gameId: Int) -> Bool {
+        if let topViewController = navigationController.topViewController as? GameDetailViewController,
+           topViewController.gameId == gameId {
+            return true
+        }
+
+        guard let existingViewController = navigationController.viewControllers.first(where: {
+            guard let detailViewController = $0 as? GameDetailViewController else { return false }
+            return detailViewController.gameId == gameId
+        }) else {
+            return false
+        }
+
+        navigationController.popToViewController(existingViewController, animated: true)
+        return true
+    }
+
+    private func reuseGameListIfPossible(section: HomeSection) -> Bool {
+        if let topViewController = navigationController.topViewController as? HomeGameListViewController,
+           topViewController.section == section {
+            return true
+        }
+
+        guard let existingViewController = navigationController.viewControllers.first(where: {
+            guard let listViewController = $0 as? HomeGameListViewController else { return false }
+            return listViewController.section == section
+        }) else {
+            return false
+        }
+
+        navigationController.popToViewController(existingViewController, animated: true)
+        return true
+    }
+
+    private func reuseReviewComposerIfPossible(gameId: Int) -> Bool {
+        if let topViewController = navigationController.topViewController as? ReviewViewController,
+           topViewController.gameId == gameId {
+            return true
+        }
+
+        guard let existingViewController = navigationController.viewControllers.first(where: {
+            guard let reviewViewController = $0 as? ReviewViewController else { return false }
+            return reviewViewController.gameId == gameId
+        }) else {
+            return false
+        }
+
+        navigationController.popToViewController(existingViewController, animated: true)
+        return true
+    }
+
+    private static func makeTrendingGame(from item: TrendingGamesWidgetSnapshot.Item) -> Game {
+        let rating = Double(item.ratingText ?? "") ?? 0
+        return Game(
+            id: item.gameID,
+            title: item.title,
+            translatedTitle: nil,
+            summary: nil,
+            translatedSummary: nil,
+            genre: item.genreText,
+            category: item.genreText,
+            developer: "",
+            platform: "",
+            releaseDate: nil,
+            releaseYear: 0,
+            coverImageURL: item.coverImageURL,
+            rating: rating,
+            reviewCount: 0,
+            popularity: 0,
+            isTrending: true,
+            formattedRating: item.ratingText ?? "—",
+            formattedReviewCount: "0"
+        )
     }
 }

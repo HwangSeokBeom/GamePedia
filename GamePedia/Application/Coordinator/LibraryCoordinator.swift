@@ -67,6 +67,15 @@ final class LibraryCoordinator {
         detailVC.onShowAllReviews = { [weak self, weak detailVC] game in
             self?.showGameReviews(game: game, detailViewController: detailVC)
         }
+        detailVC.onReviewSelected = { [weak self] game, review in
+            self?.showReviewDiscussion(
+                gameId: game.id,
+                gameTitle: game.displayTitle,
+                reviewID: review.id,
+                reviewSeed: review,
+                highlightCommentID: nil
+            )
+        }
         detailVC.onShare = { [weak self] game in
             guard let topVC = self?.navigationController.topViewController else { return }
             let items: [Any] = [L10n.tr("Localizable", "common.share.gameInvitation", game.displayTitle)]
@@ -139,7 +148,56 @@ final class LibraryCoordinator {
         reviewsViewController.onReviewsChanged = { [weak detailViewController] in
             detailViewController?.reload()
         }
+        reviewsViewController.onReviewSelected = { [weak self] review in
+            self?.showReviewDiscussion(
+                gameId: game.id,
+                gameTitle: game.displayTitle,
+                reviewID: review.id,
+                reviewSeed: review,
+                highlightCommentID: nil
+            )
+        }
         navigationController.pushViewController(reviewsViewController, animated: true)
+    }
+
+    private func showReviewDiscussion(
+        gameId: Int,
+        gameTitle: String?,
+        reviewID: String,
+        reviewSeed: Review?,
+        highlightCommentID: String?,
+        initialReplyTargetCommentID: String? = nil,
+        autoFocusReplyComposer: Bool = false
+    ) {
+        let viewController = ReviewDiscussionViewController(
+            rootView: ReviewDiscussionRootView(),
+            viewModel: ReviewDiscussionViewModel(
+                gameId: gameId,
+                gameTitle: gameTitle,
+                reviewId: reviewID,
+                reviewSeed: reviewSeed,
+                highlightCommentId: highlightCommentID
+            ),
+            initialReplyTargetCommentId: initialReplyTargetCommentID,
+            autoFocusReplyComposerOnFirstAppearance: autoFocusReplyComposer
+        )
+        viewController.onAuthenticationRequired = { [weak self, weak viewController] context, action in
+            guard let self else { return }
+            let presenter = viewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
+        }
+        viewController.onReplyDetailRequested = { [weak self] comment, reviewSeed in
+            self?.showReviewDiscussion(
+                gameId: comment.gameId,
+                gameTitle: comment.gameTitle,
+                reviewID: comment.reviewId,
+                reviewSeed: reviewSeed,
+                highlightCommentID: comment.id,
+                initialReplyTargetCommentID: comment.id,
+                autoFocusReplyComposer: true
+            )
+        }
+        navigationController.pushViewController(viewController, animated: true)
     }
 
     private func showSteamLink(url: URL, presenter: UIViewController?) {

@@ -63,8 +63,8 @@
 "detail.stats.playtime" = "プレイ時間";
 "detail.stats.reviews" = "レビュー";
 "detail.button.writeReview" = "レビューを書く";
-"detail.button.favorite" = "お気に入り";
-"detail.button.favorited" = "お気に入り済み";
+"detail.button.favorite" = "ウィッシュリスト";
+"detail.button.favorited" = "ウィッシュリスト";
 "detail.button.editReview" = "レビューを編集";
 "detail.review.none" = "まだレビューがありません";
 "detail.review.userReviews" = "ユーザーレビュー";

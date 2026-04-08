@@ -7,11 +7,26 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		04BC7C53A5C88DA4E9D3C9F1 /* GameWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 024A57DCDD7080F07EA2E7F8 /* GameWidgetSnapshot.swift */; };
+		24110B74C9636D692EAE21EB /* GamePediaWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F02B35BA4E08F03BD4CF5073 /* GamePediaWidgetExtension.appex */; };
+		31BC588E854BF5FB780D8B14 /* GameWidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78FA82D8737F7E97902E8F93 /* GameWidgetSnapshotStore.swift */; };
+		5D4AC81B011067B6F883DD1D /* GamePediaWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7485FCF17BB0BB1B52670E0 /* GamePediaWidgetBundle.swift */; };
+		8129E48F35175E1B7347D870 /* ReviewPromptWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D2C7801FADBAEA6956C987D /* ReviewPromptWidget.swift */; };
+		8561337B80828FF847F24F9E /* WidgetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E57E52BE1A067EF91366F0B6 /* WidgetTheme.swift */; };
 		8B9A887F2F6EDD1B00D5F380 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 8B9A887E2F6EDD1B00D5F380 /* Kingfisher */; };
 		8C3B650A2F6F000100D5F380 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 8C3B65092F6F000100D5F380 /* GoogleSignIn */; };
+		A3D01D2461455C12FCD1B027 /* TrendingGamesWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A791AC4D288906DD8C646A48 /* TrendingGamesWidget.swift */; };
+		C0F12397C1A50B9FDAE7C777 /* WidgetTimelineSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECAC2BE000980AD88A6944B /* WidgetTimelineSupport.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		0D41E1168F1AD6724DA36F82 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8B9A88412F6EDC9A00D5F380 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A7629673C9E428A6B0D9EC21;
+			remoteInfo = GamePediaWidgetExtension;
+		};
 		8B9A88602F6EDC9B00D5F380 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 8B9A88412F6EDC9A00D5F380 /* Project object */;
@@ -28,14 +43,38 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		3BEEE9627DBB74D78CA0FD24 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				24110B74C9636D692EAE21EB /* GamePediaWidgetExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		024A57DCDD7080F07EA2E7F8 /* GameWidgetSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GameWidgetSnapshot.swift; path = GamePedia/Shared/Widget/GameWidgetSnapshot.swift; sourceTree = "<group>"; };
+		1FBE51A9AA30FC44A34CE1CB /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5ECAC2BE000980AD88A6944B /* WidgetTimelineSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetTimelineSupport.swift; sourceTree = "<group>"; };
+		78FA82D8737F7E97902E8F93 /* GameWidgetSnapshotStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GameWidgetSnapshotStore.swift; path = GamePedia/Shared/Widget/GameWidgetSnapshotStore.swift; sourceTree = "<group>"; };
+		7D2C7801FADBAEA6956C987D /* ReviewPromptWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ReviewPromptWidget.swift; sourceTree = "<group>"; };
 		8B9A88492F6EDC9A00D5F380 /* GamePedia.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GamePedia.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B9A885F2F6EDC9B00D5F380 /* GamePediaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GamePediaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B9A88692F6EDC9B00D5F380 /* GamePediaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GamePediaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		8D0000012F70000100D5F380 /* Config/Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Debug.xcconfig; sourceTree = SOURCE_ROOT; };
-		8D0000022F70000100D5F380 /* Config/Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = SOURCE_ROOT; };
-		8D0000032F70000100D5F380 /* Config/Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Secrets.example.xcconfig; sourceTree = SOURCE_ROOT; };
-		8D00000A2F70000100D5F380 /* Config/Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Staging.xcconfig; sourceTree = SOURCE_ROOT; };
+		8D0000012F70000100D5F380 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		8D0000022F70000100D5F380 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = SOURCE_ROOT; };
+		8D0000032F70000100D5F380 /* Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Secrets.example.xcconfig; sourceTree = SOURCE_ROOT; };
+		8D00000A2F70000100D5F380 /* Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Staging.xcconfig; sourceTree = SOURCE_ROOT; };
+		A791AC4D288906DD8C646A48 /* TrendingGamesWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrendingGamesWidget.swift; sourceTree = "<group>"; };
+		ADDCE165F14D6BAF464953EC /* GamePediaWidgetExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = GamePediaWidgetExtension.entitlements; sourceTree = "<group>"; };
+		C7485FCF17BB0BB1B52670E0 /* GamePediaWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamePediaWidgetBundle.swift; sourceTree = "<group>"; };
+		E57E52BE1A067EF91366F0B6 /* WidgetTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetTheme.swift; sourceTree = "<group>"; };
+		F02B35BA4E08F03BD4CF5073 /* GamePediaWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GamePediaWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -59,17 +98,28 @@
 		};
 		8B9A88622F6EDC9B00D5F380 /* GamePediaTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = GamePediaTests;
 			sourceTree = "<group>";
 		};
 		8B9A886C2F6EDC9B00D5F380 /* GamePediaUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = GamePediaUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		3AC68741F469F55F0F4E1D32 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8B9A88462F6EDC9A00D5F380 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -96,6 +146,30 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		6629B11BB0FF427D8BDD8836 /* WidgetSharedSources */ = {
+			isa = PBXGroup;
+			children = (
+				024A57DCDD7080F07EA2E7F8 /* GameWidgetSnapshot.swift */,
+				78FA82D8737F7E97902E8F93 /* GameWidgetSnapshotStore.swift */,
+			);
+			name = WidgetSharedSources;
+			sourceTree = "<group>";
+		};
+		858EF05A5B3689542671FC45 /* GamePediaWidgetExtension */ = {
+			isa = PBXGroup;
+			children = (
+				C7485FCF17BB0BB1B52670E0 /* GamePediaWidgetBundle.swift */,
+				A791AC4D288906DD8C646A48 /* TrendingGamesWidget.swift */,
+				7D2C7801FADBAEA6956C987D /* ReviewPromptWidget.swift */,
+				5ECAC2BE000980AD88A6944B /* WidgetTimelineSupport.swift */,
+				E57E52BE1A067EF91366F0B6 /* WidgetTheme.swift */,
+				1FBE51A9AA30FC44A34CE1CB /* Info.plist */,
+				ADDCE165F14D6BAF464953EC /* GamePediaWidgetExtension.entitlements */,
+			);
+			name = GamePediaWidgetExtension;
+			path = GamePediaWidgetExtension;
+			sourceTree = "<group>";
+		};
 		8B9A88402F6EDC9A00D5F380 = {
 			isa = PBXGroup;
 			children = (
@@ -104,6 +178,8 @@
 				8B9A88622F6EDC9B00D5F380 /* GamePediaTests */,
 				8B9A886C2F6EDC9B00D5F380 /* GamePediaUITests */,
 				8B9A884A2F6EDC9A00D5F380 /* Products */,
+				858EF05A5B3689542671FC45 /* GamePediaWidgetExtension */,
+				6629B11BB0FF427D8BDD8836 /* WidgetSharedSources */,
 			);
 			sourceTree = "<group>";
 		};
@@ -113,6 +189,7 @@
 				8B9A88492F6EDC9A00D5F380 /* GamePedia.app */,
 				8B9A885F2F6EDC9B00D5F380 /* GamePediaTests.xctest */,
 				8B9A88692F6EDC9B00D5F380 /* GamePediaUITests.xctest */,
+				F02B35BA4E08F03BD4CF5073 /* GamePediaWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -120,10 +197,10 @@
 		8D0000042F70000100D5F380 /* Config */ = {
 			isa = PBXGroup;
 			children = (
-				8D0000012F70000100D5F380 /* Config/Debug.xcconfig */,
-				8D00000A2F70000100D5F380 /* Config/Staging.xcconfig */,
-				8D0000022F70000100D5F380 /* Config/Release.xcconfig */,
-				8D0000032F70000100D5F380 /* Config/Secrets.example.xcconfig */,
+				8D0000012F70000100D5F380 /* Debug.xcconfig */,
+				8D00000A2F70000100D5F380 /* Staging.xcconfig */,
+				8D0000022F70000100D5F380 /* Release.xcconfig */,
+				8D0000032F70000100D5F380 /* Secrets.example.xcconfig */,
 			);
 			path = Config;
 			sourceTree = SOURCE_ROOT;
@@ -138,10 +215,12 @@
 				8B9A88452F6EDC9A00D5F380 /* Sources */,
 				8B9A88462F6EDC9A00D5F380 /* Frameworks */,
 				8B9A88472F6EDC9A00D5F380 /* Resources */,
+				3BEEE9627DBB74D78CA0FD24 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				9F97653626A371641F0F2D4C /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				8B9A884B2F6EDC9A00D5F380 /* GamePedia */,
@@ -172,8 +251,6 @@
 				8B9A88622F6EDC9B00D5F380 /* GamePediaTests */,
 			);
 			name = GamePediaTests;
-			packageProductDependencies = (
-			);
 			productName = GamePediaTests;
 			productReference = 8B9A885F2F6EDC9B00D5F380 /* GamePediaTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -195,11 +272,26 @@
 				8B9A886C2F6EDC9B00D5F380 /* GamePediaUITests */,
 			);
 			name = GamePediaUITests;
-			packageProductDependencies = (
-			);
 			productName = GamePediaUITests;
 			productReference = 8B9A88692F6EDC9B00D5F380 /* GamePediaUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		A7629673C9E428A6B0D9EC21 /* GamePediaWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E76C3EE358FAC3173BA04BF5 /* Build configuration list for PBXNativeTarget "GamePediaWidgetExtension" */;
+			buildPhases = (
+				E74FCBD2E3568E88191C12EE /* Sources */,
+				3AC68741F469F55F0F4E1D32 /* Frameworks */,
+				628099FE62965B4A8C5AC1EB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GamePediaWidgetExtension;
+			productName = GamePediaWidgetExtension;
+			productReference = F02B35BA4E08F03BD4CF5073 /* GamePediaWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -248,11 +340,19 @@
 				8B9A88482F6EDC9A00D5F380 /* GamePedia */,
 				8B9A885E2F6EDC9B00D5F380 /* GamePediaTests */,
 				8B9A88682F6EDC9B00D5F380 /* GamePediaUITests */,
+				A7629673C9E428A6B0D9EC21 /* GamePediaWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		628099FE62965B4A8C5AC1EB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8B9A88472F6EDC9A00D5F380 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -298,6 +398,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E74FCBD2E3568E88191C12EE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D4AC81B011067B6F883DD1D /* GamePediaWidgetBundle.swift in Sources */,
+				A3D01D2461455C12FCD1B027 /* TrendingGamesWidget.swift in Sources */,
+				8129E48F35175E1B7347D870 /* ReviewPromptWidget.swift in Sources */,
+				C0F12397C1A50B9FDAE7C777 /* WidgetTimelineSupport.swift in Sources */,
+				8561337B80828FF847F24F9E /* WidgetTheme.swift in Sources */,
+				04BC7C53A5C88DA4E9D3C9F1 /* GameWidgetSnapshot.swift in Sources */,
+				31BC588E854BF5FB780D8B14 /* GameWidgetSnapshotStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -311,12 +425,18 @@
 			target = 8B9A88482F6EDC9A00D5F380 /* GamePedia */;
 			targetProxy = 8B9A886A2F6EDC9B00D5F380 /* PBXContainerItemProxy */;
 		};
+		9F97653626A371641F0F2D4C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = GamePediaWidgetExtension;
+			target = A7629673C9E428A6B0D9EC21 /* GamePediaWidgetExtension */;
+			targetProxy = 0D41E1168F1AD6724DA36F82 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		8B9A88732F6EDC9B00D5F380 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8D0000012F70000100D5F380 /* Config/Debug.xcconfig */;
+			baseConfigurationReference = 8D0000012F70000100D5F380 /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -355,7 +475,7 @@
 		};
 		8B9A88742F6EDC9B00D5F380 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8D0000022F70000100D5F380 /* Config/Release.xcconfig */;
+			baseConfigurationReference = 8D0000022F70000100D5F380 /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -603,7 +723,7 @@
 		};
 		8D00000B2F70000100D5F380 /* Staging */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8D00000A2F70000100D5F380 /* Config/Staging.xcconfig */;
+			baseConfigurationReference = 8D00000A2F70000100D5F380 /* Staging.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -744,6 +864,119 @@
 			};
 			name = Staging;
 		};
+		D2BCD430F0DF5275970B72E4 /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8D00000A2F70000100D5F380 /* Staging.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia Widget";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Staging;
+		};
+		D8311641F8728A8174B8D20B /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8D0000022F70000100D5F380 /* Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia Widget";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		F1A62F3236D918638B6F4F2A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8D0000012F70000100D5F380 /* Debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia Widget";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -783,6 +1016,16 @@
 				8B9A887B2F6EDC9B00D5F380 /* Debug */,
 				8D00000E2F70000100D5F380 /* Staging */,
 				8B9A887C2F6EDC9B00D5F380 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E76C3EE358FAC3173BA04BF5 /* Build configuration list for PBXNativeTarget "GamePediaWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D8311641F8728A8174B8D20B /* Release */,
+				F1A62F3236D918638B6F4F2A /* Debug */,
+				D2BCD430F0DF5275970B72E4 /* Staging */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
