@@ -673,7 +673,7 @@
 "review.comment.replyPrompt.root" = "写下你的回复";
 "review.comment.replyPrompt.reply" = "继续回复";
 "review.comment.action.hideReplies" = "隐藏回复";
-"review.comment.action.moreReplies" = "再看 %d 条回复";
+"review.comment.action.moreReplies" = "查看较早的 %d 条回复";
 "review.card.commentCta" = "查看 %d 条评论";
 "review.card.commentEmptyCta" = "写下第一条评论";
 "review.card.accessibility.like" = "点赞评论，共 %@ 个赞";

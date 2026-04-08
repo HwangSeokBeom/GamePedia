@@ -64,8 +64,9 @@ final class ReviewDiscussionViewModel {
             }
             apply(.setComposerModePreservingText(.comment))
         case .didTapReply(let commentId):
-            guard let comment = state.comments.first(where: { $0.id == commentId }) else { return }
-            apply(.setComposerMode(makeReplyComposerMode(for: comment)))
+            activateReplyMode(commentId: commentId)
+        case .didTapReplyCTA(let commentId):
+            activateReplyMode(commentId: commentId)
         case .didTapEdit(let commentId):
             guard let comment = state.comments.first(where: { $0.id == commentId }) else { return }
             apply(.setComposerMode(.edit(commentId: commentId)))
@@ -79,12 +80,9 @@ final class ReviewDiscussionViewModel {
         case .didTapDislike(let commentId):
             toggleReaction(on: commentId, desiredReaction: .dislike)
         case .didTapToggleReplies(let parentCommentId):
+            guard state.expandedParentCommentIds.contains(parentCommentId) == false else { break }
             var expanded = state.expandedParentCommentIds
-            if expanded.contains(parentCommentId) {
-                expanded.remove(parentCommentId)
-            } else {
-                expanded.insert(parentCommentId)
-            }
+            expanded.insert(parentCommentId)
             apply(.setExpandedParentCommentIds(expanded))
         case .didChangeSort(let sortOption):
             apply(.setSortOption(sortOption))
@@ -157,10 +155,33 @@ final class ReviewDiscussionViewModel {
         var expandedIds = current
         if let highlightCommentId = state.highlightedCommentId,
            let highlightedComment = comments.first(where: { $0.id == highlightCommentId }),
-           let parentId = highlightedComment.parentCommentId {
+           let parentId = highlightedComment.parentCommentId,
+           shouldAutoExpandThread(for: highlightedComment, in: comments, parentCommentId: parentId) {
             expandedIds.insert(parentId)
         }
         return expandedIds
+    }
+
+    private func shouldAutoExpandThread(
+        for highlightedComment: ReviewComment,
+        in comments: [ReviewComment],
+        parentCommentId: String
+    ) -> Bool {
+        let replies = comments
+            .filter { $0.parentCommentId == parentCommentId }
+            .sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt < rhs.createdAt
+                }
+                return lhs.id < rhs.id
+            }
+
+        guard replies.count > ReviewDiscussionThreadPresentation.summaryReplyLimit else {
+            return false
+        }
+
+        let latestVisibleReplyIDs = Set(replies.suffix(ReviewDiscussionThreadPresentation.summaryReplyLimit).map(\.id))
+        return latestVisibleReplyIDs.contains(highlightedComment.id) == false
     }
 
     private func submitComposer() {
@@ -203,11 +224,6 @@ final class ReviewDiscussionViewModel {
                 try await refreshComments()
 
                 await MainActor.run {
-                    var expanded = self.state.expandedParentCommentIds
-                    if let parentId = createdOrUpdatedComment.parentCommentId {
-                        expanded.insert(parentId)
-                        self.apply(.setExpandedParentCommentIds(expanded))
-                    }
                     self.apply(.setComposerMode(.comment))
                     self.apply(.setComposerText(""))
                     self.apply(.setSubmitting(false))
@@ -443,6 +459,11 @@ final class ReviewDiscussionViewModel {
             .store(in: &cancellables)
     }
 
+    private func activateReplyMode(commentId: String) {
+        guard let comment = state.comments.first(where: { $0.id == commentId }) else { return }
+        apply(.setComposerMode(makeReplyComposerMode(for: comment)))
+    }
+
     private func makeReplyComposerMode(for comment: ReviewComment) -> ReviewDiscussionComposerMode {
         .reply(.init(
             parentCommentId: comment.parentCommentId ?? comment.id,
@@ -481,6 +502,8 @@ private extension ReviewDiscussionIntent {
             return "intent=didTapDiscussionArea"
         case .didTapReply(let commentId):
             return "intent=didTapReply commentId=\(commentId)"
+        case .didTapReplyCTA(let commentId):
+            return "intent=didTapReplyCTA commentId=\(commentId)"
         case .didTapEdit(let commentId):
             return "intent=didTapEdit commentId=\(commentId)"
         case .didTapDelete(let commentId):

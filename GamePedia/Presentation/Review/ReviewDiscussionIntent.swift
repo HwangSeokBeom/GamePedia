@@ -6,6 +6,7 @@ enum ReviewDiscussionIntent {
     case didTapReviewLike(reviewId: String)
     case didTapDiscussionArea
     case didTapReply(commentId: String)
+    case didTapReplyCTA(commentId: String)
     case didTapEdit(commentId: String)
     case didTapDelete(commentId: String)
     case didTapReport(commentId: String)

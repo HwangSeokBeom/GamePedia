@@ -16,6 +16,11 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         case toggleReplies(String)
     }
 
+    private enum ReplyEntrySource {
+        case direct
+        case cta
+    }
+
     private enum Row: Hashable {
         case reviewHeaderCard(String)
         case discussionHeader(String)
@@ -38,10 +43,16 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         let minY: CGFloat
     }
 
+    private struct ReplyPromptConfiguration {
+        let title: String?
+        let targetCommentId: String?
+    }
+
     private let viewModel: ReviewDiscussionViewModel
     private let shouldAutoFocusReplyComposerOnFirstAppearance: Bool
     private var dataSource: UITableViewDiffableDataSource<Section, Row>!
     private var commentById: [String: ReviewComment] = [:]
+    private var replyPromptByAnchorCommentId: [String: ReplyPromptConfiguration] = [:]
     private var lastRenderedSnapshotSignature: SnapshotSignature?
     private var currentReviewHeaderState: ReviewDiscussionHeaderState?
     private var currentDiscussionSectionState: ReviewDiscussionSectionState?
@@ -217,7 +228,10 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         currentDiscussionSectionState = state.discussionSectionState
         currentSortMenu = makeSortMenu(selected: state.sortOption)
 
-        let commentRows = makeRows(from: state.comments, expandedParentCommentIds: state.expandedParentCommentIds)
+        let screenType = state.discussionScreenType
+        let threadStates = state.commentThreadStates
+        updateReplyPromptMappings(from: threadStates)
+        let commentRows = makeRows(from: threadStates, screenType: screenType)
         commentById = MappingSafety.dictionary(
             pairs: state.comments.map { ($0.id, $0) },
             logPrefix: "[CommentMapping]",
@@ -235,8 +249,15 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
             snapshot.appendSections([section.section])
             snapshot.appendItems(section.rows, toSection: section.section)
         }
-        dataSource.apply(snapshot, animatingDifferences: true) { [weak self] in
-            self?.restoreReplyToggleAnchorIfNeeded()
+        if screenType.isFocusedThreadScreen {
+            dataSource.applySnapshotUsingReloadData(snapshot)
+            rootView.tableView.layoutIfNeeded()
+            restoreReplyToggleAnchorIfNeeded()
+        } else {
+            dataSource.apply(snapshot, animatingDifferences: true) { [weak self] in
+                self?.rootView.tableView.layoutIfNeeded()
+                self?.restoreReplyToggleAnchorIfNeeded()
+            }
         }
     }
 
@@ -274,31 +295,48 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         return SnapshotSignature(sections: sections)
     }
 
-    private func makeRows(from comments: [ReviewComment], expandedParentCommentIds: Set<String>) -> [Row] {
-        let topLevelComments = comments.filter { $0.parentCommentId == nil }
-        let repliesByParentId = Dictionary(
-            grouping: comments.filter { $0.parentCommentId != nil },
-            by: { $0.parentCommentId ?? "" }
-        )
-        let previewReplyLimit = 2
+    private func updateReplyPromptMappings(from threadStates: [ReviewDiscussionCommentThreadState]) {
+        replyPromptByAnchorCommentId = threadStates.reduce(into: [:]) { mapping, threadState in
+            guard threadState.shouldShowThreadCTA,
+                  let anchorCommentId = threadState.threadCTAAnchorCommentId,
+                  let targetCommentId = threadState.threadCTATargetCommentId,
+                  let title = threadState.threadCTATitle else {
+                return
+            }
+            mapping[anchorCommentId] = .init(
+                title: title,
+                targetCommentId: targetCommentId
+            )
+        }
+    }
+
+    private func makeRows(
+        from threadStates: [ReviewDiscussionCommentThreadState],
+        screenType: ReviewDiscussionScreenType
+    ) -> [Row] {
         var rows: [Row] = []
 
-        for comment in topLevelComments {
-            rows.append(.comment(comment.id))
-            let replies = (repliesByParentId[comment.id] ?? []).sorted { $0.createdAt < $1.createdAt }
-            guard !replies.isEmpty else { continue }
+        for threadState in threadStates {
+            rows.append(.comment(threadState.rootComment.id))
+            guard !threadState.allReplies.isEmpty else { continue }
 
-            let isExpanded = expandedParentCommentIds.contains(comment.id)
-            // Collapse should keep the earliest replies visible and hide the newest ones.
-            let collapsedReplies = Array(replies.prefix(previewReplyLimit))
-            let visibleReplies = isExpanded ? replies : collapsedReplies
-            rows.append(contentsOf: visibleReplies.map { .comment($0.id) })
+            let showsToggleAboveReplies = screenType.prefersToggleAboveReplies
 
-            if replies.count > previewReplyLimit || isExpanded {
+            if showsToggleAboveReplies, threadState.shouldShowExpandButton {
                 rows.append(.toggleReplies(
-                    parentCommentId: comment.id,
-                    hiddenCount: max(0, replies.count - visibleReplies.count),
-                    expanded: isExpanded
+                    parentCommentId: threadState.parentCommentId,
+                    hiddenCount: threadState.hiddenOlderRepliesCount,
+                    expanded: false
+                ))
+            }
+
+            rows.append(contentsOf: threadState.visibleReplies.map { .comment($0.id) })
+
+            if !showsToggleAboveReplies, threadState.shouldShowExpandButton {
+                rows.append(.toggleReplies(
+                    parentCommentId: threadState.parentCommentId,
+                    hiddenCount: threadState.hiddenOlderRepliesCount,
+                    expanded: false
                 ))
             }
         }
@@ -362,6 +400,7 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         with comment: ReviewComment,
         reactingCommentIds: Set<String>
     ) {
+        let replyPrompt = replyPromptConfiguration(for: comment)
         cell.configure(with: .init(
             id: comment.id,
             authorName: comment.author.nickname,
@@ -375,6 +414,8 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
             myReaction: comment.myReaction,
             isReactionLoading: reactingCommentIds.contains(comment.id),
             canReply: comment.canReply,
+            replyPromptTitle: replyPrompt.title,
+            isReplyPromptEnabled: replyPrompt.targetCommentId != nil,
             showsMoreAction: availableCommentActionKinds(for: comment).isEmpty == false
         ))
         cell.onLikeTapped = { [weak self] in
@@ -384,13 +425,26 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
             }
         }
         cell.onReplyTapped = { [weak self] in
-            self?.performAuthenticatedAction { [weak self] in
-                self?.handleReplyEntry(for: comment)
+            guard let self, let targetCommentId = replyPrompt.targetCommentId,
+                  let targetComment = self.commentById[targetCommentId] else {
+                return
+            }
+
+            let source: ReplyEntrySource = self.viewModel.state.discussionScreenType.allowsThreadCTA ? .cta : .direct
+            self.performAuthenticatedAction { [weak self] in
+                self?.handleReplyEntry(for: targetComment, source: source)
             }
         }
         cell.onMoreTapped = { [weak self] in
             self?.presentCommentActionSheet(for: comment)
         }
+    }
+
+    private func replyPromptConfiguration(for comment: ReviewComment) -> ReplyPromptConfiguration {
+        guard let promptConfiguration = replyPromptByAnchorCommentId[comment.id] else {
+            return .init(title: nil, targetCommentId: nil)
+        }
+        return promptConfiguration
     }
 
     private func performAuthenticatedAction(
@@ -538,7 +592,7 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         rootView.focusComposer()
     }
 
-    private func handleReplyEntry(for comment: ReviewComment) {
+    private func handleReplyEntry(for comment: ReviewComment, source: ReplyEntrySource = .direct) {
         guard comment.canReply else { return }
 
         if shouldNavigateReplyEntryToDetail {
@@ -547,13 +601,22 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
             return
         }
 
-        activateReplyMode(for: comment)
+        activateReplyMode(for: comment, source: source)
     }
 
-    private func activateReplyMode(for comment: ReviewComment, shouldFocusComposer: Bool = true) {
+    private func activateReplyMode(
+        for comment: ReviewComment,
+        shouldFocusComposer: Bool = true,
+        source: ReplyEntrySource = .direct
+    ) {
         guard comment.canReply else { return }
         ReviewDiscussionTrace.log("[ReviewDiscussionVC] activateReplyMode commentId=\(comment.id)")
-        viewModel.send(.didTapReply(commentId: comment.id))
+        switch source {
+        case .direct:
+            viewModel.send(.didTapReply(commentId: comment.id))
+        case .cta:
+            viewModel.send(.didTapReplyCTA(commentId: comment.id))
+        }
         guard shouldFocusComposer else { return }
         focusComposer(mode: viewModel.state.composerMode)
     }
@@ -950,7 +1013,7 @@ private final class ReplyToggleCell: UITableViewCell {
 
     private let lineView: UIView = {
         let view = UIView()
-        view.backgroundColor = .gpTextTertiary
+        view.backgroundColor = .gpSeparator
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
@@ -958,13 +1021,13 @@ private final class ReplyToggleCell: UITableViewCell {
     private let titleLabel: UILabel = {
         let label = UILabel()
         label.font = .systemFont(ofSize: 12, weight: .semibold)
-        label.textColor = .gpPrimary
+        label.textColor = .gpTextSecondary
         return label
     }()
 
     private let chevronView: UIImageView = {
         let imageView = UIImageView()
-        imageView.tintColor = .gpPrimary
+        imageView.tintColor = .gpTextSecondary
         imageView.translatesAutoresizingMaskIntoConstraints = false
         return imageView
     }()
@@ -1004,11 +1067,11 @@ private final class ReplyToggleCell: UITableViewCell {
 
         NSLayoutConstraint.activate([
             rowStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
-            rowStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            rowStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 56),
             rowStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             rowStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
 
-            lineView.widthAnchor.constraint(equalToConstant: 20),
+            lineView.widthAnchor.constraint(equalToConstant: 14),
             lineView.heightAnchor.constraint(equalToConstant: 1),
             chevronView.widthAnchor.constraint(equalToConstant: 12),
             chevronView.heightAnchor.constraint(equalToConstant: 12)

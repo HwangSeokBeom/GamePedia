@@ -673,7 +673,7 @@
 "review.comment.replyPrompt.root" = "Leave a reply";
 "review.comment.replyPrompt.reply" = "Continue the reply";
 "review.comment.action.hideReplies" = "Hide replies";
-"review.comment.action.moreReplies" = "%d more replies";
+"review.comment.action.moreReplies" = "View %d earlier replies";
 "review.card.commentCta" = "View %d comments";
 "review.card.commentEmptyCta" = "Leave the first comment";
 "review.card.accessibility.like" = "Like review, %@ likes";

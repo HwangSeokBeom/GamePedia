@@ -40,6 +40,8 @@ final class ReviewCommentCell: UITableViewCell {
         let myReaction: ReviewCommentReaction?
         let isReactionLoading: Bool
         let canReply: Bool
+        let replyPromptTitle: String?
+        let isReplyPromptEnabled: Bool
         let showsMoreAction: Bool
     }
 
@@ -200,7 +202,7 @@ final class ReviewCommentCell: UITableViewCell {
         firstMetaDot.isHidden = hidesMeta
         likeButton.isHidden = hidesMeta
         moreButton.isHidden = hidesMeta || !viewState.showsMoreAction
-        replyPromptButton.isHidden = hidesMeta || !viewState.canReply
+        replyPromptButton.isHidden = viewState.replyPromptTitle == nil
     }
 
     override func prepareForReuse() {
@@ -316,9 +318,7 @@ final class ReviewCommentCell: UITableViewCell {
 
     private func configureReplyPrompt(with viewState: ViewState, metaStyle: MetaStyle) {
         var configuration = replyPromptButton.configuration
-        configuration?.title = viewState.depth == 0
-            ? L10n.tr("Localizable", "review.comment.replyPrompt.root")
-            : L10n.tr("Localizable", "review.comment.replyPrompt.reply")
+        configuration?.title = viewState.replyPromptTitle
         configuration?.baseForegroundColor = .gpTextSecondary
         configuration?.image = UIImage(
             systemName: "bubble.left",
@@ -336,8 +336,8 @@ final class ReviewCommentCell: UITableViewCell {
             weight: .medium
         )
         replyPromptButton.configuration = configuration
-        replyPromptButton.isEnabled = viewState.canReply
-        replyPromptButton.alpha = viewState.canReply ? 1 : 0.6
+        replyPromptButton.isEnabled = viewState.isReplyPromptEnabled
+        replyPromptButton.alpha = viewState.isReplyPromptEnabled ? 1 : 0.6
         replyPromptButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.reply")
         replyPromptButton.accessibilityIdentifier = "reviewComment.replyButton"
     }

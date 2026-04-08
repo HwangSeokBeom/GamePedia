@@ -673,7 +673,7 @@
 "review.comment.replyPrompt.root" = "대댓글을 남겨보세요";
 "review.comment.replyPrompt.reply" = "답글을 이어서 남겨보세요";
 "review.comment.action.hideReplies" = "답글 접기";
-"review.comment.action.moreReplies" = "답글 %d개 더 보기";
+"review.comment.action.moreReplies" = "이전 답글 %d개 더보기";
 "review.card.commentCta" = "댓글 %d개 보기";
 "review.card.commentEmptyCta" = "첫 댓글 남기기";
 "review.card.accessibility.like" = "리뷰 좋아요, 좋아요 %@개";

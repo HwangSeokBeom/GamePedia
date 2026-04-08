@@ -673,7 +673,7 @@
 "review.comment.replyPrompt.root" = "返信を書いてみましょう";
 "review.comment.replyPrompt.reply" = "会話を続ける";
 "review.comment.action.hideReplies" = "返信を隠す";
-"review.comment.action.moreReplies" = "返信を%d件もっと見る";
+"review.comment.action.moreReplies" = "以前の返信を%d件見る";
 "review.card.commentCta" = "コメント%d件を見る";
 "review.card.commentEmptyCta" = "最初のコメントを書く";
 "review.card.accessibility.like" = "レビューにいいね、%@件";

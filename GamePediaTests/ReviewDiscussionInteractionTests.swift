@@ -338,6 +338,199 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         XCTAssertEqual(viewModel.state.composerMode, .comment)
     }
 
+    func testReviewDiscussionDiscussionMode_showsCTAOnlyOnLastVisibleReplyAndRoutesToDetail() async throws {
+        let repository = MockReviewCommentRepository(
+            comments: [
+                makeComment(id: "root-comment", parentCommentId: nil, depth: 0, likeCount: 0, myReaction: nil, createdAt: 1),
+                makeComment(id: "reply-1", parentCommentId: "root-comment", depth: 1, likeCount: 0, myReaction: nil, createdAt: 2),
+                makeComment(id: "reply-2", parentCommentId: "root-comment", depth: 1, likeCount: 0, myReaction: nil, createdAt: 3),
+                makeComment(id: "reply-3", parentCommentId: "root-comment", depth: 1, likeCount: 0, myReaction: nil, createdAt: 4),
+                makeComment(id: "reply-4", parentCommentId: "root-comment", depth: 1, likeCount: 0, myReaction: nil, createdAt: 5)
+            ]
+        )
+        let viewModel = makeViewModel(reviewCommentRepository: repository)
+        let viewController = ReviewDiscussionViewController(
+            rootView: ReviewDiscussionRootView(),
+            viewModel: viewModel
+        )
+        let navigationController = UINavigationController(rootViewController: viewController)
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = navigationController
+        var routedCommentID: String?
+        var routedReviewID: String?
+        viewController.onReplyDetailRequested = { comment, review in
+            routedCommentID = comment.id
+            routedReviewID = review?.id
+        }
+
+        window.makeKeyAndVisible()
+        viewController.loadViewIfNeeded()
+
+        await waitUntil {
+            viewController.rootView.tableView.numberOfSections == 3 &&
+            viewController.rootView.tableView.numberOfRows(inSection: 2) == 5
+        }
+
+        let rootCommentIndexPath = IndexPath(row: 0, section: 2)
+        let olderSummaryReplyIndexPath = IndexPath(row: 2, section: 2)
+        let middleSummaryReplyIndexPath = IndexPath(row: 3, section: 2)
+        let latestSummaryReplyIndexPath = IndexPath(row: 4, section: 2)
+
+        viewController.rootView.tableView.scrollToRow(at: latestSummaryReplyIndexPath, at: .middle, animated: false)
+        viewController.rootView.tableView.layoutIfNeeded()
+
+        await waitUntil {
+            guard let rootCell = viewController.rootView.tableView.cellForRow(at: rootCommentIndexPath) as? ReviewCommentCell,
+                  let olderReplyCell = viewController.rootView.tableView.cellForRow(at: olderSummaryReplyIndexPath) as? ReviewCommentCell,
+                  let middleReplyCell = viewController.rootView.tableView.cellForRow(at: middleSummaryReplyIndexPath) as? ReviewCommentCell,
+                  let latestReplyCell = viewController.rootView.tableView.cellForRow(at: latestSummaryReplyIndexPath) as? ReviewCommentCell else {
+                return false
+            }
+
+            return self.findButton(in: rootCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") == nil &&
+                self.findButton(in: olderReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") == nil &&
+                self.findButton(in: middleReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") == nil &&
+                self.findButton(in: latestReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") != nil
+        }
+
+        guard let latestReplyCell = viewController.rootView.tableView.cellForRow(at: latestSummaryReplyIndexPath) as? ReviewCommentCell,
+              let latestReplyCTAButton = findButton(in: latestReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") else {
+            return XCTFail("Latest visible reply CTA button not found")
+        }
+
+        latestReplyCTAButton.sendActions(for: .touchUpInside)
+
+        XCTAssertEqual(routedCommentID, "reply-4")
+        XCTAssertEqual(routedReviewID, "review-1")
+        XCTAssertEqual(viewModel.state.composerMode, .comment)
+
+        viewController.tableView(viewController.rootView.tableView, didSelectRowAt: IndexPath(row: 1, section: 2))
+
+        await waitUntil {
+            viewController.rootView.tableView.numberOfRows(inSection: 2) == 5 &&
+            viewController.rootView.tableView.cellForRow(at: IndexPath(row: 1, section: 2)) is ReviewCommentCell
+        }
+
+        let previousExpandedReplyIndexPath = IndexPath(row: 3, section: 2)
+        let lastExpandedReplyIndexPath = IndexPath(row: 4, section: 2)
+        viewController.rootView.tableView.scrollToRow(at: lastExpandedReplyIndexPath, at: .middle, animated: false)
+        viewController.rootView.tableView.layoutIfNeeded()
+
+        await waitUntil {
+            guard let previousReplyCell = viewController.rootView.tableView.cellForRow(at: previousExpandedReplyIndexPath) as? ReviewCommentCell,
+                  let latestReplyCell = viewController.rootView.tableView.cellForRow(at: lastExpandedReplyIndexPath) as? ReviewCommentCell else {
+                return false
+            }
+
+            return self.findButton(in: previousReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") == nil &&
+                self.findButton(in: latestReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") != nil
+        }
+
+        viewController.tableView(viewController.rootView.tableView, didSelectRowAt: IndexPath(row: 1, section: 2))
+        XCTAssertEqual(viewController.rootView.tableView.numberOfRows(inSection: 2), 5)
+    }
+
+    func testReviewDiscussionSubmitReply_keepsCollapsedLatestSummaryInCommentDetail() async throws {
+        let repository = MockReviewCommentRepository(
+            comments: [
+                makeComment(id: "root-comment", parentCommentId: nil, depth: 0, likeCount: 0, myReaction: nil, createdAt: 1),
+                makeComment(id: "reply-1", parentCommentId: "root-comment", depth: 1, likeCount: 0, myReaction: nil, createdAt: 2),
+                makeComment(id: "reply-2", parentCommentId: "root-comment", depth: 1, likeCount: 0, myReaction: nil, createdAt: 3),
+                makeComment(id: "reply-3", parentCommentId: "root-comment", depth: 1, likeCount: 0, myReaction: nil, createdAt: 4)
+            ]
+        )
+        let viewModel = makeViewModel(
+            reviewCommentRepository: repository,
+            highlightCommentId: "root-comment"
+        )
+
+        viewModel.send(.viewDidLoad)
+        await waitUntil { viewModel.state.comments.count == 4 }
+
+        XCTAssertFalse(viewModel.state.expandedParentCommentIds.contains("root-comment"))
+
+        viewModel.send(.didTapReply(commentId: "reply-3"))
+        viewModel.send(.didChangeComposerText("새 답글"))
+        viewModel.send(.didTapSubmit)
+
+        await waitUntil {
+            viewModel.state.comments.count == 5 && viewModel.state.isSubmitting == false
+        }
+
+        let threadState = try XCTUnwrap(viewModel.state.commentThreadStates.first)
+        XCTAssertFalse(viewModel.state.expandedParentCommentIds.contains("root-comment"))
+        XCTAssertEqual(threadState.visibleReplies.map(\.id), ["reply-2", "reply-3", "created-5"])
+        XCTAssertEqual(threadState.lastVisibleReplyId, "created-5")
+        XCTAssertNil(threadState.threadCTATargetCommentId)
+        XCTAssertEqual(repository.createDrafts.first?.parentCommentId, "root-comment")
+        XCTAssertEqual(repository.createDrafts.first?.content, "새 답글")
+    }
+
+    func testReviewDiscussionReplyDetail_hidesCTAAndKeepsLayoutStableAcrossToggle() async throws {
+        let repository = MockReviewCommentRepository(
+            comments: [
+                makeComment(id: "root-comment", parentCommentId: nil, depth: 0, likeCount: 0, myReaction: nil, createdAt: 1),
+                makeComment(id: "reply-1", parentCommentId: "root-comment", depth: 1, likeCount: 0, myReaction: nil, createdAt: 2),
+                makeComment(id: "reply-2", parentCommentId: "root-comment", depth: 1, likeCount: 0, myReaction: nil, createdAt: 3),
+                makeComment(id: "reply-3", parentCommentId: "root-comment", depth: 1, likeCount: 0, myReaction: nil, createdAt: 4),
+                makeComment(id: "reply-4", parentCommentId: "root-comment", depth: 1, likeCount: 0, myReaction: nil, createdAt: 5)
+            ]
+        )
+        let viewModel = makeViewModel(
+            reviewCommentRepository: repository,
+            highlightCommentId: "reply-4"
+        )
+        let viewController = ReviewDiscussionViewController(
+            rootView: ReviewDiscussionRootView(),
+            viewModel: viewModel
+        )
+        let navigationController = UINavigationController(rootViewController: viewController)
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = navigationController
+
+        window.makeKeyAndVisible()
+        viewController.loadViewIfNeeded()
+
+        await waitUntil {
+            viewController.rootView.tableView.numberOfSections == 3 &&
+            viewController.rootView.tableView.numberOfRows(inSection: 2) == 5
+        }
+
+        viewController.rootView.tableView.layoutIfNeeded()
+        assertVisibleRowLayoutIsStable(in: viewController.rootView.tableView, section: 2)
+
+        for row in 0..<viewController.rootView.tableView.numberOfRows(inSection: 2) {
+            let indexPath = IndexPath(row: row, section: 2)
+            guard let cell = viewController.rootView.tableView.cellForRow(at: indexPath) as? ReviewCommentCell else {
+                continue
+            }
+            XCTAssertNil(findButton(in: cell.contentView, accessibilityIdentifier: "reviewComment.replyButton"))
+        }
+
+        viewController.tableView(viewController.rootView.tableView, didSelectRowAt: IndexPath(row: 1, section: 2))
+
+        await waitUntil {
+            viewController.rootView.tableView.numberOfRows(inSection: 2) == 5 &&
+            viewController.rootView.tableView.cellForRow(at: IndexPath(row: 1, section: 2)) is ReviewCommentCell
+        }
+
+        viewController.rootView.tableView.layoutIfNeeded()
+        assertVisibleRowLayoutIsStable(in: viewController.rootView.tableView, section: 2)
+
+        for row in 0..<viewController.rootView.tableView.numberOfRows(inSection: 2) {
+            let indexPath = IndexPath(row: row, section: 2)
+            guard let cell = viewController.rootView.tableView.cellForRow(at: indexPath) as? ReviewCommentCell else {
+                continue
+            }
+            XCTAssertNil(findButton(in: cell.contentView, accessibilityIdentifier: "reviewComment.replyButton"))
+        }
+
+        viewController.tableView(viewController.rootView.tableView, didSelectRowAt: IndexPath(row: 1, section: 2))
+        XCTAssertEqual(viewController.rootView.tableView.numberOfRows(inSection: 2), 5)
+        viewController.rootView.tableView.layoutIfNeeded()
+        assertVisibleRowLayoutIsStable(in: viewController.rootView.tableView, section: 2)
+    }
+
     func testGameReviewsViewModel_reviewLike_optimisticUpdateRollbackAndDiscussionSync() async throws {
         let initialReview = makeReview(commentCount: 2)
         let reviewRepository = MockReviewRepository(
@@ -431,13 +624,15 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
 
     private func makeViewModel(
         reviewCommentRepository: any ReviewCommentRepository,
-        reviewRepository: any ReviewRepository = MockReviewRepository()
+        reviewRepository: any ReviewRepository = MockReviewRepository(),
+        highlightCommentId: String? = nil
     ) -> ReviewDiscussionViewModel {
         ReviewDiscussionViewModel(
             gameId: 10,
             gameTitle: "테스트 게임",
             reviewId: "review-1",
             reviewSeed: makeReview(),
+            highlightCommentId: highlightCommentId,
             toggleReviewLikeUseCase: ToggleReviewLikeUseCase(reviewRepository: reviewRepository),
             reviewCommentRepository: reviewCommentRepository
         )
@@ -474,7 +669,8 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         parentCommentId: String?,
         depth: Int,
         likeCount: Int,
-        myReaction: ReviewCommentReaction?
+        myReaction: ReviewCommentReaction?,
+        createdAt: TimeInterval? = nil
     ) -> ReviewComment {
         ReviewComment(
             id: id,
@@ -490,7 +686,7 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
                 profileImageUrl: nil
             ),
             content: "댓글-\(id)",
-            createdAt: Date(timeIntervalSince1970: depth == 0 ? 1 : 2),
+            createdAt: Date(timeIntervalSince1970: createdAt ?? (depth == 0 ? 1 : 2)),
             updatedAt: nil,
             isMine: false,
             isReviewAuthor: false,
@@ -521,7 +717,9 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
 
     private func findButton(in view: UIView, accessibilityIdentifier: String) -> UIButton? {
         if let button = view as? UIButton {
-            if button.accessibilityIdentifier == accessibilityIdentifier {
+            if button.accessibilityIdentifier == accessibilityIdentifier,
+               button.isHidden == false,
+               button.alpha > 0.01 {
                 return button
             }
         }
@@ -535,7 +733,9 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
 
     private func findButton(in view: UIView, accessibilityLabel: String) -> UIButton? {
         if let button = view as? UIButton {
-            if button.accessibilityLabel == accessibilityLabel {
+            if button.accessibilityLabel == accessibilityLabel,
+               button.isHidden == false,
+               button.alpha > 0.01 {
                 return button
             }
         }
@@ -545,6 +745,17 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
             }
         }
         return nil
+    }
+
+    private func assertVisibleRowLayoutIsStable(in tableView: UITableView, section: Int) {
+        var previousMaxY: CGFloat = -.greatestFiniteMagnitude
+        for row in 0..<tableView.numberOfRows(inSection: section) {
+            let indexPath = IndexPath(row: row, section: section)
+            let rect = tableView.rectForRow(at: indexPath)
+            XCTAssertGreaterThan(rect.height, 0)
+            XCTAssertGreaterThanOrEqual(rect.minY, previousMaxY)
+            previousMaxY = rect.maxY
+        }
     }
 }
 
@@ -632,6 +843,7 @@ private final class MockReviewCommentRepository: ReviewCommentRepository {
     let reactDelayNanoseconds: UInt64
     let reactResults: [String: Result<ReviewComment, Error>]
     private(set) var reactCallCommentIds: [String] = []
+    private(set) var createDrafts: [ReviewCommentDraft] = []
 
     init(
         comments: [ReviewComment],
@@ -648,7 +860,35 @@ private final class MockReviewCommentRepository: ReviewCommentRepository {
     }
 
     func createComment(draft: ReviewCommentDraft, in context: ReviewDiscussionContext) async throws -> ReviewComment {
-        throw MockError.unused
+        createDrafts.append(draft)
+        let nextTimestamp = (comments.map { $0.createdAt.timeIntervalSince1970 }.max() ?? 0) + 1
+        let createdComment = ReviewComment(
+            id: "created-\(comments.count + 1)",
+            reviewId: context.reviewId,
+            gameId: context.gameId,
+            gameTitle: context.gameTitle,
+            reviewSnippet: context.reviewSnippet,
+            parentCommentId: draft.parentCommentId,
+            depth: draft.parentCommentId == nil ? 0 : 1,
+            author: ReviewCommentAuthor(
+                id: "created-author",
+                nickname: "생성작성자",
+                profileImageUrl: nil
+            ),
+            content: draft.content,
+            createdAt: Date(timeIntervalSince1970: nextTimestamp),
+            updatedAt: nil,
+            isMine: true,
+            isReviewAuthor: false,
+            isDeleted: false,
+            isEdited: false,
+            replyCount: 0,
+            likeCount: 0,
+            dislikeCount: 0,
+            myReaction: nil
+        )
+        comments.append(createdComment)
+        return createdComment
     }
 
     func updateComment(commentId: String, content: String, in context: ReviewDiscussionContext) async throws -> ReviewComment {
