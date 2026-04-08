@@ -65,6 +65,21 @@ final class HomeCoordinator {
         showNotifications()
     }
 
+    func navigateToTrendingGameList(items: [TrendingGamesWidgetSnapshot.Item]) {
+        let games = items.map(Self.makeTrendingGame)
+        guard games.isEmpty == false else { return }
+        showGameList(section: .trending, games: games, wishlistedGameIDs: [])
+    }
+
+    func navigateToReviewComposer(item: ReviewPromptWidgetSnapshot.Item) {
+        showReviewComposer(
+            gameId: item.gameID,
+            gameName: item.title,
+            gameSubtitle: item.subtitleText.replacingOccurrences(of: "\n", with: " · "),
+            gameThumbnailURL: item.coverImageURL?.absoluteString ?? ""
+        )
+    }
+
     func navigateToFriendRequests() {
         showFriendRequests()
     }
@@ -224,6 +239,26 @@ final class HomeCoordinator {
         navigationController.pushViewController(reviewVC, animated: true)
     }
 
+    private func showReviewComposer(
+        gameId: Int,
+        gameName: String,
+        gameSubtitle: String,
+        gameThumbnailURL: String,
+        existingReview: Review? = nil
+    ) {
+        let reviewVC = ReviewViewController(
+            rootView: ReviewRootView(),
+            viewModel: ReviewViewModel(
+                gameId: gameId,
+                gameName: gameName,
+                gameSubtitle: gameSubtitle,
+                gameThumbnailURL: gameThumbnailURL,
+                existingReview: existingReview
+            )
+        )
+        navigationController.pushViewController(reviewVC, animated: true)
+    }
+
     private func showGameReviews(game: GameDetail, detailViewController: GameDetailViewController?) {
         let reviewsViewController = GameReviewsViewController(
             rootView: GameReviewsRootView(),
@@ -298,5 +333,29 @@ final class HomeCoordinator {
             )
         }
         navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private static func makeTrendingGame(from item: TrendingGamesWidgetSnapshot.Item) -> Game {
+        let rating = Double(item.ratingText ?? "") ?? 0
+        return Game(
+            id: item.gameID,
+            title: item.title,
+            translatedTitle: nil,
+            summary: nil,
+            translatedSummary: nil,
+            genre: item.genreText,
+            category: item.genreText,
+            developer: "",
+            platform: "",
+            releaseDate: nil,
+            releaseYear: 0,
+            coverImageURL: item.coverImageURL,
+            rating: rating,
+            reviewCount: 0,
+            popularity: 0,
+            isTrending: true,
+            formattedRating: item.ratingText ?? "—",
+            formattedReviewCount: "0"
+        )
     }
 }
