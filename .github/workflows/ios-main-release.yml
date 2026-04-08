@@ -2,6 +2,15 @@ name: iOS Main Release
 
 on:
   workflow_dispatch:
+    inputs:
+      version_number:
+        description: "Release marketing version, e.g. 1.2. Leave blank to keep the current project value."
+        required: false
+        type: string
+      build_number:
+        description: "Optional build number override. Leave blank to auto-increment from App Store Connect."
+        required: false
+        type: string
   push:
     tags:
       - "v*"
@@ -32,6 +41,31 @@ jobs:
 
       - name: Bundle install
         run: bundle install --jobs 4 --retry 3
+
+      - name: Resolve release version parameters
+        env:
+          WORKFLOW_VERSION_INPUT: ${{ github.event.inputs.version_number }}
+          WORKFLOW_BUILD_INPUT: ${{ github.event.inputs.build_number }}
+        run: |
+          set -euo pipefail
+
+          release_version="${WORKFLOW_VERSION_INPUT:-}"
+          release_build="${WORKFLOW_BUILD_INPUT:-}"
+
+          if [[ -z "$release_version" && "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            release_version="${GITHUB_REF_NAME#v}"
+          fi
+
+          if [[ -n "$release_version" ]]; then
+            echo "RELEASE_VERSION_NUMBER=$release_version" >> "$GITHUB_ENV"
+          fi
+
+          if [[ -n "$release_build" ]]; then
+            echo "RELEASE_BUILD_NUMBER=$release_build" >> "$GITHUB_ENV"
+          fi
+
+          echo "Resolved marketing version: ${release_version:-<keep current project version>}"
+          echo "Resolved build number override: ${release_build:-<auto increment from App Store Connect>}"
 
       - name: Import signing certificate
         uses: apple-actions/import-codesign-certs@v3
@@ -80,4 +114,6 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ env.APP_STORE_CONNECT_PRIVATE_KEY }}
           APP_STORE_APP_IDENTIFIER: ${{ secrets.APP_STORE_APP_IDENTIFIER }}
+          RELEASE_VERSION_NUMBER: ${{ env.RELEASE_VERSION_NUMBER }}
+          RELEASE_BUILD_NUMBER: ${{ env.RELEASE_BUILD_NUMBER }}
         run: bundle exec fastlane ios release_upload
