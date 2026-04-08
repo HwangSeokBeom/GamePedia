@@ -4,16 +4,24 @@ require "xcodeproj"
 default_platform(:ios)
 
 platform :ios do
+  def repo_root
+    File.expand_path("..", __dir__)
+  end
+
+  def workspace_path
+    File.join(repo_root, "GamePedia.xcworkspace")
+  end
+
   def xcode_container_options
-    if File.exist?("GamePedia.xcworkspace")
-      { workspace: "GamePedia.xcworkspace" }
+    if File.exist?(workspace_path)
+      { workspace: workspace_path }
     else
-      { project: "GamePedia.xcodeproj" }
+      { project: project_path }
     end
   end
 
   def project_path
-    "GamePedia.xcodeproj"
+    File.join(repo_root, "GamePedia.xcodeproj")
   end
 
   def app_target_name
@@ -41,8 +49,8 @@ platform :ios do
   end
 
   def xcodebuild_container_arguments
-    if File.exist?("GamePedia.xcworkspace")
-      "-workspace #{Shellwords.escape("GamePedia.xcworkspace")}"
+    if File.exist?(workspace_path)
+      "-workspace #{Shellwords.escape(workspace_path)}"
     else
       "-project #{Shellwords.escape(project_path)}"
     end
