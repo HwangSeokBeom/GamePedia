@@ -305,6 +305,11 @@
 				TargetAttributes = {
 					8B9A88482F6EDC9A00D5F380 = {
 						CreatedOnToolsVersion = 26.3;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+						};
 					};
 					8B9A885E2F6EDC9B00D5F380 = {
 						CreatedOnToolsVersion = 26.3;
@@ -313,6 +318,14 @@
 					8B9A88682F6EDC9B00D5F380 = {
 						CreatedOnToolsVersion = 26.3;
 						TestTargetID = 8B9A88482F6EDC9A00D5F380;
+					};
+					A7629673C9E428A6B0D9EC21 = {
+						CreatedOnToolsVersion = 26.3;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+						};
 					};
 				};
 			};
