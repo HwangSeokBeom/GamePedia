@@ -82,6 +82,10 @@ private struct TrendingGamesSmallView: View {
 private struct TrendingGamesMediumView: View {
     let items: [TrendingGamesWidgetSnapshot.Item]
 
+    private var displayItems: [TrendingGamesWidgetSnapshot.Item] {
+        items.isEmpty ? TrendingGamesWidgetSnapshot.placeholder.items : items
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -93,7 +97,7 @@ private struct TrendingGamesMediumView: View {
             }
 
             VStack(spacing: 10) {
-                ForEach(items.isEmpty ? TrendingGamesWidgetSnapshot.placeholder.items : items, id: \.gameID) { item in
+                ForEach(displayItems) { item in
                     Link(destination: item.targetURL ?? WidgetDeepLinkURL.trending) {
                         TrendingGameRow(item: item)
                     }

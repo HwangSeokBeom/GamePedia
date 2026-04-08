@@ -6,7 +6,7 @@ enum GameWidgetKind {
 }
 
 struct TrendingGamesWidgetSnapshot: Codable, Hashable {
-    struct Item: Codable, Hashable {
+    struct Item: Codable, Hashable, Identifiable {
         let gameID: Int
         let title: String
         let genreText: String
@@ -14,6 +14,18 @@ struct TrendingGamesWidgetSnapshot: Codable, Hashable {
         let coverImageURL: URL?
         let rank: Int
         let targetURL: URL?
+
+        var id: String {
+            if gameID != 0 {
+                return String(gameID)
+            }
+
+            if let targetURL {
+                return targetURL.absoluteString
+            }
+
+            return title
+        }
     }
 
     let generatedAt: Date
@@ -25,7 +37,7 @@ extension TrendingGamesWidgetSnapshot {
         generatedAt: .distantPast,
         items: [
             Item(
-                gameID: 0,
+                gameID: -1,
                 title: "인기 게임",
                 genreText: "탭해서 확인",
                 ratingText: nil,
@@ -34,7 +46,7 @@ extension TrendingGamesWidgetSnapshot {
                 targetURL: nil
             ),
             Item(
-                gameID: 0,
+                gameID: -2,
                 title: "트렌딩 타이틀",
                 genreText: "곧 표시됩니다",
                 ratingText: nil,
@@ -43,7 +55,7 @@ extension TrendingGamesWidgetSnapshot {
                 targetURL: nil
             ),
             Item(
-                gameID: 0,
+                gameID: -3,
                 title: "추천 목록",
                 genreText: "데이터 로딩 중",
                 ratingText: nil,
