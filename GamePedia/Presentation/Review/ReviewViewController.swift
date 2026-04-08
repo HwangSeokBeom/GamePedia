@@ -6,6 +6,7 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
 
     // MARK: Properties
     private let viewModel: ReviewViewModel
+    let gameId: Int
     private let defaultSubmitAreaInset: CGFloat = 0
     private lazy var backgroundTapGestureRecognizer: UITapGestureRecognizer = {
         let gestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
@@ -20,6 +21,7 @@ final class ReviewViewController: BaseViewController<ReviewRootView, ReviewState
     // MARK: Init
     init(rootView: ReviewRootView, viewModel: ReviewViewModel) {
         self.viewModel = viewModel
+        self.gameId = viewModel.state.gameId
         super.init(rootView: rootView)
         hidesBottomBarWhenPushed = true
         NavigationBarStyler.apply(.opaque, to: navigationItem, buttonTintColor: .gpPrimary)

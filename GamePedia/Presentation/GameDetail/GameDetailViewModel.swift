@@ -29,6 +29,7 @@ final class GameDetailViewModel {
     private let translationProvider: any TranslationProviding
     private let translationCache: any TranslationCaching
     private let seedStore: GameDetailSeedStore
+    private var currentGameID: Int?
     private var reactingReviewIds = Set<String>()
     private var cancellables = Set<AnyCancellable>()
 
@@ -67,6 +68,7 @@ final class GameDetailViewModel {
         self.seedStore = seedStore
         observeCommentChanges()
         observeReviewLikeChanges()
+        observeFavoriteChanges()
     }
 
     // MARK: - Intent Processing
@@ -104,6 +106,7 @@ final class GameDetailViewModel {
     }
 
     private func loadDetail(gameId: Int) {
+        currentGameID = gameId
         apply(.clearError)
         apply(.setBlockingLoadError(nil))
         apply(.setInlineNotice(nil))
@@ -227,15 +230,21 @@ final class GameDetailViewModel {
     }
 
     private func toggleFavorite() {
-        guard let game = state.game, !state.isFavoriteLoading else { return }
+        guard !state.isFavoriteLoading,
+              let gameID = state.game?.id ?? currentGameID else {
+            return
+        }
 
+        let previousFavoriteState = state.isFavorite
+
+        apply(.setFavorite(!previousFavoriteState))
         apply(.setFavoriteLoading(true))
 
         Task {
             do {
                 let result = try await toggleFavoriteUseCase.execute(
-                    gameId: String(game.id),
-                    isCurrentlyFavorite: state.isFavorite
+                    gameId: String(gameID),
+                    isCurrentlyFavorite: previousFavoriteState
                 )
 
                 await MainActor.run {
@@ -256,11 +265,29 @@ final class GameDetailViewModel {
             } catch {
                 let favoriteError = FavoriteError.from(error: error)
                 await MainActor.run {
+                    self.apply(.setFavorite(previousFavoriteState))
                     self.apply(.setFavoriteLoading(false))
                     self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
                 }
             }
         }
+    }
+
+    private func observeFavoriteChanges() {
+        NotificationCenter.default.publisher(for: .favoriteDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let gameId = notification.userInfo?[FavoriteChangeUserInfoKey.gameId] as? Int,
+                      let isFavorite = notification.userInfo?[FavoriteChangeUserInfoKey.isFavorite] as? Bool,
+                      gameId == self.currentGameID else {
+                    return
+                }
+
+                self.apply(.setFavorite(isFavorite))
+                self.apply(.setFavoriteLoading(false))
+            }
+            .store(in: &cancellables)
     }
 
     private func prepareTranslation(for game: GameDetail) async {

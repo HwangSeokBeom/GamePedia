@@ -4,8 +4,11 @@ final class HomeGameListViewController: BaseViewController<HomeGameListRootView,
 
     private let viewModel: HomeGameListViewModel
     private var dataSource: UICollectionViewDiffableDataSource<Int, Game>!
+    private var lastRenderedWishlistedGameIDs = Set<Int>()
 
+    var section: HomeSection { viewModel.state.section }
     var onGameSelected: ((Int) -> Void)?
+    var onAuthenticationRequired: ((RestrictedActionContext, @escaping () -> Void) -> Void)?
 
     init(
         rootView: HomeGameListRootView,
@@ -27,7 +30,7 @@ final class HomeGameListViewController: BaseViewController<HomeGameListRootView,
     override func render(_ state: HomeGameListState) {
         GameDetailSeedStore.shared.store(games: state.games, screen: "Home.list.render")
         rootView.render(state)
-        applySnapshot(state.games)
+        applySnapshot(state: state)
     }
 
     private func configureNavigationItem() {
@@ -60,15 +63,55 @@ final class HomeGameListViewController: BaseViewController<HomeGameListRootView,
                 resolvedTitle: game.displayTitle,
                 isWishlisted: self.viewModel.state.wishlistedGameIDs.contains(game.id)
             )
+            cell.onFavoriteButtonTapped = { [weak self] in
+                self?.performAuthenticatedAction(for: .favoriteGame) { [weak self] in
+                    self?.viewModel.send(.didTapFavorite(gameId: game.id))
+                }
+            }
             return cell
         }
     }
 
-    private func applySnapshot(_ games: [Game]) {
+    private func applySnapshot(state: HomeGameListState) {
         var snapshot = NSDiffableDataSourceSnapshot<Int, Game>()
         snapshot.appendSections([0])
-        snapshot.appendItems(games, toSection: 0)
+        snapshot.appendItems(state.games, toSection: 0)
+        reconfigureWishlistItemsIfNeeded(state: state, snapshot: &snapshot)
         dataSource.apply(snapshot, animatingDifferences: false)
+        lastRenderedWishlistedGameIDs = state.wishlistedGameIDs
+    }
+
+    private func reconfigureWishlistItemsIfNeeded(
+        state: HomeGameListState,
+        snapshot: inout NSDiffableDataSourceSnapshot<Int, Game>
+    ) {
+        guard dataSource.snapshot().numberOfItems > 0,
+              lastRenderedWishlistedGameIDs != state.wishlistedGameIDs else {
+            return
+        }
+
+        let changedGameIDs = lastRenderedWishlistedGameIDs.symmetricDifference(state.wishlistedGameIDs)
+        let itemsToRefresh = state.games.filter { changedGameIDs.contains($0.id) }
+
+        guard itemsToRefresh.isEmpty == false else { return }
+
+        if #available(iOS 15.0, *) {
+            snapshot.reconfigureItems(itemsToRefresh)
+        } else {
+            snapshot.reloadItems(itemsToRefresh)
+        }
+    }
+
+    private func performAuthenticatedAction(
+        for context: RestrictedActionContext,
+        action: @escaping () -> Void
+    ) {
+        guard let onAuthenticationRequired else {
+            action()
+            return
+        }
+
+        onAuthenticationRequired(context, action)
     }
 }
 

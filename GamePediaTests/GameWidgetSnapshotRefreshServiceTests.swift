@@ -71,6 +71,7 @@ final class GameWidgetSnapshotRefreshServiceTests: XCTestCase {
         await service.refreshNow(reason: "empty")
 
         XCTAssertEqual(store.reviewPromptSnapshot?.state, .empty)
+        XCTAssertEqual(store.reviewPromptSnapshot?.headlineText, "리뷰할 찜 게임이 없어요")
         XCTAssertEqual(store.reviewPromptSnapshot?.targetURL, WidgetDeepLink.trending.url)
         XCTAssertNil(store.reviewPromptSnapshot?.item)
     }

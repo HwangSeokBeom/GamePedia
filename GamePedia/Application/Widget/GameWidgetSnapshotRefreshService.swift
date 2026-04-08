@@ -183,7 +183,7 @@ final class GameWidgetSnapshotRefreshService {
             generatedAt: Date(),
             state: .empty,
             headerTitle: "리뷰 남기기",
-            headlineText: "찜한 게임이 없어요",
+            headlineText: "리뷰할 찜 게임이 없어요",
             bodyText: "인기 게임을 둘러보고 새 리뷰를 남겨보세요.",
             ctaTitle: nil,
             targetURL: WidgetDeepLink.trending.url,

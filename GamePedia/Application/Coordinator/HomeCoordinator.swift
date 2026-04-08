@@ -91,6 +91,10 @@ final class HomeCoordinator {
     // MARK: - Navigation
 
     private func showDetail(gameId: Int) {
+        if reuseGameDetailIfPossible(gameId: gameId) {
+            return
+        }
+
         let detailVC = GameDetailViewController(gameId: gameId)
         detailVC.onAuthenticationRequired = { [weak self, weak detailVC] context, action in
             guard let self else { return }
@@ -137,6 +141,10 @@ final class HomeCoordinator {
         games: [Game],
         wishlistedGameIDs: Set<Int>
     ) {
+        if reuseGameListIfPossible(section: section) {
+            return
+        }
+
         let viewModel = HomeGameListViewModel(
             section: section,
             games: games,
@@ -148,6 +156,11 @@ final class HomeCoordinator {
         )
         listViewController.onGameSelected = { [weak self] gameId in
             self?.showDetail(gameId: gameId)
+        }
+        listViewController.onAuthenticationRequired = { [weak self, weak listViewController] context, action in
+            guard let self else { return }
+            let presenter = listViewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
         }
         navigationController.pushViewController(listViewController, animated: true)
     }
@@ -246,6 +259,10 @@ final class HomeCoordinator {
         gameThumbnailURL: String,
         existingReview: Review? = nil
     ) {
+        if reuseReviewComposerIfPossible(gameId: gameId) {
+            return
+        }
+
         let reviewVC = ReviewViewController(
             rootView: ReviewRootView(),
             viewModel: ReviewViewModel(
@@ -333,6 +350,57 @@ final class HomeCoordinator {
             )
         }
         navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func reuseGameDetailIfPossible(gameId: Int) -> Bool {
+        if let topViewController = navigationController.topViewController as? GameDetailViewController,
+           topViewController.gameId == gameId {
+            return true
+        }
+
+        guard let existingViewController = navigationController.viewControllers.first(where: {
+            guard let detailViewController = $0 as? GameDetailViewController else { return false }
+            return detailViewController.gameId == gameId
+        }) else {
+            return false
+        }
+
+        navigationController.popToViewController(existingViewController, animated: true)
+        return true
+    }
+
+    private func reuseGameListIfPossible(section: HomeSection) -> Bool {
+        if let topViewController = navigationController.topViewController as? HomeGameListViewController,
+           topViewController.section == section {
+            return true
+        }
+
+        guard let existingViewController = navigationController.viewControllers.first(where: {
+            guard let listViewController = $0 as? HomeGameListViewController else { return false }
+            return listViewController.section == section
+        }) else {
+            return false
+        }
+
+        navigationController.popToViewController(existingViewController, animated: true)
+        return true
+    }
+
+    private func reuseReviewComposerIfPossible(gameId: Int) -> Bool {
+        if let topViewController = navigationController.topViewController as? ReviewViewController,
+           topViewController.gameId == gameId {
+            return true
+        }
+
+        guard let existingViewController = navigationController.viewControllers.first(where: {
+            guard let reviewViewController = $0 as? ReviewViewController else { return false }
+            return reviewViewController.gameId == gameId
+        }) else {
+            return false
+        }
+
+        navigationController.popToViewController(existingViewController, animated: true)
+        return true
     }
 
     private static func makeTrendingGame(from item: TrendingGamesWidgetSnapshot.Item) -> Game {
