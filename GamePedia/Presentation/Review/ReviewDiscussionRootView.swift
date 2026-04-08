@@ -47,6 +47,14 @@ final class ReviewDiscussionRootView: UIView {
         return label
     }()
 
+    private let composerContextPreviewLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .gpTextSecondary
+        label.numberOfLines = 2
+        return label
+    }()
+
     let cancelComposerModeButton: UIButton = {
         var configuration = UIButton.Configuration.plain()
         configuration.title = L10n.Common.Button.cancel
@@ -124,6 +132,10 @@ final class ReviewDiscussionRootView: UIView {
     private let composerContextContainerView: UIView = {
         let view = UIView()
         view.backgroundColor = .gpSurfaceElevated
+        view.layer.cornerRadius = 14
+        view.layer.cornerCurve = .continuous
+        view.layer.borderWidth = 1
+        view.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.72).cgColor
         view.isHidden = true
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
@@ -187,6 +199,8 @@ final class ReviewDiscussionRootView: UIView {
 
         let contextText = composerState.contextText
         composerModeLabel.text = contextText
+        composerContextPreviewLabel.text = composerState.contextPreviewText
+        composerContextPreviewLabel.isHidden = composerState.contextPreviewText == nil
         composerContextContainerView.isHidden = contextText == nil
         cancelComposerModeButton.isHidden = contextText == nil
 
@@ -230,7 +244,12 @@ final class ReviewDiscussionRootView: UIView {
         composerContextRow.spacing = 8
         composerContextRow.translatesAutoresizingMaskIntoConstraints = false
 
-        composerContextContainerView.addSubview(composerContextRow)
+        let composerContextStack = UIStackView(arrangedSubviews: [composerContextRow, composerContextPreviewLabel])
+        composerContextStack.axis = .vertical
+        composerContextStack.spacing = 6
+        composerContextStack.translatesAutoresizingMaskIntoConstraints = false
+
+        composerContextContainerView.addSubview(composerContextStack)
         composerAvatarView.addSubview(composerAvatarIconView)
 
         let composerRow = UIStackView(arrangedSubviews: [composerAvatarView, composerTextContainerView])
@@ -289,10 +308,10 @@ final class ReviewDiscussionRootView: UIView {
             composerStackView.trailingAnchor.constraint(equalTo: composerContainerView.trailingAnchor, constant: -16),
             composerStackView.bottomAnchor.constraint(equalTo: composerContainerView.bottomAnchor, constant: -12),
 
-            composerContextRow.topAnchor.constraint(equalTo: composerContextContainerView.topAnchor, constant: 8),
-            composerContextRow.leadingAnchor.constraint(equalTo: composerContextContainerView.leadingAnchor, constant: 16),
-            composerContextRow.trailingAnchor.constraint(equalTo: composerContextContainerView.trailingAnchor, constant: -16),
-            composerContextRow.bottomAnchor.constraint(equalTo: composerContextContainerView.bottomAnchor, constant: -8),
+            composerContextStack.topAnchor.constraint(equalTo: composerContextContainerView.topAnchor, constant: 10),
+            composerContextStack.leadingAnchor.constraint(equalTo: composerContextContainerView.leadingAnchor, constant: 16),
+            composerContextStack.trailingAnchor.constraint(equalTo: composerContextContainerView.trailingAnchor, constant: -16),
+            composerContextStack.bottomAnchor.constraint(equalTo: composerContextContainerView.bottomAnchor, constant: -10),
 
             composerContextIconView.widthAnchor.constraint(equalToConstant: 12),
             composerContextIconView.heightAnchor.constraint(equalToConstant: 12),
@@ -350,6 +369,10 @@ final class ReviewDiscussionRootView: UIView {
         composerModeLabel.textColor = accentColor == .gpSeparator ? .gpPrimaryLight : accentColor
 
         let showsContext = state.contextText != nil
+        composerContextContainerView.layer.borderColor = (showsContext
+            ? accentColor.withAlphaComponent(accentColor == .gpSeparator ? 0.18 : 0.26)
+            : UIColor.gpSeparator.withAlphaComponent(0.72)
+        ).cgColor
         composerTextContainerView.layer.borderColor = (showsContext ? accentColor : UIColor.gpSeparator).cgColor
         composerTextContainerView.layer.borderWidth = showsContext ? 1.5 : 1
 

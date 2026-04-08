@@ -33,6 +33,7 @@ struct ReviewDiscussionComposerState: Equatable {
     let canSubmit: Bool
     let placeholder: String
     let contextText: String?
+    let contextPreviewText: String?
     let submitTitle: String
 }
 
@@ -138,6 +139,7 @@ struct ReviewDiscussionState: Equatable {
             canSubmit: canSubmit,
             placeholder: composerPlaceholder,
             contextText: composerContextText,
+            contextPreviewText: composerContextPreviewText,
             submitTitle: composerSubmitTitle
         )
     }
@@ -160,12 +162,21 @@ struct ReviewDiscussionState: Equatable {
         switch composerMode {
         case .comment:
             return nil
-        case .reply(_, let parentNickname, let isSelfReply):
-            return isSelfReply
+        case .reply(let context):
+            return context.isSelfReply
                 ? L10n.tr("Localizable", "review.comment.composer.selfReplying")
-                : L10n.tr("Localizable", "review.comment.composer.replyingTo", parentNickname)
+                : L10n.tr("Localizable", "review.comment.composer.replyingTo", context.targetNickname)
         case .edit:
             return L10n.tr("Localizable", "review.comment.composer.editing")
+        }
+    }
+
+    var composerContextPreviewText: String? {
+        switch composerMode {
+        case .reply(let context):
+            return context.targetPreviewText
+        case .comment, .edit:
+            return nil
         }
     }
 

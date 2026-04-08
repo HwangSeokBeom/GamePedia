@@ -670,6 +670,8 @@
 "review.comment.editedDate" = "%@ ・ %@に編集";
 "review.comment.action.send" = "送信";
 "review.comment.action.reply" = "返信";
+"review.comment.replyPrompt.root" = "返信を書いてみましょう";
+"review.comment.replyPrompt.reply" = "会話を続ける";
 "review.comment.action.hideReplies" = "返信を隠す";
 "review.comment.action.moreReplies" = "返信を%d件もっと見る";
 "review.card.commentCta" = "コメント%d件を見る";

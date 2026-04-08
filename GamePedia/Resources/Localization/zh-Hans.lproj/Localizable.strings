@@ -670,6 +670,8 @@
 "review.comment.editedDate" = "%@ · %@ 已编辑";
 "review.comment.action.send" = "发送";
 "review.comment.action.reply" = "回复";
+"review.comment.replyPrompt.root" = "写下你的回复";
+"review.comment.replyPrompt.reply" = "继续回复";
 "review.comment.action.hideReplies" = "隐藏回复";
 "review.comment.action.moreReplies" = "再看 %d 条回复";
 "review.card.commentCta" = "查看 %d 条评论";

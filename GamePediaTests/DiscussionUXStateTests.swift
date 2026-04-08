@@ -123,11 +123,13 @@ final class DiscussionUXStateTests: XCTestCase {
             reviewId: "review-4"
         )
         state.composerText = "답글 초안"
-        state.composerMode = .reply(
+        state.composerMode = .reply(.init(
             parentCommentId: "comment-1",
-            parentNickname: "작성자",
+            targetCommentId: "comment-1",
+            targetNickname: "작성자",
+            targetPreviewText: "원본 댓글",
             isSelfReply: false
-        )
+        ))
 
         let reducedState = ReviewDiscussionReducer.reduce(
             state,

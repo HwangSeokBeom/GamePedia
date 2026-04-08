@@ -62,7 +62,13 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         rootReplyButton.sendActions(for: .touchUpInside)
         XCTAssertEqual(
             viewModel.state.composerMode,
-            .reply(parentCommentId: "root-comment", parentNickname: "작성자-root-comment", isSelfReply: false)
+            makeReplyMode(
+                targetCommentId: "root-comment",
+                parentCommentId: "root-comment",
+                nickname: "작성자-root-comment",
+                previewText: "댓글-root-comment",
+                isSelfReply: false
+            )
         )
 
         rootLikeButton.sendActions(for: .touchUpInside)
@@ -71,7 +77,13 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         }
         XCTAssertEqual(
             viewModel.state.composerMode,
-            .reply(parentCommentId: "root-comment", parentNickname: "작성자-root-comment", isSelfReply: false)
+            makeReplyMode(
+                targetCommentId: "root-comment",
+                parentCommentId: "root-comment",
+                nickname: "작성자-root-comment",
+                previewText: "댓글-root-comment",
+                isSelfReply: false
+            )
         )
 
         viewController.tableView(viewController.rootView.tableView, didSelectRowAt: replyCommentIndexPath)
@@ -93,10 +105,12 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         }
         sheetReplyButton.sendActions(for: .touchUpInside)
         await waitUntil(timeout: 3) {
-            if case .reply(let parentCommentId, let parentNickname, let isSelfReply) = viewModel.state.composerMode {
-                return parentCommentId == "root-comment"
-                    && parentNickname == "작성자-root-comment"
-                    && isSelfReply == false
+            if case .reply(let context) = viewModel.state.composerMode {
+                return context.parentCommentId == "root-comment"
+                    && context.targetCommentId == "root-comment"
+                    && context.targetNickname == "작성자-root-comment"
+                    && context.targetPreviewText == "댓글-root-comment"
+                    && context.isSelfReply == false
             }
             return false
         }
@@ -110,7 +124,13 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         rootReplyButton.sendActions(for: .touchUpInside)
         XCTAssertEqual(
             viewModel.state.composerMode,
-            .reply(parentCommentId: "root-comment", parentNickname: "작성자-root-comment", isSelfReply: false)
+            makeReplyMode(
+                targetCommentId: "root-comment",
+                parentCommentId: "root-comment",
+                nickname: "작성자-root-comment",
+                previewText: "댓글-root-comment",
+                isSelfReply: false
+            )
         )
 
         viewController.rootView.tableView.scrollToRow(at: discussionHeaderIndexPath, at: .middle, animated: false)
@@ -128,7 +148,13 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         rootReplyButton.sendActions(for: .touchUpInside)
         XCTAssertEqual(
             viewModel.state.composerMode,
-            .reply(parentCommentId: "root-comment", parentNickname: "작성자-root-comment", isSelfReply: false)
+            makeReplyMode(
+                targetCommentId: "root-comment",
+                parentCommentId: "root-comment",
+                nickname: "작성자-root-comment",
+                previewText: "댓글-root-comment",
+                isSelfReply: false
+            )
         )
         viewController.debugHandleNavigationBarTap()
         XCTAssertEqual(viewModel.state.composerMode, .comment)
@@ -140,7 +166,13 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         rootReplyButton.sendActions(for: .touchUpInside)
         XCTAssertEqual(
             viewModel.state.composerMode,
-            .reply(parentCommentId: "root-comment", parentNickname: "작성자-root-comment", isSelfReply: false)
+            makeReplyMode(
+                targetCommentId: "root-comment",
+                parentCommentId: "root-comment",
+                nickname: "작성자-root-comment",
+                previewText: "댓글-root-comment",
+                isSelfReply: false
+            )
         )
         viewController.debugHandleTableTap(
             at: CGPoint(x: viewController.rootView.tableView.bounds.midX, y: blankAreaY)
@@ -253,6 +285,57 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
 
         XCTAssertEqual(viewModel.state.composerMode, .comment)
         XCTAssertEqual(viewModel.state.composerText, "답글 초안")
+    }
+
+    func testReviewDiscussionReplyPrompt_routesToDetailWhenDiscussionIsNotFocusedOnComment() async throws {
+        let repository = MockReviewCommentRepository(
+            comments: [makeComment(id: "root-comment", parentCommentId: nil, depth: 0, likeCount: 0, myReaction: nil)]
+        )
+        let viewModel = makeViewModel(reviewCommentRepository: repository)
+        let viewController = ReviewDiscussionViewController(
+            rootView: ReviewDiscussionRootView(),
+            viewModel: viewModel
+        )
+        let navigationController = UINavigationController(rootViewController: viewController)
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = navigationController
+
+        var routedCommentID: String?
+        var routedReviewID: String?
+        viewController.onReplyDetailRequested = { comment, review in
+            routedCommentID = comment.id
+            routedReviewID = review?.id
+        }
+
+        window.makeKeyAndVisible()
+        viewController.loadViewIfNeeded()
+
+        await waitUntil {
+            viewController.rootView.tableView.numberOfSections == 3 &&
+            viewController.rootView.tableView.numberOfRows(inSection: 2) == 1
+        }
+
+        let rootCommentIndexPath = IndexPath(row: 0, section: 2)
+        viewController.rootView.tableView.scrollToRow(at: rootCommentIndexPath, at: .middle, animated: false)
+        viewController.rootView.tableView.layoutIfNeeded()
+
+        await waitUntil {
+            guard let cell = viewController.rootView.tableView.cellForRow(at: rootCommentIndexPath) as? ReviewCommentCell else {
+                return false
+            }
+            return self.findButton(in: cell.contentView, accessibilityIdentifier: "reviewComment.replyButton") != nil
+        }
+
+        guard let rootCell = viewController.rootView.tableView.cellForRow(at: rootCommentIndexPath) as? ReviewCommentCell,
+              let replyButton = findButton(in: rootCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") else {
+            return XCTFail("Reply prompt button not found")
+        }
+
+        replyButton.sendActions(for: .touchUpInside)
+
+        XCTAssertEqual(routedCommentID, "root-comment")
+        XCTAssertEqual(routedReviewID, "review-1")
+        XCTAssertEqual(viewModel.state.composerMode, .comment)
     }
 
     func testGameReviewsViewModel_reviewLike_optimisticUpdateRollbackAndDiscussionSync() async throws {
@@ -418,6 +501,22 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
             dislikeCount: 0,
             myReaction: myReaction
         )
+    }
+
+    private func makeReplyMode(
+        targetCommentId: String,
+        parentCommentId: String,
+        nickname: String,
+        previewText: String,
+        isSelfReply: Bool
+    ) -> ReviewDiscussionComposerMode {
+        .reply(.init(
+            parentCommentId: parentCommentId,
+            targetCommentId: targetCommentId,
+            targetNickname: nickname,
+            targetPreviewText: previewText,
+            isSelfReply: isSelfReply
+        ))
     }
 
     private func findButton(in view: UIView, accessibilityIdentifier: String) -> UIButton? {

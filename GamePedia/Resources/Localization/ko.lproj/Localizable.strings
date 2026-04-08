@@ -670,6 +670,8 @@
 "review.comment.editedDate" = "%@ · %@ 수정됨";
 "review.comment.action.send" = "보내기";
 "review.comment.action.reply" = "답글쓰기";
+"review.comment.replyPrompt.root" = "대댓글을 남겨보세요";
+"review.comment.replyPrompt.reply" = "답글을 이어서 남겨보세요";
 "review.comment.action.hideReplies" = "답글 접기";
 "review.comment.action.moreReplies" = "답글 %d개 더 보기";
 "review.card.commentCta" = "댓글 %d개 보기";

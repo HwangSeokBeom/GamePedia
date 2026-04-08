@@ -670,6 +670,8 @@
 "review.comment.editedDate" = "%@ · edited %@";
 "review.comment.action.send" = "Send";
 "review.comment.action.reply" = "Reply";
+"review.comment.replyPrompt.root" = "Leave a reply";
+"review.comment.replyPrompt.reply" = "Continue the reply";
 "review.comment.action.hideReplies" = "Hide replies";
 "review.comment.action.moreReplies" = "%d more replies";
 "review.card.commentCta" = "View %d comments";

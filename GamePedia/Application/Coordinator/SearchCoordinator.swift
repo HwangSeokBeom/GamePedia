@@ -128,7 +128,9 @@ final class SearchCoordinator {
         gameTitle: String?,
         reviewID: String,
         reviewSeed: Review?,
-        highlightCommentID: String?
+        highlightCommentID: String?,
+        initialReplyTargetCommentID: String? = nil,
+        autoFocusReplyComposer: Bool = false
     ) {
         let viewController = ReviewDiscussionViewController(
             rootView: ReviewDiscussionRootView(),
@@ -138,12 +140,25 @@ final class SearchCoordinator {
                 reviewId: reviewID,
                 reviewSeed: reviewSeed,
                 highlightCommentId: highlightCommentID
-            )
+            ),
+            initialReplyTargetCommentId: initialReplyTargetCommentID,
+            autoFocusReplyComposerOnFirstAppearance: autoFocusReplyComposer
         )
         viewController.onAuthenticationRequired = { [weak self, weak viewController] context, action in
             guard let self else { return }
             let presenter = viewController ?? self.navigationController.topViewController ?? self.navigationController
             self.onAuthenticationRequested?(presenter, context, action)
+        }
+        viewController.onReplyDetailRequested = { [weak self] comment, reviewSeed in
+            self?.showReviewDiscussion(
+                gameId: comment.gameId,
+                gameTitle: comment.gameTitle,
+                reviewID: comment.reviewId,
+                reviewSeed: reviewSeed,
+                highlightCommentID: comment.id,
+                initialReplyTargetCommentID: comment.id,
+                autoFocusReplyComposer: true
+            )
         }
         navigationController.pushViewController(viewController, animated: true)
     }

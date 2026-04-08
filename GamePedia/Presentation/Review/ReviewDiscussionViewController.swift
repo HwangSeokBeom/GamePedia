@@ -33,7 +33,13 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         let sections: [SnapshotSectionSignature]
     }
 
+    private struct ReplyToggleAnchor {
+        let parentCommentId: String
+        let minY: CGFloat
+    }
+
     private let viewModel: ReviewDiscussionViewModel
+    private let shouldAutoFocusReplyComposerOnFirstAppearance: Bool
     private var dataSource: UITableViewDiffableDataSource<Section, Row>!
     private var commentById: [String: ReviewComment] = [:]
     private var lastRenderedSnapshotSignature: SnapshotSignature?
@@ -43,11 +49,22 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
     private var lastHighlightToken: Int = 0
     private var keyboardDismissTapGestureRecognizer: UITapGestureRecognizer?
     private var navigationBarTapGestureRecognizer: UITapGestureRecognizer?
+    private var pendingInitialReplyTargetCommentId: String?
+    private var hasViewAppeared = false
+    private var pendingReplyToggleAnchor: ReplyToggleAnchor?
 
     var onAuthenticationRequired: ((RestrictedActionContext, @escaping () -> Void) -> Void)?
+    var onReplyDetailRequested: ((ReviewComment, Review?) -> Void)?
 
-    init(rootView: ReviewDiscussionRootView, viewModel: ReviewDiscussionViewModel) {
+    init(
+        rootView: ReviewDiscussionRootView,
+        viewModel: ReviewDiscussionViewModel,
+        initialReplyTargetCommentId: String? = nil,
+        autoFocusReplyComposerOnFirstAppearance: Bool = false
+    ) {
         self.viewModel = viewModel
+        self.pendingInitialReplyTargetCommentId = initialReplyTargetCommentId
+        self.shouldAutoFocusReplyComposerOnFirstAppearance = autoFocusReplyComposerOnFirstAppearance
         super.init(rootView: rootView)
         NavigationBarStyler.apply(.opaque, to: navigationItem, buttonTintColor: .gpPrimary)
         hidesBottomBarWhenPushed = true
@@ -70,6 +87,12 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         setupNavigationBarDismissGesture()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        hasViewAppeared = true
+        activateInitialReplyTargetIfNeeded()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -105,6 +128,8 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
             lastHighlightToken = state.highlightToken
             highlightCommentIfNeeded(commentId: commentId)
         }
+
+        activateInitialReplyTargetIfNeeded()
     }
 
     private func setupTableView() {
@@ -210,7 +235,9 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
             snapshot.appendSections([section.section])
             snapshot.appendItems(section.rows, toSection: section.section)
         }
-        dataSource.apply(snapshot, animatingDifferences: true)
+        dataSource.apply(snapshot, animatingDifferences: true) { [weak self] in
+            self?.restoreReplyToggleAnchorIfNeeded()
+        }
     }
 
     private func makeSnapshotSignature(for state: ReviewDiscussionState, commentRows: [Row]) -> SnapshotSignature {
@@ -262,7 +289,9 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
             guard !replies.isEmpty else { continue }
 
             let isExpanded = expandedParentCommentIds.contains(comment.id)
-            let visibleReplies = isExpanded ? replies : Array(replies.prefix(previewReplyLimit))
+            // Collapse should keep the earliest replies visible and hide the newest ones.
+            let collapsedReplies = Array(replies.prefix(previewReplyLimit))
+            let visibleReplies = isExpanded ? replies : collapsedReplies
             rows.append(contentsOf: visibleReplies.map { .comment($0.id) })
 
             if replies.count > previewReplyLimit || isExpanded {
@@ -356,7 +385,7 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         }
         cell.onReplyTapped = { [weak self] in
             self?.performAuthenticatedAction { [weak self] in
-                self?.activateReplyMode(for: comment)
+                self?.handleReplyEntry(for: comment)
             }
         }
         cell.onMoreTapped = { [weak self] in
@@ -485,6 +514,7 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
             keyboardDismissOnly()
         case .toggleReplies(let parentCommentId):
             keyboardDismissOnly()
+            captureReplyToggleAnchor(for: parentCommentId)
             viewModel.send(.didTapToggleReplies(parentCommentId: parentCommentId))
         }
     }
@@ -508,15 +538,90 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         rootView.focusComposer()
     }
 
-    private func activateReplyMode(for comment: ReviewComment) {
+    private func handleReplyEntry(for comment: ReviewComment) {
+        guard comment.canReply else { return }
+
+        if shouldNavigateReplyEntryToDetail {
+            keyboardDismissOnly()
+            onReplyDetailRequested?(comment, viewModel.state.review)
+            return
+        }
+
+        activateReplyMode(for: comment)
+    }
+
+    private func activateReplyMode(for comment: ReviewComment, shouldFocusComposer: Bool = true) {
         guard comment.canReply else { return }
         ReviewDiscussionTrace.log("[ReviewDiscussionVC] activateReplyMode commentId=\(comment.id)")
         viewModel.send(.didTapReply(commentId: comment.id))
-        focusComposer(mode: .reply(
-            parentCommentId: comment.parentCommentId ?? comment.id,
-            parentNickname: comment.author.nickname,
-            isSelfReply: comment.isMine
-        ))
+        guard shouldFocusComposer else { return }
+        focusComposer(mode: viewModel.state.composerMode)
+    }
+
+    private var shouldNavigateReplyEntryToDetail: Bool {
+        viewModel.state.initialHighlightCommentId == nil && onReplyDetailRequested != nil
+    }
+
+    private func activateInitialReplyTargetIfNeeded() {
+        guard hasViewAppeared,
+              let targetCommentId = pendingInitialReplyTargetCommentId,
+              let comment = viewModel.state.comments.first(where: { $0.id == targetCommentId }) else {
+            return
+        }
+
+        pendingInitialReplyTargetCommentId = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.activateReplyMode(
+                for: comment,
+                shouldFocusComposer: self?.shouldAutoFocusReplyComposerOnFirstAppearance == true
+            )
+        }
+    }
+
+    private func captureReplyToggleAnchor(for parentCommentId: String) {
+        guard let row = dataSource.snapshot().itemIdentifiers.first(where: { row in
+            if case .toggleReplies(let currentParentCommentId, _, _) = row {
+                return currentParentCommentId == parentCommentId
+            }
+            return false
+        }),
+        let indexPath = dataSource.indexPath(for: row) else {
+            pendingReplyToggleAnchor = nil
+            return
+        }
+
+        let minY = rootView.tableView.rectForRow(at: indexPath).minY
+        pendingReplyToggleAnchor = .init(parentCommentId: parentCommentId, minY: minY)
+    }
+
+    private func restoreReplyToggleAnchorIfNeeded() {
+        guard let anchor = pendingReplyToggleAnchor else { return }
+        pendingReplyToggleAnchor = nil
+        rootView.tableView.layoutIfNeeded()
+
+        guard let row = dataSource.snapshot().itemIdentifiers.first(where: { row in
+            if case .toggleReplies(let currentParentCommentId, _, _) = row {
+                return currentParentCommentId == anchor.parentCommentId
+            }
+            return false
+        }),
+        let indexPath = dataSource.indexPath(for: row) else {
+            return
+        }
+
+        let updatedMinY = rootView.tableView.rectForRow(at: indexPath).minY
+        let delta = updatedMinY - anchor.minY
+        guard delta != 0 else { return }
+
+        let minimumOffsetY = -rootView.tableView.adjustedContentInset.top
+        let maximumOffsetY = max(
+            minimumOffsetY,
+            rootView.tableView.contentSize.height - rootView.tableView.bounds.height + rootView.tableView.adjustedContentInset.bottom
+        )
+
+        var contentOffset = rootView.tableView.contentOffset
+        contentOffset.y = min(max(contentOffset.y + delta, minimumOffsetY), maximumOffsetY)
+        rootView.tableView.setContentOffset(contentOffset, animated: false)
     }
 
     private func availableCommentActionKinds(for comment: ReviewComment) -> [ReviewCommentActionSheetViewController.Context.Action.Kind] {
@@ -614,7 +719,7 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         switch actionKind {
         case .reply:
             performAuthenticatedAction { [weak self] in
-                self?.activateReplyMode(for: comment)
+                self?.handleReplyEntry(for: comment)
             }
         case .edit:
             performAuthenticatedAction { [weak self] in

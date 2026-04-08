@@ -42,6 +42,7 @@ final class ReviewCommentActionSheetViewController: UIViewController {
         view.layer.cornerRadius = 20
         view.layer.cornerCurve = .continuous
         view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        view.layer.masksToBounds = true
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
@@ -110,8 +111,7 @@ final class ReviewCommentActionSheetViewController: UIViewController {
         return button
     }()
 
-    private var containerBottomConstraint: NSLayoutConstraint?
-    private var sheetContentBottomConstraint: NSLayoutConstraint?
+    private let hiddenTranslationY: CGFloat = 420
     private var hasAnimatedIn = false
     private var hasNotifiedDismissal = false
 
@@ -138,13 +138,9 @@ final class ReviewCommentActionSheetViewController: UIViewController {
         presentSheet()
     }
 
-    override func viewSafeAreaInsetsDidChange() {
-        super.viewSafeAreaInsetsDidChange()
-        sheetContentBottomConstraint?.constant = -(max(view.safeAreaInsets.bottom, 8))
-    }
-
     private func setup() {
         view.backgroundColor = .clear
+        sheetContainerView.transform = CGAffineTransform(translationX: 0, y: hiddenTranslationY)
 
         avatarView.addSubview(avatarInitialLabel)
         avatarView.backgroundColor = context.avatarBackgroundColor
@@ -197,11 +193,6 @@ final class ReviewCommentActionSheetViewController: UIViewController {
         view.addSubview(sheetContainerView)
         sheetContainerView.addSubview(stackView)
 
-        containerBottomConstraint = sheetContainerView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 360)
-        sheetContentBottomConstraint = cancelButton.bottomAnchor.constraint(equalTo: cancelSection.bottomAnchor, constant: -max(view.safeAreaInsets.bottom, 8))
-        containerBottomConstraint?.isActive = true
-        sheetContentBottomConstraint?.isActive = true
-
         NSLayoutConstraint.activate([
             dimView.topAnchor.constraint(equalTo: view.topAnchor),
             dimView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -210,11 +201,12 @@ final class ReviewCommentActionSheetViewController: UIViewController {
 
             sheetContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             sheetContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sheetContainerView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             stackView.topAnchor.constraint(equalTo: sheetContainerView.topAnchor),
             stackView.leadingAnchor.constraint(equalTo: sheetContainerView.leadingAnchor),
             stackView.trailingAnchor.constraint(equalTo: sheetContainerView.trailingAnchor),
-            stackView.bottomAnchor.constraint(equalTo: sheetContainerView.bottomAnchor),
+            stackView.bottomAnchor.constraint(equalTo: sheetContainerView.safeAreaLayoutGuide.bottomAnchor, constant: -8),
 
             handleRow.heightAnchor.constraint(equalToConstant: 24),
             handleView.centerXAnchor.constraint(equalTo: handleRow.centerXAnchor),
@@ -234,6 +226,8 @@ final class ReviewCommentActionSheetViewController: UIViewController {
 
             cancelButton.leadingAnchor.constraint(equalTo: cancelSection.leadingAnchor, constant: 20),
             cancelButton.trailingAnchor.constraint(equalTo: cancelSection.trailingAnchor, constant: -20),
+            cancelButton.topAnchor.constraint(equalTo: cancelSection.topAnchor, constant: 12),
+            cancelButton.bottomAnchor.constraint(equalTo: cancelSection.bottomAnchor, constant: -12),
             cancelButton.heightAnchor.constraint(equalToConstant: 48),
 
             footerDivider.topAnchor.constraint(equalTo: cancelSection.topAnchor),
@@ -273,18 +267,16 @@ final class ReviewCommentActionSheetViewController: UIViewController {
 
     private func presentSheet() {
         view.layoutIfNeeded()
-        containerBottomConstraint?.constant = 0
         UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseOut]) {
             self.dimView.alpha = 1
-            self.view.layoutIfNeeded()
+            self.sheetContainerView.transform = .identity
         }
     }
 
     private func dismissSheet(completion: (() -> Void)? = nil) {
-        containerBottomConstraint?.constant = 360
         UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseIn], animations: {
             self.dimView.alpha = 0
-            self.view.layoutIfNeeded()
+            self.sheetContainerView.transform = CGAffineTransform(translationX: 0, y: self.hiddenTranslationY)
         }, completion: { _ in
             self.dismiss(animated: false) {
                 if self.hasNotifiedDismissal == false {

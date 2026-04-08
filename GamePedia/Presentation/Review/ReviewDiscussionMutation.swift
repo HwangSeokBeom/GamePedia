@@ -1,16 +1,24 @@
 import Foundation
 
+struct ReviewDiscussionReplyContext: Equatable {
+    let parentCommentId: String
+    let targetCommentId: String
+    let targetNickname: String
+    let targetPreviewText: String
+    let isSelfReply: Bool
+}
+
 enum ReviewDiscussionComposerMode: Equatable {
     case comment
-    case reply(parentCommentId: String, parentNickname: String, isSelfReply: Bool)
+    case reply(ReviewDiscussionReplyContext)
     case edit(commentId: String)
 
     var parentCommentId: String? {
         switch self {
         case .comment:
             return nil
-        case .reply(let parentCommentId, _, _):
-            return parentCommentId
+        case .reply(let context):
+            return context.parentCommentId
         case .edit:
             return nil
         }

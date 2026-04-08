@@ -65,11 +65,7 @@ final class ReviewDiscussionViewModel {
             apply(.setComposerModePreservingText(.comment))
         case .didTapReply(let commentId):
             guard let comment = state.comments.first(where: { $0.id == commentId }) else { return }
-            apply(.setComposerMode(.reply(
-                parentCommentId: comment.parentCommentId ?? comment.id,
-                parentNickname: comment.author.nickname,
-                isSelfReply: comment.isMine
-            )))
+            apply(.setComposerMode(makeReplyComposerMode(for: comment)))
         case .didTapEdit(let commentId):
             guard let comment = state.comments.first(where: { $0.id == commentId }) else { return }
             apply(.setComposerMode(.edit(commentId: commentId)))
@@ -168,7 +164,7 @@ final class ReviewDiscussionViewModel {
     }
 
     private func submitComposer() {
-        guard let context = state.discussionContext else { return }
+        guard let discussionContext = state.discussionContext else { return }
         let trimmedText = state.composerText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
         apply(.setSubmitting(true))
@@ -180,15 +176,15 @@ final class ReviewDiscussionViewModel {
                 case .comment:
                     createdOrUpdatedComment = try await createReviewCommentUseCase.execute(
                         draft: ReviewCommentDraft(parentCommentId: nil, content: trimmedText),
-                        context: context
+                        context: discussionContext
                     )
                     await MainActor.run {
                         self.apply(.setInlineNotice(L10n.tr("Localizable", "review.comment.notice.created")))
                     }
-                case .reply(let parentCommentId, _, _):
+                case .reply(let replyContext):
                     createdOrUpdatedComment = try await createReviewCommentUseCase.execute(
-                        draft: ReviewCommentDraft(parentCommentId: parentCommentId, content: trimmedText),
-                        context: context
+                        draft: ReviewCommentDraft(parentCommentId: replyContext.parentCommentId, content: trimmedText),
+                        context: discussionContext
                     )
                     await MainActor.run {
                         self.apply(.setInlineNotice(L10n.tr("Localizable", "review.comment.notice.replied")))
@@ -197,7 +193,7 @@ final class ReviewDiscussionViewModel {
                     createdOrUpdatedComment = try await updateReviewCommentUseCase.execute(
                         commentId: commentId,
                         content: trimmedText,
-                        context: context
+                        context: discussionContext
                     )
                     await MainActor.run {
                         self.apply(.setInlineNotice(L10n.tr("Localizable", "review.comment.notice.updated")))
@@ -445,6 +441,30 @@ final class ReviewDiscussionViewModel {
                 self.apply(.replaceReview(updatedReview))
             }
             .store(in: &cancellables)
+    }
+
+    private func makeReplyComposerMode(for comment: ReviewComment) -> ReviewDiscussionComposerMode {
+        .reply(.init(
+            parentCommentId: comment.parentCommentId ?? comment.id,
+            targetCommentId: comment.id,
+            targetNickname: comment.author.nickname,
+            targetPreviewText: comment.content.condensedForReplyComposerPreview(),
+            isSelfReply: comment.isMine
+        ))
+    }
+}
+
+private extension String {
+    func condensedForReplyComposerPreview(limit: Int = 72) -> String {
+        let collapsed = replacingOccurrences(
+            of: "\\s+",
+            with: " ",
+            options: .regularExpression
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard collapsed.count > limit else { return collapsed }
+        let index = collapsed.index(collapsed.startIndex, offsetBy: limit)
+        return "\(collapsed[..<index])…"
     }
 }
 

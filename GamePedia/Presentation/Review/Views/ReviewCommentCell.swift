@@ -115,8 +115,25 @@ final class ReviewCommentCell: UITableViewCell {
     }()
 
     private let likeButton = UIButton(type: .system)
-    private let replyButton = UIButton(type: .system)
     private let moreButton = UIButton(type: .system)
+    private let replyPromptButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.baseForegroundColor = .gpTextSecondary
+        configuration.background.backgroundColor = UIColor.gpSurfaceElevated.withAlphaComponent(0.96)
+        configuration.background.strokeColor = UIColor.gpSeparator.withAlphaComponent(0.76)
+        configuration.background.strokeWidth = 1
+        configuration.background.cornerRadius = 15
+        configuration.image = UIImage(
+            systemName: "bubble.left",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .medium)
+        )
+        configuration.imagePadding = 6
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 7, leading: 12, bottom: 7, trailing: 12)
+        let button = UIButton(configuration: configuration)
+        button.contentHorizontalAlignment = .leading
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
     private let separatorView: UIView = {
         let view = UIView()
         view.backgroundColor = .gpSeparator
@@ -175,15 +192,15 @@ final class ReviewCommentCell: UITableViewCell {
         firstMetaDot.font = .systemFont(ofSize: metaStyle.labelFontSize, weight: .medium)
         mineBadgeLabel.isHidden = !viewState.isMine
         configureLikeButton(with: viewState, metaStyle: metaStyle)
-        configureReplyButton(with: viewState, metaStyle: metaStyle)
+        configureReplyPrompt(with: viewState, metaStyle: metaStyle)
         configureMoreButton(with: viewState, metaStyle: metaStyle)
 
         let hidesMeta = viewState.isDeleted
         timeLabel.isHidden = hidesMeta
         firstMetaDot.isHidden = hidesMeta
         likeButton.isHidden = hidesMeta
-        replyButton.isHidden = hidesMeta || !viewState.canReply
         moreButton.isHidden = hidesMeta || !viewState.showsMoreAction
+        replyPromptButton.isHidden = hidesMeta || !viewState.canReply
     }
 
     override func prepareForReuse() {
@@ -224,15 +241,15 @@ final class ReviewCommentCell: UITableViewCell {
         headerRow.alignment = .center
 
         configureMetaButton(likeButton, selector: #selector(didTapLike))
-        configureMetaButton(replyButton, selector: #selector(didTapReply))
         configureMetaButton(moreButton, selector: #selector(didTapMore))
+        replyPromptButton.addTarget(self, action: #selector(didTapReply), for: .touchUpInside)
 
-        let metaRow = UIStackView(arrangedSubviews: [timeLabel, firstMetaDot, likeButton, replyButton, moreButton, UIView()])
+        let metaRow = UIStackView(arrangedSubviews: [timeLabel, firstMetaDot, likeButton, moreButton, UIView()])
         metaRow.axis = .horizontal
         metaRow.alignment = .center
         metaRow.spacing = 6
 
-        let contentStack = UIStackView(arrangedSubviews: [headerRow, bodyLabel, metaRow])
+        let contentStack = UIStackView(arrangedSubviews: [headerRow, bodyLabel, metaRow, replyPromptButton])
         contentStack.axis = .vertical
         contentStack.spacing = 8
         contentStack.translatesAutoresizingMaskIntoConstraints = false
@@ -271,6 +288,7 @@ final class ReviewCommentCell: UITableViewCell {
         bodyLabel.setContentCompressionResistancePriority(.required, for: .vertical)
         bodyLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         authorLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        replyPromptButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 34).isActive = true
     }
 
     private func configureLikeButton(with viewState: ViewState, metaStyle: MetaStyle) {
@@ -296,24 +314,32 @@ final class ReviewCommentCell: UITableViewCell {
         likeButton.accessibilityIdentifier = "reviewComment.likeButton"
     }
 
-    private func configureReplyButton(with viewState: ViewState, metaStyle: MetaStyle) {
-        var configuration = replyButton.configuration
-        configuration?.title = L10n.tr("Localizable", "review.comment.action.reply")
+    private func configureReplyPrompt(with viewState: ViewState, metaStyle: MetaStyle) {
+        var configuration = replyPromptButton.configuration
+        configuration?.title = viewState.depth == 0
+            ? L10n.tr("Localizable", "review.comment.replyPrompt.root")
+            : L10n.tr("Localizable", "review.comment.replyPrompt.reply")
+        configuration?.baseForegroundColor = .gpTextSecondary
         configuration?.image = UIImage(
-            systemName: "arrowshape.turn.up.left",
+            systemName: "bubble.left",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: metaStyle.iconPointSize, weight: .medium)
         )
-        configuration?.baseForegroundColor = .gpPrimary
-        configuration?.imagePadding = metaStyle.imagePadding
-        configuration?.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: metaStyle.horizontalInset, bottom: 8, trailing: metaStyle.horizontalInset)
+        configuration?.imagePadding = 6
+        configuration?.contentInsets = NSDirectionalEdgeInsets(
+            top: viewState.depth > 0 ? 6 : 7,
+            leading: 12,
+            bottom: viewState.depth > 0 ? 6 : 7,
+            trailing: 12
+        )
         configuration?.titleTextAttributesTransformer = makeMetaTitleAttributesTransformer(
-            fontSize: metaStyle.labelFontSize,
+            fontSize: viewState.depth > 0 ? 12 : 13,
             weight: .medium
         )
-        replyButton.configuration = configuration
-        replyButton.isEnabled = viewState.canReply
-        replyButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.reply")
-        replyButton.accessibilityIdentifier = "reviewComment.replyButton"
+        replyPromptButton.configuration = configuration
+        replyPromptButton.isEnabled = viewState.canReply
+        replyPromptButton.alpha = viewState.canReply ? 1 : 0.6
+        replyPromptButton.accessibilityLabel = L10n.tr("Localizable", "review.comment.accessibility.reply")
+        replyPromptButton.accessibilityIdentifier = "reviewComment.replyButton"
     }
 
     private func configureMoreButton(with viewState: ViewState, metaStyle: MetaStyle) {
