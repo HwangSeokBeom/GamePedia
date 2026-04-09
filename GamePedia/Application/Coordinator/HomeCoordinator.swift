@@ -47,14 +47,19 @@ final class HomeCoordinator {
         showDetail(gameId: gameID)
     }
 
-    func navigateToReviewDiscussion(gameID: Int, reviewID: String?, commentID: String?) {
+    func navigateToReviewDiscussion(
+        gameID: Int,
+        reviewID: String?,
+        commentID: String?,
+        gameTitle: String? = nil
+    ) {
         guard let reviewID else {
             showDetail(gameId: gameID)
             return
         }
         showReviewDiscussion(
             gameId: gameID,
-            gameTitle: nil,
+            gameTitle: gameTitle,
             reviewID: reviewID,
             reviewSeed: nil,
             highlightCommentID: commentID
@@ -321,6 +326,15 @@ final class HomeCoordinator {
         initialReplyTargetCommentID: String? = nil,
         autoFocusReplyComposer: Bool = false
     ) {
+        if reuseReviewDiscussionIfPossible(
+            gameId: gameId,
+            reviewId: reviewID,
+            highlightCommentID: highlightCommentID,
+            initialReplyTargetCommentID: initialReplyTargetCommentID
+        ) {
+            return
+        }
+
         let viewController = ReviewDiscussionViewController(
             rootView: ReviewDiscussionRootView(),
             viewModel: ReviewDiscussionViewModel(
@@ -395,6 +409,35 @@ final class HomeCoordinator {
         guard let existingViewController = navigationController.viewControllers.first(where: {
             guard let reviewViewController = $0 as? ReviewViewController else { return false }
             return reviewViewController.gameId == gameId
+        }) else {
+            return false
+        }
+
+        navigationController.popToViewController(existingViewController, animated: true)
+        return true
+    }
+
+    private func reuseReviewDiscussionIfPossible(
+        gameId: Int,
+        reviewId: String,
+        highlightCommentID: String?,
+        initialReplyTargetCommentID: String?
+    ) -> Bool {
+        let matchesRoute: (ReviewDiscussionViewController) -> Bool = { discussionViewController in
+            discussionViewController.gameId == gameId &&
+            discussionViewController.reviewId == reviewId &&
+            discussionViewController.initialHighlightCommentId == highlightCommentID &&
+            discussionViewController.initialReplyTargetCommentId == initialReplyTargetCommentID
+        }
+
+        if let topViewController = navigationController.topViewController as? ReviewDiscussionViewController,
+           matchesRoute(topViewController) {
+            return true
+        }
+
+        guard let existingViewController = navigationController.viewControllers.first(where: {
+            guard let discussionViewController = $0 as? ReviewDiscussionViewController else { return false }
+            return matchesRoute(discussionViewController)
         }) else {
             return false
         }

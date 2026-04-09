@@ -4,7 +4,10 @@ import UIKit
 enum EnvironmentDebugMenuPresenter {
     static func present(
         from presenter: UIViewController,
-        currentEnvironment: APIEnvironment
+        currentEnvironment: APIEnvironment,
+        onRefreshWidgetSnapshots: (() -> Void)? = nil,
+        onSeedWidgetSamples: (() -> Void)? = nil,
+        onSeedLoggedOutWidgetSamples: (() -> Void)? = nil
     ) {
         let alertController = UIAlertController(
             title: "서버 환경 정보",
@@ -16,6 +19,30 @@ enum EnvironmentDebugMenuPresenter {
             """,
             preferredStyle: .actionSheet
         )
+
+        if let onRefreshWidgetSnapshots {
+            alertController.addAction(
+                UIAlertAction(title: "위젯 스냅샷 새로고침", style: .default) { _ in
+                    onRefreshWidgetSnapshots()
+                }
+            )
+        }
+
+        if let onSeedWidgetSamples {
+            alertController.addAction(
+                UIAlertAction(title: "위젯 QA 샘플 주입", style: .default) { _ in
+                    onSeedWidgetSamples()
+                }
+            )
+        }
+
+        if let onSeedLoggedOutWidgetSamples {
+            alertController.addAction(
+                UIAlertAction(title: "위젯 Logged Out 샘플 주입", style: .default) { _ in
+                    onSeedLoggedOutWidgetSamples()
+                }
+            )
+        }
 
         alertController.addAction(UIAlertAction(title: "확인", style: .default))
         alertController.addAction(UIAlertAction(title: "취소", style: .cancel))
