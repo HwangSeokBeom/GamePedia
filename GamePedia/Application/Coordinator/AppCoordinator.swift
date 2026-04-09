@@ -115,6 +115,9 @@ final class AppCoordinator {
         bindSocialActivityEvents()
         bindWidgetSnapshotEvents()
         showSplash()
+#if DEBUG
+        applyDebugLaunchOverridesIfNeeded()
+#endif
     }
 
     @discardableResult
@@ -173,6 +176,13 @@ final class AppCoordinator {
     }
 
     private func bindWidgetSnapshotEvents() {
+        NotificationCenter.default.publisher(for: .recentViewedDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshWidgetSnapshots(reason: "recentViewedDidChange")
+            }
+            .store(in: &cancellables)
+
         NotificationCenter.default.publisher(for: .favoriteDidChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -233,6 +243,12 @@ final class AppCoordinator {
     }
 
     private func refreshSessionIfNeeded() {
+#if DEBUG
+        guard WidgetDebugQAHelper.shouldSkipAutomaticSessionRefresh == false else {
+            print("[WidgetDebug] skipping session refresh due to debug launch override")
+            return
+        }
+#endif
         guard tokenStore.fetchRefreshToken() != nil else {
             print("[GuestMode] active runtime=noRefreshToken")
             return
@@ -533,12 +549,53 @@ final class AppCoordinator {
                 return
             }
             homeCoordinator?.navigateToTrendingGameList(items: items)
+        case .profile:
+            guard currentSessionAccessMode() == .authenticated else {
+                pendingWidgetDeepLink = deepLink
+                pendingWidgetReviewItem = nil
+
+                guard let presenter = topPresenter(from: window.rootViewController) else { return }
+                presentAuthFlow(from: presenter) { [weak self] in
+                    guard let self, let pendingWidgetDeepLink = self.pendingWidgetDeepLink else { return }
+                    self.pendingWidgetDeepLink = nil
+                    self.handleWidgetDeepLink(pendingWidgetDeepLink, reviewItem: nil)
+                }
+                return
+            }
+
+            ensureMainInterface(selectedIndex: 3)
         case .login:
             guard currentSessionAccessMode() == .guest,
                   let presenter = topPresenter(from: window.rootViewController) else {
                 return
             }
             presentAuthFlow(from: presenter) {}
+        case .review(let reviewID):
+            guard currentSessionAccessMode() == .authenticated else {
+                pendingWidgetDeepLink = deepLink
+                pendingWidgetReviewItem = nil
+
+                guard let presenter = topPresenter(from: window.rootViewController) else { return }
+                presentAuthFlow(from: presenter) { [weak self] in
+                    guard let self, let pendingWidgetDeepLink = self.pendingWidgetDeepLink else { return }
+                    self.pendingWidgetDeepLink = nil
+                    self.handleWidgetDeepLink(pendingWidgetDeepLink, reviewItem: nil)
+                }
+                return
+            }
+
+            guard let reviewItem = activityReviewItem(for: reviewID) else {
+                ensureMainInterface(selectedIndex: 3)
+                return
+            }
+
+            ensureMainInterface(selectedIndex: 0)
+            homeCoordinator?.navigateToReviewDiscussion(
+                gameID: reviewItem.gameID,
+                reviewID: reviewItem.reviewID,
+                commentID: nil,
+                gameTitle: reviewItem.gameTitle
+            )
         case .reviewNew(let gameID):
             let resolvedItem = reviewItem ?? reviewPromptItem(forGameID: gameID)
 
@@ -572,19 +629,37 @@ final class AppCoordinator {
     }
 
     private func reviewPromptItem(forGameID gameID: Int) -> ReviewPromptWidgetSnapshot.Item? {
-        guard let item = widgetSnapshotStore.loadReviewPrompt()?.item,
-              item.gameID == gameID else {
+        guard let item = widgetSnapshotStore.loadReviewPrompt()?.items.first(where: { $0.gameID == gameID }) else {
             return nil
         }
         return item
+    }
+
+    private func activityReviewItem(for reviewID: String) -> MyActivityWidgetSnapshot.ReviewItem? {
+        widgetSnapshotStore.loadMyActivity()?.recentReviews.first(where: { $0.reviewID == reviewID })
     }
 
 #if DEBUG
     private func presentDebugEnvironmentMenu(from presenter: UIViewController) {
         EnvironmentDebugMenuPresenter.present(
             from: presenter,
-            currentEnvironment: AppConfig.apiEnvironment
+            currentEnvironment: AppConfig.apiEnvironment,
+            onRefreshWidgetSnapshots: { [weak self] in
+                self?.refreshWidgetSnapshots(reason: "debug.manualRefresh")
+            },
+            onSeedWidgetSamples: {
+                WidgetDebugQAHelper.seedSampleSnapshots()
+            },
+            onSeedLoggedOutWidgetSamples: {
+                WidgetDebugQAHelper.seedLoggedOutSnapshots()
+            }
         )
+    }
+
+    private func applyDebugLaunchOverridesIfNeeded() {
+        if let launchURL = WidgetDebugQAHelper.applyLaunchOverrides(snapshotStore: widgetSnapshotStore) {
+            _ = handleIncomingURL(launchURL)
+        }
     }
 #endif
 }

@@ -50,6 +50,7 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
 
     private let viewModel: ReviewDiscussionViewModel
     private let shouldAutoFocusReplyComposerOnFirstAppearance: Bool
+    private let requestedInitialReplyTargetCommentId: String?
     private var dataSource: UITableViewDiffableDataSource<Section, Row>!
     private var commentById: [String: ReviewComment] = [:]
     private var replyPromptByAnchorCommentId: [String: ReplyPromptConfiguration] = [:]
@@ -66,6 +67,11 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
 
     var onAuthenticationRequired: ((RestrictedActionContext, @escaping () -> Void) -> Void)?
     var onReplyDetailRequested: ((ReviewComment, Review?) -> Void)?
+    var gameId: Int { viewModel.state.gameId }
+    var reviewId: String { viewModel.state.reviewId }
+    var initialGameTitle: String? { viewModel.state.initialGameTitle }
+    var initialHighlightCommentId: String? { viewModel.state.initialHighlightCommentId }
+    var initialReplyTargetCommentId: String? { requestedInitialReplyTargetCommentId }
 
     init(
         rootView: ReviewDiscussionRootView,
@@ -74,6 +80,7 @@ final class ReviewDiscussionViewController: BaseViewController<ReviewDiscussionR
         autoFocusReplyComposerOnFirstAppearance: Bool = false
     ) {
         self.viewModel = viewModel
+        self.requestedInitialReplyTargetCommentId = initialReplyTargetCommentId
         self.pendingInitialReplyTargetCommentId = initialReplyTargetCommentId
         self.shouldAutoFocusReplyComposerOnFirstAppearance = autoFocusReplyComposerOnFirstAppearance
         super.init(rootView: rootView)

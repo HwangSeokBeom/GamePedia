@@ -29,6 +29,7 @@ final class GameDetailViewModel {
     private let translationProvider: any TranslationProviding
     private let translationCache: any TranslationCaching
     private let seedStore: GameDetailSeedStore
+    private let widgetSnapshotStore: GameWidgetSnapshotStore
     private var currentGameID: Int?
     private var reactingReviewIds = Set<String>()
     private var cancellables = Set<AnyCancellable>()
@@ -53,7 +54,8 @@ final class GameDetailViewModel {
         languageProvider: any LanguageProviding = DefaultLanguageProvider.shared,
         translationProvider: any TranslationProviding = makeTranslationProvider(),
         translationCache: any TranslationCaching = DefaultTranslationCache.shared,
-        seedStore: GameDetailSeedStore = .shared
+        seedStore: GameDetailSeedStore = .shared,
+        widgetSnapshotStore: GameWidgetSnapshotStore = .shared
     ) {
         self.apiClient = apiClient
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
@@ -66,6 +68,7 @@ final class GameDetailViewModel {
         self.translationProvider = translationProvider
         self.translationCache = translationCache
         self.seedStore = seedStore
+        self.widgetSnapshotStore = widgetSnapshotStore
         observeCommentChanges()
         observeReviewLikeChanges()
         observeFavoriteChanges()
@@ -144,6 +147,7 @@ final class GameDetailViewModel {
             await MainActor.run {
                 self.apply(.setGame(entity))
             }
+            recordRecentViewed(entity)
             await prepareTranslation(for: entity)
         } catch {
             print("[GameDetail] failed id=\(id) error=\(error.localizedDescription)")
@@ -170,6 +174,23 @@ final class GameDetailViewModel {
                 self.apply(.setBlockingLoadError(error.localizedDescription))
             }
         }
+    }
+
+    private func recordRecentViewed(_ game: GameDetail) {
+        let record = RecentViewedGameRecord(
+            gameID: game.id,
+            title: game.displayTitle,
+            genreText: game.genre,
+            ratingText: game.formattedRating == "—" ? nil : game.formattedRating,
+            coverImageURL: game.coverImageURL ?? game.heroImageURL,
+            viewedAt: Date()
+        )
+        widgetSnapshotStore.recordRecentViewed(record)
+        NotificationCenter.default.post(
+            name: .recentViewedDidChange,
+            object: nil,
+            userInfo: [RecentViewedChangeUserInfoKey.gameId: game.id]
+        )
     }
 
     private func fetchReviews(gameId: Int) async {

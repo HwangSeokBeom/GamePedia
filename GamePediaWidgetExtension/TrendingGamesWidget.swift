@@ -11,7 +11,7 @@ struct TrendingGamesWidget: Widget {
         }
         .configurationDisplayName("인기/추천 게임")
         .description("인기 게임을 홈 화면에서 바로 확인합니다.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
@@ -25,6 +25,8 @@ private struct TrendingGamesWidgetView: View {
             switch family {
             case .systemSmall:
                 TrendingGamesSmallView(item: entry.snapshot.items.first)
+            case .systemLarge:
+                TrendingGamesLargeView(items: entry.snapshot.items)
             default:
                 TrendingGamesMediumView(items: entry.snapshot.items)
             }
@@ -83,7 +85,7 @@ private struct TrendingGamesMediumView: View {
     let items: [TrendingGamesWidgetSnapshot.Item]
 
     private var displayItems: [TrendingGamesWidgetSnapshot.Item] {
-        items.isEmpty ? TrendingGamesWidgetSnapshot.placeholder.items : items
+        Array((items.isEmpty ? TrendingGamesWidgetSnapshot.placeholder.items : items).prefix(3))
     }
 
     var body: some View {
@@ -114,6 +116,98 @@ private struct TrendingGamesMediumView: View {
         .padding(.bottom, 15)
         .padding(.horizontal, 9)
         .widgetURL(WidgetDeepLinkURL.trending)
+    }
+}
+
+private struct TrendingGamesLargeView: View {
+    let items: [TrendingGamesWidgetSnapshot.Item]
+
+    private var displayItems: [TrendingGamesWidgetSnapshot.Item] {
+        Array((items.isEmpty ? TrendingGamesWidgetSnapshot.placeholder.items : items).prefix(4))
+    }
+
+    private var heroItem: TrendingGamesWidgetSnapshot.Item {
+        displayItems.first ?? TrendingGamesWidgetSnapshot.placeholder.items[0]
+    }
+
+    private var listItems: [TrendingGamesWidgetSnapshot.Item] {
+        Array(displayItems.dropFirst())
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Link(destination: WidgetDeepLinkURL.trending) {
+                ZStack(alignment: .bottomLeading) {
+                    WidgetArtworkView(url: heroItem.coverImageURL, cornerRadius: 0)
+                        .frame(height: 170)
+                        .clipped()
+
+                    LinearGradient(
+                        colors: [
+                            Color.clear,
+                            Color.black.opacity(0.18),
+                            Color.black.opacity(0.82)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            HStack(spacing: 4) {
+                                Image(systemName: "flame.fill")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("#1 이번 주 인기")
+                                    .font(.system(size: 12, weight: .bold))
+                            }
+                            .foregroundStyle(WidgetTheme.accent)
+
+                            Spacer(minLength: 0)
+                        }
+
+                        Text(heroItem.title)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(WidgetTheme.textPrimary)
+                            .lineLimit(2)
+
+                        HStack(spacing: 6) {
+                            if let ratingText = heroItem.ratingText, ratingText.isEmpty == false {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "star.fill")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text(ratingText)
+                                        .font(.system(size: 12, weight: .bold))
+                                }
+                                .foregroundStyle(Color(red: 1.0, green: 0.73, blue: 0.31))
+                            }
+
+                            Text(heroItem.genreText)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(WidgetTheme.textSecondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .buttonStyle(.plain)
+            .frame(height: 170)
+
+            VStack(spacing: 6) {
+                ForEach(listItems) { item in
+                    Link(destination: item.targetURL ?? WidgetDeepLinkURL.trending) {
+                        TrendingGameLargeRow(item: item)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, 8)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 14)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
     }
 }
 
@@ -170,6 +264,14 @@ private struct RankBadge: View {
     }
 }
 
+#if DEBUG
+#Preview("Trending Large", as: .systemLarge) {
+    TrendingGamesWidget()
+} timeline: {
+    TrendingGamesWidgetEntry(date: .now, snapshot: .placeholder)
+}
+#endif
+
 private struct TrendingGamesMediumHeader: View {
     var body: some View {
         HStack {
@@ -218,5 +320,51 @@ private struct TrendingGameRowSubtitle: View {
                 .foregroundStyle(WidgetTheme.textSecondary)
                 .lineLimit(1)
         }
+    }
+}
+
+private struct TrendingGameLargeRow: View {
+    let item: TrendingGamesWidgetSnapshot.Item
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("\(item.rank)")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(item.rank == 2 ? WidgetTheme.textPrimary : WidgetTheme.textTertiary)
+                .frame(width: 16)
+
+            WidgetArtworkView(url: item.coverImageURL, cornerRadius: 10)
+                .frame(width: 52, height: 52)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(WidgetTheme.textPrimary)
+                    .lineLimit(1)
+
+                HStack(spacing: 4) {
+                    if let ratingText = item.ratingText, ratingText.isEmpty == false {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Color(red: 1.0, green: 0.73, blue: 0.31))
+
+                        Text(ratingText)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(WidgetTheme.accentSoft)
+                    }
+
+                    Text(item.genreText)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(WidgetTheme.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.trailing, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(WidgetTheme.surface)
+        )
     }
 }

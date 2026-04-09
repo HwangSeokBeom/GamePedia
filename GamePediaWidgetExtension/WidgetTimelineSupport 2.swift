@@ -1,47 +1,14 @@
 import Foundation
 import WidgetKit
 
-struct RecentViewedWidgetEntry: TimelineEntry {
-    let date: Date
-    let snapshot: RecentViewedWidgetSnapshot
-}
-
 struct TrendingGamesWidgetEntry: TimelineEntry {
     let date: Date
     let snapshot: TrendingGamesWidgetSnapshot
 }
 
-struct MyActivityWidgetEntry: TimelineEntry {
-    let date: Date
-    let snapshot: MyActivityWidgetSnapshot
-}
-
 struct ReviewPromptWidgetEntry: TimelineEntry {
     let date: Date
     let snapshot: ReviewPromptWidgetSnapshot
-}
-
-struct RecentViewedWidgetProvider: TimelineProvider {
-    private let snapshotStore = GameWidgetSnapshotStore.shared
-
-    func placeholder(in context: Context) -> RecentViewedWidgetEntry {
-        RecentViewedWidgetEntry(date: .now, snapshot: .placeholder)
-    }
-
-    func getSnapshot(in context: Context, completion: @escaping (RecentViewedWidgetEntry) -> Void) {
-        let snapshot = snapshotStore.loadRecentViewed() ?? .placeholder
-        completion(RecentViewedWidgetEntry(date: .now, snapshot: snapshot))
-    }
-
-    func getTimeline(in context: Context, completion: @escaping (Timeline<RecentViewedWidgetEntry>) -> Void) {
-        let snapshot = snapshotStore.loadRecentViewed() ?? .empty
-        let entry = RecentViewedWidgetEntry(date: .now, snapshot: snapshot)
-        let timeline = Timeline(
-            entries: [entry],
-            policy: .after(Date().addingTimeInterval(60 * 15))
-        )
-        completion(timeline)
-    }
 }
 
 struct TrendingGamesWidgetProvider: TimelineProvider {
@@ -59,29 +26,6 @@ struct TrendingGamesWidgetProvider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<TrendingGamesWidgetEntry>) -> Void) {
         let snapshot = snapshotStore.loadTrendingGames() ?? .placeholder
         let entry = TrendingGamesWidgetEntry(date: .now, snapshot: snapshot)
-        let timeline = Timeline(
-            entries: [entry],
-            policy: .after(Date().addingTimeInterval(60 * 60))
-        )
-        completion(timeline)
-    }
-}
-
-struct MyActivityWidgetProvider: TimelineProvider {
-    private let snapshotStore = GameWidgetSnapshotStore.shared
-
-    func placeholder(in context: Context) -> MyActivityWidgetEntry {
-        MyActivityWidgetEntry(date: .now, snapshot: .placeholder)
-    }
-
-    func getSnapshot(in context: Context, completion: @escaping (MyActivityWidgetEntry) -> Void) {
-        let snapshot = snapshotStore.loadMyActivity() ?? .placeholder
-        completion(MyActivityWidgetEntry(date: .now, snapshot: snapshot))
-    }
-
-    func getTimeline(in context: Context, completion: @escaping (Timeline<MyActivityWidgetEntry>) -> Void) {
-        let snapshot = snapshotStore.loadMyActivity() ?? .empty
-        let entry = MyActivityWidgetEntry(date: .now, snapshot: snapshot)
         let timeline = Timeline(
             entries: [entry],
             policy: .after(Date().addingTimeInterval(60 * 60))
