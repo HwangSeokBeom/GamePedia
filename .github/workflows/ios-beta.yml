@@ -1,9 +1,6 @@
 name: iOS Beta
 
 on:
-  push:
-    branches:
-      - staging
   workflow_dispatch:
     inputs:
       lane:
@@ -28,6 +25,15 @@ jobs:
       APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
 
     steps:
+      - name: Require staging branch
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF_NAME:-}" != "staging" ]]; then
+            echo "This workflow must be run from the staging branch. Current ref: ${GITHUB_REF_NAME:-unknown}" >&2
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 

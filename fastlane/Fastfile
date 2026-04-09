@@ -318,28 +318,16 @@ platform :ios do
 
   def resolved_beta_marketing_version(options)
     explicit_version_number = release_version_override(options)
-    bump_marketing = options[:bump_marketing].to_s == "true"
-    bump_type = options[:bump_type].to_s.strip
-    normalized_bump_type = %w[patch minor major].include?(bump_type) ? bump_type : "patch"
-    current_version = current_marketing_version(configuration_name: "Staging")
-
-    if !explicit_version_number.empty?
-      validate_marketing_version!(explicit_version_number)
-      UI.message("Using explicit MARKETING_VERSION #{explicit_version_number} for staging beta")
-      return explicit_version_number
-    end
-
-    unless bump_marketing
-      UI.important(
-        "No release_version provided for staging beta; keeping current MARKETING_VERSION #{current_version}. " \
-        "Passing release_version is recommended for TestFlight uploads."
+    if explicit_version_number.empty?
+      UI.user_error!(
+        "Staging beta uploads require release_version. " \
+        "Run `bundle exec fastlane ios beta release_version:1.3` or provide RELEASE_VERSION in CI."
       )
-      return current_version
     end
 
-    new_version = bumped_marketing_version(current_version, normalized_bump_type)
-    UI.message("Auto bumped MARKETING_VERSION to #{new_version} (#{normalized_bump_type}) for staging beta")
-    new_version
+    validate_marketing_version!(explicit_version_number)
+    UI.message("Using explicit MARKETING_VERSION #{explicit_version_number} for staging beta")
+    explicit_version_number
   end
 
   def next_app_store_build_number(api_key:, app_identifier:, version:)
