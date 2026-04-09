@@ -62,6 +62,7 @@ enum WidgetDebugQAHelper {
                         genreText: $0.genreText,
                         ratingText: $0.ratingText,
                         coverImageURL: $0.coverImageURL,
+                        coverImageKey: nil,
                         viewedAt: $0.viewedAt,
                         viewedRelativeText: relativeDateText(for: $0.viewedAt, referenceDate: now),
                         targetURL: $0.targetURL
@@ -87,7 +88,7 @@ enum WidgetDebugQAHelper {
                 bodyText: "",
                 targetURL: WidgetDeepLink.profile.url,
                 stats: [
-                    .init(kind: .reviews, valueText: "12", labelText: "리뷰"),
+                    .init(kind: .reviews, valueText: "12", labelText: "작성 리뷰"),
                     .init(kind: .wishlist, valueText: "8", labelText: "찜"),
                     .init(kind: .likes, valueText: "34", labelText: "좋아요")
                 ],
@@ -99,6 +100,7 @@ enum WidgetDebugQAHelper {
                         ratingText: "4.8",
                         reviewText: "\"몰입감이 압도적이에요.\"",
                         coverImageURL: URL(string: "https://example.com/debug-review-1.jpg"),
+                        coverImageKey: nil,
                         relativeDateText: "2일 전 작성",
                         targetURL: WidgetDeepLink.review("debug-review-1").url
                     ),
@@ -109,6 +111,7 @@ enum WidgetDebugQAHelper {
                         ratingText: "4.7",
                         reviewText: "\"전투 템포가 정말 좋아요.\"",
                         coverImageURL: URL(string: "https://example.com/debug-review-2.jpg"),
+                        coverImageKey: nil,
                         relativeDateText: "5일 전 작성",
                         targetURL: WidgetDeepLink.review("debug-review-2").url
                     )
@@ -275,6 +278,7 @@ enum WidgetDebugQAHelper {
                 genreText: "턴제 RPG",
                 ratingText: "4.9",
                 coverImageURL: URL(string: "https://example.com/trending-1.jpg"),
+                coverImageKey: nil,
                 rank: 1,
                 targetURL: WidgetDeepLink.game(101).url
             ),
@@ -284,6 +288,7 @@ enum WidgetDebugQAHelper {
                 genreText: "로그라이크",
                 ratingText: "4.7",
                 coverImageURL: URL(string: "https://example.com/trending-2.jpg"),
+                coverImageKey: nil,
                 rank: 2,
                 targetURL: WidgetDeepLink.game(102).url
             ),
@@ -293,6 +298,7 @@ enum WidgetDebugQAHelper {
                 genreText: "액션 RPG",
                 ratingText: "4.8",
                 coverImageURL: URL(string: "https://example.com/trending-3.jpg"),
+                coverImageKey: nil,
                 rank: 3,
                 targetURL: WidgetDeepLink.game(103).url
             ),
@@ -302,6 +308,7 @@ enum WidgetDebugQAHelper {
                 genreText: "CRPG",
                 ratingText: "4.9",
                 coverImageURL: URL(string: "https://example.com/trending-4.jpg"),
+                coverImageKey: nil,
                 rank: 4,
                 targetURL: WidgetDeepLink.game(104).url
             )
@@ -315,6 +322,7 @@ enum WidgetDebugQAHelper {
                 title: "엘든 링",
                 subtitleText: "찜했지만 아직 리뷰를 남기지 않았어요",
                 coverImageURL: URL(string: "https://example.com/review-prompt-1.jpg"),
+                coverImageKey: nil,
                 gameTargetURL: WidgetDeepLink.game(301).url,
                 reviewTargetURL: WidgetDeepLink.reviewNew(301).url
             ),
@@ -323,6 +331,7 @@ enum WidgetDebugQAHelper {
                 title: "하데스 2",
                 subtitleText: "플레이 감상이 남아 있을 때 적어보세요",
                 coverImageURL: URL(string: "https://example.com/review-prompt-2.jpg"),
+                coverImageKey: nil,
                 gameTargetURL: WidgetDeepLink.game(302).url,
                 reviewTargetURL: WidgetDeepLink.reviewNew(302).url
             ),
@@ -331,6 +340,7 @@ enum WidgetDebugQAHelper {
                 title: "발더스 게이트 3",
                 subtitleText: "지금 한 줄만 남겨도 충분해요",
                 coverImageURL: URL(string: "https://example.com/review-prompt-3.jpg"),
+                coverImageKey: nil,
                 gameTargetURL: WidgetDeepLink.game(303).url,
                 reviewTargetURL: WidgetDeepLink.reviewNew(303).url
             ),
@@ -339,6 +349,7 @@ enum WidgetDebugQAHelper {
                 title: "사이버펑크 2077",
                 subtitleText: "최근 플레이 경험을 정리해보세요",
                 coverImageURL: URL(string: "https://example.com/review-prompt-4.jpg"),
+                coverImageKey: nil,
                 gameTargetURL: WidgetDeepLink.game(304).url,
                 reviewTargetURL: WidgetDeepLink.reviewNew(304).url
             )

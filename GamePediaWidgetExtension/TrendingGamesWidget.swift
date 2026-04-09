@@ -42,7 +42,7 @@ private struct TrendingGamesSmallView: View {
         let primaryItem = item ?? TrendingGamesWidgetSnapshot.placeholder.items[0]
 
         ZStack(alignment: .bottomLeading) {
-            WidgetArtworkView(url: primaryItem.coverImageURL, cornerRadius: 22)
+            WidgetArtworkView(imageKey: primaryItem.coverImageKey, cornerRadius: 22)
 
             LinearGradient(
                 colors: [
@@ -138,7 +138,7 @@ private struct TrendingGamesLargeView: View {
         VStack(spacing: 0) {
             Link(destination: WidgetDeepLinkURL.trending) {
                 ZStack(alignment: .bottomLeading) {
-                    WidgetArtworkView(url: heroItem.coverImageURL, cornerRadius: 0)
+                    WidgetArtworkView(imageKey: heroItem.coverImageKey, cornerRadius: 0)
                         .frame(height: 170)
                         .clipped()
 
@@ -221,7 +221,7 @@ private struct TrendingGameRow: View {
                 .foregroundStyle(item.rank == 1 ? WidgetTheme.accent : WidgetTheme.textTertiary)
                 .frame(minWidth: 12, alignment: .center)
 
-            WidgetArtworkView(url: item.coverImageURL, cornerRadius: 10)
+            WidgetArtworkView(imageKey: item.coverImageKey, cornerRadius: 10)
                 .frame(width: 54)
                 .frame(maxHeight: .infinity)
 
@@ -333,7 +333,7 @@ private struct TrendingGameLargeRow: View {
                 .foregroundStyle(item.rank == 2 ? WidgetTheme.textPrimary : WidgetTheme.textTertiary)
                 .frame(width: 16)
 
-            WidgetArtworkView(url: item.coverImageURL, cornerRadius: 10)
+            WidgetArtworkView(imageKey: item.coverImageKey, cornerRadius: 10)
                 .frame(width: 52, height: 52)
 
             VStack(alignment: .leading, spacing: 4) {

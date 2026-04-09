@@ -307,35 +307,41 @@ private struct MyActivityFeaturedReviewCard: View {
     let review: MyActivityWidgetSnapshot.ReviewItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("최근 리뷰")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(WidgetTheme.textTertiary)
+        HStack(spacing: 10) {
+            WidgetArtworkView(imageKey: review.coverImageKey, cornerRadius: 10)
+                .frame(width: 52, height: 76)
 
-            Text(review.gameTitle)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(WidgetTheme.textPrimary)
-                .lineLimit(2)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("최근 리뷰")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(WidgetTheme.textTertiary)
 
-            HStack(spacing: 4) {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color(red: 1.0, green: 0.73, blue: 0.31))
-                Text(review.ratingText)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(WidgetTheme.accentSoft)
+                Text(review.gameTitle)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(WidgetTheme.textPrimary)
+                    .lineLimit(2)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color(red: 1.0, green: 0.73, blue: 0.31))
+                    Text(review.ratingText)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(WidgetTheme.accentSoft)
+                }
+
+                Text(review.reviewText)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(WidgetTheme.textSecondary)
+                    .lineLimit(2)
+
+                Spacer(minLength: 0)
+
+                Text(review.relativeDateText)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(WidgetTheme.textTertiary)
             }
-
-            Text(review.reviewText)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(WidgetTheme.textSecondary)
-                .lineLimit(2)
-
-            Spacer(minLength: 0)
-
-            Text(review.relativeDateText)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(WidgetTheme.textTertiary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .padding(12)
@@ -351,7 +357,7 @@ private struct MyActivityReviewRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            WidgetArtworkView(url: review.coverImageURL, cornerRadius: 10)
+            WidgetArtworkView(imageKey: review.coverImageKey, cornerRadius: 10)
                 .frame(width: 50, height: 68)
 
             VStack(alignment: .leading, spacing: 4) {

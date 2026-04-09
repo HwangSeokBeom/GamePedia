@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WidgetKit
 
 enum WidgetTheme {
@@ -24,8 +25,16 @@ enum WidgetDeepLinkURL {
 }
 
 struct WidgetArtworkView: View {
-    let url: URL?
+    let imageKey: String?
     let cornerRadius: CGFloat
+
+    private var uiImage: UIImage? {
+        guard let fileURL = GameWidgetSnapshotStore.shared.imageFileURL(forKey: imageKey) else {
+            return nil
+        }
+
+        return UIImage(contentsOfFile: fileURL.path)
+    }
 
     var body: some View {
         ZStack {
@@ -41,17 +50,14 @@ struct WidgetArtworkView: View {
                     )
                 )
 
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    Image(systemName: "gamecontroller.fill")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(WidgetTheme.textTertiary)
-                }
+            if let uiImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: "gamecontroller.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(WidgetTheme.textTertiary)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))

@@ -56,7 +56,7 @@ private struct RecentViewedSmallView: View {
         let item = item ?? RecentViewedWidgetSnapshot.placeholder.items[0]
 
         ZStack(alignment: .bottomLeading) {
-            WidgetArtworkView(url: item.coverImageURL, cornerRadius: 22)
+            WidgetArtworkView(imageKey: item.coverImageKey, cornerRadius: 22)
 
             LinearGradient(
                 colors: [
@@ -145,7 +145,7 @@ private struct RecentViewedMediumCard: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            WidgetArtworkView(url: item.coverImageURL, cornerRadius: 14)
+            WidgetArtworkView(imageKey: item.coverImageKey, cornerRadius: 14)
                 .frame(width: 74, height: 106)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -180,7 +180,7 @@ private struct RecentViewedLargeRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            WidgetArtworkView(url: item.coverImageURL, cornerRadius: 12)
+            WidgetArtworkView(imageKey: item.coverImageKey, cornerRadius: 12)
                 .frame(width: 54, height: 54)
 
             VStack(alignment: .leading, spacing: 4) {

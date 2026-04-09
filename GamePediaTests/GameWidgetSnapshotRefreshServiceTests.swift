@@ -289,6 +289,85 @@ final class GameWidgetSnapshotRefreshServiceTests: XCTestCase {
         XCTAssertEqual(store.myActivitySnapshot?.headlineText, "아직 활동이 없어요")
     }
 
+    func testRefreshNow_storesPreparedImageReferencesAcrossWidgetSnapshots() async {
+        let store = SpySnapshotStore()
+        let reloader = SpyWidgetTimelineReloader()
+        let imagePrefetcher = StubImagePrefetcher(
+            referencesByURL: [
+                "https://example.com/77.jpg": "recent-key",
+                "https://example.com/1.jpg": "trending-key",
+                "https://example.com/21.jpg": "review-prompt-key",
+                "https://example.com/31.jpg": "my-activity-key"
+            ]
+        )
+        let now = Date()
+        let service = GameWidgetSnapshotRefreshService(
+            snapshotStore: store,
+            widgetReloader: reloader,
+            authTokenProvider: { "token" },
+            recentViewedRecordsProvider: {
+                [
+                    RecentViewedGameRecord(
+                        gameID: 77,
+                        title: "Viewed Title",
+                        genreText: "Action",
+                        ratingText: "4.8",
+                        coverImageURL: URL(string: "https://example.com/77.jpg"),
+                        viewedAt: now
+                    )
+                ]
+            },
+            trendingGamesProvider: {
+                [Self.makeGame(id: 1, title: "One")]
+            },
+            favoriteEntriesProvider: {
+                [Self.makeFavoriteGameEntry(id: 21, title: "Need Review", createdAt: Date())]
+            },
+            reviewedGamesProvider: {
+                [Self.makeReviewedGame(id: 31, title: "Reviewed Game")]
+            },
+            profileSummaryProvider: { Self.makeUserProfile() },
+            writtenReviewCountProvider: { 6 },
+            imagePrefetcher: imagePrefetcher
+        )
+
+        await service.refreshNow(reason: "showMainInterface")
+
+        XCTAssertEqual(store.recentViewedSnapshot?.items.first?.coverImageKey, "recent-key")
+        XCTAssertEqual(store.trendingSnapshot?.items.first?.coverImageKey, "trending-key")
+        XCTAssertEqual(store.reviewPromptSnapshot?.items.first?.coverImageKey, "review-prompt-key")
+        XCTAssertEqual(store.myActivitySnapshot?.recentReviews.first?.coverImageKey, "my-activity-key")
+    }
+
+    func testRefreshNow_savesSnapshotWhenImagePreparationFails() async {
+        let store = SpySnapshotStore()
+        let reloader = SpyWidgetTimelineReloader()
+        let imagePrefetcher = StubImagePrefetcher(referencesByURL: [:])
+        let service = GameWidgetSnapshotRefreshService(
+            snapshotStore: store,
+            widgetReloader: reloader,
+            authTokenProvider: { "token" },
+            recentViewedRecordsProvider: { [] },
+            trendingGamesProvider: {
+                [Self.makeGame(id: 1, title: "One")]
+            },
+            favoriteEntriesProvider: {
+                [Self.makeFavoriteGameEntry(id: 21, title: "Need Review", createdAt: Date())]
+            },
+            reviewedGamesProvider: { [] },
+            profileSummaryProvider: { Self.makeUserProfile() },
+            writtenReviewCountProvider: { 6 },
+            imagePrefetcher: imagePrefetcher
+        )
+
+        await service.refreshNow(reason: "showMainInterface")
+
+        XCTAssertEqual(store.trendingSnapshot?.items.first?.coverImageKey, nil)
+        XCTAssertEqual(store.reviewPromptSnapshot?.items.first?.coverImageKey, nil)
+        XCTAssertEqual(store.reviewPromptSnapshot?.state, .ready)
+        XCTAssertEqual(store.trendingSnapshot?.items.first?.gameID, 1)
+    }
+
     private static func makeFavoriteGameEntry(id: Int, title: String, createdAt: Date?) -> FavoriteGameEntry {
         FavoriteGameEntry(
             favorite: FavoriteItem(gameId: id, createdAt: createdAt),
@@ -414,5 +493,23 @@ private final class SpyWidgetTimelineReloader: WidgetTimelineReloading {
 
     func reloadTimelines(ofKind kind: String) {
         reloadedKinds.append(kind)
+    }
+}
+
+private final class StubImagePrefetcher: GameWidgetImagePreparing {
+    private let referencesByURL: [String: String]
+    private(set) var pruneCalls: [Set<String>] = []
+
+    init(referencesByURL: [String: String]) {
+        self.referencesByURL = referencesByURL
+    }
+
+    func prepareImageReference(for remoteURL: URL?) async -> String? {
+        guard let remoteURL else { return nil }
+        return referencesByURL[remoteURL.absoluteString]
+    }
+
+    func pruneUnusedImages(keeping keys: Set<String>) {
+        pruneCalls.append(keys)
     }
 }

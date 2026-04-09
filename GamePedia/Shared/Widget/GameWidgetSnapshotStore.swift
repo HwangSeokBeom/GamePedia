@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 protocol GameWidgetSnapshotStoring: AnyObject {
@@ -25,14 +26,22 @@ final class GameWidgetSnapshotStore: GameWidgetSnapshotStoring {
     }
 
     private let userDefaults: UserDefaults?
+    private let appGroupIdentifier: String?
+    private let fileManager: FileManager
+    private let customCacheDirectoryURL: URL?
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
     init(
         appGroupIdentifier: String? = Bundle.main.object(forInfoDictionaryKey: "WidgetAppGroupIdentifier") as? String,
-        userDefaults: UserDefaults? = nil
+        userDefaults: UserDefaults? = nil,
+        fileManager: FileManager = .default,
+        cacheDirectoryURL: URL? = nil
     ) {
         let normalizedAppGroupIdentifier = appGroupIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.appGroupIdentifier = normalizedAppGroupIdentifier
+        self.fileManager = fileManager
+        self.customCacheDirectoryURL = cacheDirectoryURL
 
         if let userDefaults {
             self.userDefaults = userDefaults
@@ -90,6 +99,54 @@ final class GameWidgetSnapshotStore: GameWidgetSnapshotStoring {
         saveRecentViewedRecords(Array(([record] + existing).prefix(limit)))
     }
 
+    func imageKey(for remoteURL: URL?) -> String? {
+        guard let remoteURL else { return nil }
+
+        let digest = SHA256.hash(data: Data(remoteURL.absoluteString.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    func imageFileURL(forKey key: String?) -> URL? {
+        guard let key, key.isEmpty == false else { return nil }
+        guard let imageCacheDirectoryURL else { return nil }
+
+        return imageCacheDirectoryURL
+            .appendingPathComponent(key)
+            .appendingPathExtension("jpg")
+    }
+
+    func hasCachedImage(forKey key: String?) -> Bool {
+        guard let fileURL = imageFileURL(forKey: key) else { return false }
+        return fileManager.fileExists(atPath: fileURL.path)
+    }
+
+    func loadImageData(forKey key: String?) -> Data? {
+        guard let fileURL = imageFileURL(forKey: key) else { return nil }
+        return try? Data(contentsOf: fileURL)
+    }
+
+    func saveImageData(_ data: Data, forKey key: String) throws {
+        guard let fileURL = imageFileURL(forKey: key) else { return }
+        try ensureImageCacheDirectoryExists()
+        try data.write(to: fileURL, options: .atomic)
+    }
+
+    func pruneCachedImages(keeping keys: Set<String>) {
+        guard let imageCacheDirectoryURL else { return }
+        guard let fileURLs = try? fileManager.contentsOfDirectory(
+            at: imageCacheDirectoryURL,
+            includingPropertiesForKeys: nil
+        ) else {
+            return
+        }
+
+        for fileURL in fileURLs {
+            let key = fileURL.deletingPathExtension().lastPathComponent
+            guard keys.contains(key) == false else { continue }
+            try? fileManager.removeItem(at: fileURL)
+        }
+    }
+
     private func save<T: Encodable>(_ value: T, forKey key: String) {
         guard let userDefaults,
               let data = try? encoder.encode(value) else {
@@ -111,5 +168,29 @@ final class GameWidgetSnapshotStore: GameWidgetSnapshotStoring {
         }
 
         return value
+    }
+
+    private var imageCacheDirectoryURL: URL? {
+        if let customCacheDirectoryURL {
+            return customCacheDirectoryURL
+        }
+
+        guard let appGroupIdentifier, appGroupIdentifier.isEmpty == false else {
+            return nil
+        }
+
+        return fileManager
+            .containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)?
+            .appendingPathComponent("WidgetImageCache", isDirectory: true)
+    }
+
+    private func ensureImageCacheDirectoryExists() throws {
+        guard let imageCacheDirectoryURL else { return }
+
+        try fileManager.createDirectory(
+            at: imageCacheDirectoryURL,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
     }
 }

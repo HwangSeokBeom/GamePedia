@@ -1,4 +1,8 @@
 import Foundation
+import ImageIO
+#if canImport(UniformTypeIdentifiers)
+import UniformTypeIdentifiers
+#endif
 #if canImport(WidgetKit)
 import WidgetKit
 #endif
@@ -11,6 +15,115 @@ private struct LiveWidgetTimelineReloader: WidgetTimelineReloading {
     func reloadTimelines(ofKind kind: String) {
 #if canImport(WidgetKit)
         WidgetCenter.shared.reloadTimelines(ofKind: kind)
+#endif
+    }
+}
+
+protocol GameWidgetImagePreparing {
+    func prepareImageReference(for remoteURL: URL?) async -> String?
+    func pruneUnusedImages(keeping keys: Set<String>)
+}
+
+private struct NoOpGameWidgetImagePrefetcher: GameWidgetImagePreparing {
+    func prepareImageReference(for remoteURL: URL?) async -> String? {
+        nil
+    }
+
+    func pruneUnusedImages(keeping keys: Set<String>) {}
+}
+
+private final class LiveGameWidgetImagePrefetcher: GameWidgetImagePreparing {
+    private enum Limits {
+        static let maxPixelSize = 360
+        static let compressionQuality = 0.82
+    }
+
+    private let snapshotStore: GameWidgetSnapshotStore
+    private let session: URLSession
+
+    init(
+        snapshotStore: GameWidgetSnapshotStore = .shared,
+        session: URLSession = .shared
+    ) {
+        self.snapshotStore = snapshotStore
+        self.session = session
+    }
+
+    func prepareImageReference(for remoteURL: URL?) async -> String? {
+        guard let remoteURL else { return nil }
+        guard let key = snapshotStore.imageKey(for: remoteURL) else { return nil }
+
+        if snapshotStore.hasCachedImage(forKey: key) {
+            return key
+        }
+
+        do {
+            let (data, response) = try await session.data(from: remoteURL)
+            if let httpResponse = response as? HTTPURLResponse,
+               (200..<300).contains(httpResponse.statusCode) == false {
+                return nil
+            }
+
+            let preparedData = Self.downsampledJPEGData(from: data) ?? data
+            try snapshotStore.saveImageData(preparedData, forKey: key)
+            return key
+        } catch {
+            return snapshotStore.hasCachedImage(forKey: key) ? key : nil
+        }
+    }
+
+    func pruneUnusedImages(keeping keys: Set<String>) {
+        snapshotStore.pruneCachedImages(keeping: keys)
+    }
+
+    private static func downsampledJPEGData(from data: Data) -> Data? {
+        guard let imageSource = CGImageSourceCreateWithData(
+            data as CFData,
+            [kCGImageSourceShouldCache: false] as CFDictionary
+        ) else {
+            return nil
+        }
+
+        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(
+            imageSource,
+            0,
+            [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: Limits.maxPixelSize,
+                kCGImageSourceCreateThumbnailWithTransform: true
+            ] as CFDictionary
+        ) else {
+            return nil
+        }
+
+        let mutableData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            mutableData,
+            jpegTypeIdentifier,
+            1,
+            nil
+        ) else {
+            return nil
+        }
+
+        CGImageDestinationAddImage(
+            destination,
+            thumbnail,
+            [kCGImageDestinationLossyCompressionQuality: Limits.compressionQuality] as CFDictionary
+        )
+
+        guard CGImageDestinationFinalize(destination) else {
+            return nil
+        }
+
+        return mutableData as Data
+    }
+
+    private static var jpegTypeIdentifier: CFString {
+#if canImport(UniformTypeIdentifiers)
+        UTType.jpeg.identifier as CFString
+#else
+        "public.jpeg" as CFString
 #endif
     }
 }
@@ -33,6 +146,7 @@ final class GameWidgetSnapshotRefreshService {
     private let reviewedGamesProvider: () async throws -> [ReviewedGame]
     private let profileSummaryProvider: () async throws -> UserProfile
     private let writtenReviewCountProvider: () async throws -> Int
+    private let imagePrefetcher: any GameWidgetImagePreparing
 
     init(
         snapshotStore: any GameWidgetSnapshotStoring = GameWidgetSnapshotStore.shared,
@@ -54,11 +168,14 @@ final class GameWidgetSnapshotRefreshService {
         fetchMyReviewsUseCase: FetchMyReviewsUseCase = FetchMyReviewsUseCase(
             reviewRepository: DefaultReviewRepository()
         ),
-        apiClient: APIClient = .shared
+        apiClient: APIClient = .shared,
+        imagePrefetcher: (any GameWidgetImagePreparing)? = nil
     ) {
         self.snapshotStore = snapshotStore
         self.widgetReloader = widgetReloader
         self.authTokenProvider = authTokenProvider
+        let resolvedSnapshotStore = snapshotStore as? GameWidgetSnapshotStore ?? .shared
+        self.imagePrefetcher = imagePrefetcher ?? LiveGameWidgetImagePrefetcher(snapshotStore: resolvedSnapshotStore)
         self.recentViewedRecordsProvider = {
             snapshotStore.loadRecentViewedRecords()
         }
@@ -90,7 +207,8 @@ final class GameWidgetSnapshotRefreshService {
         favoriteEntriesProvider: @escaping () async throws -> [FavoriteGameEntry],
         reviewedGamesProvider: @escaping () async throws -> [ReviewedGame],
         profileSummaryProvider: @escaping () async throws -> UserProfile,
-        writtenReviewCountProvider: @escaping () async throws -> Int
+        writtenReviewCountProvider: @escaping () async throws -> Int,
+        imagePrefetcher: any GameWidgetImagePreparing = NoOpGameWidgetImagePrefetcher()
     ) {
         self.snapshotStore = snapshotStore
         self.widgetReloader = widgetReloader
@@ -101,6 +219,7 @@ final class GameWidgetSnapshotRefreshService {
         self.reviewedGamesProvider = reviewedGamesProvider
         self.profileSummaryProvider = profileSummaryProvider
         self.writtenReviewCountProvider = writtenReviewCountProvider
+        self.imagePrefetcher = imagePrefetcher
     }
 
     func refresh(reason: String) {
@@ -112,7 +231,7 @@ final class GameWidgetSnapshotRefreshService {
     func refreshNow(reason: String) async {
         switch reason {
         case "recentViewedDidChange":
-            refreshRecentViewed(reason: reason)
+            await refreshRecentViewed(reason: reason)
         case "favoriteDidChange":
             await refreshReviewPrompt(reason: reason)
             await refreshMyActivity(reason: reason)
@@ -120,14 +239,16 @@ final class GameWidgetSnapshotRefreshService {
             await refreshReviewPrompt(reason: reason)
             await refreshMyActivity(reason: reason)
         default:
-            refreshRecentViewed(reason: reason)
+            await refreshRecentViewed(reason: reason)
             await refreshTrendingGames(reason: reason)
             await refreshReviewPrompt(reason: reason)
             await refreshMyActivity(reason: reason)
         }
+
+        pruneUnusedImages()
     }
 
-    private func refreshRecentViewed(reason: String) {
+    private func refreshRecentViewed(reason: String) async {
         let records = Array(recentViewedRecordsProvider().prefix(Limits.recentViewedWidgetLimit))
 
         guard records.isEmpty == false else {
@@ -137,6 +258,26 @@ final class GameWidgetSnapshotRefreshService {
             return
         }
 
+        var items: [RecentViewedWidgetSnapshot.Item] = []
+        items.reserveCapacity(records.count)
+
+        for record in records {
+            let coverImageKey = await imagePrefetcher.prepareImageReference(for: record.coverImageURL)
+            items.append(
+                RecentViewedWidgetSnapshot.Item(
+                    gameID: record.gameID,
+                    title: record.title,
+                    genreText: record.genreText,
+                    ratingText: record.ratingText,
+                    coverImageURL: record.coverImageURL,
+                    coverImageKey: coverImageKey,
+                    viewedAt: record.viewedAt,
+                    viewedRelativeText: Self.relativeDateText(for: record.viewedAt),
+                    targetURL: record.targetURL
+                )
+            )
+        }
+
         let snapshot = RecentViewedWidgetSnapshot(
             generatedAt: Date(),
             state: .ready,
@@ -144,18 +285,7 @@ final class GameWidgetSnapshotRefreshService {
             headlineText: "",
             bodyText: "",
             targetURL: records.first?.targetURL,
-            items: records.map { record in
-                RecentViewedWidgetSnapshot.Item(
-                    gameID: record.gameID,
-                    title: record.title,
-                    genreText: record.genreText,
-                    ratingText: record.ratingText,
-                    coverImageURL: record.coverImageURL,
-                    viewedAt: record.viewedAt,
-                    viewedRelativeText: Self.relativeDateText(for: record.viewedAt),
-                    targetURL: record.targetURL
-                )
-            }
+            items: items
         )
         snapshotStore.saveRecentViewed(snapshot)
         widgetReloader.reloadTimelines(ofKind: GameWidgetKind.recentViewed)
@@ -165,15 +295,23 @@ final class GameWidgetSnapshotRefreshService {
     private func refreshTrendingGames(reason: String) async {
         do {
             let games = try await trendingGamesProvider()
-            let items = games.prefix(Limits.trendingWidgetLimit).enumerated().map { index, game in
-                TrendingGamesWidgetSnapshot.Item(
+
+            var items: [TrendingGamesWidgetSnapshot.Item] = []
+            items.reserveCapacity(min(games.count, Limits.trendingWidgetLimit))
+
+            for (index, game) in games.prefix(Limits.trendingWidgetLimit).enumerated() {
+                let coverImageKey = await imagePrefetcher.prepareImageReference(for: game.coverImageURL)
+                items.append(
+                    TrendingGamesWidgetSnapshot.Item(
                     gameID: game.id,
                     title: game.displayTitle,
                     genreText: game.genre,
                     ratingText: game.formattedRating == "—" ? nil : game.formattedRating,
                     coverImageURL: game.coverImageURL,
+                    coverImageKey: coverImageKey,
                     rank: index + 1,
                     targetURL: WidgetDeepLink.game(game.id).url
+                )
                 )
             }
 
@@ -217,14 +355,21 @@ final class GameWidgetSnapshotRefreshService {
                 return
             }
 
-            let items = candidateEntries.map { entry in
-                ReviewPromptWidgetSnapshot.Item(
+            var items: [ReviewPromptWidgetSnapshot.Item] = []
+            items.reserveCapacity(candidateEntries.count)
+
+            for entry in candidateEntries {
+                let coverImageKey = await imagePrefetcher.prepareImageReference(for: entry.game.coverImageURL)
+                items.append(
+                    ReviewPromptWidgetSnapshot.Item(
                     gameID: entry.game.id,
                     title: entry.game.displayTitle,
                     subtitleText: Self.reviewPromptSubtitle(for: entry),
                     coverImageURL: entry.game.coverImageURL,
+                    coverImageKey: coverImageKey,
                     gameTargetURL: WidgetDeepLink.game(entry.game.id).url,
                     reviewTargetURL: WidgetDeepLink.reviewNew(entry.game.id).url
+                )
                 )
             }
 
@@ -274,16 +419,23 @@ final class GameWidgetSnapshotRefreshService {
 #endif
 
             let stats = Self.makeActivityStats(from: profile, writtenReviewCount: writtenReviewCount)
-            let recentReviews = reviewedGames.prefix(Limits.myActivityRecentReviewLimit).map { reviewedGame in
-                MyActivityWidgetSnapshot.ReviewItem(
+            var recentReviews: [MyActivityWidgetSnapshot.ReviewItem] = []
+            recentReviews.reserveCapacity(min(reviewedGames.count, Limits.myActivityRecentReviewLimit))
+
+            for reviewedGame in reviewedGames.prefix(Limits.myActivityRecentReviewLimit) {
+                let coverImageKey = await imagePrefetcher.prepareImageReference(for: reviewedGame.game.coverImageURL)
+                recentReviews.append(
+                    MyActivityWidgetSnapshot.ReviewItem(
                     reviewID: reviewedGame.reviewId,
                     gameID: reviewedGame.gameId,
                     gameTitle: reviewedGame.game.displayTitle,
                     ratingText: reviewedGame.game.formattedRating,
                     reviewText: Self.reviewPreviewText(for: reviewedGame),
                     coverImageURL: reviewedGame.game.coverImageURL,
+                    coverImageKey: coverImageKey,
                     relativeDateText: Self.reviewedGameDateText(for: reviewedGame),
                     targetURL: WidgetDeepLink.review(reviewedGame.reviewId).url
+                )
                 )
             }
 
@@ -422,5 +574,20 @@ final class GameWidgetSnapshotRefreshService {
             recentReviews: [],
             loggedOutContent: .placeholder
         )
+    }
+
+    private func pruneUnusedImages() {
+        imagePrefetcher.pruneUnusedImages(keeping: referencedImageKeys())
+    }
+
+    private func referencedImageKeys() -> Set<String> {
+        var keys = Set<String>()
+
+        snapshotStore.loadRecentViewed()?.items.compactMap(\.coverImageKey).forEach { keys.insert($0) }
+        snapshotStore.loadTrendingGames()?.items.compactMap(\.coverImageKey).forEach { keys.insert($0) }
+        snapshotStore.loadReviewPrompt()?.items.compactMap(\.coverImageKey).forEach { keys.insert($0) }
+        snapshotStore.loadMyActivity()?.recentReviews.compactMap(\.coverImageKey).forEach { keys.insert($0) }
+
+        return keys
     }
 }

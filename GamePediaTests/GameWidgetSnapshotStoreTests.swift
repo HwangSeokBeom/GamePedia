@@ -8,16 +8,28 @@ final class GameWidgetSnapshotStoreTests: XCTestCase {
 
     private var suiteName: String!
     private var userDefaults: UserDefaults!
+    private var cacheDirectoryURL: URL!
 
     override func setUp() {
         super.setUp()
         suiteName = "GameWidgetSnapshotStoreTests.\(UUID().uuidString)"
         userDefaults = UserDefaults(suiteName: suiteName)
         userDefaults.removePersistentDomain(forName: suiteName)
+        cacheDirectoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("GameWidgetSnapshotStoreTests-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: cacheDirectoryURL,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
     }
 
     override func tearDown() {
         userDefaults.removePersistentDomain(forName: suiteName)
+        if let cacheDirectoryURL {
+            try? FileManager.default.removeItem(at: cacheDirectoryURL)
+        }
+        cacheDirectoryURL = nil
         userDefaults = nil
         suiteName = nil
         super.tearDown()
@@ -94,10 +106,40 @@ final class GameWidgetSnapshotStoreTests: XCTestCase {
         XCTAssertEqual(loadedSnapshot?.stats.first?.labelText, "작성 리뷰")
     }
 
+    func testImageKey_sameURLReusesSameKey() {
+        let store = makeStore()
+        let url = URL(string: "https://example.com/covers/123.jpg")
+
+        let firstKey = store.imageKey(for: url)
+        let secondKey = store.imageKey(for: url)
+
+        XCTAssertEqual(firstKey, secondKey)
+    }
+
+    func testSaveAndLoadImageData_preservesCachedFile() throws {
+        let store = makeStore()
+        let remoteURL = URL(string: "https://example.com/covers/123.jpg")
+        let key = try XCTUnwrap(store.imageKey(for: remoteURL))
+        let data = Data([0x01, 0x02, 0x03, 0x04])
+
+        try store.saveImageData(data, forKey: key)
+
+        XCTAssertEqual(store.loadImageData(forKey: key), data)
+        XCTAssertEqual(store.hasCachedImage(forKey: key), true)
+    }
+
+    func testLoadImageData_returnsNilForMissingCache() {
+        let store = makeStore()
+
+        XCTAssertNil(store.loadImageData(forKey: "missing"))
+        XCTAssertEqual(store.hasCachedImage(forKey: "missing"), false)
+    }
+
     private func makeStore() -> GameWidgetSnapshotStore {
         GameWidgetSnapshotStore(
             appGroupIdentifier: nil,
-            userDefaults: userDefaults
+            userDefaults: userDefaults,
+            cacheDirectoryURL: cacheDirectoryURL
         )
     }
 

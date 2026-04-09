@@ -57,6 +57,7 @@ private struct ReviewPromptSmallView: View {
             title: "리뷰할 게임",
             subtitleText: "찜했지만 아직 리뷰가 없어요",
             coverImageURL: nil,
+            coverImageKey: nil,
             gameTargetURL: WidgetDeepLinkURL.trending,
             reviewTargetURL: WidgetDeepLinkURL.trending
         )
@@ -68,7 +69,7 @@ private struct ReviewPromptSmallView: View {
 
             Link(destination: item.gameTargetURL ?? WidgetDeepLinkURL.trending) {
                 HStack(spacing: 10) {
-                    WidgetArtworkView(url: item.coverImageURL, cornerRadius: 10)
+                    WidgetArtworkView(imageKey: item.coverImageKey, cornerRadius: 10)
                         .frame(width: 48, height: 48)
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -107,7 +108,7 @@ private struct ReviewPromptMediumView: View {
 
         HStack(spacing: 12) {
             Link(destination: item?.gameTargetURL ?? WidgetDeepLinkURL.trending) {
-                WidgetArtworkView(url: item?.coverImageURL, cornerRadius: 14)
+                WidgetArtworkView(imageKey: item?.coverImageKey, cornerRadius: 14)
                     .frame(width: 90, height: 124)
             }
             .buttonStyle(.plain)
@@ -172,7 +173,7 @@ private struct ReviewPromptLargeRow: View {
         HStack(spacing: 10) {
             Link(destination: item.gameTargetURL ?? WidgetDeepLinkURL.trending) {
                 HStack(spacing: 10) {
-                    WidgetArtworkView(url: item.coverImageURL, cornerRadius: 10)
+                    WidgetArtworkView(imageKey: item.coverImageKey, cornerRadius: 10)
                         .frame(width: 52, height: 52)
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -231,6 +232,7 @@ private let reviewPromptPreviewSnapshot = ReviewPromptWidgetSnapshot(
             title: "엘든 링",
             subtitleText: "찜했지만 아직 리뷰를 남기지 않았어요",
             coverImageURL: URL(string: "https://example.com/review-preview-1.jpg"),
+            coverImageKey: nil,
             gameTargetURL: URL(string: "gamepedia://game/301"),
             reviewTargetURL: URL(string: "gamepedia://review/new/301")
         ),
@@ -239,6 +241,7 @@ private let reviewPromptPreviewSnapshot = ReviewPromptWidgetSnapshot(
             title: "하데스 2",
             subtitleText: "플레이 감상을 짧게 남겨보세요",
             coverImageURL: URL(string: "https://example.com/review-preview-2.jpg"),
+            coverImageKey: nil,
             gameTargetURL: URL(string: "gamepedia://game/302"),
             reviewTargetURL: URL(string: "gamepedia://review/new/302")
         ),
@@ -247,6 +250,7 @@ private let reviewPromptPreviewSnapshot = ReviewPromptWidgetSnapshot(
             title: "발더스 게이트 3",
             subtitleText: "지금의 감상이 가장 정확해요",
             coverImageURL: URL(string: "https://example.com/review-preview-3.jpg"),
+            coverImageKey: nil,
             gameTargetURL: URL(string: "gamepedia://game/303"),
             reviewTargetURL: URL(string: "gamepedia://review/new/303")
         ),
@@ -255,6 +259,7 @@ private let reviewPromptPreviewSnapshot = ReviewPromptWidgetSnapshot(
             title: "사이버펑크 2077",
             subtitleText: "최근 플레이 경험을 정리해보세요",
             coverImageURL: URL(string: "https://example.com/review-preview-4.jpg"),
+            coverImageKey: nil,
             gameTargetURL: URL(string: "gamepedia://game/304"),
             reviewTargetURL: URL(string: "gamepedia://review/new/304")
         )

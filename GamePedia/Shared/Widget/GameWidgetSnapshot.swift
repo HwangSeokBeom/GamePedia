@@ -63,6 +63,7 @@ struct RecentViewedWidgetSnapshot: Codable, Hashable {
         let genreText: String
         let ratingText: String?
         let coverImageURL: URL?
+        let coverImageKey: String?
         let viewedAt: Date
         let viewedRelativeText: String
         let targetURL: URL?
@@ -94,6 +95,7 @@ extension RecentViewedWidgetSnapshot {
                 genreText: "액션 RPG",
                 ratingText: "4.8",
                 coverImageURL: nil,
+                coverImageKey: nil,
                 viewedAt: .distantPast,
                 viewedRelativeText: "방금 전",
                 targetURL: nil
@@ -104,6 +106,7 @@ extension RecentViewedWidgetSnapshot {
                 genreText: "RPG",
                 ratingText: "4.9",
                 coverImageURL: nil,
+                coverImageKey: nil,
                 viewedAt: .distantPast,
                 viewedRelativeText: "1시간 전",
                 targetURL: nil
@@ -114,6 +117,7 @@ extension RecentViewedWidgetSnapshot {
                 genreText: "오픈월드",
                 ratingText: "4.6",
                 coverImageURL: nil,
+                coverImageKey: nil,
                 viewedAt: .distantPast,
                 viewedRelativeText: "어제",
                 targetURL: nil
@@ -124,6 +128,7 @@ extension RecentViewedWidgetSnapshot {
                 genreText: "어드벤처",
                 ratingText: "4.7",
                 coverImageURL: nil,
+                coverImageKey: nil,
                 viewedAt: .distantPast,
                 viewedRelativeText: "2일 전",
                 targetURL: nil
@@ -149,6 +154,7 @@ struct TrendingGamesWidgetSnapshot: Codable, Hashable {
         let genreText: String
         let ratingText: String?
         let coverImageURL: URL?
+        let coverImageKey: String?
         let rank: Int
         let targetURL: URL?
 
@@ -179,6 +185,7 @@ extension TrendingGamesWidgetSnapshot {
                 genreText: "탭해서 확인",
                 ratingText: nil,
                 coverImageURL: nil,
+                coverImageKey: nil,
                 rank: 1,
                 targetURL: nil
             ),
@@ -188,6 +195,7 @@ extension TrendingGamesWidgetSnapshot {
                 genreText: "곧 표시됩니다",
                 ratingText: nil,
                 coverImageURL: nil,
+                coverImageKey: nil,
                 rank: 2,
                 targetURL: nil
             ),
@@ -197,6 +205,7 @@ extension TrendingGamesWidgetSnapshot {
                 genreText: "데이터 로딩 중",
                 ratingText: nil,
                 coverImageURL: nil,
+                coverImageKey: nil,
                 rank: 3,
                 targetURL: nil
             ),
@@ -206,6 +215,7 @@ extension TrendingGamesWidgetSnapshot {
                 genreText: "불러오는 중",
                 ratingText: nil,
                 coverImageURL: nil,
+                coverImageKey: nil,
                 rank: 4,
                 targetURL: nil
             )
@@ -241,6 +251,7 @@ struct MyActivityWidgetSnapshot: Codable, Hashable {
         let ratingText: String
         let reviewText: String
         let coverImageURL: URL?
+        let coverImageKey: String?
         let relativeDateText: String
         let targetURL: URL?
 
@@ -283,6 +294,7 @@ extension MyActivityWidgetSnapshot {
                 ratingText: "4.8",
                 reviewText: "\"역대 최고의 확장판...\"",
                 coverImageURL: nil,
+                coverImageKey: nil,
                 relativeDateText: "3일 전 작성",
                 targetURL: GameWidgetSnapshotURL.review("placeholder-review-1")
             ),
@@ -293,6 +305,7 @@ extension MyActivityWidgetSnapshot {
                 ratingText: "4.9",
                 reviewText: "\"CRPG의 새로운 기준...\"",
                 coverImageURL: nil,
+                coverImageKey: nil,
                 relativeDateText: "5일 전 작성",
                 targetURL: GameWidgetSnapshotURL.review("placeholder-review-2")
             )
@@ -325,6 +338,7 @@ struct ReviewPromptWidgetSnapshot: Codable, Hashable {
         let title: String
         let subtitleText: String
         let coverImageURL: URL?
+        let coverImageKey: String?
         let gameTargetURL: URL?
         let reviewTargetURL: URL?
 
