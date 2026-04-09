@@ -3,7 +3,15 @@ name: iOS Main Release
 on:
   workflow_dispatch:
     inputs:
-      version_number:
+      lane:
+        description: "Fastlane lane to run for production uploads."
+        required: false
+        default: release
+        type: choice
+        options:
+          - release
+          - release_upload
+      release_version:
         description: "Release marketing version, e.g. 1.2. Leave blank to keep the current project value."
         required: false
         type: string
@@ -44,26 +52,31 @@ jobs:
 
       - name: Resolve release version parameters
         env:
-          WORKFLOW_VERSION_INPUT: ${{ github.event.inputs.version_number }}
+          WORKFLOW_LANE_INPUT: ${{ github.event.inputs.lane }}
+          WORKFLOW_RELEASE_VERSION: ${{ github.event.inputs.release_version }}
           WORKFLOW_BUILD_INPUT: ${{ github.event.inputs.build_number }}
         run: |
           set -euo pipefail
 
-          release_version="${WORKFLOW_VERSION_INPUT:-}"
+          fastlane_lane="${WORKFLOW_LANE_INPUT:-release}"
+          release_version="${WORKFLOW_RELEASE_VERSION:-}"
           release_build="${WORKFLOW_BUILD_INPUT:-}"
+
+          echo "FASTLANE_LANE=$fastlane_lane" >> "$GITHUB_ENV"
 
           if [[ -z "$release_version" && "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
             release_version="${GITHUB_REF_NAME#v}"
           fi
 
           if [[ -n "$release_version" ]]; then
-            echo "RELEASE_VERSION_NUMBER=$release_version" >> "$GITHUB_ENV"
+            echo "RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
           fi
 
           if [[ -n "$release_build" ]]; then
             echo "RELEASE_BUILD_NUMBER=$release_build" >> "$GITHUB_ENV"
           fi
 
+          echo "Resolved production lane: $fastlane_lane"
           echo "Resolved marketing version: ${release_version:-<keep current project version>}"
           echo "Resolved build number override: ${release_build:-<auto increment from App Store Connect>}"
 
@@ -114,6 +127,20 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ env.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ env.APP_STORE_CONNECT_PRIVATE_KEY }}
           APP_STORE_APP_IDENTIFIER: ${{ secrets.APP_STORE_APP_IDENTIFIER }}
-          RELEASE_VERSION_NUMBER: ${{ env.RELEASE_VERSION_NUMBER }}
+          FASTLANE_LANE: ${{ env.FASTLANE_LANE }}
+          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
           RELEASE_BUILD_NUMBER: ${{ env.RELEASE_BUILD_NUMBER }}
-        run: bundle exec fastlane ios release_upload
+        run: |
+          set -euo pipefail
+
+          fastlane_args=(ios "${FASTLANE_LANE}")
+
+          if [[ -n "${RELEASE_VERSION:-}" ]]; then
+            fastlane_args+=("release_version:${RELEASE_VERSION}")
+          fi
+
+          if [[ -n "${RELEASE_BUILD_NUMBER:-}" ]]; then
+            fastlane_args+=("build_number:${RELEASE_BUILD_NUMBER}")
+          fi
+
+          bundle exec fastlane "${fastlane_args[@]}"
