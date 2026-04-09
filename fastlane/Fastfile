@@ -85,6 +85,29 @@ platform :ios do
     ENV[env_key].to_s.strip
   end
 
+  def first_non_empty_value(*values)
+    values
+      .map { |value| value.to_s.strip }
+      .find { |value| !value.empty? }
+      .to_s
+  end
+
+  def release_version_override(options)
+    first_non_empty_value(
+      options[:release_version],
+      ENV["RELEASE_VERSION"],
+      options[:version_number],
+      ENV["RELEASE_VERSION_NUMBER"]
+    )
+  end
+
+  def build_number_override(options)
+    first_non_empty_value(
+      options[:build_number],
+      ENV["RELEASE_BUILD_NUMBER"]
+    )
+  end
+
   def target_named!(project, target_name)
     target = project.targets.find { |item| item.name == target_name }
     UI.user_error!("Missing target #{target_name} in #{project_path}") unless target
@@ -178,6 +201,23 @@ platform :ios do
     project.save
   end
 
+  def verify_managed_versioning!(marketing_version:, build_number:, configuration_name:)
+    versioned_target_names.each do |target_name|
+      settings = read_target_versioning(
+        target_name: target_name,
+        configuration_name: configuration_name
+      )
+
+      if settings[:marketing_version] != marketing_version || settings[:build_number] != build_number
+        UI.user_error!(
+          "Versioning mismatch for #{target_name} #{configuration_name}: " \
+          "expected MARKETING_VERSION=#{marketing_version} CURRENT_PROJECT_VERSION=#{build_number}, " \
+          "got MARKETING_VERSION=#{settings[:marketing_version]} CURRENT_PROJECT_VERSION=#{settings[:build_number]}"
+        )
+      end
+    end
+  end
+
   def log_project_versioning!(label:, configuration_name:)
     UI.message(label)
 
@@ -211,9 +251,20 @@ platform :ios do
   end
 
   def apply_versioning_and_log!(marketing_version:, build_number:, configuration_name:, context_label:)
+    UI.important(
+      "#{context_label} final versioning -> " \
+      "configuration=#{configuration_name} MARKETING_VERSION=#{marketing_version} CURRENT_PROJECT_VERSION=#{build_number}"
+    )
+
     update_managed_versioning!(
       marketing_version: marketing_version,
       build_number: build_number
+    )
+
+    verify_managed_versioning!(
+      marketing_version: marketing_version,
+      build_number: build_number,
+      configuration_name: configuration_name
     )
 
     log_project_versioning!(
@@ -266,7 +317,7 @@ platform :ios do
   end
 
   def resolved_beta_marketing_version(options)
-    explicit_version_number = options[:version_number].to_s.strip
+    explicit_version_number = release_version_override(options)
     bump_marketing = options[:bump_marketing].to_s == "true"
     bump_type = options[:bump_type].to_s.strip
     normalized_bump_type = %w[patch minor major].include?(bump_type) ? bump_type : "patch"
@@ -279,7 +330,10 @@ platform :ios do
     end
 
     unless bump_marketing
-      UI.message("Keeping existing MARKETING_VERSION #{current_version} for staging beta")
+      UI.important(
+        "No release_version provided for staging beta; keeping current MARKETING_VERSION #{current_version}. " \
+        "Passing release_version is recommended for TestFlight uploads."
+      )
       return current_version
     end
 
@@ -296,17 +350,27 @@ platform :ios do
       initial_build_number: 0
     )
 
+    if latest_build_number.to_i.zero?
+      UI.message("No existing TestFlight build found for MARKETING_VERSION #{version}; starting CURRENT_PROJECT_VERSION at 1")
+      return "1"
+    end
+
     next_build_number = latest_build_number.to_i + 1
-    UI.message("Resolved CURRENT_PROJECT_VERSION #{next_build_number} from App Store Connect for MARKETING_VERSION #{version}")
+    UI.message(
+      "Resolved CURRENT_PROJECT_VERSION #{next_build_number} from latest TestFlight build #{latest_build_number} " \
+      "for MARKETING_VERSION #{version}"
+    )
     next_build_number.to_s
   end
 
   def resolved_release_marketing_version(options)
-    explicit_version_number = option_or_env_value(options, :version_number, "RELEASE_VERSION_NUMBER")
+    explicit_version_number = release_version_override(options)
 
     if explicit_version_number.empty?
       version = current_marketing_version(configuration_name: "Release")
-      UI.message("Keeping committed MARKETING_VERSION #{version} for production release")
+      UI.important(
+        "No release_version provided for production release; keeping current MARKETING_VERSION #{version}."
+      )
       return version
     end
 
@@ -316,7 +380,7 @@ platform :ios do
   end
 
   def resolved_release_build_number(options, api_key:, app_identifier:, version:)
-    explicit_build_number = option_or_env_value(options, :build_number, "RELEASE_BUILD_NUMBER")
+    explicit_build_number = build_number_override(options)
 
     unless explicit_build_number.empty?
       validate_build_number!(explicit_build_number)
@@ -420,7 +484,7 @@ platform :ios do
   end
 
   desc "Build the production app and upload it to App Store Connect only when explicitly triggered"
-  lane :release_upload do |options|
+  private_lane :perform_release_upload do |options|
     api_key = app_store_connect_api_key_from_env
     app_identifier = resolve_app_identifier
     app_provisioning_profile_name = resolve_app_provisioning_profile_name
@@ -467,5 +531,15 @@ platform :ios do
       automatic_release: false,
       run_precheck_before_submit: false
     )
+  end
+
+  desc "Build the production app and upload it to App Store Connect only when explicitly triggered"
+  lane :release do |options|
+    perform_release_upload(options)
+  end
+
+  desc "Compatibility alias for the production upload lane"
+  lane :release_upload do |options|
+    perform_release_upload(options)
   end
 end
