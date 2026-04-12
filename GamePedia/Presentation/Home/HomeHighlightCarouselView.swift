@@ -112,10 +112,9 @@ final class HomeHighlightCarouselView: UIView {
         let collectionExpandedHeightConstraint = collectionView.heightAnchor.constraint(equalToConstant: 208)
         let collectionCollapsedHeightConstraint = collectionView.heightAnchor.constraint(equalToConstant: 0)
         let pageControlExpandedTopConstraint = pageControl.topAnchor.constraint(equalTo: collectionView.bottomAnchor, constant: 10)
-        let pageControlCollapsedTopConstraint = pageControl.topAnchor.constraint(equalTo: collectionView.bottomAnchor)
+        let pageControlCollapsedTopConstraint = pageControl.topAnchor.constraint(equalTo: topAnchor)
         let pageControlCenterConstraint = pageControl.centerXAnchor.constraint(equalTo: centerXAnchor)
         let pageControlExpandedBottomConstraint = pageControl.bottomAnchor.constraint(equalTo: bottomAnchor)
-        let pageControlCollapsedBottomConstraint = pageControl.bottomAnchor.constraint(equalTo: bottomAnchor)
         let pageControlCollapsedHeightConstraint = pageControl.heightAnchor.constraint(equalToConstant: 0)
 
         NSLayoutConstraint.activate([
@@ -134,7 +133,6 @@ final class HomeHighlightCarouselView: UIView {
         collapsedConstraints = [
             collectionCollapsedHeightConstraint,
             pageControlCollapsedTopConstraint,
-            pageControlCollapsedBottomConstraint,
             pageControlCollapsedHeightConstraint
         ]
 
