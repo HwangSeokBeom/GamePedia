@@ -68,11 +68,9 @@ final class HomeHighlightSkeletonView: UIView {
         let cardExpandedHeightConstraint = cardView.heightAnchor.constraint(equalToConstant: 208)
         let cardCollapsedHeightConstraint = cardView.heightAnchor.constraint(equalToConstant: 0)
         let dotStackExpandedTopConstraint = dotStack.topAnchor.constraint(equalTo: cardView.bottomAnchor, constant: 10)
-        let dotStackCollapsedTopConstraint = dotStack.topAnchor.constraint(equalTo: cardView.bottomAnchor)
+        let dotStackCollapsedTopConstraint = dotStack.topAnchor.constraint(equalTo: topAnchor)
         let dotStackCenterConstraint = dotStack.centerXAnchor.constraint(equalTo: centerXAnchor)
         let dotStackExpandedBottomConstraint = dotStack.bottomAnchor.constraint(equalTo: bottomAnchor)
-        let dotStackCollapsedBottomConstraint = dotStack.bottomAnchor.constraint(equalTo: bottomAnchor)
-        let dotStackCollapsedHeightConstraint = dotStack.heightAnchor.constraint(equalToConstant: 0)
 
         NSLayoutConstraint.activate([
             cardTopConstraint,
@@ -116,9 +114,7 @@ final class HomeHighlightSkeletonView: UIView {
 
         collapsedConstraints = [
             cardCollapsedHeightConstraint,
-            dotStackCollapsedTopConstraint,
-            dotStackCollapsedBottomConstraint,
-            dotStackCollapsedHeightConstraint
+            dotStackCollapsedTopConstraint
         ]
 
         NSLayoutConstraint.activate(expandedConstraints)

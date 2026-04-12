@@ -11,12 +11,14 @@
 		24110B74C9636D692EAE21EB /* GamePediaWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F02B35BA4E08F03BD4CF5073 /* GamePediaWidgetExtension.appex */; };
 		31BC588E854BF5FB780D8B14 /* GameWidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78FA82D8737F7E97902E8F93 /* GameWidgetSnapshotStore.swift */; };
 		5D4AC81B011067B6F883DD1D /* GamePediaWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7485FCF17BB0BB1B52670E0 /* GamePediaWidgetBundle.swift */; };
+		73676A9C1E2D4A5B6C7D8E90 /* RecentViewedWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98A7B6C5D4E3F20123456789 /* RecentViewedWidget.swift */; };
 		8129E48F35175E1B7347D870 /* ReviewPromptWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D2C7801FADBAEA6956C987D /* ReviewPromptWidget.swift */; };
 		8561337B80828FF847F24F9E /* WidgetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E57E52BE1A067EF91366F0B6 /* WidgetTheme.swift */; };
 		8B9A887F2F6EDD1B00D5F380 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 8B9A887E2F6EDD1B00D5F380 /* Kingfisher */; };
 		8C3B650A2F6F000100D5F380 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 8C3B65092F6F000100D5F380 /* GoogleSignIn */; };
 		A3D01D2461455C12FCD1B027 /* TrendingGamesWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A791AC4D288906DD8C646A48 /* TrendingGamesWidget.swift */; };
 		C0F12397C1A50B9FDAE7C777 /* WidgetTimelineSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECAC2BE000980AD88A6944B /* WidgetTimelineSupport.swift */; };
+		D0C1B2A39485766758493A2B /* MyActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F708192837465 /* MyActivityWidget.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +61,7 @@
 
 /* Begin PBXFileReference section */
 		024A57DCDD7080F07EA2E7F8 /* GameWidgetSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GameWidgetSnapshot.swift; path = GamePedia/Shared/Widget/GameWidgetSnapshot.swift; sourceTree = "<group>"; };
+		1A2B3C4D5E6F708192837465 /* MyActivityWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MyActivityWidget.swift; sourceTree = "<group>"; };
 		1FBE51A9AA30FC44A34CE1CB /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		5ECAC2BE000980AD88A6944B /* WidgetTimelineSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetTimelineSupport.swift; sourceTree = "<group>"; };
 		78FA82D8737F7E97902E8F93 /* GameWidgetSnapshotStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GameWidgetSnapshotStore.swift; path = GamePedia/Shared/Widget/GameWidgetSnapshotStore.swift; sourceTree = "<group>"; };
@@ -70,6 +73,7 @@
 		8D0000022F70000100D5F380 /* Config/Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = SOURCE_ROOT; };
 		8D0000032F70000100D5F380 /* Config/Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Secrets.example.xcconfig; sourceTree = SOURCE_ROOT; };
 		8D00000A2F70000100D5F380 /* Config/Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Staging.xcconfig; sourceTree = SOURCE_ROOT; };
+        98A7B6C5D4E3F20123456789 /* RecentViewedWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecentViewedWidget.swift; sourceTree = "<group>"; };
 		A791AC4D288906DD8C646A48 /* TrendingGamesWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrendingGamesWidget.swift; sourceTree = "<group>"; };
 		ADDCE165F14D6BAF464953EC /* GamePediaWidgetExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = GamePediaWidgetExtension.entitlements; sourceTree = "<group>"; };
 		C7485FCF17BB0BB1B52670E0 /* GamePediaWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamePediaWidgetBundle.swift; sourceTree = "<group>"; };
@@ -155,7 +159,9 @@
 			isa = PBXGroup;
 			children = (
 				C7485FCF17BB0BB1B52670E0 /* GamePediaWidgetBundle.swift */,
+				98A7B6C5D4E3F20123456789 /* RecentViewedWidget.swift */,
 				A791AC4D288906DD8C646A48 /* TrendingGamesWidget.swift */,
+				1A2B3C4D5E6F708192837465 /* MyActivityWidget.swift */,
 				7D2C7801FADBAEA6956C987D /* ReviewPromptWidget.swift */,
 				5ECAC2BE000980AD88A6944B /* WidgetTimelineSupport.swift */,
 				E57E52BE1A067EF91366F0B6 /* WidgetTheme.swift */,
@@ -411,7 +417,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				5D4AC81B011067B6F883DD1D /* GamePediaWidgetBundle.swift in Sources */,
+				73676A9C1E2D4A5B6C7D8E90 /* RecentViewedWidget.swift in Sources */,
 				A3D01D2461455C12FCD1B027 /* TrendingGamesWidget.swift in Sources */,
+				D0C1B2A39485766758493A2B /* MyActivityWidget.swift in Sources */,
 				8129E48F35175E1B7347D870 /* ReviewPromptWidget.swift in Sources */,
 				C0F12397C1A50B9FDAE7C777 /* WidgetTimelineSupport.swift in Sources */,
 				8561337B80828FF847F24F9E /* WidgetTheme.swift in Sources */,
