@@ -36,10 +36,20 @@ final class ProfileSettingsViewController: UIViewController {
     private let accountHeaderView = SectionHeaderView()
     private let serviceHeaderView = SectionHeaderView()
     private let supportHeaderView = SectionHeaderView()
+    private let buildInfoHeaderView = SectionHeaderView()
 
     private let accountContainerView = ProfileSettingsViewController.makeSectionContainerView()
     private let serviceContainerView = ProfileSettingsViewController.makeSectionContainerView()
     private let supportContainerView = ProfileSettingsViewController.makeSectionContainerView()
+    private let buildInfoContainerView = ProfileSettingsViewController.makeSectionContainerView()
+    private let buildInfoLabel: UILabel = {
+        let label = UILabel()
+        label.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        label.textColor = .gpTextSecondary
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
 
     private let privacySettingsButton = ProfileSettingsViewController.makeActionButton(
         title: L10n.Profile.Action.socialPrivacy,
@@ -94,19 +104,29 @@ final class ProfileSettingsViewController: UIViewController {
         navigationItem.title = L10n.Profile.Settings.title
         navigationItem.largeTitleDisplayMode = .never
 
-        [accountHeaderView, serviceHeaderView, supportHeaderView].forEach {
+        [accountHeaderView, serviceHeaderView, supportHeaderView, buildInfoHeaderView].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
 
         accountHeaderView.configure(title: L10n.Profile.Settings.account, showSeeMore: false)
         serviceHeaderView.configure(title: L10n.Profile.Settings.service, showSeeMore: false)
         supportHeaderView.configure(title: L10n.Profile.Settings.support, showSeeMore: false)
+        buildInfoHeaderView.configure(title: "Build Info", showSeeMore: false)
 
         [scrollView].forEach { view.addSubview($0) }
         [contentView].forEach { scrollView.addSubview($0) }
         [contentStackView].forEach { contentView.addSubview($0) }
 
-        [accountHeaderView, accountContainerView, serviceHeaderView, serviceContainerView, supportHeaderView, supportContainerView].forEach {
+        [
+            accountHeaderView,
+            accountContainerView,
+            serviceHeaderView,
+            serviceContainerView,
+            supportHeaderView,
+            supportContainerView,
+            buildInfoHeaderView,
+            buildInfoContainerView
+        ].forEach {
             contentStackView.addArrangedSubview($0)
         }
 
@@ -122,6 +142,7 @@ final class ProfileSettingsViewController: UIViewController {
             containerView: supportContainerView,
             buttons: [contactSupportButton]
         )
+        configureBuildInfoSection()
     }
 
     private func setupLayout() {
@@ -251,6 +272,18 @@ final class ProfileSettingsViewController: UIViewController {
     @objc
     private func didTapContactSupport() {
         onContactSupport?()
+    }
+
+    private func configureBuildInfoSection() {
+        buildInfoLabel.text = AppConfig.settingsBuildInfoText
+        buildInfoContainerView.addSubview(buildInfoLabel)
+
+        NSLayoutConstraint.activate([
+            buildInfoLabel.topAnchor.constraint(equalTo: buildInfoContainerView.topAnchor, constant: 16),
+            buildInfoLabel.leadingAnchor.constraint(equalTo: buildInfoContainerView.leadingAnchor, constant: 16),
+            buildInfoLabel.trailingAnchor.constraint(equalTo: buildInfoContainerView.trailingAnchor, constant: -16),
+            buildInfoLabel.bottomAnchor.constraint(equalTo: buildInfoContainerView.bottomAnchor, constant: -16)
+        ])
     }
 
     private static func makeSectionContainerView() -> UIView {

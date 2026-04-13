@@ -3,6 +3,8 @@
 URL_SCHEME_SEPARATOR = /
 API_ENVIRONMENT = dev
 CORE_BASE_URL = http:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)127.0.0.1:3001
+BUILD_FLAVOR_NAME = dev
+BUILD_SCHEME_NAME = GamePedia-Dev
 
 GOOGLE_CLIENT_ID = 464952520539-lbhh2kg8i9g02qkgot2odhkflca85org.apps.googleusercontent.com
 GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.464952520539-lbhh2kg8i9g02qkgot2odhkflca85org

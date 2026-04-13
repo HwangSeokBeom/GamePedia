@@ -462,7 +462,7 @@
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GamePedia/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = GamePedia;
+				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia Dev";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -751,7 +751,7 @@
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GamePedia/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = GamePedia;
+				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia Staging";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;

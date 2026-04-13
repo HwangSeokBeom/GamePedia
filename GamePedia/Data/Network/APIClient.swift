@@ -57,12 +57,20 @@ final class APIClient {
     func request<T: Decodable>(_ endpoint: Endpoint, as type: T.Type) async throws -> T {
         let urlRequest = try await buildRequest(from: endpoint)
         let isGameRequest = endpoint.path.hasPrefix("/games")
+        let homeEndpointName = homeEndpointName(for: endpoint.path)
+        let homeLogPrefix = "[HomeAPI][\(AppConfig.apiEnvironment.rawValue)]"
         let isLibraryStatusRequest = endpoint.path == "/users/me/library/status"
         let isLibraryPreviewRequest = endpoint.path == "/users/me/library"
         let isNotificationsRequest = endpoint.path == "/users/me/notifications"
         let isFriendActivityRequest = endpoint.path == "/users/me/friends/activity"
         let isProfileSummaryRequest = endpoint.path == "/users/me"
         let isProfileRecentPlaysRequest = endpoint.path == "/users/me/recent-plays"
+        if let homeEndpointName {
+            print(
+                "\(homeLogPrefix) endpoint=\(homeEndpointName) " +
+                "url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil")"
+            )
+        }
         if isGameRequest {
             print("[GameAPI] request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil")")
         }
@@ -71,6 +79,13 @@ final class APIClient {
             print("[ReviewSubmit] APIClient.request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(urlRequest.allHTTPHeaderFields ?? [:]) body=\(bodyString)")
         }
         let (data, response) = try await session.data(for: urlRequest)
+        if let homeEndpointName, let httpResponse = response as? HTTPURLResponse {
+            print(
+                "\(homeLogPrefix) endpoint=\(homeEndpointName) " +
+                "url=\(urlRequest.url?.absoluteString ?? "nil") status=\(httpResponse.statusCode)"
+            )
+            print("\(homeLogPrefix) endpoint=\(homeEndpointName) bodyPrefix=\(responseBodyPreview(from: data))")
+        }
         if isGameRequest, let httpResponse = response as? HTTPURLResponse {
             print("[GameAPI] response status=\(httpResponse.statusCode) url=\(urlRequest.url?.absoluteString ?? "nil")")
         }
@@ -105,11 +120,24 @@ final class APIClient {
         try validate(response: response, data: data)
         do {
             let decoded: T = try decode(data, as: type)
+            if let homeEndpointName {
+                print(
+                    "\(homeLogPrefix) endpoint=\(homeEndpointName) " +
+                    "decodeSuccess type=\(String(describing: type))"
+                )
+            }
             if isGameRequest {
                 print("[GameAPI] decodeSuccess type=\(String(describing: type))")
             }
             return decoded
         } catch {
+            if let homeEndpointName {
+                print(
+                    "\(homeLogPrefix) endpoint=\(homeEndpointName) " +
+                    "decodeError=\(error)"
+                )
+                print("\(homeLogPrefix) endpoint=\(homeEndpointName) bodyPrefix=\(responseBodyPreview(from: data))")
+            }
             if isGameRequest {
                 let responseBody = String(data: data, encoding: .utf8) ?? ""
                 print("[GameAPI] decodeFailure type=\(String(describing: type)) error=\(error.localizedDescription) body=\(responseBody)")
@@ -230,6 +258,27 @@ final class APIClient {
             return try decoder.decode(type, from: data)
         } catch {
             throw NetworkError.decodingFailed(error)
+        }
+    }
+
+    private func responseBodyPreview(from data: Data, maxLength: Int = 240) -> String {
+        let rawBody = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+        let normalizedBody = rawBody.replacingOccurrences(of: "\n", with: " ")
+        guard normalizedBody.count > maxLength else { return normalizedBody }
+        let endIndex = normalizedBody.index(normalizedBody.startIndex, offsetBy: maxLength)
+        return "\(normalizedBody[..<endIndex])..."
+    }
+
+    private func homeEndpointName(for path: String) -> String? {
+        switch path {
+        case "/games/highlights":
+            return "highlights"
+        case "/games/popular":
+            return "popular"
+        case "/games/recommended":
+            return "recommended"
+        default:
+            return nil
         }
     }
 }

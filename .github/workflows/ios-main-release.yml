@@ -25,7 +25,7 @@ on:
 
 jobs:
   upload-production-build:
-    name: Upload Production Build
+    name: Upload Production Release Build
     runs-on: macos-latest
     env:
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -80,6 +80,18 @@ jobs:
           echo "Resolved marketing version: ${release_version:-<keep current project version>}"
           echo "Resolved build number override: ${release_build:-<auto increment from App Store Connect>}"
 
+      - name: Print production build context
+        run: |
+          set -euo pipefail
+
+          echo "build_type=production"
+          echo "scheme=GamePedia-Prod"
+          echo "configuration=Release"
+          echo "resolved_api_environment=production"
+          echo "upload_destination=App Store Connect"
+          echo "release_version=${RELEASE_VERSION:-<keep current project version>}"
+          echo "release_build_number=${RELEASE_BUILD_NUMBER:-<resolved in fastlane>}"
+
       - name: Import signing certificate
         uses: apple-actions/import-codesign-certs@v3
         with:
@@ -119,7 +131,7 @@ jobs:
           echo "APP_STORE_PROVISIONING_PROFILE_NAME=$APP_PROFILE_NAME" >> "$GITHUB_ENV"
           echo "APP_STORE_WIDGET_PROVISIONING_PROFILE_NAME=$WIDGET_PROFILE_NAME" >> "$GITHUB_ENV"
 
-      - name: Upload production build to App Store Connect
+      - name: Upload production build to App Store Connect (main -> production)
         # staging owns TestFlight automation; main uploads only on manual or release-tag triggers.
         env:
           CI: "true"

@@ -250,6 +250,40 @@ platform :ios do
     end
   end
 
+  def log_distribution_context!(
+    build_type:,
+    scheme:,
+    configuration:,
+    api_environment:,
+    upload_destination:,
+    marketing_version: nil,
+    build_number: nil,
+    app_identifier: nil
+  )
+    UI.important(
+      "[distribution] build_type=#{build_type} scheme=#{scheme} configuration=#{configuration} " \
+      "api_environment=#{api_environment} upload_destination=#{upload_destination}"
+    )
+
+    details = []
+    details << "release_version=#{marketing_version}" unless marketing_version.to_s.strip.empty?
+    details << "release_build_number=#{build_number}" unless build_number.to_s.strip.empty?
+    details << "app_identifier=#{app_identifier}" unless app_identifier.to_s.strip.empty?
+
+    UI.important("[distribution] #{details.join(' ')}") unless details.empty?
+  end
+
+  def staging_testflight_changelog(marketing_version:, build_number:)
+    [
+      "STAGING build",
+      "scheme=GamePedia-Staging",
+      "configuration=Staging",
+      "api_environment=staging",
+      "version=#{marketing_version}",
+      "build=#{build_number}"
+    ].join(" | ")
+  end
+
   def apply_versioning_and_log!(marketing_version:, build_number:, configuration_name:, context_label:)
     UI.important(
       "#{context_label} final versioning -> " \
@@ -424,6 +458,17 @@ platform :ios do
       context_label: "Staging beta"
     )
 
+    log_distribution_context!(
+      build_type: "staging",
+      scheme: "GamePedia-Staging",
+      configuration: "Staging",
+      api_environment: "staging",
+      upload_destination: "TestFlight",
+      marketing_version: selected_marketing_version,
+      build_number: selected_build_number,
+      app_identifier: app_identifier
+    )
+
     ipa_path = build_app(
       **xcode_container_options,
       scheme: "GamePedia-Staging",
@@ -444,6 +489,10 @@ platform :ios do
       api_key: api_key,
       app_identifier: app_identifier,
       ipa: ipa_path,
+      changelog: staging_testflight_changelog(
+        marketing_version: selected_marketing_version,
+        build_number: selected_build_number
+      ),
       skip_waiting_for_build_processing: true
     )
   end
@@ -451,12 +500,23 @@ platform :ios do
   desc "Validate the production archive path on main without uploading"
   lane :release_archive do |_options|
     widget_provisioning_profile_name = resolve_widget_provisioning_profile_name
+    release_marketing_version = current_marketing_version(configuration_name: "Release")
+    release_build_number = current_build_number(configuration_name: "Release")
 
     log_project_versioning!(
       label: "Release archive validation using committed project versioning",
       configuration_name: "Release"
     )
     log_effective_xcodebuild_versioning!(configuration_name: "Release")
+    log_distribution_context!(
+      build_type: "production-validation",
+      scheme: "GamePedia-Prod",
+      configuration: "Release",
+      api_environment: "production",
+      upload_destination: "None (archive validation only)",
+      marketing_version: release_marketing_version,
+      build_number: release_build_number
+    )
 
     build_app(
       **xcode_container_options,
@@ -491,6 +551,17 @@ platform :ios do
       build_number: selected_build_number,
       configuration_name: "Release",
       context_label: "Production release"
+    )
+
+    log_distribution_context!(
+      build_type: "production",
+      scheme: "GamePedia-Prod",
+      configuration: "Release",
+      api_environment: "production",
+      upload_destination: "App Store Connect",
+      marketing_version: selected_marketing_version,
+      build_number: selected_build_number,
+      app_identifier: app_identifier
     )
 
     ipa_path = build_app(
