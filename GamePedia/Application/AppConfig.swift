@@ -21,6 +21,26 @@ enum AppConfig {
         ) ?? firstGoogleURLScheme()
     )
     static let featureFlags = FeatureFlags.defaults(for: apiEnvironment)
+    static let appVersion = configuredString(
+        infoPlistKey: "CFBundleShortVersionString",
+        environmentKey: "APP_VERSION"
+    ) ?? "unknown"
+    static let buildNumber = configuredString(
+        infoPlistKey: "CFBundleVersion",
+        environmentKey: "APP_BUILD_NUMBER"
+    ) ?? "unknown"
+    static let buildSchemeName = configuredString(
+        infoPlistKey: "BuildSchemeName",
+        environmentKey: "BUILD_SCHEME_NAME"
+    ) ?? "unknown"
+    static let buildConfiguration = configuredString(
+        infoPlistKey: "BuildConfiguration",
+        environmentKey: "BUILD_CONFIGURATION"
+    ) ?? "unknown"
+    static let buildFlavor = configuredString(
+        infoPlistKey: "BuildFlavor",
+        environmentKey: "BUILD_FLAVOR_NAME"
+    ) ?? apiEnvironment.rawValue
     static let coreBaseURL: URL = configuredURL(
         infoPlistKey: "CoreBaseURL",
         environmentKey: "CORE_BASE_URL",
@@ -52,6 +72,37 @@ enum AppConfig {
         infoPlistKey: "WidgetAppGroupIdentifier",
         environmentKey: "WIDGET_APP_GROUP_IDENTIFIER"
     )
+    static let isTestFlightDistribution = AppEnvironmentResolver.isTestFlightDistribution
+    static let distributionChannel = isTestFlightDistribution ? "testflight" : "local"
+    static let apiHost = coreBaseURL.host ?? coreBaseURL.absoluteString
+    static let buildTargetMessage = "THIS BUILD TARGETS \(apiEnvironment.rawValue.uppercased())"
+    static let shouldShowBuildIndicator = apiEnvironment != .production || isTestFlightDistribution
+    static let buildBadgeText = {
+        let environmentLabel: String
+
+        switch apiEnvironment {
+        case .dev:
+            environmentLabel = "DEV"
+        case .staging:
+            environmentLabel = "STAGING"
+        case .production:
+            environmentLabel = "PROD"
+        }
+
+        let channelSuffix = isTestFlightDistribution ? " TF" : ""
+        return "\(environmentLabel)\(channelSuffix) \(appVersion)(\(buildNumber))"
+    }()
+    static let settingsBuildInfoText = [
+        "Version: \(appVersion)",
+        "Build: \(buildNumber)",
+        "Scheme: \(buildSchemeName)",
+        "Configuration: \(buildConfiguration)",
+        "Flavor: \(buildFlavor)",
+        "Environment: \(apiEnvironment.rawValue)",
+        "Channel: \(distributionChannel)",
+        "API Host: \(apiHost)",
+        "API Base URL: \(coreBaseURL.absoluteString)"
+    ].joined(separator: "\n")
 
     // MARK: - Presentation
 
@@ -66,8 +117,13 @@ enum AppConfig {
     }()
 
     static func logRuntimeConfiguration() {
-        print("[AppConfig] apiEnvironment = \(apiEnvironment.rawValue)")
-        print("[AppConfig] coreBaseURL = \(coreBaseURL.absoluteString)")
+        print(
+            "[BuildInfo] version=\(appVersion) build=\(buildNumber) " +
+            "scheme=\(buildSchemeName) configuration=\(buildConfiguration) " +
+            "flavor=\(buildFlavor) environment=\(apiEnvironment.rawValue) channel=\(distributionChannel)"
+        )
+        print("[BuildInfo] apiBaseURL=\(coreBaseURL.absoluteString)")
+        print("[BuildInfo] \(buildTargetMessage)")
     }
 
     // MARK: - Private

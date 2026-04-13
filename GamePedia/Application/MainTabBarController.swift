@@ -3,6 +3,20 @@ import UIKit
 final class MainTabBarController: UITabBarController {
 
     private let tabNavigationControllers: [UINavigationController]
+    private let buildInfoBadgeLabel: UILabel = {
+        let label = UILabel()
+        label.font = .monospacedSystemFont(ofSize: 11, weight: .semibold)
+        label.textColor = .white
+        label.backgroundColor = .systemOrange.withAlphaComponent(0.92)
+        label.layer.cornerRadius = 11
+        label.layer.cornerCurve = .continuous
+        label.layer.masksToBounds = true
+        label.textAlignment = .center
+        label.numberOfLines = 1
+        label.isUserInteractionEnabled = false
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
     var onTabSelectionRequested: ((Int) -> Bool)?
     var onDebugEnvironmentMenuRequested: (() -> Void)?
 
@@ -33,6 +47,7 @@ final class MainTabBarController: UITabBarController {
         tabBar.backgroundImage = nil
         tabBar.shadowImage = nil
         applyTabBarAppearance()
+        configureBuildInfoBadgeIfNeeded()
         configureDebugMenuGestureIfNeeded()
     }
 
@@ -64,6 +79,33 @@ final class MainTabBarController: UITabBarController {
 
     private func makeTabBarBlurEffect() -> UIBlurEffect {
         UIBlurEffect(style: .systemChromeMaterialDark)
+    }
+
+    private func configureBuildInfoBadgeIfNeeded() {
+        guard AppConfig.shouldShowBuildIndicator else { return }
+        guard buildInfoBadgeLabel.superview == nil else { return }
+
+        buildInfoBadgeLabel.text = "  \(AppConfig.buildBadgeText)  "
+        buildInfoBadgeLabel.backgroundColor = buildInfoBadgeBackgroundColor()
+
+        view.addSubview(buildInfoBadgeLabel)
+
+        NSLayoutConstraint.activate([
+            buildInfoBadgeLabel.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+            buildInfoBadgeLabel.bottomAnchor.constraint(equalTo: tabBar.topAnchor, constant: -8),
+            buildInfoBadgeLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 22)
+        ])
+    }
+
+    private func buildInfoBadgeBackgroundColor() -> UIColor {
+        switch AppConfig.apiEnvironment {
+        case .dev:
+            return .systemRed.withAlphaComponent(0.92)
+        case .staging:
+            return .systemOrange.withAlphaComponent(0.92)
+        case .production:
+            return .systemBlue.withAlphaComponent(0.92)
+        }
     }
 
     private func configureDebugMenuGestureIfNeeded() {

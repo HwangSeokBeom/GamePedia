@@ -10,7 +10,7 @@ on:
 
 jobs:
   validate-release-archive:
-    name: Validate Production Archive
+    name: Validate Production Release Archive
     runs-on: macos-latest
 
     steps:
@@ -30,6 +30,18 @@ jobs:
 
       - name: Bundle install
         run: bundle install --jobs 4 --retry 3
+
+      - name: Print production validation context
+        run: |
+          set -euo pipefail
+
+          echo "build_type=production-validation"
+          echo "scheme=GamePedia-Prod"
+          echo "configuration=Release"
+          echo "resolved_api_environment=production"
+          echo "upload_destination=None (archive validation only)"
+          echo "release_version=<committed project value unless release workflow overrides it>"
+          echo "release_build_number=<committed project value unless release workflow overrides it>"
 
       - name: Import signing certificate
         uses: apple-actions/import-codesign-certs@v3
