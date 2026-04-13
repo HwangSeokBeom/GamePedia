@@ -34,6 +34,10 @@ enum AppEnvironmentResolver {
 #endif
     }
 
+    static var isTestFlightDistribution: Bool {
+        isTestFlight
+    }
+
     private static var configuredOverride: APIEnvironment? {
         if let environmentOverride = resolve(rawValue: ProcessInfo.processInfo.environment["API_ENVIRONMENT"]) {
             return environmentOverride

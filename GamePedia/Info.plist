@@ -4,6 +4,12 @@
 <dict>
 	<key>APIEnvironment</key>
 	<string>$(API_ENVIRONMENT)</string>
+	<key>BuildConfiguration</key>
+	<string>$(CONFIGURATION)</string>
+	<key>BuildFlavor</key>
+	<string>$(BUILD_FLAVOR_NAME)</string>
+	<key>BuildSchemeName</key>
+	<string>$(BUILD_SCHEME_NAME)</string>
 	<key>CFBundleDisplayName</key>
 	<string>GamePedia</string>
 	<key>CFBundleName</key>
