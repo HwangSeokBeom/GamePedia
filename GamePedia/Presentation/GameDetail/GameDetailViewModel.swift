@@ -88,6 +88,7 @@ final class GameDetailViewModel {
         observeCommentChanges()
         observeReviewLikeChanges()
         observeFavoriteChanges()
+        observeReviewChanges()
     }
 
     deinit {
@@ -121,12 +122,12 @@ final class GameDetailViewModel {
             handleTranslationResults(results)
         case .aiReviewSummaryRequested:
             guard let currentGameID else { return }
-            requestAIReviewSummary(gameId: currentGameID, force: false)
+            requestAIReviewSummary(gameId: currentGameID, force: false, source: "gameDetail")
         case .aiReviewSummaryRetryTapped:
             guard let currentGameID else { return }
-            requestAIReviewSummary(gameId: currentGameID, force: true)
+            requestAIReviewSummary(gameId: currentGameID, force: true, source: "gameDetail")
         case .aiReviewSummaryExpandTapped:
-            guard case .loaded(let viewState) = state.aiReviewSummarySectionState else { return }
+            guard let viewState = state.aiReviewSummarySectionState.loadedDisplayModel else { return }
             apply(.setAIReviewSummaryExpanded(!viewState.isExpanded))
         }
     }
@@ -142,7 +143,7 @@ final class GameDetailViewModel {
         apply(.clearError)
         apply(.setBlockingLoadError(nil))
         apply(.setInlineNotice(nil))
-        requestAIReviewSummary(gameId: gameId, force: true)
+        requestAIReviewSummary(gameId: gameId, force: true, source: "gameDetail")
 
         if let seed = seedStore.seed(for: gameId) {
             let partialGame = seed.makePartialDetail()
@@ -166,13 +167,14 @@ final class GameDetailViewModel {
         }
     }
 
-    private func requestAIReviewSummary(gameId: Int, force: Bool) {
+    private func requestAIReviewSummary(gameId: Int, force: Bool, source: String) {
         if !force,
            aiReviewSummaryRequestGameID == gameId,
            state.aiReviewSummarySectionState.isLoading {
             return
         }
 
+        print("[AIReviewSummary] request gameId=\(gameId) forceRefresh=\(force) source=\(source)")
         aiReviewSummaryTask?.cancel()
         aiReviewSummaryRequestGameID = gameId
         apply(.setAIReviewSummaryLoading)
@@ -183,30 +185,86 @@ final class GameDetailViewModel {
             do {
                 let summary = try await self.fetchAIReviewSummaryUseCase.execute(gameId: gameId)
                 guard !Task.isCancelled else { return }
-                let viewState = AIReviewSummaryViewState.make(from: summary)
+                let hasDisplayableContent = AIReviewSummaryDisplayModel.hasDisplayableContent(summary)
+                let viewState = AIReviewSummaryDisplayModel.make(from: summary)
+                print(
+                    "[AIReviewSummary] response " +
+                    "gameId=\(gameId) " +
+                    "status=\(summary.status) " +
+                    "reason=\(summary.reason ?? "nil") " +
+                    "reviewCount=\(summary.reviewCount) " +
+                    "fallbackUsed=\(summary.fallbackUsed) " +
+                    "summaryLength=\(summary.summary.count)"
+                )
 
                 await MainActor.run {
                     guard self.currentGameID == gameId else { return }
-                    self.apply(.setAIReviewSummaryLoaded(viewState))
+                    if summary.fallbackUsed || summary.status == "fallback" {
+                        self.apply(.setAIReviewSummaryFallback(
+                            summary: summary.summary,
+                            reviewCount: summary.reviewCount,
+                            reason: summary.reason
+                        ))
+                    } else if summary.status == "empty" {
+                        self.apply(.setAIReviewSummaryEmpty(
+                            summary: summary.summary,
+                            reason: summary.reason
+                        ))
+                    } else if hasDisplayableContent {
+                        self.apply(.setAIReviewSummarySuccess(viewState))
+                    } else {
+                        self.apply(.setAIReviewSummaryEmpty(
+                            summary: AIReviewSummaryError.emptyMessage,
+                            reason: summary.reason
+                        ))
+                    }
                     self.aiReviewSummaryTask = nil
                 }
             } catch {
                 guard !Task.isCancelled else { return }
                 let summaryError = AIReviewSummaryError.from(error: error)
-                let message = summaryError.errorDescription ?? "AI 리뷰 요약을 불러오지 못했습니다."
+                let message = summaryError.userFacingMessage
+                let retryAvailable = summaryError.isRetryAvailable
+#if DEBUG
+                print(
+                    "[AIReviewSummary] failed " +
+                    "gameId=\(gameId) " +
+                    "code=\(summaryError.logCode) " +
+                    "raw=\(summaryError.debugMessage(from: error))"
+                )
+#endif
 
                 await MainActor.run {
                     guard self.currentGameID == gameId else { return }
-                    switch summaryError {
-                    case .notAvailable:
-                        self.apply(.setAIReviewSummaryUnavailable(message))
-                    default:
-                        self.apply(.setAIReviewSummaryError(message))
+                    if summaryError.shouldRenderAsEmpty {
+                        self.apply(.setAIReviewSummaryEmpty(summary: message, reason: summaryError.logCode))
+                    } else {
+                        self.apply(.setAIReviewSummaryFailed(
+                            message: message,
+                            retryAvailable: retryAvailable
+                        ))
                     }
                     self.aiReviewSummaryTask = nil
                 }
             }
         }
+    }
+
+    private func observeReviewChanges() {
+        NotificationCenter.default.publisher(for: .reviewDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let currentGameID = self.currentGameID,
+                      let changedGameID = ReviewChangeNotificationParser.gameId(from: notification),
+                      changedGameID == currentGameID else {
+                    return
+                }
+
+                print("[AIReviewSummary] refetchAfterReviewChange gameId=\(changedGameID) reason=reviewDidChange")
+                self.requestAIReviewSummary(gameId: changedGameID, force: true, source: "gameDetail")
+            }
+            .store(in: &cancellables)
     }
 
     private func fetchGame(id: Int) async {
@@ -386,15 +444,6 @@ final class GameDetailViewModel {
 
     private func prepareTranslation(for game: GameDetail) async {
         let targetLanguage = languageProvider.currentLanguage
-        let isSupported = translationProvider.supportsOnDeviceTranslation(
-            targetLanguage: languageProvider.currentLanguageCode
-        )
-        print(
-            "[TranslationAvailability] " +
-            "iosVersion=\(currentOSVersionString()) " +
-            "isSupported=\(isSupported)"
-        )
-
         guard targetLanguage.isEnglish == false else {
             await MainActor.run {
                 self.apply(.setTranslationLoading(false))
@@ -403,6 +452,15 @@ final class GameDetailViewModel {
             }
             return
         }
+
+        let targetLanguageCode = languageProvider.currentLanguageCode
+        let isSupported = translationProvider.supportsOnDeviceTranslation(
+            targetLanguage: targetLanguageCode
+        )
+        TranslationSupportLogLimiter.logOnce(
+            key: "availability-\(currentOSVersionString())-\(targetLanguageCode)-\(isSupported)",
+            message: "[TranslationAvailability] iosVersion=\(currentOSVersionString()) isSupported=\(isSupported)"
+        )
 
         let normalizedSummary = game.summary.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedStoryline = game.storyline.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -444,7 +502,7 @@ final class GameDetailViewModel {
             : TranslationBatchRequest(
                 context: "GameDetail",
                 sourceLanguage: "en",
-                targetLanguage: languageProvider.currentLanguageCode,
+                targetLanguage: targetLanguageCode,
                 items: items
             )
 

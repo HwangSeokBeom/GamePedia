@@ -19,7 +19,7 @@ struct GameDetailState {
     var isTranslationLoading: Bool = false
     var isShowingTranslated: Bool = false
     var translationRequest: TranslationBatchRequest? = nil
-    var aiReviewSummarySectionState: AIReviewSummarySectionState = .idle
+    var aiReviewSummarySectionState: AIReviewSummaryViewState = .idle
 
     var title: String { game?.title ?? "" }
     var hasRenderableContent: Bool { game != nil }

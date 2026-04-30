@@ -9,7 +9,14 @@ struct MockAIReviewSummaryRepository: AIReviewSummaryRepository {
             success: true,
             data: AIReviewSummaryResponseDTO(
                 gameId: gameId,
+                status: "success",
+                reason: "SUMMARY_AVAILABLE",
+                fallbackUsed: false,
                 summary: "대부분의 리뷰는 느긋한 플레이와 높은 자유도를 장점으로 언급합니다. 농장 관리, 탐험, 관계 쌓기를 자기 속도에 맞춰 즐길 수 있다는 점이 좋은 평가를 받습니다.",
+                highlights: [
+                    "느긋한 플레이와 높은 자유도",
+                    "농장 관리, 탐험, 관계 쌓기의 균형"
+                ],
                 pros: [
                     "농장 관리와 탐험의 균형이 좋다는 의견이 많습니다.",
                     "힐링 분위기와 도트 그래픽 만족도가 높습니다.",

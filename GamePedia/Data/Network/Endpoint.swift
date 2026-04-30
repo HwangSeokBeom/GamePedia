@@ -139,6 +139,10 @@ extension Endpoint {
         .post("/api/v1/ai/game-recommendations", body: body, userAuth: true)
     }
 
+    static func aiSearchAssist(body: AISearchAssistRequestDTO) -> Endpoint {
+        .post("/api/v1/ai/search-assist", body: body, userAuth: true)
+    }
+
     static func aiReviewSummary(gameId: Int) -> Endpoint {
         .get("/api/v1/ai/games/\(gameId)/review-summary", userAuth: true)
     }

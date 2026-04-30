@@ -65,6 +65,7 @@ final class APIClient {
         let isFriendActivityRequest = endpoint.path == "/users/me/friends/activity"
         let isProfileSummaryRequest = endpoint.path == "/users/me"
         let isProfileRecentPlaysRequest = endpoint.path == "/users/me/recent-plays"
+        let aiReviewSummaryGameId = aiReviewSummaryGameId(for: endpoint.path)
         if let homeEndpointName {
             print(
                 "\(homeLogPrefix) endpoint=\(homeEndpointName) " +
@@ -76,7 +77,7 @@ final class APIClient {
         }
         if endpoint.path.contains("/reviews") {
             let bodyString = urlRequest.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-            print("[ReviewSubmit] APIClient.request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(urlRequest.allHTTPHeaderFields ?? [:]) body=\(bodyString)")
+            print("[ReviewSubmit] APIClient.request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(redactedHeaders(urlRequest.allHTTPHeaderFields)) body=\(bodyString)")
         }
         let (data, response) = try await session.data(for: urlRequest)
         if let homeEndpointName, let httpResponse = response as? HTTPURLResponse {
@@ -117,6 +118,14 @@ final class APIClient {
             let responseBody = String(data: data, encoding: .utf8) ?? ""
             print("[ReviewSubmit] APIClient.response status=\(httpResponse.statusCode) body=\(responseBody)")
         }
+        if let aiReviewSummaryGameId, let httpResponse = response as? HTTPURLResponse {
+            print(
+                "[AIReviewSummary] httpResponse " +
+                "gameId=\(aiReviewSummaryGameId) " +
+                "statusCode=\(httpResponse.statusCode) " +
+                "bodyPreview=\(responseBodyPreview(from: data))"
+            )
+        }
         try validate(response: response, data: data)
         do {
             let decoded: T = try decode(data, as: type)
@@ -128,6 +137,9 @@ final class APIClient {
             }
             if isGameRequest {
                 print("[GameAPI] decodeSuccess type=\(String(describing: type))")
+            }
+            if let aiReviewSummaryGameId {
+                print("[AIReviewSummary] decodeSuccess gameId=\(aiReviewSummaryGameId) type=\(String(describing: type))")
             }
             return decoded
         } catch {
@@ -166,6 +178,14 @@ final class APIClient {
                 let responseBody = String(data: data, encoding: .utf8) ?? ""
                 print("[Profile] decodeFailure endpoint=/users/me/recent-plays type=\(String(describing: type)) error=\(error) body=\(responseBody)")
             }
+            if let aiReviewSummaryGameId {
+                print(
+                    "[AIReviewSummary] decodeFailed " +
+                    "gameId=\(aiReviewSummaryGameId) " +
+                    "error=\(error) " +
+                    "bodyPreview=\(responseBodyPreview(from: data))"
+                )
+            }
             throw error
         }
     }
@@ -174,7 +194,7 @@ final class APIClient {
         let urlRequest = try await buildRequest(from: endpoint)
         if endpoint.path.contains("/reviews") {
             let bodyString = urlRequest.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-            print("[ReviewSubmit] APIClient.requestVoid url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(urlRequest.allHTTPHeaderFields ?? [:]) body=\(bodyString)")
+            print("[ReviewSubmit] APIClient.requestVoid url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(redactedHeaders(urlRequest.allHTTPHeaderFields)) body=\(bodyString)")
         }
         let (data, response) = try await session.data(for: urlRequest)
         if endpoint.path.contains("/reviews"), let httpResponse = response as? HTTPURLResponse {
@@ -269,6 +289,20 @@ final class APIClient {
         return "\(normalizedBody[..<endIndex])..."
     }
 
+    private func redactedHeaders(_ headers: [String: String]?) -> [String: String] {
+        guard let headers else { return [:] }
+        return headers.reduce(into: [:]) { result, pair in
+            let normalizedKey = pair.key.lowercased()
+            if normalizedKey == "authorization"
+                || normalizedKey.contains("token")
+                || normalizedKey.contains("cookie") {
+                result[pair.key] = "<redacted>"
+            } else {
+                result[pair.key] = pair.value
+            }
+        }
+    }
+
     private func homeEndpointName(for path: String) -> String? {
         switch path {
         case "/games/highlights":
@@ -280,5 +314,15 @@ final class APIClient {
         default:
             return nil
         }
+    }
+
+    private func aiReviewSummaryGameId(for path: String) -> String? {
+        let pattern = #"^/api/v1/ai/games/([^/]+)/review-summary$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: path, range: NSRange(path.startIndex..., in: path)),
+              let range = Range(match.range(at: 1), in: path) else {
+            return nil
+        }
+        return String(path[range])
     }
 }

@@ -17,8 +17,9 @@ enum GameDetailMutation {
     case setTranslationRequest(TranslationBatchRequest?)
     case setShowingTranslated(Bool)
     case setAIReviewSummaryLoading
-    case setAIReviewSummaryLoaded(AIReviewSummaryViewState)
-    case setAIReviewSummaryUnavailable(String)
-    case setAIReviewSummaryError(String)
+    case setAIReviewSummaryEmpty(summary: String, reason: String?)
+    case setAIReviewSummarySuccess(AIReviewSummaryDisplayModel)
+    case setAIReviewSummaryFallback(summary: String, reviewCount: Int, reason: String?)
+    case setAIReviewSummaryFailed(message: String, retryAvailable: Bool)
     case setAIReviewSummaryExpanded(Bool)
 }

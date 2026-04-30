@@ -7,6 +7,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
     private let viewModel: GameDetailViewModel
     let gameId: Int
     private var renderedPreviewReviews: [Review] = []
+    private var lastRenderedAIReviewSummaryLogKey: String?
     private var lastPresentedErrorMessage: String?
     private var lastPresentedBlockingLoadErrorMessage: String?
     private lazy var translationHostController = TranslationHostContainerViewController { [weak self] results in
@@ -133,6 +134,7 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
 
     override func render(_ state: GameDetailState) {
         rootView.render(state)
+        logAIReviewSummaryRenderIfNeeded(state.aiReviewSummarySectionState)
         translationHostController.update(request: state.translationRequest)
 
         if renderedPreviewReviews != state.previewReviews {
@@ -197,6 +199,33 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         }
     }
 
+    private func logAIReviewSummaryRenderIfNeeded(_ aiState: AIReviewSummaryViewState) {
+        let reviewCount: Int
+        switch aiState {
+        case .success(let displayModel):
+            reviewCount = Self.reviewCount(from: displayModel.subtitle)
+        case .fallback(_, let count, _):
+            reviewCount = count
+        default:
+            reviewCount = 0
+        }
+
+        let logKey = "\(aiState.renderLogState)-\(reviewCount)"
+        guard logKey != lastRenderedAIReviewSummaryLogKey else { return }
+        lastRenderedAIReviewSummaryLogKey = logKey
+        print(
+            "[AIReviewSummary] render " +
+            "state=\(aiState.renderLogState) " +
+            "gameId=\(gameId) " +
+            "reviewCount=\(reviewCount)"
+        )
+    }
+
+    private static func reviewCount(from subtitle: String) -> Int {
+        let digits = subtitle.filter(\.isNumber)
+        return Int(digits) ?? 0
+    }
+
     private func updateScrollInsets() {
         let bottomInset = resolvedBottomScrollInset()
         let currentVerticalIndicatorInsets = rootView.scrollView.verticalScrollIndicatorInsets
@@ -214,8 +243,9 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
     private func resolvedBottomScrollInset() -> CGFloat {
         let safeAreaBottom = view.safeAreaInsets.bottom
         let tabBarOverlap = visibleTabBarOverlapHeight()
-        let breathingRoom: CGFloat = 28
-        return max(safeAreaBottom, tabBarOverlap) + breathingRoom
+        let buildBadgeOverlap: CGFloat = AppConfig.shouldShowBuildIndicator ? 34 : 0
+        let breathingRoom: CGFloat = 40
+        return max(safeAreaBottom, tabBarOverlap + buildBadgeOverlap) + breathingRoom
     }
 
     private func visibleTabBarOverlapHeight() -> CGFloat {

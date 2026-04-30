@@ -8,14 +8,31 @@ final class AppleTranslationProvider: TranslationProviding {
     func supportsOnDeviceTranslation(targetLanguage: String) -> Bool {
         let normalizedTarget = targetLanguage.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !normalizedTarget.isEmpty else {
-            print("[Translation] skipped reason=empty-target-language")
+            TranslationSupportLogLimiter.logOnce(
+                key: "empty-target-language",
+                message: "[Translation] skipped reason=empty-target-language"
+            )
             return false
         }
         guard normalizedTarget != "en" else {
-            print("[Translation] skipped reason=target-language-is-english")
+            TranslationSupportLogLimiter.logOnce(
+                key: "target-language-is-english",
+                message: "[Translation] skipped reason=target-language-is-english"
+            )
             return false
         }
-        print("[Translation] provider ready target=\(normalizedTarget) sessionLifecycle=view-hosted")
+#if targetEnvironment(simulator)
+        TranslationSupportLogLimiter.logOnce(
+            key: "unsupported-simulator-\(normalizedTarget)",
+            message: "[Translation] skipped reason=unsupported-simulator target=\(normalizedTarget)"
+        )
+        return false
+#else
+        TranslationSupportLogLimiter.logOnce(
+            key: "provider-ready-\(normalizedTarget)",
+            message: "[Translation] provider ready target=\(normalizedTarget) sessionLifecycle=view-hosted"
+        )
         return true
+#endif
     }
 }

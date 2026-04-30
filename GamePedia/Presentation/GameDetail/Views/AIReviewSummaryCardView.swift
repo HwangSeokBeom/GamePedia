@@ -38,22 +38,25 @@ final class AIReviewSummaryCardView: UIView {
         layer.borderColor = UIColor.gpBorder.resolvedCGColor(with: traitCollection)
     }
 
-    func render(_ state: AIReviewSummarySectionState) {
+    func render(_ state: AIReviewSummaryViewState) {
         switch state {
         case .idle:
             isHidden = true
         case .loading:
             isHidden = false
             renderLoading()
-        case .loaded(let viewState):
+        case .success(let viewState):
             isHidden = false
             renderLoaded(viewState)
-        case .unavailable(let message):
+        case .fallback(let summary, let reviewCount, _):
             isHidden = false
-            renderStatus(message: message, showsRetry: false)
-        case .error(let message):
+            renderFallback(summary: summary, reviewCount: reviewCount)
+        case .empty(let summary, _):
             isHidden = false
-            renderStatus(message: message, showsRetry: true)
+            renderStatus(message: summary, showsRetry: false)
+        case .failed(let message, let retryAvailable):
+            isHidden = false
+            renderStatus(message: message, showsRetry: retryAvailable)
         }
     }
 
@@ -175,7 +178,7 @@ final class AIReviewSummaryCardView: UIView {
         accessibilityLabel = "AI 리뷰 요약, 리뷰를 분석하는 중"
     }
 
-    private func renderLoaded(_ state: AIReviewSummaryViewState) {
+    private func renderLoaded(_ state: AIReviewSummaryDisplayModel) {
         titleLabel.text = state.title
         subtitleLabel.text = state.subtitle
         generatedAtLabel.text = state.generatedAtText
@@ -211,6 +214,28 @@ final class AIReviewSummaryCardView: UIView {
             state.pros.joined(separator: ", "),
             state.cons.joined(separator: ", ")
         ].filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+
+    private func renderFallback(summary: String, reviewCount: Int) {
+        titleLabel.text = "AI 리뷰 요약"
+        subtitleLabel.text = "리뷰 \(reviewCount)개 기준"
+        generatedAtLabel.isHidden = true
+        bodyStackView.isHidden = false
+        statusStackView.isHidden = true
+        activityIndicatorView.stopAnimating()
+
+        summaryLabel.text = summary
+        summaryLabel.numberOfLines = 0
+        keywordFlowView.isHidden = true
+        prosSectionView.configure(title: "장점", items: [])
+        consSectionView.configure(title: "단점", items: [])
+        recommendedSectionView.configure(title: "추천 대상", items: [])
+        notRecommendedSectionView.configure(title: "주의 대상", items: [])
+        disclaimerLabel.text = "AI 요약을 일시적으로 생성하지 못해 안내 문구를 표시하고 있어요."
+        expandButton.isHidden = true
+
+        summaryLabel.accessibilityLabel = "요약, \(summary)"
+        accessibilityLabel = "AI 리뷰 요약, 리뷰 \(reviewCount)개 기준, \(summary)"
     }
 
     private func renderStatus(message: String, showsRetry: Bool) {

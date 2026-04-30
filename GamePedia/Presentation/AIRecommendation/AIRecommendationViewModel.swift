@@ -244,6 +244,19 @@ final class AIRecommendationViewModel {
             ratingText = "—"
         }
 
+        let displayTags = TagLocalizer.localizedTags(
+            for: recommendation.matchTags,
+            screen: "AIRecommendation"
+        )
+
+#if DEBUG
+        if !recommendation.matchTags.isEmpty || !displayTags.isEmpty {
+            print(
+                "[AIRecommendationTags] localized gameId=\(recommendation.gameId) rawTags=[\(recommendation.matchTags.joined(separator: ","))] displayTags=[\(displayTags.joined(separator: ","))]"
+            )
+        }
+#endif
+
         return AIRecommendationItemViewState(
             gameId: recommendation.gameId,
             title: recommendation.title,
@@ -253,6 +266,7 @@ final class AIRecommendationViewModel {
             ratingText: ratingText,
             reason: recommendation.reason,
             matchTags: recommendation.matchTags,
+            displayTags: displayTags,
             confidence: recommendation.confidence,
             isFavorite: isFavorite,
             isFavoriteUpdating: false

@@ -15,3 +15,16 @@ enum ReviewChangeAction: String {
     case updated
     case deleted
 }
+
+enum ReviewChangeNotificationParser {
+    static func gameId(from notification: Notification) -> Int? {
+        let value = notification.userInfo?[ReviewChangeUserInfoKey.gameId]
+        if let gameId = value as? Int {
+            return gameId
+        }
+        if let gameId = value as? String {
+            return Int(gameId.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return nil
+    }
+}

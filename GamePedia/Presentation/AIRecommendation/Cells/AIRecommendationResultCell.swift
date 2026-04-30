@@ -129,7 +129,7 @@ final class AIRecommendationResultCell: UITableViewCell {
         )
         favoriteButton.isEnabled = !item.isFavoriteUpdating
         favoriteButton.alpha = item.isFavoriteUpdating ? 0.55 : 1.0
-        configureTags(item.matchTags)
+        configureTags(item.displayTags)
     }
 
     private func setup() {

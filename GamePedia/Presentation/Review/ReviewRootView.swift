@@ -13,6 +13,7 @@ final class ReviewRootView: UIView {
     }
 
     private let contentStackView = UIStackView()
+    private let scrollContentView = UIView()
     private let composeTitleLabel = UILabel()
     private let bannerIconView = UIImageView()
     private let bannerLabel = UILabel()
@@ -276,10 +277,18 @@ final class ReviewRootView: UIView {
         contentStackView.setCustomSpacing(6, after: charCountLabel)
         contentStackView.setCustomSpacing(18, after: validationMessageLabel)
 
+        scrollContentView.translatesAutoresizingMaskIntoConstraints = false
+
         addSubview(scrollView)
-        scrollView.addSubview(headerRow)
-        scrollView.addSubview(bannerView)
-        scrollView.addSubview(contentStackView)
+        scrollView.addSubview(scrollContentView)
+        [headerRow, bannerView, contentStackView].forEach {
+            scrollContentView.addSubview($0)
+        }
+
+        let scrollContentWidthConstraint = scrollContentView.widthAnchor.constraint(
+            equalTo: scrollView.frameLayoutGuide.widthAnchor
+        )
+        scrollContentWidthConstraint.priority = UILayoutPriority(999)
 
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
@@ -287,17 +296,23 @@ final class ReviewRootView: UIView {
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            headerRow.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 8),
-            headerRow.leadingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.leadingAnchor, constant: UIConstants.horizontalInset),
-            headerRow.trailingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.trailingAnchor, constant: -UIConstants.horizontalInset),
+            scrollContentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            scrollContentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            scrollContentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            scrollContentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            scrollContentWidthConstraint,
+
+            headerRow.topAnchor.constraint(equalTo: scrollContentView.topAnchor, constant: 8),
+            headerRow.leadingAnchor.constraint(equalTo: scrollContentView.leadingAnchor, constant: UIConstants.horizontalInset),
+            headerRow.trailingAnchor.constraint(equalTo: scrollContentView.trailingAnchor, constant: -UIConstants.horizontalInset),
 
             closeButton.widthAnchor.constraint(equalToConstant: 24),
             closeButton.heightAnchor.constraint(equalToConstant: 24),
             submitSpacerView.widthAnchor.constraint(equalTo: closeButton.widthAnchor),
 
             bannerView.topAnchor.constraint(equalTo: headerRow.bottomAnchor, constant: 12),
-            bannerView.leadingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.leadingAnchor),
-            bannerView.trailingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.trailingAnchor),
+            bannerView.leadingAnchor.constraint(equalTo: scrollContentView.leadingAnchor),
+            bannerView.trailingAnchor.constraint(equalTo: scrollContentView.trailingAnchor),
 
             bannerContentView.topAnchor.constraint(equalTo: bannerView.topAnchor, constant: 10),
             bannerContentView.bottomAnchor.constraint(equalTo: bannerView.bottomAnchor, constant: -10),
@@ -307,9 +322,9 @@ final class ReviewRootView: UIView {
             bannerIconView.heightAnchor.constraint(equalToConstant: 16),
 
             contentStackView.topAnchor.constraint(equalTo: bannerView.bottomAnchor, constant: 12),
-            contentStackView.leadingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.leadingAnchor, constant: UIConstants.horizontalInset),
-            contentStackView.trailingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.trailingAnchor, constant: -UIConstants.horizontalInset),
-            contentStackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -UIConstants.contentBottomInset),
+            contentStackView.leadingAnchor.constraint(equalTo: scrollContentView.leadingAnchor, constant: UIConstants.horizontalInset),
+            contentStackView.trailingAnchor.constraint(equalTo: scrollContentView.trailingAnchor, constant: -UIConstants.horizontalInset),
+            contentStackView.bottomAnchor.constraint(equalTo: scrollContentView.bottomAnchor, constant: -UIConstants.contentBottomInset),
 
             gameThumbnailView.widthAnchor.constraint(equalToConstant: 56),
             gameThumbnailView.heightAnchor.constraint(equalToConstant: 56),

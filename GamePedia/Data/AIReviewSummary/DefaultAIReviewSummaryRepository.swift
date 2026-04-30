@@ -10,7 +10,7 @@ final class DefaultAIReviewSummaryRepository: AIReviewSummaryRepository {
     func fetchReviewSummary(gameId: Int) async throws -> AIReviewSummary {
         do {
             let responseDTO = try await remoteDataSource.fetchReviewSummary(gameId: gameId)
-            return AIReviewSummaryMapper.toEntity(responseDTO)
+            return AIReviewSummaryMapper.toEntity(responseDTO, fallbackGameId: gameId)
         } catch {
             throw AIReviewSummaryError.from(error: error)
         }

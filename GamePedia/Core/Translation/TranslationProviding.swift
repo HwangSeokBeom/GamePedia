@@ -20,7 +20,25 @@ func makeTranslationProvider() -> any TranslationProviding {
 
 final class NoOpTranslationProvider: TranslationProviding {
     func supportsOnDeviceTranslation(targetLanguage: String) -> Bool {
-        print("[Translation] skipped reason=NoOp target=\(targetLanguage)")
+        TranslationSupportLogLimiter.logOnce(
+            key: "noop-\(targetLanguage)",
+            message: "[Translation] skipped reason=NoOp target=\(targetLanguage)"
+        )
         return false
+    }
+}
+
+enum TranslationSupportLogLimiter {
+    private static var loggedKeys = Set<String>()
+    private static let lock = NSLock()
+
+    static func logOnce(key: String, message: String) {
+        lock.lock()
+        let shouldLog = loggedKeys.insert(key).inserted
+        lock.unlock()
+
+        if shouldLog {
+            print(message)
+        }
     }
 }

@@ -18,6 +18,11 @@ final class DefaultAIReviewSummaryRemoteDataSource: AIReviewSummaryRemoteDataSou
         )
 
         guard response.success else {
+            if let data = response.data,
+               AIReviewSummaryMapper.hasDisplayableContent(data) {
+                return data
+            }
+
             throw AIReviewSummaryError.from(
                 serverCode: response.error?.code,
                 message: response.error?.message

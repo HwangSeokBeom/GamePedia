@@ -8,6 +8,8 @@ final class SearchCoordinator {
 
     let navigationController: UINavigationController
     var onAuthenticationRequested: ((UIViewController, RestrictedActionContext, @escaping () -> Void) -> Void)?
+    private var lastDetailRoute: (gameId: Int, date: Date)?
+    private let detailRouteDebounceInterval: TimeInterval = 0.5
 
     // MARK: Init
 
@@ -24,12 +26,20 @@ final class SearchCoordinator {
     // MARK: Start
 
     func start() {
-        let searchVC = SearchViewController(rootView: SearchRootView())
+        let searchVC = SearchViewController(
+            rootView: SearchRootView(),
+            aiSearchAssistViewModel: makeAISearchAssistViewModel()
+        )
         searchVC.onGameSelected = { [weak self] gameId in
             self?.showDetail(gameId: gameId)
         }
         searchVC.onAIRecommendationRequested = { [weak self] in
             self?.showAIRecommendation()
+        }
+        searchVC.onAuthenticationRequired = { [weak self, weak searchVC] context, action in
+            guard let self else { return }
+            let presenter = searchVC ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
         }
         navigationController.setViewControllers([searchVC], animated: false)
     }
@@ -69,7 +79,22 @@ final class SearchCoordinator {
         return AIRecommendationViewModel()
     }
 
+    private func makeAISearchAssistViewModel() -> AISearchAssistViewModel {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-AISearchAssistMock") {
+            return AISearchAssistViewModel(
+                fetchAISearchAssistUseCase: DefaultFetchAISearchAssistUseCase(
+                    repository: MockAISearchAssistRepository()
+                )
+            )
+        }
+#endif
+        return AISearchAssistViewModel()
+    }
+
     private func showDetail(gameId: Int) {
+        guard shouldShowDetail(gameId: gameId) else { return }
+
         let detailVC = GameDetailViewController(gameId: gameId)
         detailVC.onAuthenticationRequired = { [weak self, weak detailVC] context, action in
             guard let self else { return }
@@ -98,6 +123,23 @@ final class SearchCoordinator {
             topVC.present(activityVC, animated: true)
         }
         navigationController.pushViewController(detailVC, animated: true)
+    }
+
+    private func shouldShowDetail(gameId: Int) -> Bool {
+        if let topDetailViewController = navigationController.topViewController as? GameDetailViewController,
+           topDetailViewController.gameId == gameId {
+            return false
+        }
+
+        let now = Date()
+        if let lastDetailRoute,
+           lastDetailRoute.gameId == gameId,
+           now.timeIntervalSince(lastDetailRoute.date) < detailRouteDebounceInterval {
+            return false
+        }
+
+        lastDetailRoute = (gameId, now)
+        return true
     }
 
     private func showReview(

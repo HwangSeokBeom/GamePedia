@@ -89,6 +89,34 @@ final class AIRecommendationTests: XCTestCase {
         XCTAssertNil(result.items.first?.rating)
     }
 
+    func testItemViewState_keepsRawTagsAndUsesLocalizedDisplayTags() {
+        let item = AIRecommendationItemViewState(
+            gameId: 1942,
+            title: "Burgie",
+            coverURL: nil,
+            platforms: [],
+            genres: [],
+            ratingText: "—",
+            reason: "reason",
+            matchTags: ["relaxing", "kitchen", "game"],
+            confidence: nil,
+            isFavorite: false,
+            isFavoriteUpdating: false
+        )
+
+        XCTAssertEqual(item.rawMatchTags, ["relaxing", "kitchen", "game"])
+        XCTAssertEqual(item.matchTags, ["relaxing", "kitchen", "game"])
+        XCTAssertEqual(item.displayTags, ["힐링", "요리", "게임"])
+    }
+
+    func testTagLocalizer_normalizesCommonEnglishTagVariants() {
+        XCTAssertEqual(TagLocalizer.localizedTag(for: " Role-playing (RPG) ", screen: "Test"), "RPG")
+        XCTAssertEqual(TagLocalizer.localizedTag(for: "role_playing", screen: "Test"), "RPG")
+        XCTAssertEqual(TagLocalizer.localizedTag(for: "single player", screen: "Test"), "싱글플레이")
+        XCTAssertEqual(TagLocalizer.localizedTag(for: "story-rich", screen: "Test"), "스토리 중심")
+        XCTAssertEqual(TagLocalizer.localizedTag(for: "online co-op", screen: "Test"), "온라인 협동")
+    }
+
     private func makeItem(gameId: Int, isFavorite: Bool) -> AIRecommendationItemViewState {
         AIRecommendationItemViewState(
             gameId: gameId,
@@ -105,4 +133,3 @@ final class AIRecommendationTests: XCTestCase {
         )
     }
 }
-

@@ -52,7 +52,10 @@ struct TranslationHostView: View {
         do {
             try await session.prepareTranslation()
         } catch {
-            print("[TranslationHost] skipped reason=session-unavailable error=\(error.localizedDescription)")
+            TranslationSupportLogLimiter.logOnce(
+                key: "session-unavailable-\(request.targetLanguage)-\(error.localizedDescription)",
+                message: "[TranslationHost] skipped reason=session-unavailable error=\(error.localizedDescription)"
+            )
             await MainActor.run {
                 onResult([])
             }

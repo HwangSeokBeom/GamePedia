@@ -53,15 +53,21 @@ enum GameDetailReducer {
             state.isShowingTranslated = isShowingTranslated
         case .setAIReviewSummaryLoading:
             state.aiReviewSummarySectionState = .loading
-        case .setAIReviewSummaryLoaded(let viewState):
-            state.aiReviewSummarySectionState = .loaded(viewState)
-        case .setAIReviewSummaryUnavailable(let message):
-            state.aiReviewSummarySectionState = .unavailable(message)
-        case .setAIReviewSummaryError(let message):
-            state.aiReviewSummarySectionState = .error(message)
+        case .setAIReviewSummaryEmpty(let summary, let reason):
+            state.aiReviewSummarySectionState = .empty(summary: summary, reason: reason)
+        case .setAIReviewSummarySuccess(let viewState):
+            state.aiReviewSummarySectionState = .success(viewState)
+        case .setAIReviewSummaryFallback(let summary, let reviewCount, let reason):
+            state.aiReviewSummarySectionState = .fallback(
+                summary: summary,
+                reviewCount: reviewCount,
+                reason: reason
+            )
+        case .setAIReviewSummaryFailed(let message, let retryAvailable):
+            state.aiReviewSummarySectionState = .failed(message: message, retryAvailable: retryAvailable)
         case .setAIReviewSummaryExpanded(let isExpanded):
-            guard case .loaded(let viewState) = state.aiReviewSummarySectionState else { break }
-            state.aiReviewSummarySectionState = .loaded(viewState.settingExpanded(isExpanded))
+            guard case .success(let viewState) = state.aiReviewSummarySectionState else { break }
+            state.aiReviewSummarySectionState = .success(viewState.settingExpanded(isExpanded))
         }
         return state
     }
