@@ -4,10 +4,7 @@ final class AIRecommendationResultCell: UITableViewCell {
     static let reuseId = "AIRecommendationResultCell"
 
     private enum Layout {
-        static let tagHeight: CGFloat = 28
-        static let tagSpacing: CGFloat = 8
-        static let tagMaximumWidth: CGFloat = 132
-        static let tagMinimumWidth: CGFloat = 44
+        static let maximumVisibleChipCount = 4
     }
 
     private let cardView: UIView = {
@@ -75,30 +72,7 @@ final class AIRecommendationResultCell: UITableViewCell {
         return button
     }()
 
-    private let tagsContainerView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
-    }()
-
-    private let badgeStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.spacing = 6
-        stackView.alignment = .center
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
-    }()
-
-    private let tagStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.spacing = Layout.tagSpacing
-        stackView.alignment = .center
-        stackView.distribution = .fill
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
-    }()
+    private let chipFlowView = AIRecommendationChipFlowView()
 
     var onFavoriteButtonTapped: (() -> Void)?
 
@@ -118,14 +92,7 @@ final class AIRecommendationResultCell: UITableViewCell {
         coverImageView.image = .gpGameCoverPlaceholder
         favoriteButton.isEnabled = true
         ratingLabel.isHidden = false
-        tagStackView.arrangedSubviews.forEach {
-            tagStackView.removeArrangedSubview($0)
-            $0.removeFromSuperview()
-        }
-        badgeStackView.arrangedSubviews.forEach {
-            badgeStackView.removeArrangedSubview($0)
-            $0.removeFromSuperview()
-        }
+        chipFlowView.configure(chips: [])
         onFavoriteButtonTapped = nil
     }
 
@@ -142,8 +109,7 @@ final class AIRecommendationResultCell: UITableViewCell {
         )
         favoriteButton.isEnabled = !item.isFavoriteUpdating
         favoriteButton.alpha = item.isFavoriteUpdating ? 0.55 : 1.0
-        configureBadges(for: item)
-        configureTags(item.displayTags)
+        configureChips(for: item)
     }
 
     private func setup() {
@@ -163,9 +129,7 @@ final class AIRecommendationResultCell: UITableViewCell {
         metadataRow.alignment = .center
         metadataRow.translatesAutoresizingMaskIntoConstraints = false
 
-        tagsContainerView.addSubview(tagStackView)
-
-        let infoStackView = UIStackView(arrangedSubviews: [titleRow, metadataRow, reasonLabel, badgeStackView, tagsContainerView])
+        let infoStackView = UIStackView(arrangedSubviews: [titleRow, metadataRow, reasonLabel, chipFlowView])
         infoStackView.axis = .vertical
         infoStackView.spacing = 7
         infoStackView.translatesAutoresizingMaskIntoConstraints = false
@@ -194,90 +158,182 @@ final class AIRecommendationResultCell: UITableViewCell {
             infoStackView.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -14),
 
             favoriteButton.widthAnchor.constraint(equalToConstant: 32),
-            favoriteButton.heightAnchor.constraint(equalToConstant: 32),
-
-            tagsContainerView.heightAnchor.constraint(equalToConstant: Layout.tagHeight),
-            tagStackView.topAnchor.constraint(equalTo: tagsContainerView.topAnchor),
-            tagStackView.leadingAnchor.constraint(equalTo: tagsContainerView.leadingAnchor),
-            tagStackView.bottomAnchor.constraint(equalTo: tagsContainerView.bottomAnchor),
-            tagStackView.trailingAnchor.constraint(lessThanOrEqualTo: tagsContainerView.trailingAnchor),
-            tagStackView.widthAnchor.constraint(lessThanOrEqualTo: tagsContainerView.widthAnchor)
+            favoriteButton.heightAnchor.constraint(equalToConstant: 32)
         ])
     }
 
-    private func configureBadges(for item: AIRecommendationItemViewState) {
-        badgeStackView.arrangedSubviews.forEach {
-            badgeStackView.removeArrangedSubview($0)
-            $0.removeFromSuperview()
-        }
+    private func configureChips(for item: AIRecommendationItemViewState) {
+        var chips: [AIRecommendationChip] = []
+        var seenKeys = Set<String>()
 
         if item.isPersonalized {
-            badgeStackView.addArrangedSubview(
-                makeBadgeLabel(
-                    title: L10n.tr("Localizable", "ai_recommendation_personalized_badge"),
-                    foregroundColor: .gpPrimary,
-                    backgroundColor: .gpPrimaryLight.withAlphaComponent(0.22)
-                )
+            appendChip(
+                title: L10n.tr("Localizable", "ai_recommendation_personalized_badge"),
+                style: .badge(foregroundColor: .gpPrimary, backgroundColor: .gpPrimaryLight.withAlphaComponent(0.22)),
+                to: &chips,
+                seenKeys: &seenKeys
             )
         }
 
         if item.isFallback {
-            badgeStackView.addArrangedSubview(
-                makeBadgeLabel(
-                    title: L10n.tr("Localizable", "ai_recommendation_fallback_badge"),
-                    foregroundColor: .gpTextSecondary,
-                    backgroundColor: .gpSurface
-                )
+            appendChip(
+                title: L10n.tr("Localizable", "ai_recommendation_fallback_badge"),
+                style: .badge(foregroundColor: .gpTextSecondary, backgroundColor: .gpSurface),
+                to: &chips,
+                seenKeys: &seenKeys
             )
         }
 
-        badgeStackView.isHidden = badgeStackView.arrangedSubviews.isEmpty
-    }
-
-    private func makeBadgeLabel(title: String, foregroundColor: UIColor, backgroundColor: UIColor) -> UILabel {
-        let label = PaddingLabel(insets: UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8))
-        label.text = title
-        label.font = .systemFont(ofSize: 11, weight: .semibold)
-        label.textColor = foregroundColor
-        label.backgroundColor = backgroundColor
-        label.layer.cornerRadius = 10
-        label.clipsToBounds = true
-        label.setContentCompressionResistancePriority(.required, for: .horizontal)
-        return label
-    }
-
-    private func configureTags(_ tags: [String]) {
-        tagStackView.arrangedSubviews.forEach {
-            tagStackView.removeArrangedSubview($0)
-            $0.removeFromSuperview()
+        item.displayTags.forEach { tag in
+            appendChip(
+                title: tag,
+                style: .tag,
+                to: &chips,
+                seenKeys: &seenKeys
+            )
         }
 
-        Array(tags.prefix(3)).enumerated().forEach { index, tag in
-            let pillView = AIRecommendationTagPillView(title: tag)
-            pillView.translatesAutoresizingMaskIntoConstraints = false
+        chipFlowView.configure(chips: Array(chips.prefix(Layout.maximumVisibleChipCount)))
+    }
 
-            let compressionPriority = UILayoutPriority(752 - Float(index))
-            pillView.setContentCompressionResistancePriority(compressionPriority, for: .horizontal)
-            pillView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+    private func appendChip(
+        title: String,
+        style: AIRecommendationChipStyle,
+        to chips: inout [AIRecommendationChip],
+        seenKeys: inout Set<String>
+    ) {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty, !trimmedTitle.isEllipsisOnly else { return }
 
-            let minimumWidthConstraint = pillView.widthAnchor.constraint(greaterThanOrEqualToConstant: Layout.tagMinimumWidth)
-            minimumWidthConstraint.priority = .defaultHigh
+        let normalizedKey = RecommendationTagLocalizer.normalizedKey(for: trimmedTitle)
+        let deduplicationKey = normalizedKey.isEmpty ? trimmedTitle.lowercased() : normalizedKey
+        guard seenKeys.insert(deduplicationKey).inserted else { return }
 
-            NSLayoutConstraint.activate([
-                pillView.heightAnchor.constraint(equalToConstant: Layout.tagHeight),
-                pillView.widthAnchor.constraint(lessThanOrEqualToConstant: Layout.tagMaximumWidth),
-                minimumWidthConstraint
-            ])
-
-            tagStackView.addArrangedSubview(pillView)
-        }
-
-        tagsContainerView.accessibilityElementsHidden = tags.isEmpty
+        chips.append(AIRecommendationChip(title: trimmedTitle, style: style))
     }
 
     @objc
     private func didTapFavoriteButton() {
         onFavoriteButtonTapped?()
+    }
+}
+
+private struct AIRecommendationChip {
+    let title: String
+    let style: AIRecommendationChipStyle
+}
+
+private struct AIRecommendationChipStyle {
+    let foregroundColor: UIColor
+    let backgroundColor: UIColor
+    let font: UIFont
+
+    static let tag = AIRecommendationChipStyle(
+        foregroundColor: .gpPrimary,
+        backgroundColor: .gpPrimaryLight.withAlphaComponent(0.2),
+        font: .systemFont(ofSize: 11, weight: .medium)
+    )
+
+    static func badge(foregroundColor: UIColor, backgroundColor: UIColor) -> AIRecommendationChipStyle {
+        AIRecommendationChipStyle(
+            foregroundColor: foregroundColor,
+            backgroundColor: backgroundColor,
+            font: .systemFont(ofSize: 11, weight: .semibold)
+        )
+    }
+}
+
+private final class AIRecommendationChipFlowView: UIView {
+    private enum Layout {
+        static let horizontalSpacing: CGFloat = 8
+        static let verticalSpacing: CGFloat = 8
+        static let maximumRows = 2
+    }
+
+    private var chipViews: [AIRecommendationTagPillView] = []
+    private var lastMeasuredWidth: CGFloat = 0
+
+    func configure(chips: [AIRecommendationChip]) {
+        chipViews.forEach { $0.removeFromSuperview() }
+        chipViews = chips.map { chip in
+            let view = AIRecommendationTagPillView(chip: chip)
+            addSubview(view)
+            return view
+        }
+
+        isHidden = chipViews.isEmpty
+        accessibilityElementsHidden = chipViews.isEmpty
+        invalidateIntrinsicContentSize()
+        setNeedsLayout()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        if abs(bounds.width - lastMeasuredWidth) > 0.5 {
+            lastMeasuredWidth = bounds.width
+            invalidateIntrinsicContentSize()
+        }
+
+        _ = layoutChips(width: bounds.width, shouldApplyFrames: true)
+    }
+
+    override var intrinsicContentSize: CGSize {
+        CGSize(
+            width: UIView.noIntrinsicMetric,
+            height: layoutChips(width: resolvedLayoutWidth, shouldApplyFrames: false)
+        )
+    }
+
+    override func sizeThatFits(_ size: CGSize) -> CGSize {
+        CGSize(
+            width: size.width,
+            height: layoutChips(width: size.width, shouldApplyFrames: false)
+        )
+    }
+
+    private var resolvedLayoutWidth: CGFloat {
+        bounds.width > 0 ? bounds.width : max(1, UIScreen.main.bounds.width - 128)
+    }
+
+    private func layoutChips(width: CGFloat, shouldApplyFrames: Bool) -> CGFloat {
+        let availableWidth = max(width, 1)
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var rowCount = 1
+        var didPlaceChip = false
+
+        for chipView in chipViews {
+            let fittingSize = chipView.intrinsicContentSize
+            let chipWidth = min(fittingSize.width, availableWidth)
+            let chipHeight = fittingSize.height
+
+            if x > 0, x + chipWidth > availableWidth {
+                guard rowCount < Layout.maximumRows else {
+                    if shouldApplyFrames {
+                        chipView.isHidden = true
+                    }
+                    continue
+                }
+
+                x = 0
+                y += rowHeight + Layout.verticalSpacing
+                rowHeight = 0
+                rowCount += 1
+            }
+
+            if shouldApplyFrames {
+                chipView.isHidden = false
+                chipView.frame = CGRect(x: x, y: y, width: chipWidth, height: chipHeight)
+            }
+
+            x += chipWidth + Layout.horizontalSpacing
+            rowHeight = max(rowHeight, chipHeight)
+            didPlaceChip = true
+        }
+
+        return didPlaceChip ? y + rowHeight : 0
     }
 }
 
@@ -291,8 +347,6 @@ private final class AIRecommendationTagPillView: UIView {
 
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 11, weight: .medium)
-        label.textColor = .gpPrimary
         label.textAlignment = .center
         label.numberOfLines = 1
         label.lineBreakMode = .byTruncatingTail
@@ -307,10 +361,10 @@ private final class AIRecommendationTagPillView: UIView {
         return CGSize(width: clampedWidth, height: Layout.height)
     }
 
-    init(title: String) {
+    init(chip: AIRecommendationChip) {
         super.init(frame: .zero)
         setup()
-        configure(title: title)
+        configure(chip: chip)
     }
 
     required init?(coder: NSCoder) {
@@ -319,7 +373,6 @@ private final class AIRecommendationTagPillView: UIView {
     }
 
     private func setup() {
-        backgroundColor = .gpPrimaryLight.withAlphaComponent(0.2)
         layer.cornerRadius = Layout.height / 2
         clipsToBounds = true
 
@@ -335,35 +388,21 @@ private final class AIRecommendationTagPillView: UIView {
         ])
     }
 
-    private func configure(title: String) {
-        titleLabel.text = title
-        accessibilityLabel = title
+    private func configure(chip: AIRecommendationChip) {
+        backgroundColor = chip.style.backgroundColor
+        titleLabel.font = chip.style.font
+        titleLabel.textColor = chip.style.foregroundColor
+        titleLabel.text = chip.title
+        accessibilityLabel = chip.title
         invalidateIntrinsicContentSize()
     }
 }
 
-private final class PaddingLabel: UILabel {
-    private let insets: UIEdgeInsets
-
-    init(insets: UIEdgeInsets) {
-        self.insets = insets
-        super.init(frame: .zero)
-    }
-
-    required init?(coder: NSCoder) {
-        self.insets = .zero
-        super.init(coder: coder)
-    }
-
-    override func drawText(in rect: CGRect) {
-        super.drawText(in: rect.inset(by: insets))
-    }
-
-    override var intrinsicContentSize: CGSize {
-        let size = super.intrinsicContentSize
-        return CGSize(
-            width: size.width + insets.left + insets.right,
-            height: size.height + insets.top + insets.bottom
-        )
+private extension String {
+    var isEllipsisOnly: Bool {
+        let reduced = filter { character in
+            character != "." && character != "…" && !character.isWhitespace
+        }
+        return reduced.isEmpty
     }
 }

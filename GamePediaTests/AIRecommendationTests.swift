@@ -358,7 +358,7 @@ final class AIRecommendationTests: XCTestCase {
 
         viewModel.send(.queryChanged("퇴근 후 힐링 게임"))
         viewModel.send(.recommendButtonTapped)
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await waitForRecommendationCount(1, in: viewModel)
 
         XCTAssertEqual(viewModel.state.recommendations.first?.displayTags, ["맞춤", "힐링", "시뮬레이션"])
         XCTAssertEqual(viewModel.state.helperMessage, L10n.tr("Localizable", "ai_recommendation_personalized_notice"))
