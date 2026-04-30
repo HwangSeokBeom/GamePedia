@@ -36,15 +36,22 @@ struct AISearchAssistItemViewState: Hashable {
         self.ratingText = ratingText
         self.matchReason = matchReason
         self.rawMatchTags = matchTags
-        self.displayTags = displayTags ?? TagLocalizer.localizedTags(
-            for: matchTags,
+        self.displayTags = displayTags ?? RecommendationTagLocalizer.localizedDisplayTags(
+            rawTags: matchTags,
+            genres: genres,
+            maxCount: 3,
             screen: "AISearchAssist"
         )
         self.confidence = confidence
     }
 
     var metadataText: String {
-        let genreText = genres.prefix(2).joined(separator: ", ")
+        let genreText = RecommendationTagLocalizer.localizedGenres(
+            for: genres,
+            screen: "AISearchAssist.genre"
+        )
+        .prefix(2)
+        .joined(separator: ", ")
         let platformText = platforms.prefix(2).joined(separator: ", ")
 
         switch (genreText.isEmpty, platformText.isEmpty) {
@@ -55,7 +62,7 @@ struct AISearchAssistItemViewState: Hashable {
         case (true, false):
             return platformText
         case (true, true):
-            return "AI 보조 결과"
+            return L10n.tr("Localizable", "aiSearchAssist.metadataFallback")
         }
     }
 
@@ -77,9 +84,9 @@ struct AISearchAssistItemViewState: Hashable {
         guard let confidence else { return nil }
         switch confidence {
         case 0.85...:
-            return "잘 맞음"
+            return L10n.tr("Localizable", "aiSearchAssist.fit.good")
         case 0.7..<0.85:
-            return "추천"
+            return L10n.tr("Localizable", "aiSearchAssist.fit.recommended")
         default:
             return nil
         }

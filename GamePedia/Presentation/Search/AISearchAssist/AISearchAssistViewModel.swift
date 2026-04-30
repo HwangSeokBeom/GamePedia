@@ -111,7 +111,10 @@ final class AISearchAssistViewModel {
                     self.gamesById = Dictionary(uniqueKeysWithValues: games.map { ($0.id, $0) })
                     GameDetailSeedStore.shared.store(games: games, screen: "AISearchAssist.result")
                     if items.isEmpty {
-                        self.apply(.setEmpty(message: "조건에 맞는 게임을 찾지 못했어요. 검색어를 조금 바꿔보세요.", requestSignature: signature))
+                        self.apply(.setEmpty(
+                            message: L10n.tr("Localizable", "aiSearchAssist.status.empty"),
+                            requestSignature: signature
+                        ))
                     } else {
                         self.apply(.setLoaded(
                             items: items,
@@ -139,9 +142,12 @@ final class AISearchAssistViewModel {
 #endif
                     switch searchAssistError {
                     case .dailyLimitExceeded:
-                        self.apply(.setDailyLimitExceeded(searchAssistError.errorDescription ?? "오늘 사용할 수 있는 AI 검색 보조 횟수를 모두 사용했어요."))
+                        self.apply(.setDailyLimitExceeded(
+                            searchAssistError.errorDescription
+                                ?? L10n.tr("Localizable", "aiSearchAssist.error.dailyLimit")
+                        ))
                     case .unauthorized:
-                        self.apply(.setUnauthorized("로그인이 필요해요."))
+                        self.apply(.setUnauthorized(L10n.Common.Error.unauthorized))
                         self.onAuthenticationRequired?(.profile) { [weak self] in
                             self?.send(.retryTapped)
                         }
@@ -153,7 +159,7 @@ final class AISearchAssistViewModel {
                     default:
                         self.apply(.setError(
                             searchAssistError.errorDescription
-                                ?? "AI 검색 보조를 불러오지 못했어요. 잠시 후 다시 시도해주세요."
+                                ?? L10n.tr("Localizable", "aiSearchAssist.error.default")
                         ))
                     }
                 }
@@ -189,17 +195,32 @@ final class AISearchAssistViewModel {
             ratingText = "—"
         }
 
-        let displayTags = TagLocalizer.localizedTags(
-            for: item.matchTags,
+        let rawDisplayTagInputs = item.reasonTags
+            + item.intentTags
+            + item.matchTags
+            + item.rawMatchTags
+            + item.displayTags
+            + item.canonicalTags
+        let displayTags = RecommendationTagLocalizer.localizedDisplayTags(
+            rawTags: rawDisplayTagInputs,
+            genres: item.genres,
+            themes: item.themes,
+            keywords: item.keywords,
+            maxCount: 3,
             screen: "AISearchAssist"
+        )
+        let unknownFallbackCount = RecommendationTagLocalizer.unknownFallbackCount(
+            for: rawDisplayTagInputs + item.genres + item.themes + item.keywords
         )
 
 #if DEBUG
-        if !item.matchTags.isEmpty || !displayTags.isEmpty {
-            print(
-                "[AISearchAssistTags] localized gameId=\(item.gameId) rawTags=[\(item.matchTags.joined(separator: ","))] displayTags=[\(displayTags.joined(separator: ","))]"
-            )
-        }
+        print(
+            "[AISearchAssistTags] localized " +
+            "gameId=\(item.gameId) " +
+            "rawTagCount=\(rawDisplayTagInputs.count) " +
+            "displayTagCount=\(displayTags.count) " +
+            "unknownFallbackCount=\(unknownFallbackCount)"
+        )
 #endif
 
         return AISearchAssistItemViewState(
@@ -225,6 +246,10 @@ final class AISearchAssistViewModel {
             + intent.genres
             + intent.keywords
         )
-        return TagLocalizer.localizedTags(for: rawChips, screen: "AISearchAssist")
+        return RecommendationTagLocalizer.localizedDisplayTags(
+            rawTags: rawChips,
+            maxCount: 4,
+            screen: "AISearchAssist.intent"
+        )
     }
 }

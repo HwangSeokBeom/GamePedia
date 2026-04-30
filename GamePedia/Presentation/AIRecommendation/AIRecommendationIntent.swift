@@ -8,5 +8,5 @@ enum AIRecommendationIntent {
     case gameTapped(gameId: Int)
     case favoriteTapped(gameId: Int)
     case retryTapped
+    case refreshTapped
 }
-

@@ -65,6 +65,7 @@ final class APIClient {
         let isFriendActivityRequest = endpoint.path == "/users/me/friends/activity"
         let isProfileSummaryRequest = endpoint.path == "/users/me"
         let isProfileRecentPlaysRequest = endpoint.path == "/users/me/recent-plays"
+        let isAIRecommendationRequest = endpoint.path == "/api/v1/ai/game-recommendations"
         let aiReviewSummaryGameId = aiReviewSummaryGameId(for: endpoint.path)
         if let homeEndpointName {
             print(
@@ -118,6 +119,14 @@ final class APIClient {
             let responseBody = String(data: data, encoding: .utf8) ?? ""
             print("[ReviewSubmit] APIClient.response status=\(httpResponse.statusCode) body=\(responseBody)")
         }
+        if isAIRecommendationRequest, let httpResponse = response as? HTTPURLResponse {
+            print(
+                "[AIRecommendation] httpResponse " +
+                "endpoint=/api/v1/ai/game-recommendations " +
+                "statusCode=\(httpResponse.statusCode) " +
+                "bodyPreview=\(responseBodyPreview(from: data))"
+            )
+        }
         if let aiReviewSummaryGameId, let httpResponse = response as? HTTPURLResponse {
             print(
                 "[AIReviewSummary] httpResponse " +
@@ -137,6 +146,9 @@ final class APIClient {
             }
             if isGameRequest {
                 print("[GameAPI] decodeSuccess type=\(String(describing: type))")
+            }
+            if isAIRecommendationRequest {
+                print("[AIRecommendation] decodeSuccess type=\(String(describing: type))")
             }
             if let aiReviewSummaryGameId {
                 print("[AIReviewSummary] decodeSuccess gameId=\(aiReviewSummaryGameId) type=\(String(describing: type))")
@@ -182,6 +194,14 @@ final class APIClient {
                 print(
                     "[AIReviewSummary] decodeFailed " +
                     "gameId=\(aiReviewSummaryGameId) " +
+                    "error=\(error) " +
+                    "bodyPreview=\(responseBodyPreview(from: data))"
+                )
+            }
+            if isAIRecommendationRequest {
+                print(
+                    "[AIRecommendation] decodeFailure " +
+                    "type=\(String(describing: type)) " +
                     "error=\(error) " +
                     "bodyPreview=\(responseBodyPreview(from: data))"
                 )

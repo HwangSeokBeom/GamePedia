@@ -6,7 +6,7 @@ final class AIRecommendationResultCell: UITableViewCell {
     private enum Layout {
         static let tagHeight: CGFloat = 28
         static let tagSpacing: CGFloat = 8
-        static let tagMaximumWidth: CGFloat = 92
+        static let tagMaximumWidth: CGFloat = 132
         static let tagMinimumWidth: CGFloat = 44
     }
 
@@ -81,6 +81,15 @@ final class AIRecommendationResultCell: UITableViewCell {
         return view
     }()
 
+    private let badgeStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .horizontal
+        stackView.spacing = 6
+        stackView.alignment = .center
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+
     private let tagStackView: UIStackView = {
         let stackView = UIStackView()
         stackView.axis = .horizontal
@@ -113,6 +122,10 @@ final class AIRecommendationResultCell: UITableViewCell {
             tagStackView.removeArrangedSubview($0)
             $0.removeFromSuperview()
         }
+        badgeStackView.arrangedSubviews.forEach {
+            badgeStackView.removeArrangedSubview($0)
+            $0.removeFromSuperview()
+        }
         onFavoriteButtonTapped = nil
     }
 
@@ -121,7 +134,7 @@ final class AIRecommendationResultCell: UITableViewCell {
         titleLabel.text = item.title
         metadataLabel.text = item.metadataText
         reasonLabel.text = item.reason
-        ratingLabel.text = item.ratingText == "—" ? "평점 없음" : "★ \(item.ratingText)"
+        ratingLabel.text = item.ratingText == "—" ? L10n.Common.Label.noRating : "★ \(item.ratingText)"
         ratingLabel.textColor = item.ratingText == "—" ? .gpTextTertiary : .gpStar
         favoriteButton.setImage(
             UIImage(systemName: item.isFavorite ? "bookmark.fill" : "bookmark"),
@@ -129,6 +142,7 @@ final class AIRecommendationResultCell: UITableViewCell {
         )
         favoriteButton.isEnabled = !item.isFavoriteUpdating
         favoriteButton.alpha = item.isFavoriteUpdating ? 0.55 : 1.0
+        configureBadges(for: item)
         configureTags(item.displayTags)
     }
 
@@ -151,7 +165,7 @@ final class AIRecommendationResultCell: UITableViewCell {
 
         tagsContainerView.addSubview(tagStackView)
 
-        let infoStackView = UIStackView(arrangedSubviews: [titleRow, metadataRow, reasonLabel, tagsContainerView])
+        let infoStackView = UIStackView(arrangedSubviews: [titleRow, metadataRow, reasonLabel, badgeStackView, tagsContainerView])
         infoStackView.axis = .vertical
         infoStackView.spacing = 7
         infoStackView.translatesAutoresizingMaskIntoConstraints = false
@@ -189,6 +203,47 @@ final class AIRecommendationResultCell: UITableViewCell {
             tagStackView.trailingAnchor.constraint(lessThanOrEqualTo: tagsContainerView.trailingAnchor),
             tagStackView.widthAnchor.constraint(lessThanOrEqualTo: tagsContainerView.widthAnchor)
         ])
+    }
+
+    private func configureBadges(for item: AIRecommendationItemViewState) {
+        badgeStackView.arrangedSubviews.forEach {
+            badgeStackView.removeArrangedSubview($0)
+            $0.removeFromSuperview()
+        }
+
+        if item.isPersonalized {
+            badgeStackView.addArrangedSubview(
+                makeBadgeLabel(
+                    title: L10n.tr("Localizable", "ai_recommendation_personalized_badge"),
+                    foregroundColor: .gpPrimary,
+                    backgroundColor: .gpPrimaryLight.withAlphaComponent(0.22)
+                )
+            )
+        }
+
+        if item.isFallback {
+            badgeStackView.addArrangedSubview(
+                makeBadgeLabel(
+                    title: L10n.tr("Localizable", "ai_recommendation_fallback_badge"),
+                    foregroundColor: .gpTextSecondary,
+                    backgroundColor: .gpSurface
+                )
+            )
+        }
+
+        badgeStackView.isHidden = badgeStackView.arrangedSubviews.isEmpty
+    }
+
+    private func makeBadgeLabel(title: String, foregroundColor: UIColor, backgroundColor: UIColor) -> UILabel {
+        let label = PaddingLabel(insets: UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8))
+        label.text = title
+        label.font = .systemFont(ofSize: 11, weight: .semibold)
+        label.textColor = foregroundColor
+        label.backgroundColor = backgroundColor
+        label.layer.cornerRadius = 10
+        label.clipsToBounds = true
+        label.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return label
     }
 
     private func configureTags(_ tags: [String]) {
@@ -231,7 +286,7 @@ private final class AIRecommendationTagPillView: UIView {
         static let height: CGFloat = 28
         static let horizontalPadding: CGFloat = 12
         static let minimumWidth: CGFloat = 44
-        static let maximumWidth: CGFloat = 92
+        static let maximumWidth: CGFloat = 132
     }
 
     private let titleLabel: UILabel = {
@@ -284,5 +339,31 @@ private final class AIRecommendationTagPillView: UIView {
         titleLabel.text = title
         accessibilityLabel = title
         invalidateIntrinsicContentSize()
+    }
+}
+
+private final class PaddingLabel: UILabel {
+    private let insets: UIEdgeInsets
+
+    init(insets: UIEdgeInsets) {
+        self.insets = insets
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        self.insets = .zero
+        super.init(coder: coder)
+    }
+
+    override func drawText(in rect: CGRect) {
+        super.drawText(in: rect.inset(by: insets))
+    }
+
+    override var intrinsicContentSize: CGSize {
+        let size = super.intrinsicContentSize
+        return CGSize(
+            width: size.width + insets.left + insets.right,
+            height: size.height + insets.top + insets.bottom
+        )
     }
 }

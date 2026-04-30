@@ -11,6 +11,9 @@ struct AIRecommendationItemViewState: Hashable {
     let rawMatchTags: [String]
     let displayTags: [String]
     let confidence: Double?
+    let isPersonalized: Bool
+    let isFallback: Bool
+    let confidenceText: String?
     var isFavorite: Bool
     var isFavoriteUpdating: Bool
 
@@ -29,6 +32,9 @@ struct AIRecommendationItemViewState: Hashable {
         matchTags: [String],
         displayTags: [String]? = nil,
         confidence: Double?,
+        isPersonalized: Bool = false,
+        isFallback: Bool = false,
+        confidenceText: String? = nil,
         isFavorite: Bool,
         isFavoriteUpdating: Bool
     ) {
@@ -40,17 +46,27 @@ struct AIRecommendationItemViewState: Hashable {
         self.ratingText = ratingText
         self.reason = reason
         self.rawMatchTags = matchTags
-        self.displayTags = displayTags ?? TagLocalizer.localizedTags(
-            for: matchTags,
+        self.displayTags = displayTags ?? RecommendationTagLocalizer.localizedDisplayTags(
+            rawTags: matchTags,
+            genres: genres,
+            maxCount: 3,
             screen: "AIRecommendation"
         )
         self.confidence = confidence
+        self.isPersonalized = isPersonalized
+        self.isFallback = isFallback
+        self.confidenceText = confidenceText
         self.isFavorite = isFavorite
         self.isFavoriteUpdating = isFavoriteUpdating
     }
 
     var metadataText: String {
-        let genreText = genres.prefix(2).joined(separator: ", ")
+        let genreText = RecommendationTagLocalizer.localizedGenres(
+            for: genres,
+            screen: "AIRecommendation.genre"
+        )
+        .prefix(2)
+        .joined(separator: ", ")
         let platformText = platforms.prefix(2).joined(separator: ", ")
 
         switch (genreText.isEmpty, platformText.isEmpty) {
@@ -61,7 +77,7 @@ struct AIRecommendationItemViewState: Hashable {
         case (true, false):
             return platformText
         case (true, true):
-            return "추천 게임"
+            return L10n.Home.List.recommendation
         }
     }
 }

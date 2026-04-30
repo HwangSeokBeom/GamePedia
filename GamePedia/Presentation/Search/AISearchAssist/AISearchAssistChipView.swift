@@ -18,6 +18,7 @@ final class AISearchAssistChipView: UIButton {
     private func setup(title: String, style: Style) {
         setTitle(title, for: .normal)
         titleLabel?.font = .systemFont(ofSize: 12, weight: .medium)
+        titleLabel?.numberOfLines = 1
         titleLabel?.lineBreakMode = .byTruncatingTail
         layer.cornerRadius = Layout.height / 2
         clipsToBounds = true
@@ -34,7 +35,7 @@ final class AISearchAssistChipView: UIButton {
         }
 
         heightAnchor.constraint(equalToConstant: Layout.height).isActive = true
-        widthAnchor.constraint(lessThanOrEqualToConstant: 220).isActive = true
+        widthAnchor.constraint(lessThanOrEqualToConstant: 180).isActive = true
         accessibilityLabel = title
     }
 }

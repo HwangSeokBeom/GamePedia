@@ -2231,6 +2231,11 @@ final class LibraryViewModel {
                 self.apply(.clearAddingToPlaying)
                 self.apply(.clearError)
                 self.persistCurrentLibraryCache()
+                NotificationCenter.default.post(
+                    name: .libraryDidChange,
+                    object: nil,
+                    userInfo: [LibraryChangeUserInfoKey.source: "steamSyncCompleted"]
+                )
             }
         }
     }
@@ -2284,6 +2289,11 @@ final class LibraryViewModel {
             do {
                 _ = try await updateLibraryGameStatusUseCase.execute(request: request)
                 await MainActor.run {
+                    NotificationCenter.default.post(
+                        name: .libraryDidChange,
+                        object: nil,
+                        userInfo: [LibraryChangeUserInfoKey.source: "libraryStatusUpdated"]
+                    )
                     self.loadLibrary(trigger: .refresh)
                 }
             } catch {
@@ -3471,7 +3481,10 @@ final class LibraryViewModel {
         case "자주 즐기는 장르와 잘 맞아요":
             return L10n.tr("Localizable", "library.sectionList.playtimeRecommendation.genreMatch")
         default:
-            return reason
+            return RecommendationTagLocalizer.localizedKnownRecommendationReason(
+                for: reason,
+                screen: "Library.playtimeRecommendation"
+            ) ?? reason
         }
     }
 

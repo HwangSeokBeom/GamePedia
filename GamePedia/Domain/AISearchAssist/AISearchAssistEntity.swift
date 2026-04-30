@@ -19,7 +19,50 @@ struct AISearchAssistItem: Equatable {
     let rating: Double?
     let matchReason: String
     let matchTags: [String]
+    let rawMatchTags: [String]
+    let displayTags: [String]
+    let canonicalTags: [String]
+    let themes: [String]
+    let keywords: [String]
+    let reasonTags: [String]
+    let intentTags: [String]
     let confidence: Double?
+
+    init(
+        gameId: Int,
+        title: String,
+        coverURL: URL?,
+        platforms: [String],
+        genres: [String],
+        rating: Double?,
+        matchReason: String,
+        matchTags: [String],
+        rawMatchTags: [String] = [],
+        displayTags: [String] = [],
+        canonicalTags: [String] = [],
+        themes: [String] = [],
+        keywords: [String] = [],
+        reasonTags: [String] = [],
+        intentTags: [String] = [],
+        confidence: Double?
+    ) {
+        self.gameId = gameId
+        self.title = title
+        self.coverURL = coverURL
+        self.platforms = platforms
+        self.genres = genres
+        self.rating = rating
+        self.matchReason = matchReason
+        self.matchTags = matchTags
+        self.rawMatchTags = rawMatchTags
+        self.displayTags = displayTags
+        self.canonicalTags = canonicalTags
+        self.themes = themes
+        self.keywords = keywords
+        self.reasonTags = reasonTags
+        self.intentTags = intentTags
+        self.confidence = confidence
+    }
 }
 
 struct AISearchAssistResult: Equatable {

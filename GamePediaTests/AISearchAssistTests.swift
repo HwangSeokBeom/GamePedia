@@ -112,11 +112,33 @@ final class AISearchAssistTests: XCTestCase {
             ratingText: "—",
             matchReason: "reason",
             matchTags: ["힐링", " ", "힐링", "Cozy", "cozy", "짧은 세션", "추가"],
+            displayTags: ["힐링", " ", "힐링", "아늑함", "아늑함", "짧은 세션", "추가"],
             confidence: nil
         )
 
         XCTAssertEqual(item.matchTags, ["힐링", " ", "힐링", "Cozy", "cozy", "짧은 세션", "추가"])
-        XCTAssertEqual(item.visibleMatchTags, ["힐링", "아늑한", "짧은 세션"])
+        XCTAssertEqual(item.visibleMatchTags, ["힐링", "아늑함", "짧은 세션"])
+    }
+
+    func testViewModel_localizesIntentAndResultTagsFromEnglishRawValues() async {
+        let useCase = EnglishTagAISearchAssistUseCase()
+        let viewModel = AISearchAssistViewModel(fetchAISearchAssistUseCase: useCase)
+
+        viewModel.send(.queryChanged("퇴근 후 짧게 할 비주얼 노벨"))
+        viewModel.send(.aiAssistTapped)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertEqual(
+            viewModel.state.intentChips,
+            ["힐링 비주얼 노벨", "짧은 세션", "싱글플레이", "비주얼 노벨"]
+        )
+        XCTAssertEqual(
+            viewModel.state.items.first?.displayTags,
+            ["힐링 비주얼 노벨", "짧은 인터랙티브 스토리", "비주얼 노벨"]
+        )
+        XCTAssertFalse(viewModel.state.items.first?.displayTags.contains("relaxing visual novel") == true)
+        XCTAssertFalse(viewModel.state.items.first?.displayTags.contains("short interactive story") == true)
+        XCTAssertFalse(viewModel.state.items.first?.displayTags.contains("Visual Novel") == true)
     }
 
     func testViewModel_preventsDuplicateRequestForSameInFlightQuery() async {
@@ -144,7 +166,7 @@ final class AISearchAssistTests: XCTestCase {
         await useCase.waitForRequestCount(2)
 
         await useCase.resume(at: 1, with: makeResult(requestId: "new", title: "New Game"))
-        try? await Task.sleep(nanoseconds: 30_000_000)
+        await waitForFirstTitle("New Game", in: viewModel)
         await useCase.resume(at: 0, with: makeResult(requestId: "old", title: "Old Game"))
         try? await Task.sleep(nanoseconds: 30_000_000)
 
@@ -203,6 +225,19 @@ final class AISearchAssistTests: XCTestCase {
             disclaimer: nil
         )
     }
+
+    private func waitForFirstTitle(
+        _ expectedTitle: String,
+        in viewModel: AISearchAssistViewModel,
+        retryCount: Int = 50
+    ) async {
+        for _ in 0..<retryCount {
+            if viewModel.state.items.first?.title == expectedTitle {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+    }
 }
 
 private final class ImmediateAISearchAssistUseCase: FetchAISearchAssistUseCase {
@@ -223,6 +258,44 @@ private final class ImmediateAISearchAssistUseCase: FetchAISearchAssistUseCase {
                     rating: nil,
                     matchReason: "reason",
                     matchTags: [],
+                    confidence: nil
+                )
+            ],
+            fallbackUsed: false,
+            disclaimer: nil
+        )
+    }
+}
+
+private final class EnglishTagAISearchAssistUseCase: FetchAISearchAssistUseCase {
+    func execute(query: String, platforms: [String], genres: [String]) async throws -> AISearchAssistResult {
+        AISearchAssistResult(
+            requestId: "english-tags",
+            originalQuery: query,
+            normalizedQuery: query,
+            intent: AISearchAssistIntentSummary(
+                mood: ["relaxing visual novel"],
+                sessionLength: "short_session",
+                playMode: "single_player",
+                difficulty: nil,
+                platforms: [],
+                genres: ["Visual Novel"],
+                keywords: ["interactive story"]
+            ),
+            suggestedQueries: [],
+            items: [
+                AISearchAssistItem(
+                    gameId: 1942,
+                    title: "Visual Novel",
+                    coverURL: nil,
+                    platforms: [],
+                    genres: ["Visual Novel"],
+                    rating: nil,
+                    matchReason: "reason",
+                    matchTags: ["relaxing visual novel", "short interactive story", "Visual Novel", "visual_novel"],
+                    displayTags: ["Visual Novel"],
+                    canonicalTags: ["visual_novel"],
+                    keywords: ["interactive_story"],
                     confidence: nil
                 )
             ],

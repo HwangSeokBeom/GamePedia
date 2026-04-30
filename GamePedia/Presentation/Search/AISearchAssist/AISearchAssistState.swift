@@ -50,11 +50,11 @@ struct AISearchAssistState: Equatable {
         }
         switch status {
         case .loaded, .empty:
-            return "검색 의도를 분석했어요"
+            return L10n.tr("Localizable", "aiSearchAssist.subtitle.loaded")
         case .loading:
-            return "검색 의도를 분석하는 중이에요"
+            return L10n.tr("Localizable", "aiSearchAssist.subtitle.loading")
         default:
-            return "문장 검색은 AI로 의도를 분석할 수 있어요"
+            return L10n.tr("Localizable", "aiSearchAssist.subtitle.default")
         }
     }
 }

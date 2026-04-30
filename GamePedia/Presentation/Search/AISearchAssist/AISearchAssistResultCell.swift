@@ -6,8 +6,8 @@ final class AISearchAssistResultCell: UIControl {
         static let coverSize: CGFloat = 72
         static let minimumCellHeight: CGFloat = 140
         static let trailingColumnWidth: CGFloat = 74
-        static let tagMinimumWidth: CGFloat = 58
-        static let tagMaximumWidth: CGFloat = 88
+        static let tagMinimumWidth: CGFloat = 44
+        static let tagMaximumWidth: CGFloat = 128
         static let horizontalPadding: CGFloat = 12
         static let verticalPadding: CGFloat = 12
         static let mainSpacing: CGFloat = 10
@@ -119,7 +119,7 @@ final class AISearchAssistResultCell: UIControl {
         coverImageView.loadImage(url: item.coverURL, placeholder: .gpGameCoverPlaceholder)
         titleLabel.text = item.title
         metadataLabel.text = item.metadataText
-        ratingLabel.text = item.ratingText == "—" ? "평점 없음" : "★ \(item.ratingText)"
+        ratingLabel.text = item.ratingText == "—" ? L10n.Common.Label.noRating : "★ \(item.ratingText)"
         ratingLabel.textColor = item.ratingText == "—" ? .gpTextTertiary : .gpStar
         reasonLabel.text = item.matchReason
         fitBadgeLabel.text = item.fitBadgeText

@@ -15,7 +15,7 @@ final class AIRecommendationViewController: BaseViewController<AIRecommendationR
         self.viewModel = viewModel
         super.init(rootView: rootView)
         NavigationBarStyler.apply(.opaque, to: navigationItem, buttonTintColor: .gpPrimary)
-        navigationItem.title = "AI 추천"
+        navigationItem.title = L10n.tr("Localizable", "aiRecommendation.navigation.title")
         navigationItem.largeTitleDisplayMode = .never
     }
 
@@ -58,6 +58,7 @@ final class AIRecommendationViewController: BaseViewController<AIRecommendationR
         rootView.tableView.delegate = self
         rootView.recommendButton.addTarget(self, action: #selector(didTapRecommendButton), for: .touchUpInside)
         rootView.retryButton.addTarget(self, action: #selector(didTapRetryButton), for: .touchUpInside)
+        rootView.refreshButton.addTarget(self, action: #selector(didTapRefreshButton), for: .touchUpInside)
     }
 
     private func bindViewModel() {
@@ -112,6 +113,11 @@ final class AIRecommendationViewController: BaseViewController<AIRecommendationR
     @objc
     private func didTapRetryButton() {
         viewModel.send(.retryTapped)
+    }
+
+    @objc
+    private func didTapRefreshButton() {
+        viewModel.send(.refreshTapped)
     }
 
     @objc

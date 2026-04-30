@@ -18,7 +18,7 @@ final class AISearchAssistView: UIView {
 
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "AI 검색 보조"
+        label.text = L10n.tr("Localizable", "aiSearchAssist.title")
         label.font = .systemFont(ofSize: 16, weight: .semibold)
         label.textColor = .gpTextPrimary
         return label
@@ -34,7 +34,7 @@ final class AISearchAssistView: UIView {
 
     private let fallbackLabel: UILabel = {
         let label = UILabel()
-        label.text = "AI 응답 대신 기본 검색 기준으로 정렬했어요."
+        label.text = L10n.tr("Localizable", "aiSearchAssist.fallbackNotice")
         label.font = .systemFont(ofSize: 12)
         label.textColor = .gpTextTertiary
         label.numberOfLines = 0
@@ -44,7 +44,7 @@ final class AISearchAssistView: UIView {
 
     private let noSearchResultsNoticeLabel: UILabel = {
         let label = UILabel()
-        label.text = "일반 검색 결과는 없지만, AI가 추천한 게임이에요."
+        label.text = L10n.tr("Localizable", "aiSearchAssist.noSearchResultsNotice")
         label.font = .systemFont(ofSize: 12, weight: .medium)
         label.textColor = .gpPrimaryLight
         label.numberOfLines = 0
@@ -118,7 +118,9 @@ final class AISearchAssistView: UIView {
         disclaimerLabel.isHidden = state.disclaimer?.isEmpty ?? true
 
         var buttonConfiguration = UIButton.Configuration.filled()
-        buttonConfiguration.title = state.isLoading ? "분석 중..." : "AI로 의도 분석하기"
+        buttonConfiguration.title = state.isLoading
+            ? L10n.tr("Localizable", "aiSearchAssist.button.loading")
+            : L10n.tr("Localizable", "aiSearchAssist.button.analyze")
         buttonConfiguration.image = UIImage(systemName: "sparkles")
         buttonConfiguration.imagePadding = 6
         buttonConfiguration.baseBackgroundColor = state.shouldShowCTA ? .gpPrimary : .gpSurface
@@ -129,7 +131,9 @@ final class AISearchAssistView: UIView {
         assistButton.isEnabled = state.shouldShowCTA
 
         var retryConfiguration = UIButton.Configuration.bordered()
-        retryConfiguration.title = state.status == .unauthorized ? "로그인하기" : "다시 시도"
+        retryConfiguration.title = state.status == .unauthorized
+            ? L10n.tr("Localizable", "aiSearchAssist.button.login")
+            : L10n.Common.Button.retry
         retryConfiguration.baseForegroundColor = .gpPrimary
         retryConfiguration.cornerStyle = .capsule
         retryButton.configuration = retryConfiguration
@@ -221,13 +225,13 @@ final class AISearchAssistView: UIView {
             statusLabel.text = nil
             statusLabel.isHidden = true
         case .empty:
-            statusLabel.text = state.errorMessage ?? "조건에 맞는 게임을 찾지 못했어요. 검색어를 조금 바꿔보세요."
+            statusLabel.text = state.errorMessage ?? L10n.tr("Localizable", "aiSearchAssist.status.empty")
             statusLabel.isHidden = false
         case .error, .dailyLimitExceeded, .unauthorized:
             if state.status == .unauthorized {
-                statusLabel.text = "로그인이 필요해요. 로그인 후 AI 검색 보조를 사용할 수 있어요."
+                statusLabel.text = L10n.tr("Localizable", "aiSearchAssist.status.unauthorized")
             } else if state.status == .error, !state.items.isEmpty {
-                statusLabel.text = "새 AI 결과를 불러오지 못했어요. 이전 결과를 유지합니다."
+                statusLabel.text = L10n.tr("Localizable", "aiSearchAssist.status.previousResults")
             } else {
                 statusLabel.text = state.errorMessage
             }
@@ -325,7 +329,7 @@ final class AISearchAssistView: UIView {
             return
         }
 
-        resultSummaryLabel.text = "AI 추천 \(items.count)개를 보여드려요."
+        resultSummaryLabel.text = L10n.tr("Localizable", "aiSearchAssist.summaryFormat", items.count)
         resultSummaryLabel.isHidden = false
         resultStackView.isHidden = false
         items.forEach { item in

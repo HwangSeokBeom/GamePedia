@@ -26,6 +26,12 @@ final class AIRecommendationRootView: UIView {
         return button
     }()
 
+    let refreshButton: UIButton = {
+        let button = UIButton(configuration: .bordered())
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     let tableView: UITableView = {
         let tableView = UITableView()
         tableView.backgroundColor = .clear
@@ -69,7 +75,7 @@ final class AIRecommendationRootView: UIView {
 
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "어떤 게임을 찾고 있나요?"
+        label.text = L10n.tr("Localizable", "aiRecommendation.title")
         label.font = .systemFont(ofSize: 26, weight: .bold)
         label.textColor = .gpTextPrimary
         label.numberOfLines = 2
@@ -78,7 +84,7 @@ final class AIRecommendationRootView: UIView {
 
     private let placeholderLabel: UILabel = {
         let label = UILabel()
-        label.text = "예: 퇴근하고 30분 정도 할 수 있는 힐링 게임 추천해줘"
+        label.text = L10n.tr("Localizable", "aiRecommendation.placeholder")
         label.font = .systemFont(ofSize: 15)
         label.textColor = .gpTextTertiary
         label.numberOfLines = 2
@@ -88,7 +94,7 @@ final class AIRecommendationRootView: UIView {
 
     private let privacyNoticeLabel: UILabel = {
         let label = UILabel()
-        label.text = "AI 추천을 위해 입력한 문장이 서버로 전송될 수 있습니다. 민감한 개인정보는 입력하지 마세요."
+        label.text = L10n.tr("Localizable", "aiRecommendation.privacyNotice")
         label.font = .systemFont(ofSize: 12)
         label.textColor = .gpTextTertiary
         label.numberOfLines = 0
@@ -97,7 +103,7 @@ final class AIRecommendationRootView: UIView {
 
     private let aiNoticeLabel: UILabel = {
         let label = UILabel()
-        label.text = "AI 추천은 사용자의 입력과 게임 데이터 기반으로 생성되며, 실제 취향과 다를 수 있습니다."
+        label.text = L10n.tr("Localizable", "aiRecommendation.aiNotice")
         label.font = .systemFont(ofSize: 12)
         label.textColor = .gpTextTertiary
         label.numberOfLines = 0
@@ -106,15 +112,32 @@ final class AIRecommendationRootView: UIView {
 
     private let resultTitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "추천 결과"
+        label.text = L10n.tr("Localizable", "aiRecommendation.resultTitle")
         label.font = .systemFont(ofSize: 18, weight: .semibold)
         label.textColor = .gpTextPrimary
         return label
     }()
 
+    private let helperMessageLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextSecondary
+        label.numberOfLines = 0
+        return label
+    }()
+
+    private let helperContainerView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpSurface
+        view.layer.cornerRadius = 12
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
     private let emptyStateView: EmptyStateView = {
         let view = EmptyStateView()
-        view.configure(icon: "sparkles", message: "조건에 맞는 추천 결과가 없습니다.")
+        view.configure(icon: "sparkles", message: L10n.tr("Localizable", "aiRecommendation.emptyMessage"))
         view.isHidden = true
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
@@ -171,7 +194,7 @@ final class AIRecommendationRootView: UIView {
             button.backgroundColor = .gpSurface
             button.layer.cornerRadius = 18
             button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
-            button.accessibilityLabel = "AI 추천 예시: \(example)"
+            button.accessibilityLabel = L10n.tr("Localizable", "aiRecommendation.example.accessibility", example)
             button.addTarget(target, action: action, for: .touchUpInside)
             chipStackView.addArrangedSubview(button)
         }
@@ -184,7 +207,9 @@ final class AIRecommendationRootView: UIView {
         placeholderLabel.isHidden = !state.query.isEmpty
 
         var buttonConfiguration = UIButton.Configuration.filled()
-        buttonConfiguration.title = state.isLoading ? "추천 중..." : "추천받기"
+        buttonConfiguration.title = state.isLoading
+            ? L10n.tr("Localizable", "aiRecommendation.button.loading")
+            : L10n.tr("Localizable", "aiRecommendation.button.recommend")
         buttonConfiguration.baseBackgroundColor = state.isRecommendButtonEnabled ? .gpPrimary : .gpSurface
         buttonConfiguration.baseForegroundColor = state.isRecommendButtonEnabled ? .gpOnPrimary : .gpTextTertiary
         buttonConfiguration.cornerStyle = .capsule
@@ -192,10 +217,17 @@ final class AIRecommendationRootView: UIView {
         recommendButton.isEnabled = state.isRecommendButtonEnabled
 
         var retryConfiguration = UIButton.Configuration.bordered()
-        retryConfiguration.title = "다시 시도"
+        retryConfiguration.title = L10n.tr("Localizable", "ai_recommendation_error_retry")
         retryConfiguration.baseForegroundColor = .gpPrimary
         retryConfiguration.cornerStyle = .capsule
         retryButton.configuration = retryConfiguration
+
+        var refreshConfiguration = UIButton.Configuration.bordered()
+        refreshConfiguration.title = L10n.tr("Localizable", "ai_recommendation_refresh_button")
+        refreshConfiguration.baseForegroundColor = .gpPrimary
+        refreshConfiguration.cornerStyle = .capsule
+        refreshButton.configuration = refreshConfiguration
+        refreshButton.isHidden = !state.isStale
 
         if state.isLoading {
             activityIndicator.startAnimating()
@@ -203,8 +235,11 @@ final class AIRecommendationRootView: UIView {
             activityIndicator.stopAnimating()
         }
 
-        errorLabel.text = state.errorMessage ?? "추천을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+        errorLabel.text = state.errorMessage ?? L10n.tr("Localizable", "aiRecommendation.error.default")
         errorContainerView.isHidden = state.errorMessage == nil
+        helperMessageLabel.text = state.helperMessage
+        helperContainerView.isHidden = state.helperMessage == nil || state.errorMessage != nil
+        emptyStateView.configure(icon: "sparkles", message: state.emptyMessage)
         tableView.isHidden = state.recommendations.isEmpty || state.errorMessage != nil
         emptyStateView.isHidden = !state.showsEmptyState
         resultTitleLabel.isHidden = state.recommendations.isEmpty && state.errorMessage == nil && !state.showsEmptyState
@@ -253,8 +288,16 @@ final class AIRecommendationRootView: UIView {
         errorStackView.translatesAutoresizingMaskIntoConstraints = false
         errorContainerView.addSubview(errorStackView)
 
+        let helperStackView = UIStackView(arrangedSubviews: [helperMessageLabel, refreshButton])
+        helperStackView.axis = .vertical
+        helperStackView.spacing = 10
+        helperStackView.alignment = .fill
+        helperStackView.translatesAutoresizingMaskIntoConstraints = false
+        helperContainerView.addSubview(helperStackView)
+
         let resultStackView = UIStackView(arrangedSubviews: [
             resultTitleLabel,
+            helperContainerView,
             activityIndicator,
             errorContainerView,
             emptyStateView,
@@ -311,7 +354,13 @@ final class AIRecommendationRootView: UIView {
             errorStackView.leadingAnchor.constraint(equalTo: errorContainerView.leadingAnchor, constant: 16),
             errorStackView.trailingAnchor.constraint(equalTo: errorContainerView.trailingAnchor, constant: -16),
             errorStackView.bottomAnchor.constraint(equalTo: errorContainerView.bottomAnchor, constant: -18),
-            retryButton.heightAnchor.constraint(equalToConstant: 36)
+            retryButton.heightAnchor.constraint(equalToConstant: 36),
+
+            helperStackView.topAnchor.constraint(equalTo: helperContainerView.topAnchor, constant: 12),
+            helperStackView.leadingAnchor.constraint(equalTo: helperContainerView.leadingAnchor, constant: 14),
+            helperStackView.trailingAnchor.constraint(equalTo: helperContainerView.trailingAnchor, constant: -14),
+            helperStackView.bottomAnchor.constraint(equalTo: helperContainerView.bottomAnchor, constant: -12),
+            refreshButton.heightAnchor.constraint(equalToConstant: 34)
         ])
     }
 }

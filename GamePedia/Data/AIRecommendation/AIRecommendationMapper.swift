@@ -2,11 +2,31 @@ import Foundation
 
 enum AIRecommendationMapper {
     static func toEntity(_ dto: AIRecommendationResponseDTO) -> AIRecommendationResult {
-        AIRecommendationResult(
-            requestId: dto.requestId,
+        var droppedItemCount = 0
+        let items = dto.items.compactMap { dto -> AIRecommendation? in
+            guard let item = toItemEntity(dto) else {
+                droppedItemCount += 1
+                return nil
+            }
+            return item
+        }
+#if DEBUG
+        print(
+            "[AIRecommendationMapping] " +
+            "itemCount=\(items.count) " +
+            "droppedEmptyGameIdCount=\(droppedItemCount) " +
+            "personalizationUsed=\(dto.meta?.personalizationUsed.map(String.init) ?? "nil") " +
+            "personalizationAvailable=\(dto.meta?.personalizationAvailable.map(String.init) ?? "nil") " +
+            "fallbackUsed=\(dto.meta?.fallbackUsed.map(String.init) ?? "nil") " +
+            "source=\(dto.meta?.source ?? "nil")"
+        )
+#endif
+        return AIRecommendationResult(
+            requestId: sanitized(dto.requestId) ?? "",
             normalizedQuery: sanitized(dto.normalizedQuery) ?? "",
             intent: dto.intent.map(toIntentEntity),
-            items: dto.items.map(toItemEntity),
+            items: items,
+            meta: dto.meta.map(toMetaEntity),
             disclaimer: sanitized(dto.disclaimer)
         )
     }
@@ -46,22 +66,60 @@ enum AIRecommendationMapper {
             sessionLength: sanitized(dto.sessionLength),
             playMode: sanitized(dto.playMode),
             difficulty: sanitized(dto.difficulty),
-            platforms: dto.platforms ?? []
+            platforms: dto.platforms ?? [],
+            genres: dto.genres ?? [],
+            keywords: dto.keywords ?? []
         )
     }
 
-    private static func toItemEntity(_ dto: AIRecommendationItemDTO) -> AIRecommendation {
-        AIRecommendation(
-            gameId: dto.gameId,
-            title: sanitized(dto.title) ?? L10n.tr("Localizable", "common.label.untitledGame"),
-            coverURL: sanitized(dto.coverUrl).flatMap(URL.init(string:)),
-            platforms: dto.platforms ?? [],
-            genres: dto.genres ?? [],
-            rating: dto.rating,
-            reason: sanitized(dto.reason) ?? "입력한 취향과 잘 맞는 게임입니다.",
-            matchTags: dto.matchTags ?? [],
-            confidence: dto.confidence
+    private static func toMetaEntity(_ dto: AIRecommendationMetaDTO) -> AIRecommendationMeta {
+        AIRecommendationMeta(
+            personalizationUsed: dto.personalizationUsed,
+            personalizationAvailable: dto.personalizationAvailable,
+            fallbackUsed: dto.fallbackUsed,
+            source: sanitized(dto.source),
+            candidateCount: dto.candidateCount,
+            generatedAt: sanitized(dto.generatedAt)
         )
+    }
+
+    private static func toItemEntity(_ dto: AIRecommendationItemDTO) -> AIRecommendation? {
+        guard let gameId = Int(dto.gameId.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            return nil
+        }
+
+        return AIRecommendation(
+            gameId: gameId,
+            title: sanitized(dto.title) ?? L10n.tr("Localizable", "common.label.untitledGame"),
+            coverURL: (sanitized(dto.coverUrl) ?? sanitized(dto.imageUrl)).flatMap(URL.init(string:)),
+            platforms: sanitized(dto.platforms ?? []),
+            genres: sanitized(dto.genres ?? []),
+            rating: dto.rating,
+            reason: localizedReason(from: dto.reason),
+            matchTags: sanitized(dto.matchTags ?? []),
+            rawMatchTags: sanitized(dto.rawMatchTags ?? []),
+            displayTags: sanitized(dto.displayTags ?? []),
+            canonicalTags: sanitized(dto.canonicalTags ?? []),
+            themes: sanitized(dto.themes ?? []),
+            keywords: sanitized(dto.keywords ?? []),
+            reasonTags: sanitized(dto.reasonTags ?? []),
+            intentTags: sanitized(dto.intentTags ?? []),
+            confidence: dto.confidence,
+            recommendationSource: sanitized(dto.recommendationSource),
+            personalized: dto.personalized ?? false,
+            fallbackUsed: dto.fallbackUsed ?? false
+        )
+    }
+
+    private static func localizedReason(from reason: String?) -> String {
+        guard let reason = sanitized(reason) else {
+            return L10n.tr("Localizable", "ai_recommendation_default_reason_query_match")
+        }
+
+        return RecommendationTagLocalizer.localizedKnownRecommendationReason(
+            for: reason,
+            screen: "AIRecommendation"
+        ) ?? reason
     }
 
     private static func sanitized(_ value: String?) -> String? {
@@ -69,5 +127,8 @@ enum AIRecommendationMapper {
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedValue.isEmpty ? nil : trimmedValue
     }
-}
 
+    private static func sanitized(_ values: [String]) -> [String] {
+        values.compactMap(sanitized)
+    }
+}

@@ -13,6 +13,7 @@ enum AIRecommendationReducer {
             state.recommendations = recommendations
             state.errorMessage = nil
             state.hasRequestedRecommendations = true
+            state.isStale = false
         case .setErrorMessage(let message):
             state.errorMessage = message
             state.hasRequestedRecommendations = message != nil || state.hasRequestedRecommendations
@@ -22,6 +23,20 @@ enum AIRecommendationReducer {
             state.disclaimer = disclaimer
         case .setHasRequestedRecommendations(let hasRequestedRecommendations):
             state.hasRequestedRecommendations = hasRequestedRecommendations
+        case .setPersonalizationMetadata(
+            let personalizationUsed,
+            let personalizationAvailable,
+            let fallbackUsed,
+            let recommendationSource,
+            let generatedAt
+        ):
+            state.personalizationUsed = personalizationUsed
+            state.personalizationAvailable = personalizationAvailable
+            state.fallbackUsed = fallbackUsed
+            state.recommendationSource = recommendationSource
+            state.generatedAt = generatedAt
+        case .setStale(let isStale):
+            state.isStale = isStale
         case .setFavorite(let gameId, let isFavorite):
             state.recommendations = state.recommendations.map { item in
                 guard item.gameId == gameId else { return item }

@@ -718,7 +718,10 @@ final class LibrarySectionListViewController: UIViewController {
         case "자주 즐기는 장르와 잘 맞아요":
             return L10n.tr("Localizable", "library.sectionList.playtimeRecommendation.genreMatch")
         default:
-            return reason
+            return RecommendationTagLocalizer.localizedKnownRecommendationReason(
+                for: reason,
+                screen: "Library.playtimeRecommendation"
+            ) ?? reason
         }
     }
 

@@ -63,8 +63,15 @@ enum AISearchAssistMapper {
             platforms: sanitized(dto.platforms ?? []),
             genres: sanitized(dto.genres ?? []),
             rating: dto.rating,
-            matchReason: sanitized(dto.matchReason) ?? "검색 의도와 잘 맞는 게임입니다.",
+            matchReason: sanitized(dto.matchReason) ?? L10n.tr("Localizable", "aiSearchAssist.reason.fallback"),
             matchTags: sanitized(dto.matchTags ?? []),
+            rawMatchTags: sanitized(dto.rawMatchTags ?? []),
+            displayTags: sanitized(dto.displayTags ?? []),
+            canonicalTags: sanitized(dto.canonicalTags ?? []),
+            themes: sanitized(dto.themes ?? []),
+            keywords: sanitized(dto.keywords ?? []),
+            reasonTags: sanitized(dto.reasonTags ?? []),
+            intentTags: sanitized(dto.intentTags ?? []),
             confidence: dto.confidence
         )
     }

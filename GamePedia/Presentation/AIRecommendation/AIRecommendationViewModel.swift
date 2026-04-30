@@ -32,6 +32,7 @@ final class AIRecommendationViewModel {
         self.fetchMyFavoritesUseCase = fetchMyFavoritesUseCase
         self.toggleFavoriteUseCase = toggleFavoriteUseCase
         observeFavoriteChanges()
+        observePersonalizationInvalidationEvents()
     }
 
     deinit {
@@ -42,10 +43,10 @@ final class AIRecommendationViewModel {
         switch intent {
         case .viewDidLoad:
             apply(.setExamples([
-                "퇴근 후 힐링",
-                "친구랑 같이",
-                "스토리 좋은 RPG",
-                "짧게 즐기는 게임"
+                L10n.tr("Localizable", "aiRecommendation.example.afterWorkHealing"),
+                L10n.tr("Localizable", "aiRecommendation.example.withFriends"),
+                L10n.tr("Localizable", "aiRecommendation.example.storyRPG"),
+                L10n.tr("Localizable", "aiRecommendation.example.shortSession")
             ]))
             loadFavoriteStatus()
         case .queryChanged(let query):
@@ -69,6 +70,8 @@ final class AIRecommendationViewModel {
         case .favoriteTapped(let gameId):
             toggleFavorite(gameId: gameId)
         case .retryTapped:
+            fetchRecommendations()
+        case .refreshTapped:
             fetchRecommendations()
         }
     }
@@ -96,7 +99,7 @@ final class AIRecommendationViewModel {
                 let favoriteGameIds = await loadFavoriteGameIds()
                 guard !Task.isCancelled else { return }
                 let items = result.items.map { recommendation in
-                    makeItemViewState(
+                    self.makeItemViewState(
                         from: recommendation,
                         isFavorite: favoriteGameIds.contains(recommendation.gameId)
                     )
@@ -109,9 +112,24 @@ final class AIRecommendationViewModel {
                     self.currentRecommendationToken = nil
                     self.recommendationGamesById = Dictionary(uniqueKeysWithValues: games.map { ($0.id, $0) })
                     GameDetailSeedStore.shared.store(games: games, screen: "AIRecommendation.result")
+                    self.apply(.setPersonalizationMetadata(
+                        personalizationUsed: result.meta?.personalizationUsed,
+                        personalizationAvailable: result.meta?.personalizationAvailable,
+                        fallbackUsed: result.meta?.fallbackUsed,
+                        recommendationSource: result.meta?.source,
+                        generatedAt: result.meta?.generatedAt
+                    ))
                     self.apply(.setRecommendations(items))
                     self.apply(.setDisclaimer(result.disclaimer))
                     self.apply(.setLoading(false))
+#if DEBUG
+                    print(
+                        "[AIRecommendationRender] " +
+                        "itemCount=\(items.count) " +
+                        "visiblePersonalizedBadgeCount=\(items.filter(\.isPersonalized).count) " +
+                        "staleState=\(self.state.isStale)"
+                    )
+#endif
                 }
             } catch {
                 guard !Task.isCancelled else { return }
@@ -131,7 +149,7 @@ final class AIRecommendationViewModel {
 
                     self.apply(.setErrorMessage(
                         recommendationError.errorDescription
-                            ?? "추천을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+                            ?? L10n.tr("Localizable", "aiRecommendation.error.default")
                     ))
                 }
             }
@@ -225,8 +243,38 @@ final class AIRecommendationViewModel {
                 }
 
                 self.apply(.setFavorite(gameId: gameId, isFavorite: isFavorite))
+                self.markRecommendationsStale(reason: "favoriteDidChange")
             }
             .store(in: &cancellables)
+    }
+
+    private func observePersonalizationInvalidationEvents() {
+        let notificationNames: [Notification.Name] = [
+            .reviewDidChange,
+            .libraryDidChange,
+            .authSessionDidChange,
+            .currentUserProfileDidChange,
+            .steamLinkDidComplete,
+            .steamLinkStateDidChange
+        ]
+
+        notificationNames.forEach { name in
+            NotificationCenter.default.publisher(for: name)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] notification in
+                    self?.markRecommendationsStale(reason: notification.name.rawValue)
+                }
+                .store(in: &cancellables)
+        }
+    }
+
+    private func markRecommendationsStale(reason: String) {
+        let hasQuery = !state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard hasQuery, state.hasRequestedRecommendations, !state.recommendations.isEmpty else { return }
+        apply(.setStale(true))
+#if DEBUG
+        print("[AIRecommendation] stale reason=\(reason) queryLength=\(state.query.count)")
+#endif
     }
 
     private func makeItemViewState(
@@ -244,17 +292,34 @@ final class AIRecommendationViewModel {
             ratingText = "—"
         }
 
-        let displayTags = TagLocalizer.localizedTags(
-            for: recommendation.matchTags,
+        let recommendationReasonTags = makeRecommendationReasonTags(from: recommendation)
+        let rawDisplayTagInputs = recommendationReasonTags
+            + recommendation.reasonTags
+            + recommendation.intentTags
+            + recommendation.matchTags
+            + recommendation.rawMatchTags
+            + recommendation.displayTags
+            + recommendation.canonicalTags
+        let displayTags = RecommendationTagLocalizer.localizedDisplayTags(
+            rawTags: rawDisplayTagInputs,
+            genres: recommendation.genres,
+            themes: recommendation.themes,
+            keywords: recommendation.keywords,
+            maxCount: 3,
             screen: "AIRecommendation"
+        )
+        let unknownFallbackCount = RecommendationTagLocalizer.unknownFallbackCount(
+            for: rawDisplayTagInputs + recommendation.genres + recommendation.themes + recommendation.keywords
         )
 
 #if DEBUG
-        if !recommendation.matchTags.isEmpty || !displayTags.isEmpty {
-            print(
-                "[AIRecommendationTags] localized gameId=\(recommendation.gameId) rawTags=[\(recommendation.matchTags.joined(separator: ","))] displayTags=[\(displayTags.joined(separator: ","))]"
-            )
-        }
+        print(
+            "[AIRecommendationTags] localized " +
+            "gameId=\(recommendation.gameId) " +
+            "rawTagCount=\(rawDisplayTagInputs.count) " +
+            "displayTagCount=\(displayTags.count) " +
+            "unknownFallbackCount=\(unknownFallbackCount)"
+        )
 #endif
 
         return AIRecommendationItemViewState(
@@ -268,9 +333,27 @@ final class AIRecommendationViewModel {
             matchTags: recommendation.matchTags,
             displayTags: displayTags,
             confidence: recommendation.confidence,
+            isPersonalized: recommendation.personalized,
+            isFallback: recommendation.fallbackUsed,
+            confidenceText: nil,
             isFavorite: isFavorite,
             isFavoriteUpdating: false
         )
+    }
+
+    private func makeRecommendationReasonTags(from recommendation: AIRecommendation) -> [String] {
+        var tags: [String] = []
+        if recommendation.personalized {
+            tags.append("personalized")
+        }
+        if recommendation.fallbackUsed {
+            tags.append("default ranking")
+        }
+        if let source = recommendation.recommendationSource?.lowercased(),
+           source.contains("fallback") || source.contains("default") {
+            tags.append("default ranking")
+        }
+        return tags
     }
 
     func cancelInFlightRequest() {

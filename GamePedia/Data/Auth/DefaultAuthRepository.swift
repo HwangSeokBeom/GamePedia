@@ -260,6 +260,14 @@ final class DefaultAuthRepository: AuthRepository {
         tokenStore.saveRefreshToken(session.refreshToken)
         saveCurrentUser(session.user)
         apiClient.userAuthToken = session.accessToken
+        NotificationCenter.default.post(
+            name: .authSessionDidChange,
+            object: nil,
+            userInfo: [
+                AuthSessionChangeUserInfoKey.isAuthenticated: true,
+                AuthSessionChangeUserInfoKey.userId: session.user.id
+            ]
+        )
     }
 
     private func saveCurrentUser(_ user: AuthUser) {
@@ -270,5 +278,10 @@ final class DefaultAuthRepository: AuthRepository {
         tokenStore.clear()
         userSessionStore.clear()
         apiClient.userAuthToken = nil
+        NotificationCenter.default.post(
+            name: .authSessionDidChange,
+            object: nil,
+            userInfo: [AuthSessionChangeUserInfoKey.isAuthenticated: false]
+        )
     }
 }

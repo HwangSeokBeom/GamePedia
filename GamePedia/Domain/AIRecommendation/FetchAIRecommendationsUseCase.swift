@@ -20,12 +20,15 @@ struct DefaultFetchAIRecommendationsUseCase: FetchAIRecommendationsUseCase {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let request = AIRecommendationRequest(
             query: trimmedQuery,
-            platforms: [],
-            preferredGenres: [],
+            platforms: nil,
+            preferredGenres: nil,
             excludedGameIds: [],
-            limit: limit
+            limit: limit,
+            personalization: true,
+            includeOwned: false,
+            includeReviewed: false,
+            includeFavorites: false
         )
         return try await repository.fetchRecommendations(request: request)
     }
 }
-
