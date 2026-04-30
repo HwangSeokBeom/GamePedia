@@ -12,6 +12,7 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
 
     // Set by SearchCoordinator.
     var onGameSelected: ((Int) -> Void)?
+    var onAIRecommendationRequested: (() -> Void)?
 
     // MARK: Init
     init(
@@ -45,6 +46,15 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
         UIView.performWithoutAnimation {
             navigationItem.title = L10n.Search.Tab.title
             navigationItem.largeTitleDisplayMode = .never
+            let aiRecommendationButton = UIBarButtonItem(
+                image: UIImage(systemName: "sparkles") ?? UIImage(systemName: "wand.and.stars"),
+                style: .plain,
+                target: self,
+                action: #selector(didTapAIRecommendationButton)
+            )
+            aiRecommendationButton.accessibilityLabel = "AI 게임 추천"
+            aiRecommendationButton.tintColor = .gpPrimary
+            navigationItem.rightBarButtonItem = aiRecommendationButton
         }
     }
 
@@ -136,6 +146,10 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
 
     @objc private func dismissKeyboard() {
         rootView.searchTextField.resignFirstResponder()
+    }
+
+    @objc private func didTapAIRecommendationButton() {
+        onAIRecommendationRequested?()
     }
 }
 

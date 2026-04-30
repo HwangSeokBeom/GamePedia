@@ -28,10 +28,46 @@ final class SearchCoordinator {
         searchVC.onGameSelected = { [weak self] gameId in
             self?.showDetail(gameId: gameId)
         }
+        searchVC.onAIRecommendationRequested = { [weak self] in
+            self?.showAIRecommendation()
+        }
         navigationController.setViewControllers([searchVC], animated: false)
     }
 
     // MARK: - Navigation
+
+    private func showAIRecommendation() {
+        if navigationController.topViewController is AIRecommendationViewController {
+            return
+        }
+
+        let viewController = AIRecommendationViewController(
+            rootView: AIRecommendationRootView(),
+            viewModel: makeAIRecommendationViewModel()
+        )
+        viewController.onGameSelected = { [weak self] gameId in
+            self?.showDetail(gameId: gameId)
+        }
+        viewController.onAuthenticationRequired = { [weak self, weak viewController] context, action in
+            guard let self else { return }
+            let presenter = viewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func makeAIRecommendationViewModel() -> AIRecommendationViewModel {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-AIRecommendationMock") {
+            return AIRecommendationViewModel(
+                fetchAIRecommendationsUseCase: DefaultFetchAIRecommendationsUseCase(
+                    repository: MockAIRecommendationRepository()
+                )
+            )
+        }
+#endif
+        return AIRecommendationViewModel()
+    }
 
     private func showDetail(gameId: Int) {
         let detailVC = GameDetailViewController(gameId: gameId)
