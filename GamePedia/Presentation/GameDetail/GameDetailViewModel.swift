@@ -24,6 +24,7 @@ final class GameDetailViewModel {
     private let toggleReviewLikeUseCase: ToggleReviewLikeUseCase
     private let fetchFavoriteStatusUseCase: FetchFavoriteStatusUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
+    private let fetchAIReviewSummaryUseCase: FetchAIReviewSummaryUseCase
     private let moderationRepository: any ModerationRepository
     private let languageProvider: any LanguageProviding
     private let translationProvider: any TranslationProviding
@@ -31,8 +32,21 @@ final class GameDetailViewModel {
     private let seedStore: GameDetailSeedStore
     private let widgetSnapshotStore: GameWidgetSnapshotStore
     private var currentGameID: Int?
+    private var aiReviewSummaryTask: Task<Void, Never>?
+    private var aiReviewSummaryRequestGameID: Int?
     private var reactingReviewIds = Set<String>()
     private var cancellables = Set<AnyCancellable>()
+
+    private static func makeDefaultAIReviewSummaryUseCase() -> FetchAIReviewSummaryUseCase {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-AIReviewSummaryMock") {
+            return DefaultFetchAIReviewSummaryUseCase(
+                repository: MockAIReviewSummaryRepository()
+            )
+        }
+#endif
+        return DefaultFetchAIReviewSummaryUseCase()
+    }
 
     // MARK: Init
     init(
@@ -50,6 +64,7 @@ final class GameDetailViewModel {
         toggleFavoriteUseCase: ToggleFavoriteUseCase = ToggleFavoriteUseCase(
             favoriteRepository: DefaultFavoriteRepository()
         ),
+        fetchAIReviewSummaryUseCase: FetchAIReviewSummaryUseCase = GameDetailViewModel.makeDefaultAIReviewSummaryUseCase(),
         moderationRepository: any ModerationRepository = DefaultModerationRepository(),
         languageProvider: any LanguageProviding = DefaultLanguageProvider.shared,
         translationProvider: any TranslationProviding = makeTranslationProvider(),
@@ -63,6 +78,7 @@ final class GameDetailViewModel {
         self.toggleReviewLikeUseCase = toggleReviewLikeUseCase
         self.fetchFavoriteStatusUseCase = fetchFavoriteStatusUseCase
         self.toggleFavoriteUseCase = toggleFavoriteUseCase
+        self.fetchAIReviewSummaryUseCase = fetchAIReviewSummaryUseCase
         self.moderationRepository = moderationRepository
         self.languageProvider = languageProvider
         self.translationProvider = translationProvider
@@ -72,6 +88,10 @@ final class GameDetailViewModel {
         observeCommentChanges()
         observeReviewLikeChanges()
         observeFavoriteChanges()
+    }
+
+    deinit {
+        aiReviewSummaryTask?.cancel()
     }
 
     // MARK: - Intent Processing
@@ -99,6 +119,15 @@ final class GameDetailViewModel {
             apply(.setShowingTranslated(!state.isShowingTranslated))
         case .didReceiveTranslationResults(let results):
             handleTranslationResults(results)
+        case .aiReviewSummaryRequested:
+            guard let currentGameID else { return }
+            requestAIReviewSummary(gameId: currentGameID, force: false)
+        case .aiReviewSummaryRetryTapped:
+            guard let currentGameID else { return }
+            requestAIReviewSummary(gameId: currentGameID, force: true)
+        case .aiReviewSummaryExpandTapped:
+            guard case .loaded(let viewState) = state.aiReviewSummarySectionState else { return }
+            apply(.setAIReviewSummaryExpanded(!viewState.isExpanded))
         }
     }
 
@@ -113,6 +142,7 @@ final class GameDetailViewModel {
         apply(.clearError)
         apply(.setBlockingLoadError(nil))
         apply(.setInlineNotice(nil))
+        requestAIReviewSummary(gameId: gameId, force: true)
 
         if let seed = seedStore.seed(for: gameId) {
             let partialGame = seed.makePartialDetail()
@@ -132,6 +162,49 @@ final class GameDetailViewModel {
                 group.addTask { await self.fetchGame(id: gameId) }
                 group.addTask { await self.fetchReviews(gameId: gameId) }
                 group.addTask { await self.fetchFavoriteStatus(gameId: gameId) }
+            }
+        }
+    }
+
+    private func requestAIReviewSummary(gameId: Int, force: Bool) {
+        if !force,
+           aiReviewSummaryRequestGameID == gameId,
+           state.aiReviewSummarySectionState.isLoading {
+            return
+        }
+
+        aiReviewSummaryTask?.cancel()
+        aiReviewSummaryRequestGameID = gameId
+        apply(.setAIReviewSummaryLoading)
+
+        aiReviewSummaryTask = Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let summary = try await self.fetchAIReviewSummaryUseCase.execute(gameId: gameId)
+                guard !Task.isCancelled else { return }
+                let viewState = AIReviewSummaryViewState.make(from: summary)
+
+                await MainActor.run {
+                    guard self.currentGameID == gameId else { return }
+                    self.apply(.setAIReviewSummaryLoaded(viewState))
+                    self.aiReviewSummaryTask = nil
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                let summaryError = AIReviewSummaryError.from(error: error)
+                let message = summaryError.errorDescription ?? "AI 리뷰 요약을 불러오지 못했습니다."
+
+                await MainActor.run {
+                    guard self.currentGameID == gameId else { return }
+                    switch summaryError {
+                    case .notAvailable:
+                        self.apply(.setAIReviewSummaryUnavailable(message))
+                    default:
+                        self.apply(.setAIReviewSummaryError(message))
+                    }
+                    self.aiReviewSummaryTask = nil
+                }
             }
         }
     }

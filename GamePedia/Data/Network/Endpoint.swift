@@ -139,6 +139,10 @@ extension Endpoint {
         .post("/api/v1/ai/game-recommendations", body: body, userAuth: true)
     }
 
+    static func aiReviewSummary(gameId: Int) -> Endpoint {
+        .get("/api/v1/ai/games/\(gameId)/review-summary", userAuth: true)
+    }
+
     private static func homeFilterQueryItems(limit: Int, filter: HomeContentFilter?) -> [URLQueryItem] {
         var queryItems = [URLQueryItem(name: "limit", value: "\(limit)")]
         if let platform = filter?.platform.queryValue {

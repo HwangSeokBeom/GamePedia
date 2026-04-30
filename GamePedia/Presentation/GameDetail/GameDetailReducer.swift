@@ -51,6 +51,17 @@ enum GameDetailReducer {
             state.translationRequest = translationRequest
         case .setShowingTranslated(let isShowingTranslated):
             state.isShowingTranslated = isShowingTranslated
+        case .setAIReviewSummaryLoading:
+            state.aiReviewSummarySectionState = .loading
+        case .setAIReviewSummaryLoaded(let viewState):
+            state.aiReviewSummarySectionState = .loaded(viewState)
+        case .setAIReviewSummaryUnavailable(let message):
+            state.aiReviewSummarySectionState = .unavailable(message)
+        case .setAIReviewSummaryError(let message):
+            state.aiReviewSummarySectionState = .error(message)
+        case .setAIReviewSummaryExpanded(let isExpanded):
+            guard case .loaded(let viewState) = state.aiReviewSummarySectionState else { break }
+            state.aiReviewSummarySectionState = .loaded(viewState.settingExpanded(isExpanded))
         }
         return state
     }

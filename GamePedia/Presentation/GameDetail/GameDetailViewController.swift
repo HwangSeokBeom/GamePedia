@@ -78,6 +78,12 @@ final class GameDetailViewController: BaseViewController<GameDetailRootView, Gam
         rootView.steamReviewBannerView.onWriteReviewTapped = { [weak self] in
             self?.didTapWriteReview()
         }
+        rootView.aiReviewSummaryCardView.onRetryTapped = { [weak self] in
+            self?.viewModel.send(.aiReviewSummaryRetryTapped)
+        }
+        rootView.aiReviewSummaryCardView.onExpandTapped = { [weak self] in
+            self?.viewModel.send(.aiReviewSummaryExpandTapped)
+        }
         rootView.onEditMyReview = { [weak self] review in
             self?.didTapEditReview(review)
         }

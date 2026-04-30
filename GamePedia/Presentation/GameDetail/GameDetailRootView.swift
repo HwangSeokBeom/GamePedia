@@ -150,6 +150,12 @@ final class GameDetailRootView: UIView {
         return view
     }()
 
+    let aiReviewSummaryCardView: AIReviewSummaryCardView = {
+        let view = AIReviewSummaryCardView()
+        view.isHidden = true
+        return view
+    }()
+
     let descriptionTitleLabel: UILabel = {
         let label = UILabel()
         label.text = L10n.Detail.Section.description
@@ -336,6 +342,7 @@ final class GameDetailRootView: UIView {
         contentStackView.addArrangedSubview(statsView)
         contentStackView.addArrangedSubview(actionStackView)
         contentStackView.addArrangedSubview(steamReviewBannerView)
+        contentStackView.addArrangedSubview(aiReviewSummaryCardView)
         contentStackView.addArrangedSubview(descriptionSectionStackView)
         contentStackView.addArrangedSubview(myReviewSectionStackView)
         contentStackView.addArrangedSubview(communitySectionStackView)
@@ -399,6 +406,7 @@ final class GameDetailRootView: UIView {
         translationToggleConfiguration?.title = state.translationToggleTitle
         translationToggleButton.configuration = translationToggleConfiguration
         steamReviewBannerView.isHidden = !state.showSteamReviewLinkage
+        aiReviewSummaryCardView.render(state.aiReviewSummarySectionState)
 
         heroHeightConstraint.constant = state.hasMyReviews ? 220 : 240
         writeReviewButton.isHidden = state.hasMyReviews

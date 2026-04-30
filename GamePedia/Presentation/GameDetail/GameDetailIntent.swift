@@ -11,4 +11,7 @@ enum GameDetailIntent {
     case didTapShare
     case didTapTranslationToggle
     case didReceiveTranslationResults([TranslationResultItem])
+    case aiReviewSummaryRequested
+    case aiReviewSummaryRetryTapped
+    case aiReviewSummaryExpandTapped
 }
