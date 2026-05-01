@@ -567,7 +567,18 @@ final class GameDetailViewModel {
 
     private func temporaryDegradedMessage(for error: Error) -> String? {
         guard let networkError = error as? NetworkError else { return nil }
-        guard case let .serverError(statusCode, code, message) = networkError else { return nil }
+        let statusCode: Int
+        let code: String?
+        let message: String?
+        switch networkError {
+        case .serverError(let errorStatusCode, let errorCode, let errorMessage),
+             .rateLimited(let errorStatusCode, let errorCode, let errorMessage):
+            statusCode = errorStatusCode
+            code = errorCode
+            message = errorMessage
+        default:
+            return nil
+        }
 
         let normalizedCode = code?.uppercased() ?? ""
         let normalizedMessage = message?.lowercased() ?? ""

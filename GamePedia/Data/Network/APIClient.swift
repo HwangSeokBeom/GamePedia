@@ -23,6 +23,7 @@ private struct APIErrorEnvelope: Decodable {
 // talks to IGDB directly or performs Twitch token exchange on-device.
 
 final class APIClient {
+    private static let verboseNetworkBodyLogs = false
 
     // MARK: Singleton
     static let shared = APIClient(baseURL: AppConfig.authBaseURL)
@@ -66,6 +67,7 @@ final class APIClient {
         let isProfileSummaryRequest = endpoint.path == "/users/me"
         let isProfileRecentPlaysRequest = endpoint.path == "/users/me/recent-plays"
         let isAIRecommendationRequest = endpoint.path == "/api/v1/ai/game-recommendations"
+        let isLibraryCuratorRequest = endpoint.path == "/api/v1/ai/library-curator"
         let aiReviewSummaryGameId = aiReviewSummaryGameId(for: endpoint.path)
         if let homeEndpointName {
             print(
@@ -77,8 +79,8 @@ final class APIClient {
             print("[GameAPI] request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil")")
         }
         if endpoint.path.contains("/reviews") {
-            let bodyString = urlRequest.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-            print("[ReviewSubmit] APIClient.request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(redactedHeaders(urlRequest.allHTTPHeaderFields)) body=\(bodyString)")
+            let bodyString = requestBodyPreview(from: urlRequest.httpBody)
+            print("[ReviewSubmit] APIClient.request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(redactedHeaders(urlRequest.allHTTPHeaderFields)) bodyPrefix=\(bodyString)")
         }
         let (data, response) = try await session.data(for: urlRequest)
         if let homeEndpointName, let httpResponse = response as? HTTPURLResponse {
@@ -92,37 +94,42 @@ final class APIClient {
             print("[GameAPI] response status=\(httpResponse.statusCode) url=\(urlRequest.url?.absoluteString ?? "nil")")
         }
         if isNotificationsRequest, let httpResponse = response as? HTTPURLResponse {
-            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            let responseBody = networkBodyForLog(from: data)
             print("[Notifications] rawResponse endpoint=/users/me/notifications status=\(httpResponse.statusCode) body=\(responseBody)")
         }
         if isFriendActivityRequest, let httpResponse = response as? HTTPURLResponse {
-            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            let responseBody = networkBodyForLog(from: data)
             print("[FriendActivity] rawResponse endpoint=/users/me/friends/activity status=\(httpResponse.statusCode) body=\(responseBody)")
         }
         if isLibraryStatusRequest, let httpResponse = response as? HTTPURLResponse {
-            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            let responseBody = networkBodyForLog(from: data)
             print("[Library] rawResponse endpoint=/users/me/library/status status=\(httpResponse.statusCode) body=\(responseBody)")
         }
         if isLibraryPreviewRequest, let httpResponse = response as? HTTPURLResponse {
-            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            let responseBody = networkBodyForLog(from: data)
             print("[Library] rawResponse endpoint=/users/me/library status=\(httpResponse.statusCode) body=\(responseBody)")
         }
         if isProfileSummaryRequest, let httpResponse = response as? HTTPURLResponse {
-            let responseBody = String(data: data, encoding: .utf8) ?? ""
-            print("[Profile] rawResponse endpoint=/users/me status=\(httpResponse.statusCode) body=\(responseBody)")
+            print("[Profile] response endpoint=/users/me status=\(httpResponse.statusCode)")
         }
         if isProfileRecentPlaysRequest, let httpResponse = response as? HTTPURLResponse {
-            let responseBody = String(data: data, encoding: .utf8) ?? ""
-            print("[Profile] rawResponse endpoint=/users/me/recent-plays status=\(httpResponse.statusCode) body=\(responseBody)")
+            print("[Profile] response endpoint=/users/me/recent-plays status=\(httpResponse.statusCode)")
         }
         if endpoint.path.contains("/reviews"), let httpResponse = response as? HTTPURLResponse {
-            let responseBody = String(data: data, encoding: .utf8) ?? ""
-            print("[ReviewSubmit] APIClient.response status=\(httpResponse.statusCode) body=\(responseBody)")
+            print("[ReviewSubmit] APIClient.response status=\(httpResponse.statusCode)")
         }
         if isAIRecommendationRequest, let httpResponse = response as? HTTPURLResponse {
             print(
                 "[AIRecommendation] httpResponse " +
                 "endpoint=/api/v1/ai/game-recommendations " +
+                "statusCode=\(httpResponse.statusCode) " +
+                "bodyPreview=\(responseBodyPreview(from: data))"
+            )
+        }
+        if isLibraryCuratorRequest, let httpResponse = response as? HTTPURLResponse {
+            print(
+                "[LibraryCurator] httpResponse " +
+                "endpoint=/api/v1/ai/library-curator " +
                 "statusCode=\(httpResponse.statusCode) " +
                 "bodyPreview=\(responseBodyPreview(from: data))"
             )
@@ -150,8 +157,18 @@ final class APIClient {
             if isAIRecommendationRequest {
                 print("[AIRecommendation] decodeSuccess type=\(String(describing: type))")
             }
+            if isLibraryCuratorRequest {
+                print("[LibraryCurator] decodeSuccess type=\(String(describing: type))")
+            }
             if let aiReviewSummaryGameId {
                 print("[AIReviewSummary] decodeSuccess gameId=\(aiReviewSummaryGameId) type=\(String(describing: type))")
+            }
+            if let httpResponse = response as? HTTPURLResponse {
+                logDecodedSummaryIfNeeded(
+                    decoded,
+                    endpoint: endpoint,
+                    statusCode: httpResponse.statusCode
+                )
             }
             return decoded
         } catch {
@@ -163,31 +180,31 @@ final class APIClient {
                 print("\(homeLogPrefix) endpoint=\(homeEndpointName) bodyPrefix=\(responseBodyPreview(from: data))")
             }
             if isGameRequest {
-                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                let responseBody = networkBodyForLog(from: data)
                 print("[GameAPI] decodeFailure type=\(String(describing: type)) error=\(error.localizedDescription) body=\(responseBody)")
             }
             if isNotificationsRequest {
-                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                let responseBody = networkBodyForLog(from: data)
                 print("[Notifications] decodeFailure endpoint=/users/me/notifications type=\(String(describing: type)) error=\(error) body=\(responseBody)")
             }
             if isFriendActivityRequest {
-                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                let responseBody = networkBodyForLog(from: data)
                 print("[FriendActivity] decodeFailure endpoint=/users/me/friends/activity type=\(String(describing: type)) error=\(error) body=\(responseBody)")
             }
             if isLibraryStatusRequest {
-                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                let responseBody = networkBodyForLog(from: data)
                 print("[Library] decodeFailure endpoint=/users/me/library/status type=\(String(describing: type)) error=\(error) body=\(responseBody)")
             }
             if isLibraryPreviewRequest {
-                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                let responseBody = networkBodyForLog(from: data)
                 print("[Library] decodeFailure endpoint=/users/me/library type=\(String(describing: type)) error=\(error) body=\(responseBody)")
             }
             if isProfileSummaryRequest {
-                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                let responseBody = networkBodyForLog(from: data)
                 print("[Profile] decodeFailure endpoint=/users/me type=\(String(describing: type)) error=\(error) body=\(responseBody)")
             }
             if isProfileRecentPlaysRequest {
-                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                let responseBody = networkBodyForLog(from: data)
                 print("[Profile] decodeFailure endpoint=/users/me/recent-plays type=\(String(describing: type)) error=\(error) body=\(responseBody)")
             }
             if let aiReviewSummaryGameId {
@@ -206,6 +223,14 @@ final class APIClient {
                     "bodyPreview=\(responseBodyPreview(from: data))"
                 )
             }
+            if isLibraryCuratorRequest {
+                print(
+                    "[LibraryCurator] decodeFailure " +
+                    "type=\(String(describing: type)) " +
+                    "error=\(error) " +
+                    "bodyPreview=\(responseBodyPreview(from: data))"
+                )
+            }
             throw error
         }
     }
@@ -213,13 +238,12 @@ final class APIClient {
     func requestVoid(_ endpoint: Endpoint) async throws {
         let urlRequest = try await buildRequest(from: endpoint)
         if endpoint.path.contains("/reviews") {
-            let bodyString = urlRequest.httpBody.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-            print("[ReviewSubmit] APIClient.requestVoid url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(redactedHeaders(urlRequest.allHTTPHeaderFields)) body=\(bodyString)")
+            let bodyString = requestBodyPreview(from: urlRequest.httpBody)
+            print("[ReviewSubmit] APIClient.requestVoid url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(redactedHeaders(urlRequest.allHTTPHeaderFields)) bodyPrefix=\(bodyString)")
         }
         let (data, response) = try await session.data(for: urlRequest)
         if endpoint.path.contains("/reviews"), let httpResponse = response as? HTTPURLResponse {
-            let responseBody = String(data: data, encoding: .utf8) ?? ""
-            print("[ReviewSubmit] APIClient.responseVoid status=\(httpResponse.statusCode) body=\(responseBody)")
+            print("[ReviewSubmit] APIClient.responseVoid status=\(httpResponse.statusCode)")
         }
         try validate(response: response, data: data)
     }
@@ -281,6 +305,13 @@ final class APIClient {
             let plainMessage = try? JSONDecoder().decode(APIErrorResponse.self, from: data).message
             let code = envelope?.error?.code
             let message = envelope?.error?.message ?? envelope?.message ?? plainMessage
+            if httpResponse.statusCode == 429 {
+                throw NetworkError.rateLimited(
+                    statusCode: httpResponse.statusCode,
+                    code: code,
+                    message: message
+                )
+            }
             throw NetworkError.serverError(
                 statusCode: httpResponse.statusCode,
                 code: code,
@@ -307,6 +338,67 @@ final class APIClient {
         guard normalizedBody.count > maxLength else { return normalizedBody }
         let endIndex = normalizedBody.index(normalizedBody.startIndex, offsetBy: maxLength)
         return "\(normalizedBody[..<endIndex])..."
+    }
+
+    private func networkBodyForLog(from data: Data) -> String {
+        if Self.verboseNetworkBodyLogs {
+            return String(data: data, encoding: .utf8) ?? "<non-utf8>"
+        }
+        return responseBodyPreview(from: data)
+    }
+
+    private func requestBodyPreview(from data: Data?) -> String {
+        guard let data else { return "" }
+        return responseBodyPreview(from: data, maxLength: 250)
+    }
+
+    private func logDecodedSummaryIfNeeded<T>(
+        _ decoded: T,
+        endpoint: Endpoint,
+        statusCode: Int
+    ) {
+        if endpoint.path == "/users/me",
+           let response = decoded as? CurrentUserProfileResponseDTO {
+            let profile = response.profile
+            print(
+                "[Profile] decoded " +
+                "status=\(statusCode) " +
+                "userId=\(profile.id) " +
+                "nickname=\(profile.name) " +
+                "reviewCount=\(profile.writtenReviewCount) " +
+                "favoriteCount=\(profile.wishlistCount)"
+            )
+            return
+        }
+
+        if endpoint.path == "/users/me/recent-plays",
+           let response = decoded as? RecentGameListResponseDTO {
+            print(
+                "[Profile] decoded " +
+                "status=\(statusCode) " +
+                "recentPlayCount=\(response.recentGames.count) " +
+                "hasMore=\(response.hasMoreRecentPlayed ?? false)"
+            )
+            return
+        }
+
+        guard endpoint.path.contains("/reviews") else { return }
+
+        if let response = decoded as? ReviewResponseEnvelopeDTO<MyReviewsResponseDataDTO> {
+            print("[ReviewSubmit] response status=\(statusCode) reviewCount=\(response.data.reviews.count) sort=\(reviewSortQueryValue(from: endpoint) ?? "nil")")
+        } else if let response = decoded as? ReviewResponseEnvelopeDTO<ReviewListResponseDataDTO> {
+            print("[ReviewSubmit] response status=\(statusCode) reviewCount=\(response.data.reviews.count) sort=\(reviewSortQueryValue(from: endpoint) ?? "nil")")
+        } else if let response = decoded as? ReviewResponseEnvelopeDTO<ReviewObjectResponseDataDTO> {
+            print("[ReviewSubmit] response status=\(statusCode) reviewId=\(response.data.review.id)")
+        } else if let response = decoded as? ReviewResponseEnvelopeDTO<DeleteReviewResponseDataDTO> {
+            print("[ReviewSubmit] response status=\(statusCode) deleted=\(response.data.deleted) reviewId=\(response.data.reviewId)")
+        } else if let response = decoded as? ReviewResponseEnvelopeDTO<ReviewLikeResponseDataDTO> {
+            print("[ReviewSubmit] response status=\(statusCode) reviewId=\(response.data.reviewId) likeCount=\(response.data.likeCount)")
+        }
+    }
+
+    private func reviewSortQueryValue(from endpoint: Endpoint) -> String? {
+        endpoint.queryItems.first { $0.name == "sort" }?.value
     }
 
     private func redactedHeaders(_ headers: [String: String]?) -> [String: String] {

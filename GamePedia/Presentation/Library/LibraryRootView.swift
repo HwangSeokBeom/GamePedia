@@ -35,6 +35,7 @@ final class LibraryRootView: UIView {
     var onOwnedSummaryTapped: (() -> Void)?
     var onPlayingSummaryTapped: (() -> Void)?
     var onRecommendationSummaryTapped: (() -> Void)?
+    var onLibraryCuratorTapped: (() -> Void)?
 
     private let topContentStackView: UIStackView = {
         let stackView = UIStackView()
@@ -232,6 +233,72 @@ final class LibraryRootView: UIView {
         return stackView
     }()
 
+    private let curatorEntryCardView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .gpCardBackground
+        view.layer.cornerRadius = 18
+        view.layer.cornerCurve = .continuous
+        view.layer.borderWidth = 1
+        view.layer.borderColor = UIColor.gpSeparator.withAlphaComponent(0.26).cgColor
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
+    private let curatorEntryIconView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.image = UIImage(
+            systemName: "sparkles",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 19, weight: .semibold)
+        )
+        imageView.tintColor = .gpPrimaryLight
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let curatorEntryTitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = L10n.tr("Localizable", "library_curator_entry_title")
+        label.font = .systemFont(ofSize: 15, weight: .semibold)
+        label.textColor = .gpTextPrimary
+        label.numberOfLines = 1
+        return label
+    }()
+
+    private let curatorEntrySubtitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = L10n.tr("Localizable", "library_curator_entry_subtitle")
+        label.font = .systemFont(ofSize: 13)
+        label.textColor = .gpTextSecondary
+        label.numberOfLines = 0
+        return label
+    }()
+
+    private let curatorEntryButton: UIButton = {
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = L10n.tr("Localizable", "library_curator_entry_button")
+        configuration.baseBackgroundColor = .gpPrimary
+        configuration.baseForegroundColor = .gpOnPrimary
+        configuration.cornerStyle = .capsule
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
+        configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
+            var attributes = attributes
+            attributes.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+            return attributes
+        }
+        let button = UIButton(configuration: configuration)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    private let curatorEntryStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.axis = .horizontal
+        stackView.alignment = .center
+        stackView.spacing = 12
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        return stackView
+    }()
+
     private let miniFilterStackView: UIStackView = {
         let stackView = UIStackView()
         stackView.axis = .horizontal
@@ -353,7 +420,16 @@ final class LibraryRootView: UIView {
         [steamTopRowStackView, steamCardMessageLabel, steamButtonRowView].forEach { steamContentStackView.addArrangedSubview($0) }
         steamCardView.addSubview(steamContentStackView)
 
-        [primaryTabContainerView, summaryStackView, steamCardView, miniFilterStackView].forEach {
+        let curatorTextStackView = UIStackView(arrangedSubviews: [curatorEntryTitleLabel, curatorEntrySubtitleLabel])
+        curatorTextStackView.axis = .vertical
+        curatorTextStackView.spacing = 4
+        curatorTextStackView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        [curatorEntryIconView, curatorTextStackView, curatorEntryButton].forEach {
+            curatorEntryStackView.addArrangedSubview($0)
+        }
+        curatorEntryCardView.addSubview(curatorEntryStackView)
+
+        [primaryTabContainerView, summaryStackView, steamCardView, curatorEntryCardView, miniFilterStackView].forEach {
             topContentStackView.addArrangedSubview($0)
         }
 
@@ -378,6 +454,12 @@ final class LibraryRootView: UIView {
 
         steamPrimaryButton.addTarget(self, action: #selector(didTapSteamPrimaryAction), for: .touchUpInside)
         steamSecondaryButton.addTarget(self, action: #selector(didTapSteamSecondaryAction), for: .touchUpInside)
+        curatorEntryButton.addTarget(self, action: #selector(didTapCuratorEntry), for: .touchUpInside)
+        let tapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(didTapCuratorEntry))
+        tapGestureRecognizer.cancelsTouchesInView = false
+        tapGestureRecognizer.delegate = self
+        curatorEntryCardView.addGestureRecognizer(tapGestureRecognizer)
+        curatorEntryCardView.isUserInteractionEnabled = true
     }
 
     private func setupLayout() {
@@ -408,6 +490,13 @@ final class LibraryRootView: UIView {
             steamPrimaryButton.heightAnchor.constraint(equalToConstant: 36),
             steamPrimaryButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 112),
             steamSecondaryButton.heightAnchor.constraint(equalToConstant: 36),
+            curatorEntryStackView.topAnchor.constraint(equalTo: curatorEntryCardView.topAnchor, constant: 14),
+            curatorEntryStackView.leadingAnchor.constraint(equalTo: curatorEntryCardView.leadingAnchor, constant: 16),
+            curatorEntryStackView.trailingAnchor.constraint(equalTo: curatorEntryCardView.trailingAnchor, constant: -16),
+            curatorEntryStackView.bottomAnchor.constraint(equalTo: curatorEntryCardView.bottomAnchor, constant: -14),
+            curatorEntryIconView.widthAnchor.constraint(equalToConstant: 22),
+            curatorEntryIconView.heightAnchor.constraint(equalToConstant: 22),
+            curatorEntryButton.heightAnchor.constraint(equalToConstant: 34),
 
             collectionView.topAnchor.constraint(equalTo: topContentStackView.bottomAnchor, constant: 10),
             collectionView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -614,11 +703,22 @@ final class LibraryRootView: UIView {
         onSteamSecondaryActionTapped?()
     }
 
+    @objc
+    private func didTapCuratorEntry() {
+        onLibraryCuratorTapped?()
+    }
+
     private static let numberFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         return formatter
     }()
+}
+
+extension LibraryRootView: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        !(touch.view is UIControl)
+    }
 }
 
 private final class LibraryPillButton: UIButton {

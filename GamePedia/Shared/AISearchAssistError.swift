@@ -46,6 +46,11 @@ enum AISearchAssistError: Error, LocalizedError, Equatable {
             switch networkError {
             case .unauthorized:
                 return .unauthorized
+            case .rateLimited(_, let code, let message):
+                if containsInternalServerDetails(message) {
+                    return .server(code: code?.uppercased() ?? "UNKNOWN_ERROR", message: genericFailureMessage)
+                }
+                return from(serverCode: code, message: message)
             case .serverError(_, let code, let message):
                 if containsInternalServerDetails(message) {
                     return .server(code: code?.uppercased() ?? "UNKNOWN_ERROR", message: genericFailureMessage)

@@ -19,7 +19,7 @@ enum RecommendationTagLocalizer {
     private static let definitions: [TagDefinition] = [
         definition("personalized", aliases: ["personalized match", "personalized_match", "맞춤", "カスタム", "个性化"], ko: "맞춤", en: "Personalized", ja: "カスタム", zh: "个性化"),
         definition("good match", aliases: ["great match", "잘 맞음", "よく合う", "很匹配"], ko: "잘 맞음", en: "Good Match", ja: "よく合う", zh: "很匹配"),
-        definition("high rated", aliases: ["highly rated", "high_rated", "고평점 취향", "高評価傾向", "高评分偏好"], ko: "고평점 취향", en: "High Rated", ja: "高評価傾向", zh: "高评分偏好"),
+        definition("high rated", aliases: ["highly rated", "high_rated", "high_rating_preference", "고평점 취향", "高評価傾向", "高评分偏好"], ko: "고평점 취향", en: "High-rated picks", ja: "高評価傾向", zh: "高评分偏好"),
         definition("default ranking", aliases: ["fallback", "fallback ranking", "ai fallback", "default sort", "기본 정렬", "標準順", "默认排序"], ko: "기본 정렬", en: "Default Ranking", ja: "標準順", zh: "默认排序"),
         definition("relaxing", aliases: ["relax", "healing", "chill", "힐링", "癒やし", "治愈"], ko: "힐링", en: "Relaxing", ja: "癒やし", zh: "治愈"),
         definition("relaxing visual novel", aliases: ["healing visual novel", "힐링 비주얼 노벨", "癒やしビジュアルノベル", "治愈视觉小说"], ko: "힐링 비주얼 노벨", en: "Relaxing Visual Novel", ja: "癒やしビジュアルノベル", zh: "治愈视觉小说"),
@@ -30,11 +30,20 @@ enum RecommendationTagLocalizer {
         definition("game", aliases: ["games", "게임", "ゲーム", "游戏"], ko: "게임", en: "Game", ja: "ゲーム", zh: "游戏"),
         definition("survival", aliases: ["생존", "サバイバル", "生存"], ko: "생존", en: "Survival", ja: "サバイバル", zh: "生存"),
         definition("builder", aliases: ["building", "construction", "빌더", "건설", "建築", "建造"], ko: "빌더", en: "Builder", ja: "ビルダー", zh: "建造"),
-        definition("short session", aliases: ["short", "short sessions", "quick", "short play", "짧은 세션", "短時間", "短时游玩"], ko: "짧은 세션", en: "Short Session", ja: "短時間", zh: "短时游玩"),
+        definition("short session", aliases: ["short", "short sessions", "short_session", "quick", "short play", "짧은 세션", "短時間", "短时游玩"], ko: "짧은 세션", en: "Short session", ja: "短時間プレイ", zh: "短时游玩"),
+        definition("long session", aliases: ["long", "long sessions", "long_session", "긴 세션", "長時間", "长时游玩"], ko: "긴 세션", en: "Long session", ja: "長時間プレイ", zh: "长时游玩"),
+        definition("rediscover", aliases: ["rediscovery", "replay", "다시 해볼 게임", "再発見", "重新发现"], ko: "다시 해볼 게임", en: "Rediscover", ja: "再発見", zh: "重新发现"),
+        definition("match", aliases: ["matched", "matching", "맞춤", "マッチ", "匹配"], ko: "맞춤", en: "Match", ja: "マッチ", zh: "匹配"),
+        definition("competitive", aliases: ["competition", "ranked", "경쟁", "対戦", "竞技"], ko: "경쟁", en: "Competitive", ja: "対戦", zh: "竞技"),
+        definition("reviewed", aliases: ["review written", "has review", "리뷰 작성", "レビュー済み", "已评论"], ko: "리뷰 작성", en: "Reviewed", ja: "レビュー済み", zh: "已评论"),
+        definition("high user rating", aliases: ["high_user_rating", "high user score", "높은 내 평점", "自分の高評価", "我的高评分"], ko: "높은 내 평점", en: "High personal rating", ja: "自分の高評価", zh: "我的高评分"),
+        definition("played", aliases: ["play history", "played before", "플레이 기록", "プレイ履歴", "游玩记录"], ko: "플레이 기록", en: "Played", ja: "プレイ履歴", zh: "游玩记录"),
+        definition("review driven", aliases: ["review_driven", "review based", "리뷰 기반", "レビュー基準", "基于评论"], ko: "리뷰 기반", en: "Review based", ja: "レビュー基準", zh: "基于评论"),
         definition("singleplayer", aliases: ["single player", "solo", "싱글플레이", "シングルプレイ", "单人"], ko: "싱글플레이", en: "Singleplayer", ja: "シングルプレイ", zh: "单人"),
         definition("balanced", aliases: ["balance", "균형형", "バランス型", "均衡"], ko: "균형형", en: "Balanced", ja: "バランス型", zh: "均衡"),
+        definition("average preference", aliases: ["avg", "평균 선호", "平均的", "平均偏好"], ko: "평균 선호", en: "Average preference", ja: "平均的な好み", zh: "平均偏好"),
         definition("low difficulty", aliases: ["low", "easygoing", "낮은 난이도", "低難度", "低难度"], ko: "낮은 난이도", en: "Low Difficulty", ja: "低難度", zh: "低难度"),
-        definition("medium difficulty", aliases: ["medium", "normal", "보통 난이도", "普通難度", "中等难度"], ko: "보통 난이도", en: "Medium Difficulty", ja: "普通難度", zh: "中等难度"),
+        definition("medium difficulty", aliases: ["medium", "normal", "average", "보통 난이도", "普通難度", "中等难度"], ko: "보통 난이도", en: "Medium Difficulty", ja: "普通難度", zh: "中等难度"),
         definition("high difficulty", aliases: ["high", "hard", "높은 난이도", "高難度", "高难度"], ko: "높은 난이도", en: "High Difficulty", ja: "高難度", zh: "高难度"),
         definition("difficult", aliases: ["challenging", "어려움", "難しい", "困难"], ko: "어려움", en: "Difficult", ja: "難しい", zh: "困难"),
         definition("easy", aliases: ["쉬움", "簡単", "简单"], ko: "쉬움", en: "Easy", ja: "簡単", zh: "简单"),
@@ -51,6 +60,7 @@ enum RecommendationTagLocalizer {
         definition("cozy", aliases: ["아늑한", "아늑함", "居心地がいい", "舒适"], ko: "아늑함", en: "Cozy", ja: "癒やし系", zh: "舒适"),
         definition("casual", aliases: ["캐주얼", "カジュアル", "休闲"], ko: "캐주얼", en: "Casual", ja: "カジュアル", zh: "休闲"),
         definition("multiplayer", aliases: ["multi player", "멀티플레이", "マルチプレイ", "多人"], ko: "멀티플레이", en: "Multiplayer", ja: "マルチプレイ", zh: "多人"),
+        definition("moba", aliases: ["multiplayer online battle arena", "multiplayer-online-battle-arena"], ko: "MOBA", en: "MOBA", ja: "MOBA", zh: "MOBA"),
         definition("co op", aliases: ["coop", "co-op", "cooperative", "협동", "協力", "合作"], ko: "협동", en: "Co-op", ja: "協力", zh: "合作"),
         definition("online co op", aliases: ["online coop", "online co-op", "온라인 협동", "オンライン協力", "在线合作"], ko: "온라인 협동", en: "Online Co-op", ja: "オンライン協力", zh: "在线合作"),
         definition("turn based", aliases: ["turn-based", "턴제", "ターン制", "回合制"], ko: "턴제", en: "Turn-Based", ja: "ターン制", zh: "回合制"),
@@ -126,6 +136,7 @@ enum RecommendationTagLocalizer {
 
             let normalizedKey = normalizedKey(for: trimmedTag)
             guard !normalizedKey.isEmpty else { return nil }
+            guard !isInternalOnly(normalizedKey) else { return nil }
             let deduplicationKey = canonicalKeyByNormalizedAlias[normalizedKey] ?? normalizedKey
             guard seenRawKeys.insert(deduplicationKey).inserted else { return nil }
 
@@ -182,6 +193,7 @@ enum RecommendationTagLocalizer {
                 guard let preparedTag = preparedTag(from: rawTag) else { return }
                 let normalizedKey = normalizedKey(for: preparedTag)
                 guard !normalizedKey.isEmpty, !isPlaceholder(normalizedKey) else { return }
+                guard !isInternalOnly(normalizedKey) else { return }
 
                 let canonicalKey = canonicalKeyByNormalizedAlias[normalizedKey] ?? normalizedKey
                 guard seenKeys.insert(canonicalKey).inserted else { return }
@@ -227,6 +239,7 @@ enum RecommendationTagLocalizer {
             let trimmedTag = rawTag.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedTag.isEmpty else { return }
             let normalizedKey = normalizedKey(for: trimmedTag)
+            guard !isInternalOnly(normalizedKey) else { return }
             guard canonicalKeyByNormalizedAlias[normalizedKey] == nil else { return }
             if language == .korean, trimmedTag.containsKoreanText { return }
             count += 1
@@ -293,7 +306,7 @@ enum RecommendationTagLocalizer {
         let trimmedTag = rawTag.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTag.isEmpty else { return nil }
         let normalizedKey = normalizedKey(for: trimmedTag)
-        guard !isPlaceholder(normalizedKey) else { return nil }
+        guard !isPlaceholder(normalizedKey), !isInternalOnly(normalizedKey) else { return nil }
         return trimmedTag
     }
 
@@ -307,6 +320,17 @@ enum RecommendationTagLocalizer {
             "n a",
             "na",
             "none"
+        ].contains(normalizedKey)
+    }
+
+    private static func isInternalOnly(_ normalizedKey: String) -> Bool {
+        [
+            "user",
+            "users",
+            "user preference",
+            "user preferences",
+            "preference",
+            "preferences"
         ].contains(normalizedKey)
     }
 
@@ -367,6 +391,10 @@ enum RecommendationTagLocalizer {
         language: AppLanguage,
         screen: String
     ) -> String {
+        if let averageRatingTag = localizedAverageUserRatingTag(normalizedKey: normalizedKey, language: language) {
+            return averageRatingTag
+        }
+
         if let canonicalKey = canonicalKeyByNormalizedAlias[normalizedKey],
            let localizedTag = localizedValuesByKey[canonicalKey]?[language] ?? localizedValuesByKey[canonicalKey]?[.english] {
             return localizedTag
@@ -380,6 +408,30 @@ enum RecommendationTagLocalizer {
         logUnknownTag(rawTag: rawTag, normalizedKey: normalizedKey, screen: screen)
 #endif
         return readableFallback(for: rawTag, normalizedKey: normalizedKey)
+    }
+
+    private static func localizedAverageUserRatingTag(
+        normalizedKey: String,
+        language: AppLanguage
+    ) -> String? {
+        let prefix = "avg user rating "
+        guard normalizedKey.hasPrefix(prefix) else { return nil }
+        let ratingText = normalizedKey
+            .dropFirst(prefix.count)
+            .split(separator: " ")
+            .joined(separator: ".")
+        guard !ratingText.isEmpty else { return nil }
+
+        switch language {
+        case .korean:
+            return "평균 평점 \(ratingText)"
+        case .japanese:
+            return "平均評価 \(ratingText)"
+        case .chinese:
+            return "平均评分 \(ratingText)"
+        case .english:
+            return "Average rating \(ratingText)"
+        }
     }
 
 #if DEBUG
@@ -404,6 +456,8 @@ enum RecommendationTagLocalizer {
                     return "PC"
                 case "rpg":
                     return "RPG"
+                case "moba":
+                    return "MOBA"
                 default:
                     return word.prefix(1).uppercased() + word.dropFirst()
                 }

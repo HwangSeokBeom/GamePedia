@@ -41,6 +41,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     var onSteamLinkRequested: ((URL) -> Void)?
     var onSteamPrivacyGuideRequested: ((URL) -> Void)?
     var onSectionListRequested: ((LibrarySectionListRoute) -> Void)?
+    var onLibraryCuratorRequested: (() -> Void)?
 
     init(
         rootView: LibraryRootView = LibraryRootView(),
@@ -305,6 +306,9 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         }
         rootView.onSteamSecondaryActionTapped = { [weak self] in
             self?.presentSteamUnlinkConfirmationAlert()
+        }
+        rootView.onLibraryCuratorTapped = { [weak self] in
+            self?.onLibraryCuratorRequested?()
         }
     }
 

@@ -1,9 +1,8 @@
 import Foundation
 
-enum AIRecommendationError: Error, LocalizedError, Equatable {
+enum LibraryCuratorError: Error, LocalizedError, Equatable {
     case validationFailed(message: String)
     case dailyLimitExceeded(message: String)
-    case recommendationFailed(message: String)
     case candidateNotFound(message: String)
     case unauthorized
     case invalidResponse
@@ -11,31 +10,29 @@ enum AIRecommendationError: Error, LocalizedError, Equatable {
     case server(code: String, message: String)
     case unknown(message: String)
 
-    static func from(serverCode code: String?, message: String?) -> AIRecommendationError {
+    static func from(serverCode code: String?, message: String?) -> LibraryCuratorError {
         let resolvedCode = code?.uppercased() ?? "UNKNOWN_ERROR"
 
         switch resolvedCode {
         case "VALIDATION_FAILED":
-            return .validationFailed(message: "입력 내용을 확인해 주세요.")
-        case "AI_DAILY_LIMIT_EXCEEDED":
-            return .dailyLimitExceeded(message: "오늘 사용할 수 있는 AI 추천 횟수를 모두 사용했어요.")
-        case "AI_RECOMMENDATION_FAILED":
-            return .recommendationFailed(message: "추천을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.")
-        case "CANDIDATE_NOT_FOUND":
-            return .candidateNotFound(message: "조건에 맞는 게임을 찾지 못했어요. 다른 표현으로 다시 시도해 주세요.")
+            return .validationFailed(message: L10n.tr("Localizable", "library_curator_error_message"))
+        case "AI_DAILY_LIMIT_EXCEEDED", "AI_LIBRARY_DAILY_LIMIT_EXCEEDED", "AI_LIBRARY_CURATOR_DAILY_LIMIT_EXCEEDED":
+            return .dailyLimitExceeded(message: L10n.tr("Localizable", "library_curator_daily_limit_message"))
+        case "CANDIDATE_NOT_FOUND", "NO_CANDIDATES":
+            return .candidateNotFound(message: L10n.tr("Localizable", "library_curator_empty_message"))
         case "UNAUTHORIZED":
             return .unauthorized
         default:
             return .server(
                 code: resolvedCode,
-                message: message ?? "추천을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+                message: message ?? L10n.tr("Localizable", "library_curator_error_message")
             )
         }
     }
 
-    static func from(error: Error) -> AIRecommendationError {
-        if let aiRecommendationError = error as? AIRecommendationError {
-            return aiRecommendationError
+    static func from(error: Error) -> LibraryCuratorError {
+        if let libraryCuratorError = error as? LibraryCuratorError {
+            return libraryCuratorError
         }
 
         if let urlError = error as? URLError,
@@ -71,7 +68,6 @@ enum AIRecommendationError: Error, LocalizedError, Equatable {
         switch self {
         case .dailyLimitExceeded(let message),
              .validationFailed(let message),
-             .recommendationFailed(let message),
              .candidateNotFound(let message),
              .server(_, let message),
              .unknown(let message):
@@ -79,9 +75,9 @@ enum AIRecommendationError: Error, LocalizedError, Equatable {
         case .unauthorized:
             return L10n.Common.Error.unauthorized
         case .network:
-            return "네트워크 연결을 확인해 주세요."
+            return L10n.Common.Error.network
         case .invalidResponse:
-            return "추천을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+            return L10n.tr("Localizable", "library_curator_error_message")
         }
     }
 }

@@ -137,6 +137,8 @@ final class GameWidgetSnapshotRefreshService {
         static let myActivityRecentReviewLimit = 2
     }
 
+    private static let refreshCoordinator = WidgetSnapshotRefreshCoordinator()
+
     private let snapshotStore: any GameWidgetSnapshotStoring
     private let widgetReloader: any WidgetTimelineReloading
     private let authTokenProvider: () -> String?
@@ -147,6 +149,7 @@ final class GameWidgetSnapshotRefreshService {
     private let profileSummaryProvider: () async throws -> UserProfile
     private let writtenReviewCountProvider: () async throws -> Int
     private let imagePrefetcher: any GameWidgetImagePreparing
+    private var lastWidgetSnapshotLogKey: String?
 
     init(
         snapshotStore: any GameWidgetSnapshotStoring = GameWidgetSnapshotStore.shared,
@@ -224,7 +227,10 @@ final class GameWidgetSnapshotRefreshService {
 
     func refresh(reason: String) {
         Task {
-            await refreshNow(reason: reason)
+            let key = Self.refreshKey(for: reason)
+            await Self.refreshCoordinator.run(key: key, reason: reason, ttl: Self.refreshTTL(for: reason)) { [weak self] in
+                await self?.refreshNow(reason: reason)
+            }
         }
     }
 
@@ -254,7 +260,7 @@ final class GameWidgetSnapshotRefreshService {
         guard records.isEmpty == false else {
             snapshotStore.saveRecentViewed(.empty)
             widgetReloader.reloadTimelines(ofKind: GameWidgetKind.recentViewed)
-            print("[WidgetSnapshot] recentViewedSaved state=empty trigger=\(reason)")
+            logWidgetSnapshot("[WidgetSnapshot] recentViewedSaved state=empty trigger=\(reason)", key: "recentViewed|empty|\(reason)")
             return
         }
 
@@ -289,7 +295,7 @@ final class GameWidgetSnapshotRefreshService {
         )
         snapshotStore.saveRecentViewed(snapshot)
         widgetReloader.reloadTimelines(ofKind: GameWidgetKind.recentViewed)
-        print("[WidgetSnapshot] recentViewedSaved count=\(snapshot.items.count) trigger=\(reason)")
+        logWidgetSnapshot("[WidgetSnapshot] recentViewedSaved count=\(snapshot.items.count) trigger=\(reason)", key: "recentViewed|ready|\(snapshot.items.count)|\(reason)")
     }
 
     private func refreshTrendingGames(reason: String) async {
@@ -316,7 +322,7 @@ final class GameWidgetSnapshotRefreshService {
             }
 
             guard !items.isEmpty else {
-                print("[WidgetSnapshot] trendingSkipped reason=emptyData trigger=\(reason)")
+                logWidgetSnapshot("[WidgetSnapshot] trendingSkipped reason=emptyData trigger=\(reason)", key: "trending|empty|\(reason)")
                 return
             }
 
@@ -327,9 +333,9 @@ final class GameWidgetSnapshotRefreshService {
                 )
             )
             widgetReloader.reloadTimelines(ofKind: GameWidgetKind.trendingGames)
-            print("[WidgetSnapshot] trendingSaved count=\(items.count) trigger=\(reason)")
+            logWidgetSnapshot("[WidgetSnapshot] trendingSaved count=\(items.count) trigger=\(reason)", key: "trending|ready|\(items.count)|\(reason)")
         } catch {
-            print("[WidgetSnapshot] trendingFailed trigger=\(reason) error=\(error.localizedDescription)")
+            logWidgetSnapshot("[WidgetSnapshot] trendingFailed trigger=\(reason) error=\(error.localizedDescription)", key: "trending|failed|\(reason)|\(error.localizedDescription)")
         }
     }
 
@@ -337,7 +343,7 @@ final class GameWidgetSnapshotRefreshService {
         guard authTokenProvider()?.isEmpty == false else {
             snapshotStore.saveReviewPrompt(Self.loggedOutReviewPromptSnapshot())
             widgetReloader.reloadTimelines(ofKind: GameWidgetKind.reviewPrompt)
-            print("[WidgetSnapshot] reviewPromptSaved state=loggedOut trigger=\(reason)")
+            logWidgetSnapshot("[WidgetSnapshot] reviewPromptSaved state=loggedOut trigger=\(reason)", key: "reviewPrompt|loggedOut|\(reason)")
             return
         }
 
@@ -351,7 +357,7 @@ final class GameWidgetSnapshotRefreshService {
             guard candidateEntries.isEmpty == false else {
                 snapshotStore.saveReviewPrompt(Self.emptyReviewPromptSnapshot())
                 widgetReloader.reloadTimelines(ofKind: GameWidgetKind.reviewPrompt)
-                print("[WidgetSnapshot] reviewPromptSaved state=empty trigger=\(reason)")
+                logWidgetSnapshot("[WidgetSnapshot] reviewPromptSaved state=empty trigger=\(reason)", key: "reviewPrompt|empty|\(reason)")
                 return
             }
 
@@ -386,9 +392,9 @@ final class GameWidgetSnapshotRefreshService {
             )
             snapshotStore.saveReviewPrompt(snapshot)
             widgetReloader.reloadTimelines(ofKind: GameWidgetKind.reviewPrompt)
-            print("[WidgetSnapshot] reviewPromptSaved state=ready count=\(items.count) trigger=\(reason)")
+            logWidgetSnapshot("[WidgetSnapshot] reviewPromptSaved state=ready count=\(items.count) trigger=\(reason)", key: "reviewPrompt|ready|\(items.count)|\(reason)")
         } catch {
-            print("[WidgetSnapshot] reviewPromptFailed trigger=\(reason) error=\(error.localizedDescription)")
+            logWidgetSnapshot("[WidgetSnapshot] reviewPromptFailed trigger=\(reason) error=\(error.localizedDescription)", key: "reviewPrompt|failed|\(reason)|\(error.localizedDescription)")
         }
     }
 
@@ -396,7 +402,7 @@ final class GameWidgetSnapshotRefreshService {
         guard authTokenProvider()?.isEmpty == false else {
             snapshotStore.saveMyActivity(Self.loggedOutMyActivitySnapshot())
             widgetReloader.reloadTimelines(ofKind: GameWidgetKind.myActivity)
-            print("[WidgetSnapshot] myActivitySaved state=loggedOut trigger=\(reason)")
+            logWidgetSnapshot("[WidgetSnapshot] myActivitySaved state=loggedOut trigger=\(reason)", key: "myActivity|loggedOut|\(reason)")
             return
         }
 
@@ -442,7 +448,7 @@ final class GameWidgetSnapshotRefreshService {
             guard stats.contains(where: { $0.valueText != "0" }) || recentReviews.isEmpty == false else {
                 snapshotStore.saveMyActivity(.empty)
                 widgetReloader.reloadTimelines(ofKind: GameWidgetKind.myActivity)
-                print("[WidgetSnapshot] myActivitySaved state=empty trigger=\(reason)")
+                logWidgetSnapshot("[WidgetSnapshot] myActivitySaved state=empty trigger=\(reason)", key: "myActivity|empty|\(reason)")
                 return
             }
 
@@ -469,10 +475,18 @@ final class GameWidgetSnapshotRefreshService {
             )
 #endif
             widgetReloader.reloadTimelines(ofKind: GameWidgetKind.myActivity)
-            print("[WidgetSnapshot] myActivitySaved state=ready reviewCount=\(recentReviews.count) trigger=\(reason)")
+            logWidgetSnapshot("[WidgetSnapshot] myActivitySaved state=ready reviewCount=\(recentReviews.count) trigger=\(reason)", key: "myActivity|ready|\(recentReviews.count)|\(reason)")
         } catch {
-            print("[WidgetSnapshot] myActivityFailed trigger=\(reason) error=\(error.localizedDescription)")
+            logWidgetSnapshot("[WidgetSnapshot] myActivityFailed trigger=\(reason) error=\(error.localizedDescription)", key: "myActivity|failed|\(reason)|\(error.localizedDescription)")
         }
+    }
+
+    private func logWidgetSnapshot(_ message: @autoclosure () -> String, key: String) {
+#if DEBUG
+        guard lastWidgetSnapshotLogKey != key else { return }
+        lastWidgetSnapshotLogKey = key
+        print(message())
+#endif
     }
 
     private static func makeActivityStats(
@@ -576,6 +590,26 @@ final class GameWidgetSnapshotRefreshService {
         )
     }
 
+    private static func refreshKey(for reason: String) -> String {
+        switch reason {
+        case "recentViewedDidChange":
+            return "widgetSnapshot:recentViewed"
+        case "favoriteDidChange", "reviewDidChange":
+            return "widgetSnapshot:reviewActivity"
+        default:
+            return "widgetSnapshot:full"
+        }
+    }
+
+    private static func refreshTTL(for reason: String) -> TimeInterval {
+        switch reason {
+        case "recentViewedDidChange", "favoriteDidChange", "reviewDidChange":
+            return 10
+        default:
+            return 45
+        }
+    }
+
     private func pruneUnusedImages() {
         imagePrefetcher.pruneUnusedImages(keeping: referencedImageKeys())
     }
@@ -589,5 +623,44 @@ final class GameWidgetSnapshotRefreshService {
         snapshotStore.loadMyActivity()?.recentReviews.compactMap(\.coverImageKey).forEach { keys.insert($0) }
 
         return keys
+    }
+}
+
+private actor WidgetSnapshotRefreshCoordinator {
+    private var inFlightTasks: [String: Task<Void, Never>] = [:]
+    private var lastSuccessAt: [String: Date] = [:]
+
+    func run(
+        key: String,
+        reason: String,
+        ttl: TimeInterval,
+        operation: @escaping () async -> Void
+    ) async {
+        let now = Date()
+        if let lastSuccess = lastSuccessAt[key] {
+            let age = now.timeIntervalSince(lastSuccess)
+            if age < ttl {
+#if DEBUG
+                print("[RequestCache] hit key=\(key) age=\(Int(age))s reason=\(reason)")
+#endif
+                return
+            }
+        }
+
+        if let task = inFlightTasks[key] {
+#if DEBUG
+            print("[RequestDedupe] join key=\(key) reason=inFlight trigger=\(reason)")
+#endif
+            await task.value
+            return
+        }
+
+        let task = Task {
+            await operation()
+        }
+        inFlightTasks[key] = task
+        await task.value
+        inFlightTasks[key] = nil
+        lastSuccessAt[key] = Date()
     }
 }

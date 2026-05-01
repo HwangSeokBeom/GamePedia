@@ -51,6 +51,11 @@ enum AIReviewSummaryError: Error, LocalizedError, Equatable {
             switch networkError {
             case .unauthorized:
                 return .unauthorized
+            case .rateLimited(let statusCode, let code, let message):
+                if statusCode == 404 || containsInternalServerDetails(message) {
+                    return .notAvailable(message: unavailableMessage)
+                }
+                return from(serverCode: code, message: message)
             case .serverError(let statusCode, let code, let message):
                 if statusCode == 404 || containsInternalServerDetails(message) {
                     return .notAvailable(message: unavailableMessage)

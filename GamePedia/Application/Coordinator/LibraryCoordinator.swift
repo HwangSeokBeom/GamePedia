@@ -51,7 +51,23 @@ final class LibraryCoordinator {
         libraryVC.onSectionListRequested = { [weak self] route in
             self?.showSectionList(route)
         }
+        libraryVC.onLibraryCuratorRequested = { [weak self] in
+            self?.showLibraryCurator()
+        }
         navigationController.setViewControllers([libraryVC], animated: false)
+    }
+
+    private func showLibraryCurator() {
+        let viewController = LibraryCuratorViewController()
+        viewController.onGameSelected = { [weak self] gameId in
+            self?.showDetail(gameId: gameId)
+        }
+        viewController.onAuthenticationRequired = { [weak self, weak viewController] context, action in
+            guard let self else { return }
+            let presenter = viewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
+        }
+        navigationController.pushViewController(viewController, animated: true)
     }
 
     private func showDetail(gameId: Int) {

@@ -1,17 +1,13 @@
 import UIKit
 
-final class AIRecommendationResultCell: UITableViewCell {
-    static let reuseId = "AIRecommendationResultCell"
-
-    private enum Layout {
-        static let maximumVisibleChipCount = 4
-    }
+final class LibraryCuratorResultCell: UITableViewCell {
+    static let reuseId = "LibraryCuratorResultCell"
 
     private let cardView: UIView = {
         let view = UIView()
         view.backgroundColor = .gpCardBackground
         view.layer.cornerRadius = 14
-        view.clipsToBounds = true
+        view.layer.cornerCurve = .continuous
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
@@ -35,21 +31,12 @@ final class AIRecommendationResultCell: UITableViewCell {
         return label
     }()
 
-    private let metadataLabel: UILabel = {
+    private let subtitleLabel: UILabel = {
         let label = UILabel()
         label.font = .systemFont(ofSize: 12)
         label.textColor = .gpTextTertiary
         label.numberOfLines = 1
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-
-    private let reasonLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 13)
-        label.textColor = .gpTextSecondary
-        label.numberOfLines = 3
-        label.lineBreakMode = .byWordWrapping
+        label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -63,6 +50,25 @@ final class AIRecommendationResultCell: UITableViewCell {
         return label
     }()
 
+    private let reasonLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 13)
+        label.textColor = .gpTextSecondary
+        label.numberOfLines = 3
+        label.lineBreakMode = .byTruncatingTail
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
+    private let statsLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .gpTextTertiary
+        label.numberOfLines = 2
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+
     private let favoriteButton: UIButton = {
         let button = UIButton(type: .system)
         button.tintColor = .gpPrimary
@@ -72,9 +78,15 @@ final class AIRecommendationResultCell: UITableViewCell {
         return button
     }()
 
-    private let chipFlowView = TagFlowView()
+    private let chipFlowView: TagFlowView = {
+        let view = TagFlowView()
+        view.maximumRows = 2
+        view.maximumChipWidth = 132
+        return view
+    }()
 
     var onFavoriteButtonTapped: (() -> Void)?
+    var onTagTapped: ((String) -> Void)?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -90,26 +102,33 @@ final class AIRecommendationResultCell: UITableViewCell {
         super.prepareForReuse()
         coverImageView.cancelLoad()
         coverImageView.image = .gpGameCoverPlaceholder
-        favoriteButton.isEnabled = true
-        ratingLabel.isHidden = false
         chipFlowView.configure(items: [])
         onFavoriteButtonTapped = nil
+        onTagTapped = nil
     }
 
-    func configure(with item: AIRecommendationItemViewState) {
-        coverImageView.loadImage(url: item.coverURL, placeholder: .gpGameCoverPlaceholder)
+    func configure(with item: LibraryCuratorItemViewState, selectedGenreTagIDs: Set<String> = []) {
+        coverImageView.loadImage(url: item.coverUrl, placeholder: .gpGameCoverPlaceholder)
         titleLabel.text = item.title
-        metadataLabel.text = item.metadataText
-        reasonLabel.text = item.reason
+        subtitleLabel.text = item.subtitle
         ratingLabel.text = item.ratingText == "—" ? L10n.Common.Label.noRating : "★ \(item.ratingText)"
         ratingLabel.textColor = item.ratingText == "—" ? .gpTextTertiary : .gpStar
-        favoriteButton.setImage(
-            UIImage(systemName: item.isFavorite ? "bookmark.fill" : "bookmark"),
-            for: .normal
-        )
+        reasonLabel.text = item.reason
+        statsLabel.text = [item.playtimeText, item.userRatingText, item.confidenceText]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+        statsLabel.isHidden = statsLabel.text?.isEmpty ?? true
+        favoriteButton.setImage(UIImage(systemName: item.isFavorite ? "bookmark.fill" : "bookmark"), for: .normal)
         favoriteButton.isEnabled = !item.isFavoriteUpdating
         favoriteButton.alpha = item.isFavoriteUpdating ? 0.55 : 1.0
-        configureChips(for: item)
+        chipFlowView.configure(items: item.displayTags.map {
+            let id = LibraryCuratorViewModel.tagID(for: $0, section: "genre")
+            return TagFlowItem(
+                id: id,
+                title: $0,
+                isSelected: selectedGenreTagIDs.contains(id)
+            )
+        })
     }
 
     private func setup() {
@@ -123,13 +142,19 @@ final class AIRecommendationResultCell: UITableViewCell {
         titleRow.alignment = .top
         titleRow.translatesAutoresizingMaskIntoConstraints = false
 
-        let metadataRow = UIStackView(arrangedSubviews: [metadataLabel, ratingLabel])
+        let metadataRow = UIStackView(arrangedSubviews: [subtitleLabel, ratingLabel])
         metadataRow.axis = .horizontal
         metadataRow.spacing = 8
         metadataRow.alignment = .center
         metadataRow.translatesAutoresizingMaskIntoConstraints = false
 
-        let infoStackView = UIStackView(arrangedSubviews: [titleRow, metadataRow, reasonLabel, chipFlowView])
+        let infoStackView = UIStackView(arrangedSubviews: [
+            titleRow,
+            metadataRow,
+            reasonLabel,
+            statsLabel,
+            chipFlowView
+        ])
         infoStackView.axis = .vertical
         infoStackView.spacing = 7
         infoStackView.translatesAutoresizingMaskIntoConstraints = false
@@ -137,8 +162,10 @@ final class AIRecommendationResultCell: UITableViewCell {
         contentView.addSubview(cardView)
         cardView.addSubview(coverImageView)
         cardView.addSubview(infoStackView)
-
         favoriteButton.addTarget(self, action: #selector(didTapFavoriteButton), for: .touchUpInside)
+        chipFlowView.onItemTapped = { [weak self] item in
+            self?.onTagTapped?(item.id)
+        }
 
         NSLayoutConstraint.activate([
             cardView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
@@ -162,82 +189,8 @@ final class AIRecommendationResultCell: UITableViewCell {
         ])
     }
 
-    private func configureChips(for item: AIRecommendationItemViewState) {
-        var chips: [TagFlowItem] = []
-        var seenKeys = Set<String>()
-
-        if item.isPersonalized {
-            appendChip(
-                title: L10n.tr("Localizable", "ai_recommendation_personalized_badge"),
-                foregroundColor: .gpPrimary,
-                backgroundColor: .gpPrimaryLight.withAlphaComponent(0.22),
-                font: .systemFont(ofSize: 11, weight: .semibold),
-                to: &chips,
-                seenKeys: &seenKeys
-            )
-        }
-
-        if item.isFallback {
-            appendChip(
-                title: L10n.tr("Localizable", "ai_recommendation_fallback_badge"),
-                foregroundColor: .gpTextSecondary,
-                backgroundColor: .gpSurface,
-                font: .systemFont(ofSize: 11, weight: .semibold),
-                to: &chips,
-                seenKeys: &seenKeys
-            )
-        }
-
-        item.displayTags.forEach { tag in
-            appendChip(
-                title: tag,
-                foregroundColor: .gpPrimary,
-                backgroundColor: .gpPrimaryLight.withAlphaComponent(0.2),
-                font: .systemFont(ofSize: 11, weight: .medium),
-                to: &chips,
-                seenKeys: &seenKeys
-            )
-        }
-
-        chipFlowView.maximumRows = 2
-        chipFlowView.maximumChipWidth = 132
-        chipFlowView.configure(items: Array(chips.prefix(Layout.maximumVisibleChipCount)))
-    }
-
-    private func appendChip(
-        title: String,
-        foregroundColor: UIColor,
-        backgroundColor: UIColor,
-        font: UIFont,
-        to chips: inout [TagFlowItem],
-        seenKeys: inout Set<String>
-    ) {
-        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedTitle.isEmpty, !trimmedTitle.isEllipsisOnly else { return }
-
-        let normalizedKey = RecommendationTagLocalizer.normalizedKey(for: trimmedTitle)
-        let deduplicationKey = normalizedKey.isEmpty ? trimmedTitle.lowercased() : normalizedKey
-        guard seenKeys.insert(deduplicationKey).inserted else { return }
-
-        chips.append(TagFlowItem(
-            title: trimmedTitle,
-            foregroundColor: foregroundColor,
-            backgroundColor: backgroundColor,
-            font: font
-        ))
-    }
-
     @objc
     private func didTapFavoriteButton() {
         onFavoriteButtonTapped?()
-    }
-}
-
-private extension String {
-    var isEllipsisOnly: Bool {
-        let reduced = filter { character in
-            character != "." && character != "…" && !character.isWhitespace
-        }
-        return reduced.isEmpty
     }
 }

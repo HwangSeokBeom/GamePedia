@@ -46,7 +46,13 @@ final class EmptyStateView: UIView {
     }
 
     func configure(icon: String, message: String) {
+        configure(icon: icon, message: Optional(message))
+    }
+
+    func configure(icon: String, message: String?) {
+        let normalizedMessage = message?.trimmingCharacters(in: .whitespacesAndNewlines)
         iconImageView.image = UIImage(systemName: icon)
-        messageLabel.text = message
+        messageLabel.text = normalizedMessage
+        isHidden = normalizedMessage?.isEmpty != false
     }
 }

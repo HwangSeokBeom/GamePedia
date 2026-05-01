@@ -2,12 +2,9 @@ import UIKit
 
 final class AISearchAssistResultCell: UIControl {
     private enum Layout {
-        static let tagHeight: CGFloat = 26
         static let coverSize: CGFloat = 72
         static let minimumCellHeight: CGFloat = 140
         static let trailingColumnWidth: CGFloat = 74
-        static let tagMinimumWidth: CGFloat = 44
-        static let tagMaximumWidth: CGFloat = 128
         static let horizontalPadding: CGFloat = 12
         static let verticalPadding: CGFloat = 12
         static let mainSpacing: CGFloat = 10
@@ -83,21 +80,7 @@ final class AISearchAssistResultCell: UIControl {
         return label
     }()
 
-    private let tagsContainerView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
-    }()
-
-    private let tagStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.spacing = 6
-        stackView.alignment = .center
-        stackView.distribution = .fill
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        return stackView
-    }()
+    private let tagFlowView = TagFlowView()
 
     override var isHighlighted: Bool {
         didSet {
@@ -131,10 +114,7 @@ final class AISearchAssistResultCell: UIControl {
     func prepareForReuse() {
         coverImageView.cancelLoad()
         coverImageView.image = .gpGameCoverPlaceholder
-        tagStackView.arrangedSubviews.forEach {
-            tagStackView.removeArrangedSubview($0)
-            $0.removeFromSuperview()
-        }
+        tagFlowView.configure(items: [])
     }
 
     private func setup() {
@@ -145,9 +125,11 @@ final class AISearchAssistResultCell: UIControl {
         accessibilityTraits = .button
         translatesAutoresizingMaskIntoConstraints = false
 
-        tagsContainerView.addSubview(tagStackView)
+        tagFlowView.maximumRows = 2
+        tagFlowView.maximumChipWidth = 128
+        tagFlowView.minimumChipWidth = 44
 
-        let textStackView = UIStackView(arrangedSubviews: [titleLabel, metadataLabel, reasonLabel, tagsContainerView])
+        let textStackView = UIStackView(arrangedSubviews: [titleLabel, metadataLabel, reasonLabel, tagFlowView])
         textStackView.axis = .vertical
         textStackView.spacing = 6
         textStackView.alignment = .fill
@@ -174,9 +156,6 @@ final class AISearchAssistResultCell: UIControl {
 
         let fitBadgeHeightConstraint = fitBadgeLabel.heightAnchor.constraint(equalToConstant: 20)
         fitBadgeHeightConstraint.priority = UILayoutPriority(999)
-        let tagsHeightConstraint = tagsContainerView.heightAnchor.constraint(equalToConstant: Layout.tagHeight)
-        tagsHeightConstraint.priority = UILayoutPriority(999)
-
         NSLayoutConstraint.activate([
             heightAnchor.constraint(greaterThanOrEqualToConstant: Layout.minimumCellHeight),
             coverImageView.widthAnchor.constraint(equalToConstant: Layout.coverSize),
@@ -190,44 +169,22 @@ final class AISearchAssistResultCell: UIControl {
             fitBadgeHeightConstraint,
             fitBadgeLabel.widthAnchor.constraint(equalToConstant: Layout.trailingColumnWidth),
             trailingStackView.widthAnchor.constraint(equalToConstant: Layout.trailingColumnWidth),
-            ratingLabel.widthAnchor.constraint(equalToConstant: Layout.trailingColumnWidth),
-            tagsHeightConstraint,
-            tagStackView.topAnchor.constraint(equalTo: tagsContainerView.topAnchor),
-            tagStackView.leadingAnchor.constraint(equalTo: tagsContainerView.leadingAnchor),
-            tagStackView.bottomAnchor.constraint(equalTo: tagsContainerView.bottomAnchor),
-            tagStackView.trailingAnchor.constraint(lessThanOrEqualTo: tagsContainerView.trailingAnchor),
-            tagStackView.widthAnchor.constraint(lessThanOrEqualTo: tagsContainerView.widthAnchor)
+            ratingLabel.widthAnchor.constraint(equalToConstant: Layout.trailingColumnWidth)
         ])
     }
 
     private func configureTags(_ tags: [String]) {
-        tagStackView.arrangedSubviews.forEach {
-            tagStackView.removeArrangedSubview($0)
-            $0.removeFromSuperview()
-        }
-
         let visibleTags = sanitizedTags(tags)
         let maximumVisibleTagCount = maximumVisibleTagCount()
-        Array(visibleTags.prefix(maximumVisibleTagCount)).enumerated().forEach { index, tag in
-            let pillView = AISearchAssistTagPillView(title: tag)
-            let compressionPriority = UILayoutPriority(752 - Float(index))
-            pillView.setContentCompressionResistancePriority(compressionPriority, for: .horizontal)
-            pillView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-
-            let minimumWidthConstraint = pillView.widthAnchor.constraint(greaterThanOrEqualToConstant: Layout.tagMinimumWidth)
-            minimumWidthConstraint.priority = .defaultHigh
-            let maximumWidthConstraint = pillView.widthAnchor.constraint(lessThanOrEqualToConstant: Layout.tagMaximumWidth)
-            maximumWidthConstraint.priority = .required
-
-            NSLayoutConstraint.activate([
-                pillView.heightAnchor.constraint(equalToConstant: Layout.tagHeight),
-                minimumWidthConstraint,
-                maximumWidthConstraint
-            ])
-            tagStackView.addArrangedSubview(pillView)
+        let chipItems = visibleTags.prefix(maximumVisibleTagCount).map {
+            TagFlowItem(
+                title: $0,
+                foregroundColor: .gpPrimary,
+                backgroundColor: .gpPrimaryLight.withAlphaComponent(0.18),
+                font: .systemFont(ofSize: 11, weight: .medium)
+            )
         }
-
-        tagsContainerView.isHidden = tagStackView.arrangedSubviews.isEmpty
+        tagFlowView.configure(items: Array(chipItems))
     }
 
     private func sanitizedTags(_ tags: [String]) -> [String] {
@@ -269,66 +226,6 @@ final class AISearchAssistResultCell: UIControl {
     private func disableUserInteraction(in view: UIView) {
         view.isUserInteractionEnabled = false
         view.subviews.forEach { disableUserInteraction(in: $0) }
-    }
-}
-
-private final class AISearchAssistTagPillView: UIView {
-    private enum Layout {
-        static let height: CGFloat = 26
-        static let horizontalPadding: CGFloat = 10
-        static let minimumWidth: CGFloat = 36
-    }
-
-    private let titleLabel: UILabel = {
-        let label = UILabel()
-        label.font = .systemFont(ofSize: 11, weight: .medium)
-        label.textColor = .gpPrimary
-        label.textAlignment = .center
-        label.numberOfLines = 1
-        label.lineBreakMode = .byTruncatingTail
-        label.adjustsFontSizeToFitWidth = true
-        label.minimumScaleFactor = 0.82
-        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        label.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-
-    override var intrinsicContentSize: CGSize {
-        let preferredWidth = titleLabel.intrinsicContentSize.width + (Layout.horizontalPadding * 2)
-        return CGSize(width: max(Layout.minimumWidth, preferredWidth), height: Layout.height)
-    }
-
-    init(title: String) {
-        super.init(frame: .zero)
-        setup()
-        configure(title: title)
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setup()
-    }
-
-    private func setup() {
-        backgroundColor = .gpPrimaryLight.withAlphaComponent(0.18)
-        layer.cornerRadius = Layout.height / 2
-        clipsToBounds = true
-        translatesAutoresizingMaskIntoConstraints = false
-
-        addSubview(titleLabel)
-
-        NSLayoutConstraint.activate([
-            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Layout.horizontalPadding),
-            titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Layout.horizontalPadding),
-            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
-        ])
-    }
-
-    private func configure(title: String) {
-        titleLabel.text = title
-        accessibilityLabel = title
-        invalidateIntrinsicContentSize()
     }
 }
 

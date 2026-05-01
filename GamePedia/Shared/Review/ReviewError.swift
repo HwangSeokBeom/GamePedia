@@ -24,6 +24,11 @@ enum ReviewError: Error, LocalizedError, Equatable {
                 return .server(code: "CONFIGURATION_MISSING", message: message)
             case .unauthorized:
                 return .unauthorized
+            case .rateLimited(_, let code, let message):
+                return .server(
+                    code: code?.uppercased() ?? "RATE_LIMITED",
+                    message: message ?? L10n.tr("Localizable", "review.error.requestFailed")
+                )
             case .serverError(_, let code, let message):
                 let resolvedCode = code?.uppercased() ?? "UNKNOWN_ERROR"
                 let resolvedMessage = message ?? L10n.tr("Localizable", "review.error.requestFailed")

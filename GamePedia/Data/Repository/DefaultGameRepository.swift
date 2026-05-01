@@ -3,6 +3,7 @@ import Foundation
 final class DefaultGameRepository: GameRepository {
 
     private let apiClient: APIClient
+    private static let detailStore = GameDetailRequestStore()
 
     init(apiClient: APIClient = .shared) {
         self.apiClient = apiClient
@@ -54,11 +55,13 @@ final class DefaultGameRepository: GameRepository {
         let games = try await withThrowingTaskGroup(of: Game.self) { group in
             for id in uniqueRequestedIDs {
                 group.addTask { [apiClient] in
-                    let response = try await apiClient.request(
-                        .gameDetail(id: id),
-                        as: GameResponseEnvelopeDTO<GameDetailResponseDataDTO>.self
-                    )
-                    return GameMapper.toEntity(response.data.game)
+                    try await Self.detailStore.value(gameID: id, ttl: 600, backoff: 60) {
+                        let response = try await apiClient.request(
+                            .gameDetail(id: id),
+                            as: GameResponseEnvelopeDTO<GameDetailResponseDataDTO>.self
+                        )
+                        return GameMapper.toEntity(response.data.game)
+                    }
                 }
             }
 
@@ -98,5 +101,88 @@ final class DefaultGameRepository: GameRepository {
         let games = response.data.games.map { GameMapper.toEntity($0, isTrending: isTrending) }
         print("[GameRepository] \(logLabel) count=\(games.count)")
         return games
+    }
+}
+
+private actor GameDetailRequestStore {
+    private struct CacheEntry {
+        let game: Game
+        let timestamp: Date
+    }
+
+    private var inFlightTasks: [Int: Task<Game, Error>] = [:]
+    private var cache: [Int: CacheEntry] = [:]
+    private var backoffUntil: [Int: Date] = [:]
+
+    func value(
+        gameID: Int,
+        ttl: TimeInterval,
+        backoff: TimeInterval,
+        operation: @escaping () async throws -> Game
+    ) async throws -> Game {
+        let now = Date()
+        if let until = backoffUntil[gameID], until > now {
+            let remaining = Int(ceil(until.timeIntervalSince(now)))
+            if let cached = cache[gameID] {
+#if DEBUG
+                print("[RateLimitBackoff] suppress key=gameDetail:\(gameID) remaining=\(remaining)s status=429")
+                print("[RequestCache] hit key=gameDetail:\(gameID) age=\(Int(now.timeIntervalSince(cached.timestamp)))s")
+#endif
+                return cached.game
+            }
+#if DEBUG
+            print("[RateLimitBackoff] suppress key=gameDetail:\(gameID) remaining=\(remaining)s status=429")
+#endif
+            throw NetworkError.rateLimited(statusCode: 429, code: nil, message: "IGDB is temporarily rate limited")
+        }
+
+        if let cached = cache[gameID] {
+            let age = now.timeIntervalSince(cached.timestamp)
+            if age < ttl {
+#if DEBUG
+                print("[RequestCache] hit key=gameDetail:\(gameID) age=\(Int(age))s")
+#endif
+                return cached.game
+            }
+        }
+
+        if let task = inFlightTasks[gameID] {
+#if DEBUG
+            print("[RequestDedupe] join key=gameDetail:\(gameID) reason=inFlight")
+#endif
+            return try await task.value
+        }
+
+        let task = Task {
+            try await operation()
+        }
+        inFlightTasks[gameID] = task
+
+        do {
+            let game = try await task.value
+            cache[gameID] = CacheEntry(game: game, timestamp: Date())
+            backoffUntil[gameID] = nil
+            inFlightTasks[gameID] = nil
+            return game
+        } catch {
+            inFlightTasks[gameID] = nil
+            if Self.isRateLimit(error) {
+                backoffUntil[gameID] = Date().addingTimeInterval(backoff)
+                if let cached = cache[gameID] {
+#if DEBUG
+                    print("[RateLimitBackoff] cacheFallback key=gameDetail:\(gameID) status=429")
+#endif
+                    return cached.game
+                }
+            }
+            throw error
+        }
+    }
+
+    private static func isRateLimit(_ error: Error) -> Bool {
+        if case NetworkError.rateLimited = error {
+            return true
+        }
+        return false
     }
 }

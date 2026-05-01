@@ -16,8 +16,15 @@ struct FetchMyReviewedGamesUseCase {
             screen: screen
         )
         guard !orderedGameIDs.isEmpty else { return [] }
+        let uniqueGameIDs = MappingSafety.orderedUniqueElements(
+            orderedGameIDs,
+            logPrefix: "[ReviewMapping]",
+            keyName: "gameId",
+            countLabel: "detailRequestCount",
+            screen: "\(screen).detailFetch"
+        )
 
-        let games = try await gameRepository.fetchGames(ids: orderedGameIDs)
+        let games = try await gameRepository.fetchGames(ids: uniqueGameIDs)
         let gamesByID = MappingSafety.dictionary(
             pairs: games.map { ($0.id, $0) },
             logPrefix: "[ReviewMapping]",
@@ -44,6 +51,7 @@ struct FetchMyReviewedGamesUseCase {
         print(
             "[Library] reviews mapped " +
             "requestedGameCount=\(orderedGameIDs.count) " +
+            "uniqueRequestedGameCount=\(uniqueGameIDs.count) " +
             "fetchedGameCount=\(games.count) " +
             "reviewedGameCount=\(reviewedGames.count) " +
             "screen=\(screen)"
