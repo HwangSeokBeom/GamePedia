@@ -19,6 +19,14 @@
 		A3D01D2461455C12FCD1B027 /* TrendingGamesWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A791AC4D288906DD8C646A48 /* TrendingGamesWidget.swift */; };
 		AA1000012F80000100D5F380 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA1000042F80000100D5F380 /* FirebaseCore */; };
 		AA1000022F80000100D5F380 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = AA1000052F80000100D5F380 /* FirebaseMessaging */; };
+		AA2000012F90000100D5F380 /* GamePedia/Application/Push/FCMTokenRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2001012F90000100D5F380 /* GamePedia/Application/Push/FCMTokenRegistrar.swift */; };
+		AA2000022F90000100D5F380 /* GamePedia/Application/Push/NotificationBadgeRefreshService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2001022F90000100D5F380 /* GamePedia/Application/Push/NotificationBadgeRefreshService.swift */; };
+		AA2000032F90000100D5F380 /* GamePedia/Application/Push/PushNotificationPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2001032F90000100D5F380 /* GamePedia/Application/Push/PushNotificationPayload.swift */; };
+		AA2000042F90000100D5F380 /* GamePedia/Application/Push/PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2001042F90000100D5F380 /* GamePedia/Application/Push/PushNotificationService.swift */; };
+		AA2000052F90000100D5F380 /* GamePedia/Application/Push/PushRouteDispatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2001052F90000100D5F380 /* GamePedia/Application/Push/PushRouteDispatcher.swift */; };
+		AA2000062F90000100D5F380 /* GamePedia/Data/Push/PushTokenDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2001062F90000100D5F380 /* GamePedia/Data/Push/PushTokenDTO.swift */; };
+		AA2000072F90000100D5F380 /* GamePedia/Data/Push/PushTokenRemoteDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2001072F90000100D5F380 /* GamePedia/Data/Push/PushTokenRemoteDataSource.swift */; };
+		AA2000082F90000100D5F380 /* GamePedia/Domain/Push/DeviceIdentifierProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2001082F90000100D5F380 /* GamePedia/Domain/Push/DeviceIdentifierProvider.swift */; };
 		C0F12397C1A50B9FDAE7C777 /* WidgetTimelineSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECAC2BE000980AD88A6944B /* WidgetTimelineSupport.swift */; };
 		D0C1B2A39485766758493A2B /* MyActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F708192837465 /* MyActivityWidget.swift */; };
 /* End PBXBuildFile section */
@@ -72,12 +80,20 @@
 		8B9A885F2F6EDC9B00D5F380 /* GamePediaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GamePediaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B9A88692F6EDC9B00D5F380 /* GamePediaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GamePediaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D0000012F70000100D5F380 /* Config/Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Debug.xcconfig; sourceTree = SOURCE_ROOT; };
-		8D0000202F70000100D5F380 /* Config/DeviceDev.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/DeviceDev.xcconfig; sourceTree = SOURCE_ROOT; };
 		8D0000022F70000100D5F380 /* Config/Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = SOURCE_ROOT; };
 		8D0000032F70000100D5F380 /* Config/Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Secrets.example.xcconfig; sourceTree = SOURCE_ROOT; };
 		8D00000A2F70000100D5F380 /* Config/Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Staging.xcconfig; sourceTree = SOURCE_ROOT; };
+		8D0000202F70000100D5F380 /* Config/DeviceDev.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/DeviceDev.xcconfig; sourceTree = SOURCE_ROOT; };
 		98A7B6C5D4E3F20123456789 /* RecentViewedWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecentViewedWidget.swift; sourceTree = "<group>"; };
 		A791AC4D288906DD8C646A48 /* TrendingGamesWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrendingGamesWidget.swift; sourceTree = "<group>"; };
+		AA2001012F90000100D5F380 /* GamePedia/Application/Push/FCMTokenRegistrar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamePedia/Application/Push/FCMTokenRegistrar.swift; sourceTree = SOURCE_ROOT; };
+		AA2001022F90000100D5F380 /* GamePedia/Application/Push/NotificationBadgeRefreshService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamePedia/Application/Push/NotificationBadgeRefreshService.swift; sourceTree = SOURCE_ROOT; };
+		AA2001032F90000100D5F380 /* GamePedia/Application/Push/PushNotificationPayload.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamePedia/Application/Push/PushNotificationPayload.swift; sourceTree = SOURCE_ROOT; };
+		AA2001042F90000100D5F380 /* GamePedia/Application/Push/PushNotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamePedia/Application/Push/PushNotificationService.swift; sourceTree = SOURCE_ROOT; };
+		AA2001052F90000100D5F380 /* GamePedia/Application/Push/PushRouteDispatcher.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamePedia/Application/Push/PushRouteDispatcher.swift; sourceTree = SOURCE_ROOT; };
+		AA2001062F90000100D5F380 /* GamePedia/Data/Push/PushTokenDTO.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamePedia/Data/Push/PushTokenDTO.swift; sourceTree = SOURCE_ROOT; };
+		AA2001072F90000100D5F380 /* GamePedia/Data/Push/PushTokenRemoteDataSource.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamePedia/Data/Push/PushTokenRemoteDataSource.swift; sourceTree = SOURCE_ROOT; };
+		AA2001082F90000100D5F380 /* GamePedia/Domain/Push/DeviceIdentifierProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamePedia/Domain/Push/DeviceIdentifierProvider.swift; sourceTree = SOURCE_ROOT; };
 		ADDCE165F14D6BAF464953EC /* GamePediaWidgetExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = GamePediaWidgetExtension.entitlements; sourceTree = "<group>"; };
 		C7485FCF17BB0BB1B52670E0 /* GamePediaWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GamePediaWidgetBundle.swift; sourceTree = "<group>"; };
 		E57E52BE1A067EF91366F0B6 /* WidgetTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetTheme.swift; sourceTree = "<group>"; };
@@ -88,7 +104,7 @@
 		8B9A88712F6EDC9B00D5F380 /* Exceptions for "GamePedia" folder in "GamePedia" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info-Debug.plist,
+				"Info-Debug.plist",
 				Info.plist,
 			);
 			target = 8B9A88482F6EDC9A00D5F380 /* GamePedia */;
@@ -187,6 +203,7 @@
 				8B9A884A2F6EDC9A00D5F380 /* Products */,
 				858EF05A5B3689542671FC45 /* GamePediaWidgetExtension */,
 				6629B11BB0FF427D8BDD8836 /* WidgetSharedSources */,
+				8BBDFFD02FA4E0AA009CB5EF /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -199,6 +216,21 @@
 				F02B35BA4E08F03BD4CF5073 /* GamePediaWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		8BBDFFD02FA4E0AA009CB5EF /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				AA2001012F90000100D5F380 /* GamePedia/Application/Push/FCMTokenRegistrar.swift */,
+				AA2001022F90000100D5F380 /* GamePedia/Application/Push/NotificationBadgeRefreshService.swift */,
+				AA2001032F90000100D5F380 /* GamePedia/Application/Push/PushNotificationPayload.swift */,
+				AA2001042F90000100D5F380 /* GamePedia/Application/Push/PushNotificationService.swift */,
+				AA2001052F90000100D5F380 /* GamePedia/Application/Push/PushRouteDispatcher.swift */,
+				AA2001062F90000100D5F380 /* GamePedia/Data/Push/PushTokenDTO.swift */,
+				AA2001072F90000100D5F380 /* GamePedia/Data/Push/PushTokenRemoteDataSource.swift */,
+				AA2001082F90000100D5F380 /* GamePedia/Domain/Push/DeviceIdentifierProvider.swift */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 		8D0000042F70000100D5F380 /* Config */ = {
@@ -411,6 +443,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA2000012F90000100D5F380 /* GamePedia/Application/Push/FCMTokenRegistrar.swift in Sources */,
+				AA2000022F90000100D5F380 /* GamePedia/Application/Push/NotificationBadgeRefreshService.swift in Sources */,
+				AA2000032F90000100D5F380 /* GamePedia/Application/Push/PushNotificationPayload.swift in Sources */,
+				AA2000042F90000100D5F380 /* GamePedia/Application/Push/PushNotificationService.swift in Sources */,
+				AA2000052F90000100D5F380 /* GamePedia/Application/Push/PushRouteDispatcher.swift in Sources */,
+				AA2000062F90000100D5F380 /* GamePedia/Data/Push/PushTokenDTO.swift in Sources */,
+				AA2000072F90000100D5F380 /* GamePedia/Data/Push/PushTokenRemoteDataSource.swift in Sources */,
+				AA2000082F90000100D5F380 /* GamePedia/Domain/Push/DeviceIdentifierProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -474,7 +514,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = GamePedia/GamePedia.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "GamePedia/Info-Debug.plist";
@@ -488,7 +528,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1.1;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -505,45 +545,6 @@
 			};
 			name = Debug;
 		};
-		8D0000222F70000100D5F380 /* DeviceDev */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8D0000202F70000100D5F380 /* Config/DeviceDev.xcconfig */;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = GamePedia/GamePedia.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 63SB2B8YJ5;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "GamePedia/Info-Debug.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia DeviceDev";
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.1.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDev;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
-			};
-			name = DeviceDev;
-		};
 		8B9A88742F6EDC9B00D5F380 /* Release */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 8D0000022F70000100D5F380 /* Config/Release.xcconfig */;
@@ -553,7 +554,7 @@
 				CODE_SIGN_ENTITLEMENTS = GamePedia/GamePedia.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GamePedia/Info.plist;
@@ -567,7 +568,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1.1;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -649,70 +650,6 @@
 			};
 			name = Debug;
 		};
-		8D0000212F70000100D5F380 /* DeviceDev */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 63SB2B8YJ5;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"DEBUG=1",
-					"$(inherited)",
-				);
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				MTL_FAST_MATH = YES;
-				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-			};
-			name = DeviceDev;
-		};
 		8B9A88762F6EDC9B00D5F380 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -792,28 +729,6 @@
 			};
 			name = Debug;
 		};
-		8D0000232F70000100D5F380 /* DeviceDev */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 63SB2B8YJ5;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDevTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GamePedia.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/GamePedia";
-			};
-			name = DeviceDev;
-		};
 		8B9A88792F6EDC9B00D5F380 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -856,26 +771,6 @@
 			};
 			name = Debug;
 		};
-		8D0000242F70000100D5F380 /* DeviceDev */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 63SB2B8YJ5;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDevUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = GamePedia;
-			};
-			name = DeviceDev;
-		};
 		8B9A887C2F6EDC9B00D5F380 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -905,7 +800,7 @@
 				CODE_SIGN_ENTITLEMENTS = GamePedia/GamePedia.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GamePedia/Info.plist;
@@ -919,7 +814,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1.1;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1037,6 +932,188 @@
 			};
 			name = Staging;
 		};
+		8D0000212F70000100D5F380 /* DeviceDev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = DeviceDev;
+		};
+		8D0000222F70000100D5F380 /* DeviceDev */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8D0000202F70000100D5F380 /* Config/DeviceDev.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = GamePedia/GamePedia.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "GamePedia/Info-Debug.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia DeviceDev";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDev;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = DeviceDev;
+		};
+		8D0000232F70000100D5F380 /* DeviceDev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDevTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GamePedia.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/GamePedia";
+			};
+			name = DeviceDev;
+		};
+		8D0000242F70000100D5F380 /* DeviceDev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDevUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = GamePedia;
+			};
+			name = DeviceDev;
+		};
+		8D0000252F70000100D5F380 /* DeviceDev */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8D0000202F70000100D5F380 /* Config/DeviceDev.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia Widget";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDev.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = DeviceDev;
+		};
 		D2BCD430F0DF5275970B72E4 /* Staging */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 8D00000A2F70000100D5F380 /* Config/Staging.xcconfig */;
@@ -1153,43 +1230,6 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
-		};
-		8D0000252F70000100D5F380 /* DeviceDev */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8D0000202F70000100D5F380 /* Config/DeviceDev.xcconfig */;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
-				DEVELOPMENT_TEAM = 63SB2B8YJ5;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia Widget";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDev.widget;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
-			};
-			name = DeviceDev;
 		};
 /* End XCBuildConfiguration section */
 
