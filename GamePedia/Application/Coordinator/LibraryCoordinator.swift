@@ -57,6 +57,10 @@ final class LibraryCoordinator {
         navigationController.setViewControllers([libraryVC], animated: false)
     }
 
+    func navigateToLibraryCurator() {
+        showLibraryCurator()
+    }
+
     private func showLibraryCurator() {
         let viewController = LibraryCuratorViewController()
         viewController.onGameSelected = { [weak self] gameId in

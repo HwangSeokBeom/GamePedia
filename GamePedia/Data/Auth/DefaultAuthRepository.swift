@@ -229,8 +229,10 @@ final class DefaultAuthRepository: AuthRepository {
 
     func logout() {
         let refreshToken = tokenStore.fetchRefreshToken()
+        let accessToken = tokenStore.fetchAccessToken()
         let logoutPublisher = authRemoteDataSource.logout(refreshToken: refreshToken)
 
+        PushNotificationService.shared.deleteRegisteredTokenOnLogout(accessToken: accessToken)
         clearStoredSession()
 
         logoutPublisher
@@ -250,6 +252,7 @@ final class DefaultAuthRepository: AuthRepository {
                 return error
             }
             .handleEvents(receiveOutput: { [weak self] _ in
+                PushNotificationService.shared.deleteRegisteredTokenOnLogout(accessToken: self?.tokenStore.fetchAccessToken())
                 self?.clearStoredSession()
             })
             .eraseToAnyPublisher()
@@ -260,6 +263,9 @@ final class DefaultAuthRepository: AuthRepository {
         tokenStore.saveRefreshToken(session.refreshToken)
         saveCurrentUser(session.user)
         apiClient.userAuthToken = session.accessToken
+#if DEBUG
+        AuthDebugAccessTokenLogger.logAccessTokenForPushTest(session.accessToken)
+#endif
         NotificationCenter.default.post(
             name: .authSessionDidChange,
             object: nil,
@@ -285,3 +291,51 @@ final class DefaultAuthRepository: AuthRepository {
         )
     }
 }
+
+#if DEBUG
+private final class AuthDebugAccessTokenLogger {
+    private static var lastPrintedAccessToken: String?
+    private static let lock = NSLock()
+
+    // TODO: remove after FCM push test
+    static func logAccessTokenForPushTest(_ accessToken: String?) {
+        guard isAllowedDebugDevelopmentBuild else { return }
+
+        let trimmedAccessToken = accessToken?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard trimmedAccessToken.isEmpty == false else {
+            print("[AuthDebug] accessTokenForPushTest unavailable reason=empty")
+            return
+        }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard lastPrintedAccessToken != trimmedAccessToken else {
+            print("[AuthDebug] accessTokenForPushTest skipped reason=unchanged")
+            return
+        }
+
+        lastPrintedAccessToken = trimmedAccessToken
+        print("[AuthDebug] accessTokenForPushTest=\(trimmedAccessToken)")
+    }
+
+    private static var isAllowedDebugDevelopmentBuild: Bool {
+        let buildConfiguration = normalized(AppConfig.buildConfiguration)
+        guard buildConfiguration == "debug" else { return false }
+        guard AppConfig.apiEnvironment != .production else { return false }
+
+        let buildFlavor = normalized(AppConfig.buildFlavor)
+        guard buildFlavor != "staging", buildFlavor != "production" else { return false }
+
+        let distributionChannel = normalized(AppConfig.distributionChannel)
+        let isDevelopmentChannel = ["devicedev", "local", "testflight"].contains(distributionChannel)
+        let isDevelopmentEnvironmentOrFlavor = AppConfig.apiEnvironment == .dev || buildFlavor == "dev"
+
+        return isDevelopmentEnvironmentOrFlavor || isDevelopmentChannel
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+}
+#endif

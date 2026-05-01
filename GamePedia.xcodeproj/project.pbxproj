@@ -17,6 +17,8 @@
 		8B9A887F2F6EDD1B00D5F380 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 8B9A887E2F6EDD1B00D5F380 /* Kingfisher */; };
 		8C3B650A2F6F000100D5F380 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 8C3B65092F6F000100D5F380 /* GoogleSignIn */; };
 		A3D01D2461455C12FCD1B027 /* TrendingGamesWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A791AC4D288906DD8C646A48 /* TrendingGamesWidget.swift */; };
+		AA1000012F80000100D5F380 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA1000042F80000100D5F380 /* FirebaseCore */; };
+		AA1000022F80000100D5F380 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = AA1000052F80000100D5F380 /* FirebaseMessaging */; };
 		C0F12397C1A50B9FDAE7C777 /* WidgetTimelineSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECAC2BE000980AD88A6944B /* WidgetTimelineSupport.swift */; };
 		D0C1B2A39485766758493A2B /* MyActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F708192837465 /* MyActivityWidget.swift */; };
 /* End PBXBuildFile section */
@@ -70,6 +72,7 @@
 		8B9A885F2F6EDC9B00D5F380 /* GamePediaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GamePediaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B9A88692F6EDC9B00D5F380 /* GamePediaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GamePediaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D0000012F70000100D5F380 /* Config/Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		8D0000202F70000100D5F380 /* Config/DeviceDev.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/DeviceDev.xcconfig; sourceTree = SOURCE_ROOT; };
 		8D0000022F70000100D5F380 /* Config/Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = SOURCE_ROOT; };
 		8D0000032F70000100D5F380 /* Config/Secrets.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Secrets.example.xcconfig; sourceTree = SOURCE_ROOT; };
 		8D00000A2F70000100D5F380 /* Config/Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Staging.xcconfig; sourceTree = SOURCE_ROOT; };
@@ -85,6 +88,7 @@
 		8B9A88712F6EDC9B00D5F380 /* Exceptions for "GamePedia" folder in "GamePedia" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Info-Debug.plist,
 				Info.plist,
 			);
 			target = 8B9A88482F6EDC9A00D5F380 /* GamePedia */;
@@ -124,6 +128,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA1000012F80000100D5F380 /* FirebaseCore in Frameworks */,
+				AA1000022F80000100D5F380 /* FirebaseMessaging in Frameworks */,
 				8C3B650A2F6F000100D5F380 /* GoogleSignIn in Frameworks */,
 				8B9A887F2F6EDD1B00D5F380 /* Kingfisher in Frameworks */,
 			);
@@ -199,6 +205,7 @@
 			isa = PBXGroup;
 			children = (
 				8D0000012F70000100D5F380 /* Config/Debug.xcconfig */,
+				8D0000202F70000100D5F380 /* Config/DeviceDev.xcconfig */,
 				8D00000A2F70000100D5F380 /* Config/Staging.xcconfig */,
 				8D0000022F70000100D5F380 /* Config/Release.xcconfig */,
 				8D0000032F70000100D5F380 /* Config/Secrets.example.xcconfig */,
@@ -228,6 +235,8 @@
 			);
 			name = GamePedia;
 			packageProductDependencies = (
+				AA1000042F80000100D5F380 /* FirebaseCore */,
+				AA1000052F80000100D5F380 /* FirebaseMessaging */,
 				8C3B65092F6F000100D5F380 /* GoogleSignIn */,
 				8B9A887E2F6EDD1B00D5F380 /* Kingfisher */,
 			);
@@ -310,6 +319,12 @@
 							com.apple.ApplicationGroups.iOS = {
 								enabled = 1;
 							};
+							com.apple.BackgroundModes = {
+								enabled = 1;
+							};
+							com.apple.Push = {
+								enabled = 1;
+							};
 						};
 					};
 					8B9A885E2F6EDC9B00D5F380 = {
@@ -343,6 +358,7 @@
 			mainGroup = 8B9A88402F6EDC9A00D5F380;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				AA1000032F80000100D5F380 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				8C3B65082F6F000100D5F380 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				8B9A887D2F6EDD1B00D5F380 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 			);
@@ -461,7 +477,7 @@
 				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = GamePedia/Info.plist;
+				INFOPLIST_FILE = "GamePedia/Info-Debug.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia Dev";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
@@ -488,6 +504,45 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
+		};
+		8D0000222F70000100D5F380 /* DeviceDev */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8D0000202F70000100D5F380 /* Config/DeviceDev.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = GamePedia/GamePedia.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "GamePedia/Info-Debug.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia DeviceDev";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDev;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = DeviceDev;
 		};
 		8B9A88742F6EDC9B00D5F380 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -594,6 +649,70 @@
 			};
 			name = Debug;
 		};
+		8D0000212F70000100D5F380 /* DeviceDev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = DeviceDev;
+		};
 		8B9A88762F6EDC9B00D5F380 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -673,6 +792,28 @@
 			};
 			name = Debug;
 		};
+		8D0000232F70000100D5F380 /* DeviceDev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDevTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GamePedia.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/GamePedia";
+			};
+			name = DeviceDev;
+		};
 		8B9A88792F6EDC9B00D5F380 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -714,6 +855,26 @@
 				TEST_TARGET_NAME = GamePedia;
 			};
 			name = Debug;
+		};
+		8D0000242F70000100D5F380 /* DeviceDev */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDevUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = GamePedia;
+			};
+			name = DeviceDev;
 		};
 		8B9A887C2F6EDC9B00D5F380 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -884,7 +1045,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
@@ -924,7 +1085,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
@@ -964,7 +1125,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
@@ -993,6 +1154,43 @@
 			};
 			name = Debug;
 		};
+		8D0000252F70000100D5F380 /* DeviceDev */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8D0000202F70000100D5F380 /* Config/DeviceDev.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = 63SB2B8YJ5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "GamePedia Widget";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDev.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = DeviceDev;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1000,6 +1198,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				8B9A88752F6EDC9B00D5F380 /* Debug */,
+				8D0000212F70000100D5F380 /* DeviceDev */,
 				8D00000C2F70000100D5F380 /* Staging */,
 				8B9A88762F6EDC9B00D5F380 /* Release */,
 			);
@@ -1010,6 +1209,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				8B9A88732F6EDC9B00D5F380 /* Debug */,
+				8D0000222F70000100D5F380 /* DeviceDev */,
 				8D00000B2F70000100D5F380 /* Staging */,
 				8B9A88742F6EDC9B00D5F380 /* Release */,
 			);
@@ -1020,6 +1220,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				8B9A88782F6EDC9B00D5F380 /* Debug */,
+				8D0000232F70000100D5F380 /* DeviceDev */,
 				8D00000D2F70000100D5F380 /* Staging */,
 				8B9A88792F6EDC9B00D5F380 /* Release */,
 			);
@@ -1030,6 +1231,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				8B9A887B2F6EDC9B00D5F380 /* Debug */,
+				8D0000242F70000100D5F380 /* DeviceDev */,
 				8D00000E2F70000100D5F380 /* Staging */,
 				8B9A887C2F6EDC9B00D5F380 /* Release */,
 			);
@@ -1041,6 +1243,7 @@
 			buildConfigurations = (
 				D8311641F8728A8174B8D20B /* Release */,
 				F1A62F3236D918638B6F4F2A /* Debug */,
+				8D0000252F70000100D5F380 /* DeviceDev */,
 				D2BCD430F0DF5275970B72E4 /* Staging */,
 			);
 			defaultConfigurationIsVisible = 0;
@@ -1065,6 +1268,14 @@
 				minimumVersion = 7.1.0;
 			};
 		};
+		AA1000032F80000100D5F380 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1077,6 +1288,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 8C3B65082F6F000100D5F380 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignIn;
+		};
+		AA1000042F80000100D5F380 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA1000032F80000100D5F380 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		AA1000052F80000100D5F380 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA1000032F80000100D5F380 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

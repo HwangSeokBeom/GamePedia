@@ -17,7 +17,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         AppConfig.logRuntimeConfiguration()
         UNUserNotificationCenter.current().delegate = self
+        PushNotificationService.shared.start(application: application)
         return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        PushNotificationService.shared.applicationDidRegisterForRemoteNotifications(deviceToken: deviceToken)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        PushNotificationService.shared.applicationDidFailToRegisterForRemoteNotifications(error: error)
     }
 
     // MARK: UISceneSession Lifecycle
@@ -63,6 +78,13 @@ extension AppDelegate {
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         let userInfo = notification.request.content.userInfo
+        let pushPayload = PushNotificationPayload.parse(userInfo: userInfo)
+        if let pushPayload {
+            logPushPayload(pushPayload, phase: "willPresent")
+            NotificationBadgeRefreshService.shared.applyPayloadBadgeIfPresent(pushPayload.badge)
+            NotificationBadgeRefreshService.shared.refresh(reason: "pushForeground")
+        }
+
         if let payload = SocialActivityPushPayload.parse(userInfo: userInfo),
            SocialActivityDeduplicator.shared.shouldProcess("push:\(payload.stableIdentity)", timeToLive: 60 * 5) {
             SocialActivityEventDispatcher.shared.send(.showBanner(payload.bannerPayload))
@@ -79,9 +101,22 @@ extension AppDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        if let payload = SocialActivityPushPayload.parse(userInfo: userInfo) {
+        if let pushPayload = PushNotificationPayload.parse(userInfo: userInfo) {
+            logPushPayload(pushPayload, phase: "didReceive")
+            NotificationBadgeRefreshService.shared.applyPayloadBadgeIfPresent(pushPayload.badge)
+            NotificationBadgeRefreshService.shared.refresh(reason: "pushTap", force: true)
+            PushRouteDispatcher.shared.send(.route(pushPayload))
+        } else if let payload = SocialActivityPushPayload.parse(userInfo: userInfo) {
             SocialActivityEventDispatcher.shared.send(.route(payload.route))
         }
         completionHandler()
+    }
+
+    private func logPushPayload(_ payload: PushNotificationPayload, phase: String) {
+        print(
+            "[PushRoute] \(phase) type=\(payload.type ?? "nil") " +
+            "notificationId=\(payload.notificationID ?? "nil") " +
+            "routeTarget=\(payload.routeTarget) gameId=\(payload.gameID.map(String.init) ?? "nil")"
+        )
     }
 }

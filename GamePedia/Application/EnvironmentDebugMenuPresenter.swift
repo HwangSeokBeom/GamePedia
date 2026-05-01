@@ -13,7 +13,7 @@ enum EnvironmentDebugMenuPresenter {
             title: "서버 환경 정보",
             message: """
             현재 환경: \(currentEnvironment.rawValue)
-            API: \(currentEnvironment.apiBaseURL.absoluteString)
+            API: \(AppConfig.coreBaseURL.absoluteString)
 
             환경은 빌드 설정과 스킴으로 결정됩니다.
             """,

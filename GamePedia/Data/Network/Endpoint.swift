@@ -69,6 +69,20 @@ extension Endpoint {
         )
     }
 
+    static func put<T: Encodable>(
+        _ path: String,
+        body: T,
+        userAuth: Bool = true
+    ) -> Endpoint {
+        Endpoint(
+            path: path,
+            method: .PUT,
+            queryItems: [],
+            body: .json(body),
+            requiresUserAuth: userAuth
+        )
+    }
+
     static func delete(
         _ path: String,
         query: [URLQueryItem] = [],
@@ -243,6 +257,16 @@ extension Endpoint {
 
     static var markAllNotificationsRead: Endpoint {
         .patch("/users/me/notifications/read-all", body: EmptyRequestBody(), userAuth: true)
+    }
+
+    static func savePushToken(body: PushTokenRequestDTO) -> Endpoint {
+        .put("/users/me/push-token", body: body, userAuth: true)
+    }
+
+    static func deletePushToken(deviceId: String) -> Endpoint {
+        .delete("/users/me/push-token", query: [
+            URLQueryItem(name: "deviceId", value: deviceId)
+        ], userAuth: true)
     }
 
     static func searchFriends(keyword: String) -> Endpoint {

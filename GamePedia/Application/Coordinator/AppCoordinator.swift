@@ -73,6 +73,7 @@ final class AppCoordinator {
     private var pendingSteamLinkCallbackURL: URL?
     private var pendingWidgetDeepLink: WidgetDeepLink?
     private var pendingWidgetReviewItem: ReviewPromptWidgetSnapshot.Item?
+    private var pendingPushPayload: PushNotificationPayload?
     private var cancellables = Set<AnyCancellable>()
     private let steamLinkFlowController = SteamLinkFlowController()
     private lazy var socialActivityBannerPresenter = SocialActivityBannerPresenter(window: window)
@@ -113,6 +114,7 @@ final class AppCoordinator {
 
     func start() {
         bindSocialActivityEvents()
+        bindPushRouteEvents()
         bindWidgetSnapshotEvents()
         showSplash()
 #if DEBUG
@@ -173,6 +175,20 @@ final class AppCoordinator {
                 self?.handleSocialActivityEvent(event)
             }
             .store(in: &cancellables)
+    }
+
+    private func bindPushRouteEvents() {
+        PushRouteDispatcher.shared.publisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard case .route(let payload) = event else { return }
+                self?.handlePushPayload(payload)
+            }
+            .store(in: &cancellables)
+
+        if let payload = PushRouteDispatcher.shared.drainPendingRoute() {
+            handlePushPayload(payload)
+        }
     }
 
     private func bindWidgetSnapshotEvents() {
@@ -318,7 +334,15 @@ final class AppCoordinator {
             }
         }
 
+        if let pendingPushPayload {
+            self.pendingPushPayload = nil
+            DispatchQueue.main.async { [weak self] in
+                self?.executePushRoute(pendingPushPayload)
+            }
+        }
+
         refreshWidgetSnapshots(reason: "showMainInterface")
+        NotificationBadgeRefreshService.shared.refresh(reason: "showMainInterface")
     }
 
     private func makeMainTabBarController(selectedIndex: Int) -> MainTabBarController {
@@ -478,6 +502,57 @@ final class AppCoordinator {
 
     func refreshWidgetSnapshots(reason: String) {
         widgetSnapshotRefreshService.refresh(reason: reason)
+    }
+
+    private func handlePushPayload(_ payload: PushNotificationPayload) {
+        guard mainTabBarController != nil else {
+            pendingPushPayload = payload
+            print("[PushRoute] deferred reason=mainInterfaceNotReady")
+            return
+        }
+
+        executePushRoute(payload)
+    }
+
+    private func executePushRoute(_ payload: PushNotificationPayload) {
+        NotificationBadgeRefreshService.shared.refresh(reason: "pushRoute", force: true)
+
+        switch payload.destination {
+        case .notifications:
+            ensureMainInterface(selectedIndex: 0)
+            homeCoordinator?.navigateToNotifications()
+            print("[PushRoute] executed destination=notifications")
+        case .gameDetail(let gameID):
+            ensureMainInterface(selectedIndex: 0)
+            homeCoordinator?.navigateToGameDetail(gameID: gameID)
+            print("[PushRoute] executed destination=gameDetail id=\(gameID)")
+        case .reviewDetail(let gameID, let reviewID, let commentID):
+            ensureMainInterface(selectedIndex: 0)
+            homeCoordinator?.navigateToReviewDiscussion(gameID: gameID, reviewID: reviewID, commentID: commentID)
+            print("[PushRoute] executed destination=reviewDetail gameId=\(gameID) reviewId=\(reviewID ?? "nil")")
+        case .friendRequests:
+            ensureMainInterface(selectedIndex: 3)
+            profileCoordinator?.navigateToFriendRequests()
+            print("[PushRoute] executed destination=friendRequests")
+        case .profile(let userID):
+            ensureMainInterface(selectedIndex: 3)
+            if let userID {
+                profileCoordinator?.navigateToFriendProfile(userID: userID)
+                print("[PushRoute] executed destination=profile id=\(userID)")
+            } else {
+                print("[PushRoute] executed destination=profile")
+            }
+        case .libraryCurator:
+            guard currentSessionAccessMode() == .authenticated else {
+                ensureMainInterface(selectedIndex: 0)
+                homeCoordinator?.navigateToNotifications()
+                print("[PushRoute] fallback destination=notifications reason=authRequired")
+                return
+            }
+            ensureMainInterface(selectedIndex: 2)
+            libraryCoordinator?.navigateToLibraryCurator()
+            print("[PushRoute] executed destination=libraryCurator")
+        }
     }
 
     private func presentResetPasswordFlow(token: String) {

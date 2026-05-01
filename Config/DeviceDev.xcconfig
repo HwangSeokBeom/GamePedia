@@ -1,0 +1,4 @@
+#include "Debug.xcconfig"
+
+BUILD_SCHEME_NAME = GamePedia-DeviceDev
+DISTRIBUTION_CHANNEL = deviceDev

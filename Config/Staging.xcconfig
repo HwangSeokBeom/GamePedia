@@ -5,6 +5,7 @@ API_ENVIRONMENT = staging
 CORE_BASE_URL = https:$(URL_SCHEME_SEPARATOR)$(URL_SCHEME_SEPARATOR)staging-gamepedia-api.duckdns.org
 BUILD_FLAVOR_NAME = staging
 BUILD_SCHEME_NAME = GamePedia-Staging
+APS_ENVIRONMENT = development
 
 GOOGLE_CLIENT_ID = 464952520539-lbhh2kg8i9g02qkgot2odhkflca85org.apps.googleusercontent.com
 GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.464952520539-lbhh2kg8i9g02qkgot2odhkflca85org

@@ -49,6 +49,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // Called as the scene transitions from the background to the foreground.
         // Use this method to undo the changes made on entering the background.
         appCoordinator?.refreshWidgetSnapshots(reason: "sceneWillEnterForeground")
+        PushNotificationService.shared.fetchFCMToken(source: "sceneWillEnterForeground")
+        NotificationBadgeRefreshService.shared.refresh(reason: "sceneWillEnterForeground")
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {

@@ -166,6 +166,17 @@ open GamePedia.xcodeproj
 
 로컬 실행 시에는 `Secrets.example.xcconfig`를 참고하여 실제 환경 파일을 구성하는 방식으로 사용하는 것을 권장합니다.
 
+### FCM 테스트 푸시 호출
+
+Debug 개발 빌드에서 로그인 또는 세션 refresh 후 Xcode 콘솔의 `[AuthDebug] accessTokenForPushTest=...` 로그에서 accessToken을 확인한 뒤 아래처럼 테스트 푸시를 호출할 수 있습니다. 실제 토큰은 문서나 커밋에 남기지 않습니다.
+
+```bash
+curl -X POST http://192.168.0.36:3001/users/me/notifications/test-push \
+  -H "Authorization: Bearer <ACCESS_TOKEN_FROM_[AuthDebug]_LOG>" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"GamePedia 테스트 알림","body":"푸시 알림 연결 테스트입니다.","route":"notification_list"}'
+```
+
 ## 9. 향후 확장 계획
 
 - Steam, 콘솔 등 외부 플랫폼 연동 강화
