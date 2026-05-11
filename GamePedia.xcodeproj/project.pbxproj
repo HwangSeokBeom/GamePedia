@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		04BC7C53A5C88DA4E9D3C9F1 /* GameWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 024A57DCDD7080F07EA2E7F8 /* GameWidgetSnapshot.swift */; };
-		24110B74C9636D692EAE21EB /* GamePediaWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F02B35BA4E08F03BD4CF5073 /* GamePediaWidgetExtension.appex */; };
+		24110B74C9636D692EAE21EB /* GamePediaWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F02B35BA4E08F03BD4CF5073 /* GamePediaWidgetExtension.appex */; };
 		31BC588E854BF5FB780D8B14 /* GameWidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78FA82D8737F7E97902E8F93 /* GameWidgetSnapshotStore.swift */; };
 		5D4AC81B011067B6F883DD1D /* GamePediaWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7485FCF17BB0BB1B52670E0 /* GamePediaWidgetBundle.swift */; };
 		73676A9C1E2D4A5B6C7D8E90 /* RecentViewedWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98A7B6C5D4E3F20123456789 /* RecentViewedWidget.swift */; };
@@ -56,15 +56,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		3BEEE9627DBB74D78CA0FD24 /* Embed App Extensions */ = {
+		3BEEE9627DBB74D78CA0FD24 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				24110B74C9636D692EAE21EB /* GamePediaWidgetExtension.appex in Embed App Extensions */,
+				24110B74C9636D692EAE21EB /* GamePediaWidgetExtension.appex in Embed Foundation Extensions */,
 			);
-			name = "Embed App Extensions";
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -255,7 +255,7 @@
 				8B9A88452F6EDC9A00D5F380 /* Sources */,
 				8B9A88462F6EDC9A00D5F380 /* Frameworks */,
 				8B9A88472F6EDC9A00D5F380 /* Resources */,
-				3BEEE9627DBB74D78CA0FD24 /* Embed App Extensions */,
+				3BEEE9627DBB74D78CA0FD24 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
@@ -343,7 +343,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2630;
-				LastUpgradeCheck = 2630;
+				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					8B9A88482F6EDC9A00D5F380 = {
 						CreatedOnToolsVersion = 26.3;
@@ -591,6 +591,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -645,6 +646,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -655,6 +657,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -702,6 +705,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -837,6 +841,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -884,6 +889,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "STAGING $(inherited)";
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
@@ -937,6 +943,10 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+<<<<<<< HEAD
+=======
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+>>>>>>> dev
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -991,6 +1001,10 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+<<<<<<< HEAD
+=======
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+>>>>>>> dev
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -1004,7 +1018,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = GamePedia/GamePedia.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+<<<<<<< HEAD
 				CURRENT_PROJECT_VERSION = 1;
+=======
+				CURRENT_PROJECT_VERSION = 5;
+>>>>>>> dev
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "GamePedia/Info-Debug.plist";
@@ -1018,7 +1036,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+<<<<<<< HEAD
 				MARKETING_VERSION = 2.0.0;
+=======
+				MARKETING_VERSION = 1.1.1;
+>>>>>>> dev
 				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDev;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
