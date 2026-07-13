@@ -168,11 +168,11 @@ open GamePedia.xcodeproj
 
 ### FCM 테스트 푸시 호출
 
-Debug 개발 빌드에서 로그인 또는 세션 refresh 후 Xcode 콘솔의 `[AuthDebug] accessTokenForPushTest=...` 로그에서 accessToken을 확인한 뒤 아래처럼 테스트 푸시를 호출할 수 있습니다. 실제 토큰은 문서나 커밋에 남기지 않습니다.
+클라이언트는 access token을 콘솔에 출력하지 않습니다. 테스트 푸시는 승인된 개발/스테이징 도구가 현재 사용자 세션을 안전하게 위임하는 방식으로 실행해야 하며, 토큰을 콘솔·문서·셸 히스토리·커밋에 복사하지 않습니다. 아래 예시는 엔드포인트 형식만 보여 주며 실제 인증 값 취득 절차로 사용하지 않습니다.
 
 ```bash
 curl -X POST http://192.168.0.36:3001/users/me/notifications/test-push \
-  -H "Authorization: Bearer <ACCESS_TOKEN_FROM_[AuthDebug]_LOG>" \
+  -H "Authorization: Bearer <INJECTED_BY_APPROVED_TEST_TOOL>" \
   -H "Content-Type: application/json" \
   -d '{"title":"GamePedia 테스트 알림","body":"푸시 알림 연결 테스트입니다.","route":"notification_list"}'
 ```
