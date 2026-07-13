@@ -31,6 +31,9 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
 
         window.makeKeyAndVisible()
         viewController.loadViewIfNeeded()
+        navigationController.view.frame = window.bounds
+        window.layoutIfNeeded()
+        navigationController.view.layoutIfNeeded()
 
         await waitUntil {
             viewController.rootView.tableView.numberOfSections == 3 &&
@@ -51,25 +54,55 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
             guard let cell = viewController.rootView.tableView.cellForRow(at: rootCommentIndexPath) as? ReviewCommentCell else {
                 return false
             }
-            return self.findButton(in: cell.contentView, accessibilityIdentifier: "reviewComment.replyButton") != nil
+            return self.findButton(in: cell.contentView, accessibilityIdentifier: "reviewComment.likeButton") != nil &&
+                self.findButton(in: cell.contentView, accessibilityIdentifier: "reviewComment.moreButton") != nil
         }
         guard let rootCell = viewController.rootView.tableView.cellForRow(at: rootCommentIndexPath) as? ReviewCommentCell,
-              let rootReplyButton = findButton(in: rootCell.contentView, accessibilityIdentifier: "reviewComment.replyButton"),
-              let rootLikeButton = findButton(in: rootCell.contentView, accessibilityIdentifier: "reviewComment.likeButton"),
-              let rootMoreButton = findButton(in: rootCell.contentView, accessibilityIdentifier: "reviewComment.moreButton") else {
+              findButton(in: rootCell.contentView, accessibilityIdentifier: "reviewComment.likeButton") != nil,
+              findButton(in: rootCell.contentView, accessibilityIdentifier: "reviewComment.moreButton") != nil else {
             return XCTFail("Root comment action buttons not found")
         }
-        rootReplyButton.sendActions(for: .touchUpInside)
+        XCTAssertNil(findButton(in: rootCell.contentView, accessibilityIdentifier: "reviewComment.replyButton"))
+
+        viewController.rootView.tableView.scrollToRow(at: replyCommentIndexPath, at: .middle, animated: false)
+        viewController.rootView.tableView.layoutIfNeeded()
+        await waitUntil {
+            guard let cell = viewController.rootView.tableView.cellForRow(at: replyCommentIndexPath) as? ReviewCommentCell else {
+                return false
+            }
+            return self.findButton(in: cell.contentView, accessibilityIdentifier: "reviewComment.replyButton") != nil
+        }
+        guard let replyCell = viewController.rootView.tableView.cellForRow(at: replyCommentIndexPath) as? ReviewCommentCell,
+              let replyCTAButton = findButton(in: replyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") else {
+            return XCTFail("Last visible reply CTA button not found")
+        }
+
+        replyCTAButton.sendActions(for: .touchUpInside)
         XCTAssertEqual(
             viewModel.state.composerMode,
             makeReplyMode(
-                targetCommentId: "root-comment",
+                targetCommentId: "reply-comment",
                 parentCommentId: "root-comment",
-                nickname: "작성자-root-comment",
-                previewText: "댓글-root-comment",
+                nickname: "작성자-reply-comment",
+                previewText: "댓글-reply-comment",
                 isSelfReply: false
             )
         )
+
+        viewController.rootView.tableView.scrollToRow(at: rootCommentIndexPath, at: .middle, animated: false)
+        viewController.rootView.tableView.layoutIfNeeded()
+        await waitUntil {
+            guard let cell = viewController.rootView.tableView.cellForRow(at: rootCommentIndexPath) as? ReviewCommentCell else {
+                return false
+            }
+            return self.findButton(in: cell.contentView, accessibilityIdentifier: "reviewComment.likeButton") != nil &&
+                self.findButton(in: cell.contentView, accessibilityIdentifier: "reviewComment.moreButton") != nil
+        }
+        guard let rootActionCell = viewController.rootView.tableView.cellForRow(at: rootCommentIndexPath) as? ReviewCommentCell,
+              let rootLikeButton = findButton(in: rootActionCell.contentView, accessibilityIdentifier: "reviewComment.likeButton"),
+              let rootMoreButton = findButton(in: rootActionCell.contentView, accessibilityIdentifier: "reviewComment.moreButton") else {
+            return XCTFail("Root comment action buttons not visible")
+        }
 
         rootLikeButton.sendActions(for: .touchUpInside)
         await waitUntil {
@@ -78,10 +111,10 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         XCTAssertEqual(
             viewModel.state.composerMode,
             makeReplyMode(
-                targetCommentId: "root-comment",
+                targetCommentId: "reply-comment",
                 parentCommentId: "root-comment",
-                nickname: "작성자-root-comment",
-                previewText: "댓글-root-comment",
+                nickname: "작성자-reply-comment",
+                previewText: "댓글-reply-comment",
                 isSelfReply: false
             )
         )
@@ -121,14 +154,21 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         viewController.tableView(viewController.rootView.tableView, didSelectRowAt: reviewHeaderIndexPath)
         XCTAssertEqual(viewModel.state.composerMode, .comment)
 
-        rootReplyButton.sendActions(for: .touchUpInside)
+        guard let replyCTAAfterHeaderTap = await replyButton(
+            in: viewController.rootView.tableView,
+            at: replyCommentIndexPath,
+            expectedVisible: true
+        ) else {
+            return XCTFail("Reply CTA not visible after header tap")
+        }
+        replyCTAAfterHeaderTap.sendActions(for: .touchUpInside)
         XCTAssertEqual(
             viewModel.state.composerMode,
             makeReplyMode(
-                targetCommentId: "root-comment",
+                targetCommentId: "reply-comment",
                 parentCommentId: "root-comment",
-                nickname: "작성자-root-comment",
-                previewText: "댓글-root-comment",
+                nickname: "작성자-reply-comment",
+                previewText: "댓글-reply-comment",
                 isSelfReply: false
             )
         )
@@ -145,14 +185,21 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         sortButton.sendActions(for: .touchDown)
         XCTAssertEqual(viewModel.state.composerMode, .comment)
 
-        rootReplyButton.sendActions(for: .touchUpInside)
+        guard let replyCTAAfterSortTap = await replyButton(
+            in: viewController.rootView.tableView,
+            at: replyCommentIndexPath,
+            expectedVisible: true
+        ) else {
+            return XCTFail("Reply CTA not visible after sort tap")
+        }
+        replyCTAAfterSortTap.sendActions(for: .touchUpInside)
         XCTAssertEqual(
             viewModel.state.composerMode,
             makeReplyMode(
-                targetCommentId: "root-comment",
+                targetCommentId: "reply-comment",
                 parentCommentId: "root-comment",
-                nickname: "작성자-root-comment",
-                previewText: "댓글-root-comment",
+                nickname: "작성자-reply-comment",
+                previewText: "댓글-reply-comment",
                 isSelfReply: false
             )
         )
@@ -163,14 +210,21 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
             viewController.rootView.tableView.bounds.height - 10,
             viewController.rootView.tableView.contentSize.height + 20
         )
-        rootReplyButton.sendActions(for: .touchUpInside)
+        guard let replyCTAAfterNavigationTap = await replyButton(
+            in: viewController.rootView.tableView,
+            at: replyCommentIndexPath,
+            expectedVisible: true
+        ) else {
+            return XCTFail("Reply CTA not visible after navigation tap")
+        }
+        replyCTAAfterNavigationTap.sendActions(for: .touchUpInside)
         XCTAssertEqual(
             viewModel.state.composerMode,
             makeReplyMode(
-                targetCommentId: "root-comment",
+                targetCommentId: "reply-comment",
                 parentCommentId: "root-comment",
-                nickname: "작성자-root-comment",
-                previewText: "댓글-root-comment",
+                nickname: "작성자-reply-comment",
+                previewText: "댓글-reply-comment",
                 isSelfReply: false
             )
         )
@@ -309,6 +363,9 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
 
         window.makeKeyAndVisible()
         viewController.loadViewIfNeeded()
+        navigationController.view.frame = window.bounds
+        window.layoutIfNeeded()
+        navigationController.view.layoutIfNeeded()
 
         await waitUntil {
             viewController.rootView.tableView.numberOfSections == 3 &&
@@ -365,6 +422,9 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
 
         window.makeKeyAndVisible()
         viewController.loadViewIfNeeded()
+        navigationController.view.frame = window.bounds
+        window.layoutIfNeeded()
+        navigationController.view.layoutIfNeeded()
 
         await waitUntil {
             viewController.rootView.tableView.numberOfSections == 3 &&
@@ -376,25 +436,31 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         let middleSummaryReplyIndexPath = IndexPath(row: 3, section: 2)
         let latestSummaryReplyIndexPath = IndexPath(row: 4, section: 2)
 
-        viewController.rootView.tableView.scrollToRow(at: latestSummaryReplyIndexPath, at: .middle, animated: false)
-        viewController.rootView.tableView.layoutIfNeeded()
+        let collapsedThread = try XCTUnwrap(viewModel.state.commentThreadStates.first)
+        XCTAssertEqual(collapsedThread.visibleReplies.map(\.id), ["reply-2", "reply-3", "reply-4"])
+        XCTAssertEqual(collapsedThread.threadCTAAnchorCommentId, "reply-4")
+        XCTAssertEqual(collapsedThread.threadCTATargetCommentId, "reply-4")
 
-        await waitUntil {
-            guard let rootCell = viewController.rootView.tableView.cellForRow(at: rootCommentIndexPath) as? ReviewCommentCell,
-                  let olderReplyCell = viewController.rootView.tableView.cellForRow(at: olderSummaryReplyIndexPath) as? ReviewCommentCell,
-                  let middleReplyCell = viewController.rootView.tableView.cellForRow(at: middleSummaryReplyIndexPath) as? ReviewCommentCell,
-                  let latestReplyCell = viewController.rootView.tableView.cellForRow(at: latestSummaryReplyIndexPath) as? ReviewCommentCell else {
-                return false
-            }
-
-            return self.findButton(in: rootCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") == nil &&
-                self.findButton(in: olderReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") == nil &&
-                self.findButton(in: middleReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") == nil &&
-                self.findButton(in: latestReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") != nil
-        }
-
-        guard let latestReplyCell = viewController.rootView.tableView.cellForRow(at: latestSummaryReplyIndexPath) as? ReviewCommentCell,
-              let latestReplyCTAButton = findButton(in: latestReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") else {
+        _ = await replyButton(
+            in: viewController.rootView.tableView,
+            at: rootCommentIndexPath,
+            expectedVisible: false
+        )
+        _ = await replyButton(
+            in: viewController.rootView.tableView,
+            at: olderSummaryReplyIndexPath,
+            expectedVisible: false
+        )
+        _ = await replyButton(
+            in: viewController.rootView.tableView,
+            at: middleSummaryReplyIndexPath,
+            expectedVisible: false
+        )
+        guard let latestReplyCTAButton = await replyButton(
+            in: viewController.rootView.tableView,
+            at: latestSummaryReplyIndexPath,
+            expectedVisible: true
+        ) else {
             return XCTFail("Latest visible reply CTA button not found")
         }
 
@@ -407,24 +473,22 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         viewController.tableView(viewController.rootView.tableView, didSelectRowAt: IndexPath(row: 1, section: 2))
 
         await waitUntil {
-            viewController.rootView.tableView.numberOfRows(inSection: 2) == 5 &&
-            viewController.rootView.tableView.cellForRow(at: IndexPath(row: 1, section: 2)) is ReviewCommentCell
+            viewModel.state.expandedParentCommentIds.contains("root-comment") &&
+                viewController.rootView.tableView.numberOfRows(inSection: 2) == 5
         }
 
         let previousExpandedReplyIndexPath = IndexPath(row: 3, section: 2)
         let lastExpandedReplyIndexPath = IndexPath(row: 4, section: 2)
-        viewController.rootView.tableView.scrollToRow(at: lastExpandedReplyIndexPath, at: .middle, animated: false)
-        viewController.rootView.tableView.layoutIfNeeded()
-
-        await waitUntil {
-            guard let previousReplyCell = viewController.rootView.tableView.cellForRow(at: previousExpandedReplyIndexPath) as? ReviewCommentCell,
-                  let latestReplyCell = viewController.rootView.tableView.cellForRow(at: lastExpandedReplyIndexPath) as? ReviewCommentCell else {
-                return false
-            }
-
-            return self.findButton(in: previousReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") == nil &&
-                self.findButton(in: latestReplyCell.contentView, accessibilityIdentifier: "reviewComment.replyButton") != nil
-        }
+        _ = await replyButton(
+            in: viewController.rootView.tableView,
+            at: previousExpandedReplyIndexPath,
+            expectedVisible: false
+        )
+        _ = await replyButton(
+            in: viewController.rootView.tableView,
+            at: lastExpandedReplyIndexPath,
+            expectedVisible: true
+        )
 
         viewController.tableView(viewController.rootView.tableView, didSelectRowAt: IndexPath(row: 1, section: 2))
         XCTAssertEqual(viewController.rootView.tableView.numberOfRows(inSection: 2), 5)
@@ -490,6 +554,9 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
 
         window.makeKeyAndVisible()
         viewController.loadViewIfNeeded()
+        navigationController.view.frame = window.bounds
+        window.layoutIfNeeded()
+        navigationController.view.layoutIfNeeded()
 
         await waitUntil {
             viewController.rootView.tableView.numberOfSections == 3 &&
@@ -499,31 +566,36 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
         viewController.rootView.tableView.layoutIfNeeded()
         assertVisibleRowLayoutIsStable(in: viewController.rootView.tableView, section: 2)
 
-        for row in 0..<viewController.rootView.tableView.numberOfRows(inSection: 2) {
-            let indexPath = IndexPath(row: row, section: 2)
-            guard let cell = viewController.rootView.tableView.cellForRow(at: indexPath) as? ReviewCommentCell else {
-                continue
-            }
-            XCTAssertNil(findButton(in: cell.contentView, accessibilityIdentifier: "reviewComment.replyButton"))
-        }
+        let collapsedThread = try XCTUnwrap(viewModel.state.commentThreadStates.first)
+        XCTAssertFalse(collapsedThread.shouldShowThreadCTA)
+        XCTAssertNil(collapsedThread.threadCTAAnchorCommentId)
+        XCTAssertNil(collapsedThread.threadCTATargetCommentId)
+        _ = await replyButton(
+            in: viewController.rootView.tableView,
+            at: IndexPath(row: 4, section: 2),
+            expectedVisible: false
+        )
 
         viewController.tableView(viewController.rootView.tableView, didSelectRowAt: IndexPath(row: 1, section: 2))
 
         await waitUntil {
-            viewController.rootView.tableView.numberOfRows(inSection: 2) == 5 &&
-            viewController.rootView.tableView.cellForRow(at: IndexPath(row: 1, section: 2)) is ReviewCommentCell
+            viewModel.state.expandedParentCommentIds.contains("root-comment") &&
+                viewController.rootView.tableView.numberOfRows(inSection: 2) == 5
         }
 
         viewController.rootView.tableView.layoutIfNeeded()
         assertVisibleRowLayoutIsStable(in: viewController.rootView.tableView, section: 2)
 
-        for row in 0..<viewController.rootView.tableView.numberOfRows(inSection: 2) {
-            let indexPath = IndexPath(row: row, section: 2)
-            guard let cell = viewController.rootView.tableView.cellForRow(at: indexPath) as? ReviewCommentCell else {
-                continue
-            }
-            XCTAssertNil(findButton(in: cell.contentView, accessibilityIdentifier: "reviewComment.replyButton"))
-        }
+        let expandedThread = try XCTUnwrap(viewModel.state.commentThreadStates.first)
+        XCTAssertEqual(expandedThread.visibleReplies.map(\.id), ["reply-1", "reply-2", "reply-3", "reply-4"])
+        XCTAssertFalse(expandedThread.shouldShowThreadCTA)
+        XCTAssertNil(expandedThread.threadCTAAnchorCommentId)
+        XCTAssertNil(expandedThread.threadCTATargetCommentId)
+        _ = await replyButton(
+            in: viewController.rootView.tableView,
+            at: IndexPath(row: 4, section: 2),
+            expectedVisible: false
+        )
 
         viewController.tableView(viewController.rootView.tableView, didSelectRowAt: IndexPath(row: 1, section: 2))
         XCTAssertEqual(viewController.rootView.tableView.numberOfRows(inSection: 2), 5)
@@ -620,6 +692,35 @@ final class ReviewDiscussionInteractionTests: XCTestCase {
             await Task.yield()
         }
         XCTFail("Timed out waiting for condition")
+    }
+
+    private func replyButton(
+        in tableView: UITableView,
+        at indexPath: IndexPath,
+        expectedVisible: Bool,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async -> UIButton? {
+        tableView.scrollToRow(at: indexPath, at: .middle, animated: false)
+        tableView.layoutIfNeeded()
+
+        await waitUntil {
+            guard tableView.cellForRow(at: indexPath) is ReviewCommentCell else {
+                return false
+            }
+            return true
+        }
+
+        guard let cell = tableView.cellForRow(at: indexPath) as? ReviewCommentCell else {
+            XCTFail("Comment cell not visible at \(indexPath)", file: file, line: line)
+            return nil
+        }
+        let button = findButton(
+            in: cell.contentView,
+            accessibilityIdentifier: "reviewComment.replyButton"
+        )
+        XCTAssertEqual(button != nil, expectedVisible, file: file, line: line)
+        return button
     }
 
     private func makeViewModel(

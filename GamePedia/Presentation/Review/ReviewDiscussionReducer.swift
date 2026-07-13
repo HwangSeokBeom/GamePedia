@@ -17,6 +17,7 @@ enum ReviewDiscussionReducer {
         case .replaceReview(let review):
             state.review = review
         case .setComments(let comments):
+            state.hasLoadedComments = true
             state.allComments = comments
             state.comments = sortComments(comments, by: state.sortOption)
         case .setSortOption(let sortOption):

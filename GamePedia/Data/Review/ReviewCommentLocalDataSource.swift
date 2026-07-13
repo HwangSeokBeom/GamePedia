@@ -417,7 +417,7 @@ final class DefaultReviewCommentLocalDataSource: ReviewCommentLocalDataSource {
             let lhsRootCreatedAt = rootCreatedAtByThreadId[lhs.id] ?? lhs.createdAt
             let rhsRootCreatedAt = rootCreatedAtByThreadId[rhs.id] ?? rhs.createdAt
             if lhsRootCreatedAt != rhsRootCreatedAt {
-                return lhsRootCreatedAt < rhsRootCreatedAt
+                return lhsRootCreatedAt > rhsRootCreatedAt
             }
             return lhsParent < rhsParent
         }

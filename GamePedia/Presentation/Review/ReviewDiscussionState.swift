@@ -114,6 +114,7 @@ struct ReviewDiscussionState: Equatable {
     var review: Review? = nil
     var resolvedGameTitle: String? = nil
     var isLoading: Bool = false
+    var hasLoadedComments: Bool = false
     var allComments: [ReviewComment] = []
     var comments: [ReviewComment] = []
     var sortOption: ReviewCommentSortOption = .latest
@@ -176,7 +177,7 @@ struct ReviewDiscussionState: Equatable {
     }
 
     var totalDiscussionCount: Int {
-        if isLoading && allComments.isEmpty {
+        if hasLoadedComments == false && allComments.isEmpty && comments.isEmpty {
             return review?.commentCount ?? 0
         }
         return activeDiscussionCount

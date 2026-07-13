@@ -57,6 +57,13 @@ final class DiscussionUXStateTests: XCTestCase {
 
         XCTAssertEqual(state.discussionSectionState?.commentCount, 2)
         XCTAssertEqual(state.emptyStateActionTitle, L10n.tr("Localizable", "review.comment.empty.nonEmptyCta"))
+
+        state = ReviewDiscussionReducer.reduce(state, .setComments([]))
+
+        XCTAssertTrue(state.hasLoadedComments)
+        XCTAssertEqual(state.discussionSectionState?.commentCount, 0)
+        XCTAssertEqual(state.discussionContentState, .empty)
+        XCTAssertEqual(state.emptyStateActionTitle, L10n.tr("Localizable", "review.comment.empty.cta"))
     }
 
     func testReviewDiscussionSectionState_countsRepliesInLocalDiscussionState() {
