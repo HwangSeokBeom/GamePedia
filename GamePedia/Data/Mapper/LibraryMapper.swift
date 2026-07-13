@@ -11,8 +11,8 @@ enum LibraryMapper {
             displayName: sanitized(dto.displayName),
             personaName: sanitized(dto.personaName),
             profileURL: makeURL(from: dto.profileUrl),
-            canSync: dto.canSync ?? dto.isLinked,
-            canDisconnect: dto.canDisconnect ?? dto.isLinked,
+            canSync: dto.canSync,
+            canDisconnect: dto.canDisconnect,
             lastSteamSyncAt: parseDate(dto.lastSteamSyncAt)
         )
     }

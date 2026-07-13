@@ -23,8 +23,6 @@ private struct APIErrorEnvelope: Decodable {
 // talks to IGDB directly or performs Twitch token exchange on-device.
 
 final class APIClient {
-    private static let verboseNetworkBodyLogs = false
-
     // MARK: Singleton
     static let shared = APIClient(baseURL: AppConfig.authBaseURL)
 
@@ -65,55 +63,50 @@ final class APIClient {
         let isNotificationsRequest = endpoint.path == "/users/me/notifications"
         let isFriendActivityRequest = endpoint.path == "/users/me/friends/activity"
         let isProfileSummaryRequest = endpoint.path == "/users/me"
-        let isProfileRecentPlaysRequest = endpoint.path == "/users/me/recent-plays"
+        let isProfileRecentPlaysRequest = endpoint.path == "/users/me/recently-played"
         let isAIRecommendationRequest = endpoint.path == "/api/v1/ai/game-recommendations"
         let isLibraryCuratorRequest = endpoint.path == "/api/v1/ai/library-curator"
         let aiReviewSummaryGameId = aiReviewSummaryGameId(for: endpoint.path)
+        let logPath = redactedPathForLog(endpoint.path)
         if let homeEndpointName {
             print(
                 "\(homeLogPrefix) endpoint=\(homeEndpointName) " +
-                "url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil")"
+                "path=\(logPath) method=\(urlRequest.httpMethod ?? "nil")"
             )
         }
         if isGameRequest {
-            print("[GameAPI] request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil")")
+            print("[GameAPI] request endpoint=\(logPath) method=\(urlRequest.httpMethod ?? "nil")")
         }
         if endpoint.path.contains("/reviews") {
-            let bodyString = requestBodyPreview(from: urlRequest.httpBody)
-            print("[ReviewSubmit] APIClient.request url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(redactedHeaders(urlRequest.allHTTPHeaderFields)) bodyPrefix=\(bodyString)")
+            print("[ReviewSubmit] APIClient.request endpoint=\(logPath) method=\(urlRequest.httpMethod ?? "nil")")
         }
         let (data, response) = try await session.data(for: urlRequest)
         if let homeEndpointName, let httpResponse = response as? HTTPURLResponse {
             print(
                 "\(homeLogPrefix) endpoint=\(homeEndpointName) " +
-                "url=\(urlRequest.url?.absoluteString ?? "nil") status=\(httpResponse.statusCode)"
+                "path=\(logPath) status=\(httpResponse.statusCode)"
             )
-            print("\(homeLogPrefix) endpoint=\(homeEndpointName) bodyPrefix=\(responseBodyPreview(from: data))")
         }
         if isGameRequest, let httpResponse = response as? HTTPURLResponse {
-            print("[GameAPI] response status=\(httpResponse.statusCode) url=\(urlRequest.url?.absoluteString ?? "nil")")
+            print("[GameAPI] response endpoint=\(logPath) status=\(httpResponse.statusCode)")
         }
         if isNotificationsRequest, let httpResponse = response as? HTTPURLResponse {
-            let responseBody = networkBodyForLog(from: data)
-            print("[Notifications] rawResponse endpoint=/users/me/notifications status=\(httpResponse.statusCode) body=\(responseBody)")
+            print("[Notifications] response endpoint=/users/me/notifications status=\(httpResponse.statusCode)")
         }
         if isFriendActivityRequest, let httpResponse = response as? HTTPURLResponse {
-            let responseBody = networkBodyForLog(from: data)
-            print("[FriendActivity] rawResponse endpoint=/users/me/friends/activity status=\(httpResponse.statusCode) body=\(responseBody)")
+            print("[FriendActivity] response endpoint=/users/me/friends/activity status=\(httpResponse.statusCode)")
         }
         if isLibraryStatusRequest, let httpResponse = response as? HTTPURLResponse {
-            let responseBody = networkBodyForLog(from: data)
-            print("[Library] rawResponse endpoint=/users/me/library/status status=\(httpResponse.statusCode) body=\(responseBody)")
+            print("[Library] response endpoint=/users/me/library/status status=\(httpResponse.statusCode)")
         }
         if isLibraryPreviewRequest, let httpResponse = response as? HTTPURLResponse {
-            let responseBody = networkBodyForLog(from: data)
-            print("[Library] rawResponse endpoint=/users/me/library status=\(httpResponse.statusCode) body=\(responseBody)")
+            print("[Library] response endpoint=/users/me/library status=\(httpResponse.statusCode)")
         }
         if isProfileSummaryRequest, let httpResponse = response as? HTTPURLResponse {
             print("[Profile] response endpoint=/users/me status=\(httpResponse.statusCode)")
         }
         if isProfileRecentPlaysRequest, let httpResponse = response as? HTTPURLResponse {
-            print("[Profile] response endpoint=/users/me/recent-plays status=\(httpResponse.statusCode)")
+            print("[Profile] response endpoint=/users/me/recently-played status=\(httpResponse.statusCode)")
         }
         if endpoint.path.contains("/reviews"), let httpResponse = response as? HTTPURLResponse {
             print("[ReviewSubmit] APIClient.response status=\(httpResponse.statusCode)")
@@ -122,24 +115,21 @@ final class APIClient {
             print(
                 "[AIRecommendation] httpResponse " +
                 "endpoint=/api/v1/ai/game-recommendations " +
-                "statusCode=\(httpResponse.statusCode) " +
-                "bodyPreview=\(responseBodyPreview(from: data))"
+                "statusCode=\(httpResponse.statusCode)"
             )
         }
         if isLibraryCuratorRequest, let httpResponse = response as? HTTPURLResponse {
             print(
                 "[LibraryCurator] httpResponse " +
                 "endpoint=/api/v1/ai/library-curator " +
-                "statusCode=\(httpResponse.statusCode) " +
-                "bodyPreview=\(responseBodyPreview(from: data))"
+                "statusCode=\(httpResponse.statusCode)"
             )
         }
         if let aiReviewSummaryGameId, let httpResponse = response as? HTTPURLResponse {
             print(
                 "[AIReviewSummary] httpResponse " +
                 "gameId=\(aiReviewSummaryGameId) " +
-                "statusCode=\(httpResponse.statusCode) " +
-                "bodyPreview=\(responseBodyPreview(from: data))"
+                "statusCode=\(httpResponse.statusCode)"
             )
         }
         try validate(response: response, data: data)
@@ -177,58 +167,47 @@ final class APIClient {
                     "\(homeLogPrefix) endpoint=\(homeEndpointName) " +
                     "decodeError=\(error)"
                 )
-                print("\(homeLogPrefix) endpoint=\(homeEndpointName) bodyPrefix=\(responseBodyPreview(from: data))")
             }
             if isGameRequest {
-                let responseBody = networkBodyForLog(from: data)
-                print("[GameAPI] decodeFailure type=\(String(describing: type)) error=\(error.localizedDescription) body=\(responseBody)")
+                print("[GameAPI] decodeFailure type=\(String(describing: type)) error=\(error.localizedDescription)")
             }
             if isNotificationsRequest {
-                let responseBody = networkBodyForLog(from: data)
-                print("[Notifications] decodeFailure endpoint=/users/me/notifications type=\(String(describing: type)) error=\(error) body=\(responseBody)")
+                print("[Notifications] decodeFailure endpoint=/users/me/notifications type=\(String(describing: type)) error=\(error)")
             }
             if isFriendActivityRequest {
-                let responseBody = networkBodyForLog(from: data)
-                print("[FriendActivity] decodeFailure endpoint=/users/me/friends/activity type=\(String(describing: type)) error=\(error) body=\(responseBody)")
+                print("[FriendActivity] decodeFailure endpoint=/users/me/friends/activity type=\(String(describing: type)) error=\(error)")
             }
             if isLibraryStatusRequest {
-                let responseBody = networkBodyForLog(from: data)
-                print("[Library] decodeFailure endpoint=/users/me/library/status type=\(String(describing: type)) error=\(error) body=\(responseBody)")
+                print("[Library] decodeFailure endpoint=/users/me/library/status type=\(String(describing: type)) error=\(error)")
             }
             if isLibraryPreviewRequest {
-                let responseBody = networkBodyForLog(from: data)
-                print("[Library] decodeFailure endpoint=/users/me/library type=\(String(describing: type)) error=\(error) body=\(responseBody)")
+                print("[Library] decodeFailure endpoint=/users/me/library type=\(String(describing: type)) error=\(error)")
             }
             if isProfileSummaryRequest {
-                let responseBody = networkBodyForLog(from: data)
-                print("[Profile] decodeFailure endpoint=/users/me type=\(String(describing: type)) error=\(error) body=\(responseBody)")
+                print("[Profile] decodeFailure endpoint=/users/me type=\(String(describing: type)) error=\(error)")
             }
             if isProfileRecentPlaysRequest {
-                let responseBody = networkBodyForLog(from: data)
-                print("[Profile] decodeFailure endpoint=/users/me/recent-plays type=\(String(describing: type)) error=\(error) body=\(responseBody)")
+                print("[Profile] decodeFailure endpoint=/users/me/recently-played type=\(String(describing: type)) error=\(error)")
             }
             if let aiReviewSummaryGameId {
                 print(
                     "[AIReviewSummary] decodeFailed " +
                     "gameId=\(aiReviewSummaryGameId) " +
-                    "error=\(error) " +
-                    "bodyPreview=\(responseBodyPreview(from: data))"
+                    "error=\(error)"
                 )
             }
             if isAIRecommendationRequest {
                 print(
                     "[AIRecommendation] decodeFailure " +
                     "type=\(String(describing: type)) " +
-                    "error=\(error) " +
-                    "bodyPreview=\(responseBodyPreview(from: data))"
+                    "error=\(error)"
                 )
             }
             if isLibraryCuratorRequest {
                 print(
                     "[LibraryCurator] decodeFailure " +
                     "type=\(String(describing: type)) " +
-                    "error=\(error) " +
-                    "bodyPreview=\(responseBodyPreview(from: data))"
+                    "error=\(error)"
                 )
             }
             throw error
@@ -237,9 +216,9 @@ final class APIClient {
 
     func requestVoid(_ endpoint: Endpoint) async throws {
         let urlRequest = try await buildRequest(from: endpoint)
+        let logPath = redactedPathForLog(endpoint.path)
         if endpoint.path.contains("/reviews") {
-            let bodyString = requestBodyPreview(from: urlRequest.httpBody)
-            print("[ReviewSubmit] APIClient.requestVoid url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(redactedHeaders(urlRequest.allHTTPHeaderFields)) bodyPrefix=\(bodyString)")
+            print("[ReviewSubmit] APIClient.requestVoid endpoint=\(logPath) method=\(urlRequest.httpMethod ?? "nil")")
         }
         let (data, response) = try await session.data(for: urlRequest)
         if endpoint.path.contains("/reviews"), let httpResponse = response as? HTTPURLResponse {
@@ -324,32 +303,10 @@ final class APIClient {
 
     private func decode<T: Decodable>(_ data: Data, as type: T.Type) throws -> T {
         do {
-            let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
-            return try decoder.decode(type, from: data)
+            return try APIJSONCoding.makeDecoder().decode(type, from: data)
         } catch {
             throw NetworkError.decodingFailed(error)
         }
-    }
-
-    private func responseBodyPreview(from data: Data, maxLength: Int = 240) -> String {
-        let rawBody = String(data: data, encoding: .utf8) ?? "<non-utf8>"
-        let normalizedBody = rawBody.replacingOccurrences(of: "\n", with: " ")
-        guard normalizedBody.count > maxLength else { return normalizedBody }
-        let endIndex = normalizedBody.index(normalizedBody.startIndex, offsetBy: maxLength)
-        return "\(normalizedBody[..<endIndex])..."
-    }
-
-    private func networkBodyForLog(from data: Data) -> String {
-        if Self.verboseNetworkBodyLogs {
-            return String(data: data, encoding: .utf8) ?? "<non-utf8>"
-        }
-        return responseBodyPreview(from: data)
-    }
-
-    private func requestBodyPreview(from data: Data?) -> String {
-        guard let data else { return "" }
-        return responseBodyPreview(from: data, maxLength: 250)
     }
 
     private func logDecodedSummaryIfNeeded<T>(
@@ -363,15 +320,13 @@ final class APIClient {
             print(
                 "[Profile] decoded " +
                 "status=\(statusCode) " +
-                "userId=\(profile.id) " +
-                "nickname=\(profile.name) " +
                 "reviewCount=\(profile.writtenReviewCount) " +
                 "favoriteCount=\(profile.wishlistCount)"
             )
             return
         }
 
-        if endpoint.path == "/users/me/recent-plays",
+        if endpoint.path == "/users/me/recently-played",
            let response = decoded as? RecentGameListResponseDTO {
             print(
                 "[Profile] decoded " +
@@ -401,18 +356,13 @@ final class APIClient {
         endpoint.queryItems.first { $0.name == "sort" }?.value
     }
 
-    private func redactedHeaders(_ headers: [String: String]?) -> [String: String] {
-        guard let headers else { return [:] }
-        return headers.reduce(into: [:]) { result, pair in
-            let normalizedKey = pair.key.lowercased()
-            if normalizedKey == "authorization"
-                || normalizedKey.contains("token")
-                || normalizedKey.contains("cookie") {
-                result[pair.key] = "<redacted>"
-            } else {
-                result[pair.key] = pair.value
+    private func redactedPathForLog(_ path: String) -> String {
+        path
+            .split(separator: "/", omittingEmptySubsequences: false)
+            .map { component in
+                UUID(uuidString: String(component)) == nil ? String(component) : ":id"
             }
-        }
+            .joined(separator: "/")
     }
 
     private func homeEndpointName(for path: String) -> String? {

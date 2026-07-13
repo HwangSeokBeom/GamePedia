@@ -59,6 +59,7 @@
 "search.tab.title" = "Search";
 "search.placeholder" = "Search games";
 "search.empty.noResults" = "No results";
+"search.error.loadFailed" = "Couldn't load search results. Check your connection and try again.";
 "search.filter.all" = "All";
 
 "aiRecommendation.navigation.title" = "AI Recommendations";

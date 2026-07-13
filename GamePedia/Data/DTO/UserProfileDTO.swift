@@ -469,6 +469,7 @@ struct RecentGameListResponseDTO: Decodable {
         if let container = try? decoder.container(keyedBy: CodingKeys.self) {
             if let dataContainer = try? container.nestedContainer(keyedBy: CodingKeys.self, forKey: .data) {
                 recentGames =
+                    (try? dataContainer.decodeIfPresent([RecentGameDTO].self, forKey: .games)) ??
                     (try? dataContainer.decodeIfPresent([RecentGameDTO].self, forKey: .recentGames)) ??
                     (try? dataContainer.decodeIfPresent([RecentGameDTO].self, forKey: .recentlyPlayed)) ??
                     (try? dataContainer.decodeIfPresent([RecentGameDTO].self, forKey: .recentPlayedPreview)) ??
@@ -480,6 +481,7 @@ struct RecentGameListResponseDTO: Decodable {
             }
 
             recentGames =
+                (try? container.decodeIfPresent([RecentGameDTO].self, forKey: .games)) ??
                 (try? container.decodeIfPresent([RecentGameDTO].self, forKey: .recentGames)) ??
                 (try? container.decodeIfPresent([RecentGameDTO].self, forKey: .recentlyPlayed)) ??
                 (try? container.decodeIfPresent([RecentGameDTO].self, forKey: .recentPlayedPreview)) ??
@@ -503,6 +505,7 @@ struct RecentGameListResponseDTO: Decodable {
 
     private enum CodingKeys: String, CodingKey {
         case data
+        case games
         case recentGames
         case recentlyPlayed
         case recentPlayedPreview

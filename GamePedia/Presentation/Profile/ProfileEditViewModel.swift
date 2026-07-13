@@ -32,7 +32,7 @@ final class ProfileEditViewModel {
         self.uploadCurrentUserProfileImageUseCase = uploadCurrentUserProfileImageUseCase
         self.removeCurrentUserProfileImageUseCase = removeCurrentUserProfileImageUseCase
         self.profileBadgeSelectionStore = profileBadgeSelectionStore
-        print("[ProfileEdit] initial selectedTitleKey=\(initialSelectedTitleKey ?? "nil")")
+        print("[ProfileEdit] initial selectedTitleExists=\(initialSelectedTitleKey != nil)")
         apply(.setNicknameValidationMessage(nicknameValidationMessage(for: authenticatedUser.nickname)))
     }
 
@@ -73,7 +73,7 @@ final class ProfileEditViewModel {
         let selectedTitleKeys = selectedTitleKey.map { [$0] } ?? []
         let selectedTitle = profileBadgeSelectionStore.badgeTitle(for: selectedTitleKey)
         print("[ProfileEdit] save tapped")
-        print("[ProfileEdit] selectedTitleKey=\(selectedTitleKey ?? "nil")")
+        print("[ProfileEdit] selectedTitleExists=\(selectedTitleKey != nil)")
         apply(.setNickname(trimmedNickname))
         apply(.setNicknameValidationMessage(nicknameValidationMessage(for: trimmedNickname)))
 
@@ -88,14 +88,14 @@ final class ProfileEditViewModel {
 
         let basePublisher: AnyPublisher<AuthUser, AuthError>
         if shouldUpdateProfile {
-            print("[ProfileEdit] save payload selectedTitleKeys=\(selectedTitleKeys)")
+            print("[ProfileEdit] save payload selectedTitleCount=\(selectedTitleKeys.count)")
             basePublisher = updateCurrentUserProfileUseCase.execute(
                 nickname: trimmedNickname,
                 selectedTitleKeys: selectedTitleKeys
             )
                 .eraseToAnyPublisher()
         } else {
-            print("[ProfileEdit] save payload selectedTitleKeys=\(selectedTitleKeys)")
+            print("[ProfileEdit] save skippedProfileUpdate selectedTitleCount=\(selectedTitleKeys.count)")
             basePublisher = Just(state.originalUser)
                 .setFailureType(to: AuthError.self)
                 .eraseToAnyPublisher()
@@ -155,9 +155,8 @@ final class ProfileEditViewModel {
                     print(
                         """
                         [ProfileEdit] saveSuccess \
-                        userId=\(authenticatedUser.id) \
                         hasProfileImage=\((authenticatedUser.profileImageUrl?.isEmpty == false)) \
-                        selectedTitleKey=\(selectedTitleKey ?? "nil")
+                        selectedTitleExists=\(selectedTitleKey != nil)
                         """
                     )
 
@@ -179,7 +178,7 @@ final class ProfileEditViewModel {
 
     private func toggleBadgeSelection(_ badgeTitle: String) {
         let selectedTitleKey = profileBadgeSelectionStore.selectedTitleKey(for: badgeTitle)
-        print("[ProfileEdit] tapped selectedTitleKey=\(selectedTitleKey ?? "nil")")
+        print("[ProfileEdit] tapped selectedTitleExists=\(selectedTitleKey != nil)")
         apply(.setSelectedTitleKey(selectedTitleKey))
     }
 

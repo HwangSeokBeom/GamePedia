@@ -21,10 +21,10 @@ final class LibraryCuratorViewModel {
         var description: String {
             [
                 "mode=\(mode)",
-                "query=\(normalizedQuery.isEmpty ? "nil" : normalizedQuery)",
-                "prompt=\(selectedPromptID)",
-                "taste=\(selectedTasteTagIDs.joined(separator: ","))",
-                "genre=\(selectedGenreTagIDs.joined(separator: ","))",
+                "queryLength=\(normalizedQuery.count)",
+                "promptSelected=\(!selectedPromptID.isEmpty)",
+                "tasteCount=\(selectedTasteTagIDs.count)",
+                "genreCount=\(selectedGenreTagIDs.count)",
                 "scope=\(candidateScope)",
                 "limit=\(limit)",
                 "locale=\(locale)"

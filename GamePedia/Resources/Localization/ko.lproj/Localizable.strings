@@ -59,6 +59,7 @@
 "search.tab.title" = "검색";
 "search.placeholder" = "게임을 검색하세요";
 "search.empty.noResults" = "결과 없음";
+"search.error.loadFailed" = "검색 결과를 불러오지 못했습니다. 연결을 확인하고 다시 시도해 주세요.";
 "search.filter.all" = "전체";
 
 "aiRecommendation.navigation.title" = "AI 추천";

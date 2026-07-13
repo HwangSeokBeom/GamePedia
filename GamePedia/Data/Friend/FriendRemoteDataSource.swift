@@ -27,7 +27,7 @@ final class DefaultFriendRemoteDataSource: FriendRemoteDataSource {
     }
 
     func searchFriends(keyword: String) async throws -> FriendSearchResponseDataDTO {
-        print("[Friend] request endpoint=GET /users/search keyword=\(keyword)")
+        print("[Friend] request endpoint=GET /users/search keywordLength=\(keyword.count)")
         let response = try await apiClient.request(
             .searchFriends(keyword: keyword),
             as: FriendResponseEnvelopeDTO<FriendSearchResponseDataDTO>.self
@@ -47,22 +47,22 @@ final class DefaultFriendRemoteDataSource: FriendRemoteDataSource {
     }
 
     func sendFriendRequest(userID: String) async throws {
-        print("[Friend] request endpoint=POST /users/me/friend-requests toUserId=\(userID)")
+        print("[Friend] request endpoint=POST /users/me/friend-requests")
         try await apiClient.requestVoid(.sendFriendRequest(body: SendFriendRequestDTO(toUserId: userID)))
     }
 
     func acceptFriendRequest(requestID: String) async throws {
-        print("[Friend] request endpoint=PATCH /users/me/friend-requests/\(requestID)/accept")
+        print("[Friend] request endpoint=PATCH /users/me/friend-requests/:requestId/accept")
         try await apiClient.requestVoid(.acceptFriendRequest(requestID: requestID))
     }
 
     func rejectFriendRequest(requestID: String) async throws {
-        print("[Friend] request endpoint=PATCH /users/me/friend-requests/\(requestID)/reject")
+        print("[Friend] request endpoint=PATCH /users/me/friend-requests/:requestId/reject")
         try await apiClient.requestVoid(.rejectFriendRequest(requestID: requestID))
     }
 
     func cancelFriendRequest(requestID: String) async throws {
-        print("[Friend] request endpoint=DELETE /users/me/friend-requests/\(requestID)")
+        print("[Friend] request endpoint=DELETE /users/me/friend-requests/:requestId")
         try await apiClient.requestVoid(.cancelFriendRequest(requestID: requestID))
     }
 
@@ -84,13 +84,13 @@ final class DefaultFriendRemoteDataSource: FriendRemoteDataSource {
         )
         print(
             "[Friend] response endpoint=GET /users/me/steam-friends success count=\(response.data.friends.count) " +
-            "available=\(response.data.steamFriendsAvailable ?? false) privacy=\(response.data.steamFriendsLimitedByPrivacy ?? false)"
+            "available=\(response.data.steamFriendsAvailable) privacy=\(response.data.steamFriendsLimitedByPrivacy)"
         )
         return response.data
     }
 
     func fetchFriendProfile(userID: String) async throws -> FriendProfileResponseDataDTO {
-        print("[Friend] request endpoint=GET /users/\(userID)/profile")
+        print("[Friend] request endpoint=GET /users/:userId/profile")
         let response = try await apiClient.request(
             .friendProfile(userID: userID),
             as: FriendResponseEnvelopeDTO<FriendProfileResponseDataDTO>.self
@@ -112,7 +112,7 @@ final class DefaultFriendRemoteDataSource: FriendRemoteDataSource {
     }
 
     func fetchFriendRecommendations(userID: String) async throws -> FriendRecommendationsResponseDataDTO {
-        print("[Friend] request endpoint=GET /users/\(userID)/friend-recommendations")
+        print("[Friend] request endpoint=GET /users/:userId/friend-recommendations")
         let response = try await apiClient.request(
             .friendRecommendations(userID: userID),
             as: FriendResponseEnvelopeDTO<FriendRecommendationsResponseDataDTO>.self
@@ -121,17 +121,17 @@ final class DefaultFriendRemoteDataSource: FriendRemoteDataSource {
     }
 
     func removeFriend(userID: String) async throws {
-        print("[Friend] request endpoint=DELETE /users/me/friends/\(userID)")
+        print("[Friend] request endpoint=DELETE /users/me/friends/:userId")
         try await apiClient.requestVoid(.removeFriend(userID: userID))
     }
 
     func blockUser(userID: String) async throws {
-        print("[Friend] request endpoint=POST /users/me/blocks userId=\(userID)")
+        print("[Friend] request endpoint=POST /users/me/blocks")
         try await apiClient.requestVoid(.blockUser(body: BlockUserRequestDTO(userId: userID)))
     }
 
     func fetchSocialPrivacySettings() async throws -> SocialPrivacySettingsResponseDataDTO {
-        print("[Friend] request endpoint=GET /users/me/privacy-settings")
+        print("[Friend] request endpoint=GET /users/me/privacy")
         let response = try await apiClient.request(
             .socialPrivacySettings,
             as: FriendResponseEnvelopeDTO<SocialPrivacySettingsResponseDataDTO>.self
@@ -148,7 +148,7 @@ final class DefaultFriendRemoteDataSource: FriendRemoteDataSource {
     }
 
     func updateSocialPrivacySettings(_ payload: UpdateSocialPrivacySettingsRequestDTO) async throws -> SocialPrivacySettingsResponseDataDTO {
-        print("[Friend] request endpoint=PATCH /users/me/privacy-settings")
+        print("[Friend] request endpoint=PATCH /users/me/privacy")
         let response = try await apiClient.request(
             .updateSocialPrivacySettings(body: payload),
             as: FriendResponseEnvelopeDTO<SocialPrivacySettingsResponseDataDTO>.self
@@ -166,6 +166,15 @@ final class DefaultFriendRemoteDataSource: FriendRemoteDataSource {
 
     func importSteamFriends() async throws {
         print("[Friend] request endpoint=POST /users/me/friends/steam/import")
-        try await apiClient.requestVoid(.importSteamFriends)
+        let response = try await apiClient.request(
+            .importSteamFriends,
+            as: FriendResponseEnvelopeDTO<SteamFriendsResponseDataDTO>.self
+        )
+        print(
+            "[Friend] response endpoint=POST /users/me/friends/steam/import " +
+            "count=\(response.data.friends.count) " +
+            "available=\(response.data.steamFriendsAvailable) " +
+            "limitedByPrivacy=\(response.data.steamFriendsLimitedByPrivacy)"
+        )
     }
 }

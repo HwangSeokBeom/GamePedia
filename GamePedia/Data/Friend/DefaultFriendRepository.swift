@@ -47,8 +47,8 @@ final class DefaultFriendRepository: FriendRepository {
         let data = try await remoteDataSource.fetchSteamFriends()
         return (
             friends: data.friends.map(mapSteamFriend),
-            isAvailable: data.steamFriendsAvailable ?? false,
-            isLimitedByPrivacy: data.steamFriendsLimitedByPrivacy ?? false,
+            isAvailable: data.steamFriendsAvailable,
+            isLimitedByPrivacy: data.steamFriendsLimitedByPrivacy,
             syncWarningCode: sanitized(data.syncWarningCode)
         )
     }

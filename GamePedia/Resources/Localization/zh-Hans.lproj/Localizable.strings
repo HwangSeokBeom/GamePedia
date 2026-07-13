@@ -59,6 +59,7 @@
 "search.tab.title" = "搜索";
 "search.placeholder" = "搜索游戏";
 "search.empty.noResults" = "无结果";
+"search.error.loadFailed" = "无法加载搜索结果。请检查网络连接后重试。";
 "search.filter.all" = "全部";
 
 "aiRecommendation.navigation.title" = "AI 推荐";

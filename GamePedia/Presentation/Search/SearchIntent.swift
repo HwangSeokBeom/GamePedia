@@ -6,6 +6,7 @@ enum SearchIntent {
     case viewDidLoad
     case queryChanged(String)
     case queryCleared
-    case genreSelected(String)
+    case genreSelected(SearchGenre)
+    case retryTapped
     case didTapGame(id: Int)
 }

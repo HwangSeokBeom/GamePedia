@@ -943,10 +943,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-<<<<<<< HEAD
-=======
 				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
->>>>>>> dev
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -1001,10 +998,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
-<<<<<<< HEAD
-=======
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
->>>>>>> dev
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -1018,11 +1012,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = GamePedia/GamePedia.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-<<<<<<< HEAD
 				CURRENT_PROJECT_VERSION = 1;
-=======
-				CURRENT_PROJECT_VERSION = 5;
->>>>>>> dev
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "GamePedia/Info-Debug.plist";
@@ -1036,11 +1026,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-<<<<<<< HEAD
 				MARKETING_VERSION = 2.0.0;
-=======
-				MARKETING_VERSION = 1.1.1;
->>>>>>> dev
 				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDev;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -1107,7 +1093,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
@@ -1118,7 +1104,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.deviceDev.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -1144,7 +1130,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
@@ -1155,7 +1141,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1184,7 +1170,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
@@ -1195,7 +1181,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1224,7 +1210,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = GamePediaWidgetExtension/GamePediaWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 63SB2B8YJ5;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GamePediaWidgetExtension/Info.plist;
@@ -1235,7 +1221,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hwb.GamePedia.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

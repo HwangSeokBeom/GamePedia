@@ -71,7 +71,7 @@ struct TranslationHostView: View {
                 continue
             }
 
-            print("[TranslationHost] requested field=\(item.field) text=\(item.text.prefix(60))")
+            print("[TranslationHost] requested field=\(item.field) characterCount=\(item.text.count)")
 
             do {
                 let response = try await session.translate(item.text)
@@ -89,7 +89,7 @@ struct TranslationHostView: View {
                         translatedText: translatedText
                     )
                 )
-                print("[TranslationHost] translated field=\(item.field) result=\(translatedText.prefix(60))")
+                print("[TranslationHost] translated field=\(item.field) characterCount=\(translatedText.count)")
             } catch {
                 print("[TranslationHost] skipped reason=translation-failed field=\(item.field) error=\(error.localizedDescription)")
             }

@@ -88,7 +88,7 @@ final class AISearchAssistViewModel {
         apply(.setLoading(true))
 
 #if DEBUG
-        print("[AISearchAssist] request query=\(query) limit=10")
+        print("[AISearchAssist] request queryLength=\(query.count) limit=10")
 #endif
 
         currentTask = Task { [weak self] in

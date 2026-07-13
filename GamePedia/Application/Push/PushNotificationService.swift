@@ -116,11 +116,9 @@ final class PushNotificationService: NSObject {
     }
 
     private func logTokenSummary(_ token: String, source: String) {
-        let prefix = String(token.prefix(4))
-        let suffix = String(token.suffix(4))
         print(
             "[FCM] didReceiveRegistrationToken exists=true " +
-            "prefix=\(prefix) suffix=\(suffix) length=\(token.count) source=\(source)"
+            "length=\(token.count) source=\(source)"
         )
     }
 }

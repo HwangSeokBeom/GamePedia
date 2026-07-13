@@ -3,22 +3,73 @@ import Foundation
 
 final class DefaultAuthRepository: AuthRepository {
 
+    private final class RefreshFlight {
+        let publisher: AnyPublisher<AuthSession, AuthError>
+        let generation: UInt64
+        private let resolve: (Result<AuthSession, AuthError>) -> Void
+        private let lock = NSLock()
+        private var cancellable: AnyCancellable?
+        private var isCompleted = false
+
+        init(
+            publisher: AnyPublisher<AuthSession, AuthError>,
+            generation: UInt64,
+            resolve: @escaping (Result<AuthSession, AuthError>) -> Void
+        ) {
+            self.publisher = publisher
+            self.generation = generation
+            self.resolve = resolve
+        }
+
+        func install(_ cancellable: AnyCancellable) {
+            lock.lock()
+            if isCompleted {
+                lock.unlock()
+                cancellable.cancel()
+                return
+            }
+            self.cancellable = cancellable
+            lock.unlock()
+        }
+
+        func complete(_ result: Result<AuthSession, AuthError>) {
+            lock.lock()
+            guard isCompleted == false else {
+                lock.unlock()
+                return
+            }
+            isCompleted = true
+            lock.unlock()
+
+            resolve(result)
+        }
+    }
+
     private let authRemoteDataSource: AuthRemoteDataSource
     private let tokenStore: any TokenStore
     private let userSessionStore: any UserSessionStore
     private let apiClient: APIClient
+    private let refreshWillCommit: (() -> Void)?
+    private let refreshDidAttemptCommit: (() -> Void)?
     private var cancellables = Set<AnyCancellable>()
+    private let refreshLock = NSRecursiveLock()
+    private var refreshGeneration: UInt64 = 0
+    private var inFlightRefresh: RefreshFlight?
 
     init(
         authRemoteDataSource: AuthRemoteDataSource,
         tokenStore: any TokenStore,
         userSessionStore: any UserSessionStore,
-        apiClient: APIClient = .shared
+        apiClient: APIClient = .shared,
+        refreshWillCommit: (() -> Void)? = nil,
+        refreshDidAttemptCommit: (() -> Void)? = nil
     ) {
         self.authRemoteDataSource = authRemoteDataSource
         self.tokenStore = tokenStore
         self.userSessionStore = userSessionStore
         self.apiClient = apiClient
+        self.refreshWillCommit = refreshWillCommit
+        self.refreshDidAttemptCommit = refreshDidAttemptCommit
     }
 
     func login(email: String, password: String) -> AnyPublisher<AuthSession, AuthError> {
@@ -86,9 +137,7 @@ final class DefaultAuthRepository: AuthRepository {
         print(
             """
             [AppleLogin] requestDTO prepared \
-            payloadKeys=[identityToken,deviceName] \
-            identityTokenExists=\(!requestDTO.identityToken.isEmpty) \
-            identityTokenLength=\(requestDTO.identityToken.count) \
+            credentialPresent=\(!requestDTO.identityToken.isEmpty) \
             deviceNameExists=\((requestDTO.deviceName?.isEmpty == false))
             """
         )
@@ -114,9 +163,7 @@ final class DefaultAuthRepository: AuthRepository {
         print(
             """
             [GoogleLogin] requestDTO prepared \
-            payloadKeys=[idToken,deviceName] \
-            idTokenExists=\(!requestDTO.idToken.isEmpty) \
-            idTokenLength=\(requestDTO.idToken.count) \
+            credentialPresent=\(!requestDTO.idToken.isEmpty) \
             deviceNameExists=\((requestDTO.deviceName?.isEmpty == false))
             """
         )
@@ -151,23 +198,54 @@ final class DefaultAuthRepository: AuthRepository {
     }
 
     func refreshSession() -> AnyPublisher<AuthSession, AuthError> {
+        refreshLock.lock()
+        if let inFlightRefresh {
+            refreshLock.unlock()
+            return inFlightRefresh.publisher
+        }
+
         guard let refreshToken = tokenStore.fetchRefreshToken() else {
+            refreshLock.unlock()
             return Fail(error: AuthError.missingRefreshToken).eraseToAnyPublisher()
         }
 
-        return authRemoteDataSource.refreshSession(refreshToken: refreshToken)
-            .tryMap { [weak self] responseDTO in
-                let session = try responseDTO.toDomainSession()
-                self?.persist(session)
-                return session
-            }
-            .handleEvents(receiveCompletion: { [weak self] completion in
-                if case .failure = completion {
-                    self?.clearStoredSession()
-                }
-            })
+        var resolve: ((Result<AuthSession, AuthError>) -> Void)?
+        let publisher = Future<AuthSession, AuthError> { promise in
+            resolve = promise
+        }
+        .eraseToAnyPublisher()
+        guard let resolve else {
+            refreshLock.unlock()
+            return Fail(error: AuthError.invalidResponse).eraseToAnyPublisher()
+        }
+        let flight = RefreshFlight(
+            publisher: publisher,
+            generation: refreshGeneration,
+            resolve: resolve
+        )
+        inFlightRefresh = flight
+        refreshLock.unlock()
+
+        let cancellable = authRemoteDataSource.refreshSession(refreshToken: refreshToken)
+            .tryMap { try $0.toDomainSession() }
             .mapError { $0 as? AuthError ?? AuthError.unknown(message: $0.localizedDescription) }
-            .eraseToAnyPublisher()
+            .sink(
+                receiveCompletion: { [weak self, weak flight] completion in
+                    guard let self, let flight else { return }
+                    if case .failure(let error) = completion {
+                        self.failRefresh(error, flight: flight)
+                    }
+                },
+                receiveValue: { [weak self, weak flight] session in
+                    guard let self, let flight else { return }
+                    self.refreshWillCommit?()
+                    self.commitRefresh(session, flight: flight)
+                    self.refreshDidAttemptCommit?()
+                }
+            )
+        flight.install(cancellable)
+
+        return publisher
     }
 
     func fetchCurrentUser() -> AnyPublisher<AuthUser, AuthError> {
@@ -185,7 +263,7 @@ final class DefaultAuthRepository: AuthRepository {
         print(
             "[ProfileEdit] updateProfile " +
             "nicknameLength=\(nickname.count) " +
-            "selectedTitleKeys=\(selectedTitleKeys)"
+            "selectedTitleCount=\(selectedTitleKeys.count)"
         )
         return authRemoteDataSource.updateCurrentUserProfile(
             requestDTO: UpdateCurrentUserProfileRequestDTO(
@@ -232,8 +310,8 @@ final class DefaultAuthRepository: AuthRepository {
         let accessToken = tokenStore.fetchAccessToken()
         let logoutPublisher = authRemoteDataSource.logout(refreshToken: refreshToken)
 
+        invalidateStoredSession()
         PushNotificationService.shared.deleteRegisteredTokenOnLogout(accessToken: accessToken)
-        clearStoredSession()
 
         logoutPublisher
             .sink(
@@ -252,8 +330,9 @@ final class DefaultAuthRepository: AuthRepository {
                 return error
             }
             .handleEvents(receiveOutput: { [weak self] _ in
-                PushNotificationService.shared.deleteRegisteredTokenOnLogout(accessToken: self?.tokenStore.fetchAccessToken())
-                self?.clearStoredSession()
+                let accessToken = self?.tokenStore.fetchAccessToken()
+                self?.invalidateStoredSession()
+                PushNotificationService.shared.deleteRegisteredTokenOnLogout(accessToken: accessToken)
             })
             .eraseToAnyPublisher()
     }
@@ -263,9 +342,6 @@ final class DefaultAuthRepository: AuthRepository {
         tokenStore.saveRefreshToken(session.refreshToken)
         saveCurrentUser(session.user)
         apiClient.userAuthToken = session.accessToken
-#if DEBUG
-        AuthDebugAccessTokenLogger.logAccessTokenForPushTest(session.accessToken)
-#endif
         NotificationCenter.default.post(
             name: .authSessionDidChange,
             object: nil,
@@ -290,52 +366,39 @@ final class DefaultAuthRepository: AuthRepository {
             userInfo: [AuthSessionChangeUserInfoKey.isAuthenticated: false]
         )
     }
-}
 
-#if DEBUG
-private final class AuthDebugAccessTokenLogger {
-    private static var lastPrintedAccessToken: String?
-    private static let lock = NSLock()
-
-    // TODO: remove after FCM push test
-    static func logAccessTokenForPushTest(_ accessToken: String?) {
-        guard isAllowedDebugDevelopmentBuild else { return }
-
-        let trimmedAccessToken = accessToken?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard trimmedAccessToken.isEmpty == false else {
-            print("[AuthDebug] accessTokenForPushTest unavailable reason=empty")
+    private func commitRefresh(_ session: AuthSession, flight: RefreshFlight) {
+        refreshLock.lock()
+        guard inFlightRefresh === flight, flight.generation == refreshGeneration else {
+            refreshLock.unlock()
             return
         }
+        persist(session)
+        inFlightRefresh = nil
+        flight.complete(.success(session))
+        refreshLock.unlock()
+    }
 
-        lock.lock()
-        defer { lock.unlock() }
-
-        guard lastPrintedAccessToken != trimmedAccessToken else {
-            print("[AuthDebug] accessTokenForPushTest skipped reason=unchanged")
+    private func failRefresh(_ error: AuthError, flight: RefreshFlight) {
+        refreshLock.lock()
+        guard inFlightRefresh === flight else {
+            refreshLock.unlock()
             return
         }
-
-        lastPrintedAccessToken = trimmedAccessToken
-        print("[AuthDebug] accessTokenForPushTest=\(trimmedAccessToken)")
+        refreshGeneration &+= 1
+        inFlightRefresh = nil
+        clearStoredSession()
+        flight.complete(.failure(error))
+        refreshLock.unlock()
     }
 
-    private static var isAllowedDebugDevelopmentBuild: Bool {
-        let buildConfiguration = normalized(AppConfig.buildConfiguration)
-        guard buildConfiguration == "debug" else { return false }
-        guard AppConfig.apiEnvironment != .production else { return false }
-
-        let buildFlavor = normalized(AppConfig.buildFlavor)
-        guard buildFlavor != "staging", buildFlavor != "production" else { return false }
-
-        let distributionChannel = normalized(AppConfig.distributionChannel)
-        let isDevelopmentChannel = ["devicedev", "local", "testflight"].contains(distributionChannel)
-        let isDevelopmentEnvironmentOrFlavor = AppConfig.apiEnvironment == .dev || buildFlavor == "dev"
-
-        return isDevelopmentEnvironmentOrFlavor || isDevelopmentChannel
-    }
-
-    private static func normalized(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    private func invalidateStoredSession() {
+        refreshLock.lock()
+        refreshGeneration &+= 1
+        let flight = inFlightRefresh
+        inFlightRefresh = nil
+        clearStoredSession()
+        flight?.complete(.failure(.unauthorized))
+        refreshLock.unlock()
     }
 }
-#endif

@@ -243,7 +243,7 @@ extension Endpoint {
     }
 
     static func recentPlays(limit: Int = 20) -> Endpoint {
-        .get("/users/me/recent-plays", query: [
+        .get("/users/me/recently-played", query: [
             URLQueryItem(name: "limit", value: "\(limit)")
         ], userAuth: true)
     }
@@ -336,11 +336,11 @@ extension Endpoint {
     }
 
     static var socialPrivacySettings: Endpoint {
-        .get("/users/me/privacy-settings", userAuth: true)
+        .get("/users/me/privacy", userAuth: true)
     }
 
     static func updateSocialPrivacySettings(body: UpdateSocialPrivacySettingsRequestDTO) -> Endpoint {
-        .patch("/users/me/privacy-settings", body: body, userAuth: true)
+        .patch("/users/me/privacy", body: body, userAuth: true)
     }
 
     static var importSteamFriends: Endpoint {

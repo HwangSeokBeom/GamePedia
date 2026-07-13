@@ -538,7 +538,7 @@ final class AppCoordinator {
             ensureMainInterface(selectedIndex: 3)
             if let userID {
                 profileCoordinator?.navigateToFriendProfile(userID: userID)
-                print("[PushRoute] executed destination=profile id=\(userID)")
+                print("[PushRoute] executed destination=profile")
             } else {
                 print("[PushRoute] executed destination=profile")
             }

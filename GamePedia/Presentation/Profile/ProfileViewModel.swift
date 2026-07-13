@@ -216,33 +216,21 @@ final class ProfileViewModel {
             let response = try await apiClient.request(.myProfile, as: CurrentUserProfileResponseDTO.self)
             print(
                 "[Profile] dto received " +
-                "selectedTitle=\(response.profile.selectedTitle ?? "nil") " +
-                "selectedTitles=\(response.profile.selectedTitles) " +
+                "selectedTitleExists=\(response.profile.selectedTitle != nil) " +
+                "selectedTitleCount=\(response.profile.selectedTitles.count) " +
                 "explicitSelected=\(response.profile.explicitSelected.map(String.init(describing:)) ?? "nil") " +
                 "availableTitles=\(response.profile.availableTitles.count) " +
                 "recentPlayedPreview=\(response.profile.recentPlayedPreview.count) " +
                 "recentPlayedCount=\(response.profile.recentPlayedCount) " +
                 "recentPlayedSource=\(response.profile.recentPlayedSource ?? "nil")"
             )
-            response.profile.recentPlayedPreview.forEach { game in
-                print(
-                    "[RecentPlayDecode] " +
-                    "screen=Profile.summary " +
-                    "title=\(game.title) " +
-                    "recentPlaytimeMinutes=\(game.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
-                    "lastPlayedAt=\(game.lastPlayedAt) " +
-                    "hasReliableLastPlayedAt=\(game.hasReliableLastPlayedAt.map(String.init) ?? "nil") " +
-                    "lastPlayedAtSource=\(game.lastPlayedAtSource ?? "nil") " +
-                    "fallbackReason=\(game.fallbackReason ?? "nil")"
-                )
-            }
             let profileSummary = UserProfileMapper.toEntity(response.profile)
             let selectedTitleKey = self.profileBadgeSelectionStore.selectedTitleKey(for: profileSummary.resolvedBadgeTitle)
             print(
                 "[Profile] entity mapped " +
-                "selectedTitle=\(profileSummary.selectedTitle ?? "nil") " +
-                "selectedTitleKey=\(selectedTitleKey ?? "nil") " +
-                "selectedTitles=\(profileSummary.selectedTitles) " +
+                "selectedTitleExists=\(profileSummary.selectedTitle != nil) " +
+                "selectedTitleKeyExists=\(selectedTitleKey != nil) " +
+                "selectedTitleCount=\(profileSummary.selectedTitles.count) " +
                 "explicitSelected=\(profileSummary.explicitSelected.map(String.init(describing:)) ?? "nil") " +
                 "availableTitles=\(profileSummary.availableTitles.count) " +
                 "profileTags=\(profileSummary.profileTags.count) " +
@@ -267,13 +255,10 @@ final class ProfileViewModel {
                 }
                 self.refreshSelectedBadges()
                 print(
-                    "[Profile] current selectedTitleKey from server = \(self.state.selectedTitleKey ?? "nil")"
-                )
-                print(
                     "[Profile] state emitted " +
-                    "selectedTitle=\(self.state.selectedTitle ?? "nil") " +
-                    "selectedTitleKey=\(self.state.selectedTitleKey ?? "nil") " +
-                    "selectedTitles=\(self.state.selectedTitles) " +
+                    "selectedTitleExists=\(self.state.selectedTitle != nil) " +
+                    "selectedTitleKeyExists=\(self.state.selectedTitleKey != nil) " +
+                    "selectedTitleCount=\(self.state.selectedTitles.count) " +
                     "explicitSelected=\(self.state.hasExplicitSelectedTitles.map(String.init(describing:)) ?? "nil") " +
                     "recentPlayed=\(self.state.recentlyPlayedGames.count) " +
                     "friendCount=\(self.state.friendCount) " +
@@ -300,18 +285,6 @@ final class ProfileViewModel {
                 "count=\(response.recentGames.count) " +
                 "hasMore=\(response.hasMoreRecentPlayed ?? false)"
             )
-            response.recentGames.forEach { game in
-                print(
-                    "[RecentPlayDecode] " +
-                    "screen=Profile.\(source).dto " +
-                    "title=\(game.title) " +
-                    "recentPlaytimeMinutes=\(game.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
-                    "lastPlayedAt=\(game.lastPlayedAt) " +
-                    "hasReliableLastPlayedAt=\(game.hasReliableLastPlayedAt.map(String.init) ?? "nil") " +
-                    "lastPlayedAtSource=\(game.lastPlayedAtSource ?? "nil") " +
-                    "fallbackReason=\(game.fallbackReason ?? "nil")"
-                )
-            }
             let games = response.recentGames
                 .map { UserProfileMapper.toRecentGameEntity($0) }
                 .sorted { lhs, rhs in
@@ -480,7 +453,7 @@ final class ProfileViewModel {
                 self.apply(.setAuthenticatedUser(user))
                 let selectedTitleKey = notification.userInfo?[ProfileChangeUserInfoKey.selectedTitleKey] as? String
                 let selectedTitle = notification.userInfo?[ProfileChangeUserInfoKey.selectedTitle] as? String
-                print("[Profile] profileChanged selectedTitleKey=\(selectedTitleKey ?? "nil") selectedTitle=\(selectedTitle ?? "nil")")
+                print("[Profile] profileChanged selectedTitleExists=\(selectedTitle != nil)")
                 self.apply(.setSelectedTitleSelection(title: selectedTitle, key: selectedTitleKey))
                 self.refreshSelectedBadges()
                 Task {
