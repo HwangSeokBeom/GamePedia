@@ -353,6 +353,231 @@ final class AuthRefreshConcurrencyTests: XCTestCase {
         assertSessionInvalidationWinsDecodedRefresh(useAccountDeletion: true)
     }
 
+    // MARK: - Waiter cancellation
+
+    func testCancellingOneWaiterKeepsSharedRefreshAliveForRemainingWaiters() {
+        let context = makeContext(initialRefreshToken: "old-refresh")
+        defer { context.session.invalidateAndCancel() }
+
+        RefreshURLProtocol.responseDelay = 0.2
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "new-access", refreshToken: "new-refresh")
+        )
+
+        let firstWaiter = context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { _ in
+                    XCTFail("A cancelled waiter must not receive a completion.")
+                },
+                receiveValue: { _ in
+                    XCTFail("A cancelled waiter must not receive a session.")
+                }
+            )
+
+        let secondWaiterReceived = expectation(description: "remaining waiter receives the shared result")
+        context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Remaining waiter failed: \(error)")
+                    }
+                },
+                receiveValue: { session in
+                    XCTAssertEqual(session.refreshToken, "new-refresh")
+                    secondWaiterReceived.fulfill()
+                }
+            )
+            .store(in: &cancellables)
+
+        firstWaiter.cancel()
+
+        wait(for: [secondWaiterReceived], timeout: 2)
+
+        XCTAssertEqual(RefreshURLProtocol.requestCount, 1)
+        XCTAssertEqual(RefreshURLProtocol.refreshTokens, ["old-refresh"])
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+        XCTAssertEqual(context.apiClient.userAuthToken, "new-access")
+    }
+
+    func testLastWaiterCancellationCancelsRequestAndLeavesSessionUntouched() {
+        let context = makeContext(initialRefreshToken: "old-refresh")
+        defer { context.session.invalidateAndCancel() }
+
+        // The stub would only answer after 2 seconds, so any stopLoading
+        // observed inside the 0.8 second window below can only come from the
+        // abandoned flight cancelling its underlying URLSession task.
+        RefreshURLProtocol.responseDelay = 2
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "abandoned-access", refreshToken: "abandoned-refresh")
+        )
+
+        let authenticatedNotifications = SessionChangeCounter(authenticated: true)
+        defer { authenticatedNotifications.stop() }
+
+        let noDelivery = expectation(description: "abandoned waiter receives nothing")
+        noDelivery.isInverted = true
+        let onlyWaiter = context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { _ in noDelivery.fulfill() },
+                receiveValue: { _ in noDelivery.fulfill() }
+            )
+
+        // Cancelling immediately can beat the URLSession task's own startup,
+        // in which case the protocol never starts loading at all. Wait until
+        // the request is genuinely in flight so the test exercises the
+        // cancellation of live provider work.
+        let requestStarted = expectation(description: "refresh request started")
+        DispatchQueue.global().async {
+            while RefreshURLProtocol.requestCount < 1 {
+                usleep(10_000)
+            }
+            requestStarted.fulfill()
+        }
+        wait(for: [requestStarted], timeout: 2)
+
+        onlyWaiter.cancel()
+
+        wait(for: [noDelivery], timeout: 0.8)
+
+        XCTAssertEqual(RefreshURLProtocol.stopLoadingCount, 1, "Cancelling the last waiter must cancel the underlying request.")
+        XCTAssertNil(context.tokenStore.fetchAccessToken())
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "old-refresh")
+        XCTAssertNil(context.apiClient.userAuthToken)
+        XCTAssertNil(context.userStore.fetchUser())
+        XCTAssertEqual(authenticatedNotifications.count, 0)
+
+        // The abandoned flight was detached, so a later refresh starts a new
+        // request with the still-unconsumed refresh token.
+        RefreshURLProtocol.responseDelay = 0
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "new-access", refreshToken: "new-refresh")
+        )
+
+        let refreshed = expectation(description: "fresh refresh succeeds")
+        context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Fresh refresh failed: \(error)")
+                    }
+                },
+                receiveValue: { _ in refreshed.fulfill() }
+            )
+            .store(in: &cancellables)
+        wait(for: [refreshed], timeout: 2)
+
+        XCTAssertEqual(RefreshURLProtocol.requestCount, 2)
+        XCTAssertEqual(RefreshURLProtocol.refreshTokens, ["old-refresh", "old-refresh"])
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+    }
+
+    func testLateSuccessCannotPersistSessionAfterLastWaiterCancelled() {
+        let resolveEntered = DispatchSemaphore(value: 0)
+        let releaseResolve = DispatchSemaphore(value: 0)
+        let resolveFinished = DispatchSemaphore(value: 0)
+        let context = makeContext(
+            initialRefreshToken: "old-refresh",
+            refreshWillResolve: {
+                resolveEntered.signal()
+                _ = releaseResolve.wait(timeout: .now() + 4)
+            },
+            refreshDidResolve: { resolveFinished.signal() }
+        )
+        defer { context.session.invalidateAndCancel() }
+
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "late-access", refreshToken: "late-refresh")
+        )
+
+        let onlyWaiter = context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { _ in
+                    XCTFail("A cancelled waiter must not receive a completion.")
+                },
+                receiveValue: { _ in
+                    XCTFail("A cancelled waiter must not receive a session.")
+                }
+            )
+
+        // The decoded refresh success is parked right before the repository
+        // resolves it; the last waiter cancels while it is parked.
+        XCTAssertEqual(resolveEntered.wait(timeout: .now() + 2), .success)
+
+        let authenticatedNotifications = SessionChangeCounter(authenticated: true)
+        defer { authenticatedNotifications.stop() }
+
+        onlyWaiter.cancel()
+
+        releaseResolve.signal()
+        XCTAssertEqual(resolveFinished.wait(timeout: .now() + 2), .success)
+
+        XCTAssertNil(context.tokenStore.fetchAccessToken())
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "old-refresh")
+        XCTAssertNil(context.apiClient.userAuthToken)
+        XCTAssertNil(context.userStore.fetchUser())
+        XCTAssertEqual(authenticatedNotifications.count, 0)
+    }
+
+    func testLateFailureCannotClearSessionAfterLastWaiterCancelled() {
+        let resolveEntered = DispatchSemaphore(value: 0)
+        let releaseResolve = DispatchSemaphore(value: 0)
+        let resolveFinished = DispatchSemaphore(value: 0)
+        let context = makeContext(
+            initialRefreshToken: "old-refresh",
+            refreshWillResolve: {
+                resolveEntered.signal()
+                _ = releaseResolve.wait(timeout: .now() + 4)
+            },
+            refreshDidResolve: { resolveFinished.signal() }
+        )
+        defer { context.session.invalidateAndCancel() }
+
+        context.tokenStore.saveAccessToken("old-access")
+        context.apiClient.userAuthToken = "old-access"
+
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 401,
+            data: Data(
+                """
+                {"success": false, "data": null, "error": {"code": "UNAUTHORIZED", "message": "expired"}}
+                """.utf8
+            )
+        )
+
+        let onlyWaiter = context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { _ in
+                    XCTFail("A cancelled waiter must not receive a completion.")
+                },
+                receiveValue: { _ in
+                    XCTFail("A cancelled waiter must not receive a session.")
+                }
+            )
+
+        // The refresh failure is parked right before the repository resolves
+        // it; the last waiter cancels while it is parked.
+        XCTAssertEqual(resolveEntered.wait(timeout: .now() + 2), .success)
+
+        let unauthenticatedNotifications = SessionChangeCounter(authenticated: false)
+        defer { unauthenticatedNotifications.stop() }
+
+        onlyWaiter.cancel()
+
+        releaseResolve.signal()
+        XCTAssertEqual(resolveFinished.wait(timeout: .now() + 2), .success)
+
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "old-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "old-refresh")
+        XCTAssertEqual(context.apiClient.userAuthToken, "old-access")
+        XCTAssertEqual(unauthenticatedNotifications.count, 0)
+    }
+
     // MARK: - Credential logging privacy
 
     func testAuthenticationFlowsDoNotLogRawCredentials() {
@@ -838,6 +1063,7 @@ private struct StubRoute {
 private final class RefreshURLProtocol: URLProtocol {
     private static let lock = NSLock()
     private static var storedRequestCount = 0
+    private static var storedStopLoadingCount = 0
     private static var storedRefreshTokens: [String] = []
     private static var storedRouteResponses: [String: StubRoute] = [:]
     static var responseData = Data()
@@ -847,6 +1073,12 @@ private final class RefreshURLProtocol: URLProtocol {
         lock.lock()
         defer { lock.unlock() }
         return storedRequestCount
+    }
+
+    static var stopLoadingCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedStopLoadingCount
     }
 
     static var refreshTokens: [String] {
@@ -871,6 +1103,7 @@ private final class RefreshURLProtocol: URLProtocol {
     static func reset() {
         lock.lock()
         storedRequestCount = 0
+        storedStopLoadingCount = 0
         storedRefreshTokens = []
         storedRouteResponses = [:]
         responseData = Data()
@@ -914,7 +1147,11 @@ private final class RefreshURLProtocol: URLProtocol {
         }
     }
 
-    override func stopLoading() {}
+    override func stopLoading() {
+        Self.lock.lock()
+        Self.storedStopLoadingCount += 1
+        Self.lock.unlock()
+    }
 
     private static func bodyData(for request: URLRequest) -> Data? {
         if let body = request.httpBody {

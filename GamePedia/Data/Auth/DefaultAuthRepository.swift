@@ -3,22 +3,42 @@ import Foundation
 
 final class DefaultAuthRepository: AuthRepository {
 
+    // The shared result publisher is a Future, so a downstream cancellation
+    // never propagates to the privately retained upstream sink on its own.
+    // The flight therefore counts active waiters itself: when the last one
+    // cancels before a terminal result, it atomically invalidates the flight,
+    // detaches it from the repository, and cancels the upstream request so a
+    // late response can neither persist nor clear credentials. It shares the
+    // repository's recursive lock so that this invalidation is atomic with
+    // commitRefresh/failRefresh and free of lock-order inversions.
     private final class RefreshFlight {
-        let publisher: AnyPublisher<AuthSession, AuthError>
         let generation: UInt64
+        private(set) var publisher: AnyPublisher<AuthSession, AuthError>
+        private let lock: NSRecursiveLock
         private let resolve: (Result<AuthSession, AuthError>) -> Void
-        private let lock = NSLock()
-        private var cancellable: AnyCancellable?
+        private var onAbandoned: ((RefreshFlight) -> Void)?
+        private var upstream: AnyCancellable?
+        private var activeWaiters = 0
         private var isCompleted = false
 
         init(
-            publisher: AnyPublisher<AuthSession, AuthError>,
+            result: AnyPublisher<AuthSession, AuthError>,
             generation: UInt64,
-            resolve: @escaping (Result<AuthSession, AuthError>) -> Void
+            lock: NSRecursiveLock,
+            resolve: @escaping (Result<AuthSession, AuthError>) -> Void,
+            onAbandoned: @escaping (RefreshFlight) -> Void
         ) {
-            self.publisher = publisher
             self.generation = generation
+            self.lock = lock
             self.resolve = resolve
+            self.onAbandoned = onAbandoned
+            self.publisher = result
+            self.publisher = result
+                .handleEvents(
+                    receiveSubscription: { [weak self] _ in self?.waiterDidSubscribe() },
+                    receiveCancel: { [weak self] in self?.waiterDidCancel() }
+                )
+                .eraseToAnyPublisher()
         }
 
         func install(_ cancellable: AnyCancellable) {
@@ -28,7 +48,7 @@ final class DefaultAuthRepository: AuthRepository {
                 cancellable.cancel()
                 return
             }
-            self.cancellable = cancellable
+            upstream = cancellable
             lock.unlock()
         }
 
@@ -39,9 +59,45 @@ final class DefaultAuthRepository: AuthRepository {
                 return
             }
             isCompleted = true
+            onAbandoned = nil
             lock.unlock()
 
             resolve(result)
+        }
+
+        private func waiterDidSubscribe() {
+            lock.lock()
+            if isCompleted == false {
+                activeWaiters += 1
+            }
+            lock.unlock()
+        }
+
+        private func waiterDidCancel() {
+            lock.lock()
+            guard isCompleted == false else {
+                lock.unlock()
+                return
+            }
+            activeWaiters -= 1
+            guard activeWaiters <= 0 else {
+                lock.unlock()
+                return
+            }
+            isCompleted = true
+            let upstream = self.upstream
+            self.upstream = nil
+            let onAbandoned = self.onAbandoned
+            self.onAbandoned = nil
+            // Detach from the repository while still holding the shared lock
+            // so a concurrent commit/fail cannot pass its identity check.
+            onAbandoned?(self)
+            lock.unlock()
+
+            upstream?.cancel()
+            // Resolve so a subscriber that grabbed the shared publisher
+            // before abandonment terminates instead of hanging forever.
+            resolve(.failure(.unauthorized))
         }
     }
 
@@ -216,9 +272,16 @@ final class DefaultAuthRepository: AuthRepository {
             return Fail(error: AuthError.invalidResponse).eraseToAnyPublisher()
         }
         let flight = RefreshFlight(
-            publisher: publisher,
+            result: publisher,
             generation: refreshGeneration,
-            resolve: resolve
+            lock: refreshLock,
+            resolve: resolve,
+            onAbandoned: { [weak self] abandoned in
+                guard let self else { return }
+                if self.inFlightRefresh === abandoned {
+                    self.inFlightRefresh = nil
+                }
+            }
         )
         inFlightRefresh = flight
         refreshLock.unlock()
@@ -244,7 +307,7 @@ final class DefaultAuthRepository: AuthRepository {
             )
         flight.install(cancellable)
 
-        return publisher
+        return flight.publisher
     }
 
     func fetchCurrentUser() -> AnyPublisher<AuthUser, AuthError> {
