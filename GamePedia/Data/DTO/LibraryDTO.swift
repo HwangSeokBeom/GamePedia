@@ -8,14 +8,11 @@ struct LibraryResponseEnvelopeDTO<DataDTO: Decodable>: Decodable {
 struct SteamLinkStatusDTO: Decodable {
     let isLinked: Bool
     let steamId: String?
-    let steamId64: String?
     let displayName: String?
     let personaName: String?
-    let avatarUrl: String?
     let profileUrl: String?
-    let canSync: Bool
-    let canDisconnect: Bool
-    let linkedAt: String?
+    let canSync: Bool?
+    let canDisconnect: Bool?
     let lastSteamSyncAt: String?
 }
 

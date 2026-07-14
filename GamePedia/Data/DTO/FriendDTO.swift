@@ -304,8 +304,8 @@ struct SteamFriendsContextDTO: Decodable {
 
 struct SteamFriendsResponseDataDTO: Decodable {
     let friends: [SteamFriendDTO]
-    let steamFriendsAvailable: Bool
-    let steamFriendsLimitedByPrivacy: Bool
+    let steamFriendsAvailable: Bool?
+    let steamFriendsLimitedByPrivacy: Bool?
     let syncWarningCode: String?
 }
 
@@ -529,46 +529,27 @@ struct SocialPrivacySettingsResponseDataDTO: Decodable {
 
         isFriendsListPublic = Self.decodeBool(
             from: resolvedContainer,
-            keys: [.showFriendsList, .isFriendsListPublic, .friendsListPublic, .friends_list_public]
-        ) ?? Self.decodeBool(
-            from: container,
-            keys: [.showFriendsList, .isFriendsListPublic, .friendsListPublic, .friends_list_public]
+            keys: [.isFriendsListPublic, .friendsListPublic, .friends_list_public]
         )
         isRecentPlayPublic = Self.decodeBool(
             from: resolvedContainer,
-            keys: [.showRecentlyPlayed, .isRecentPlayPublic, .recentPlayPublic, .recent_play_public]
-        ) ?? Self.decodeBool(
-            from: container,
-            keys: [.showRecentlyPlayed, .isRecentPlayPublic, .recentPlayPublic, .recent_play_public]
+            keys: [.isRecentPlayPublic, .recentPlayPublic, .recent_play_public]
         )
         isLikedGamesPublic = Self.decodeBool(
             from: resolvedContainer,
-            keys: [.showLikedGames, .isLikedGamesPublic, .likedGamesPublic, .liked_games_public]
-        ) ?? Self.decodeBool(
-            from: container,
-            keys: [.showLikedGames, .isLikedGamesPublic, .likedGamesPublic, .liked_games_public]
+            keys: [.isLikedGamesPublic, .likedGamesPublic, .liked_games_public]
         )
         isReviewsPublic = Self.decodeBool(
             from: resolvedContainer,
-            keys: [.showReviews, .isReviewsPublic, .reviewsPublic, .reviews_public]
-        ) ?? Self.decodeBool(
-            from: container,
-            keys: [.showReviews, .isReviewsPublic, .reviewsPublic, .reviews_public]
+            keys: [.isReviewsPublic, .reviewsPublic, .reviews_public]
         )
         steamFriendsFeatureAvailable = Self.decodeBool(
             from: resolvedContainer,
-            keys: [.steamFriendsFeatureAvailable, .isSteamFriendsFeatureAvailable, .steam_friends_feature_available]
-        ) ?? Self.decodeBool(
-            from: container,
             keys: [.steamFriendsFeatureAvailable, .isSteamFriendsFeatureAvailable, .steam_friends_feature_available]
         )
     }
 
     private enum CodingKeys: String, CodingKey {
-        case showFriendsList
-        case showRecentlyPlayed
-        case showLikedGames
-        case showReviews
         case isFriendsListPublic
         case friendsListPublic
         case friends_list_public
@@ -643,19 +624,4 @@ struct UpdateSocialPrivacySettingsRequestDTO: Encodable {
     let isRecentPlayPublic: Bool
     let isLikedGamesPublic: Bool
     let isReviewsPublic: Bool
-
-    private enum CodingKeys: String, CodingKey {
-        case showFriendsList
-        case showRecentlyPlayed
-        case showLikedGames
-        case showReviews
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(isFriendsListPublic, forKey: .showFriendsList)
-        try container.encode(isRecentPlayPublic, forKey: .showRecentlyPlayed)
-        try container.encode(isLikedGamesPublic, forKey: .showLikedGames)
-        try container.encode(isReviewsPublic, forKey: .showReviews)
-    }
 }

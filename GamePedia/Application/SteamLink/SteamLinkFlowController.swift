@@ -17,7 +17,7 @@ final class SteamLinkFlowController: NSObject, SteamLinkFlowControlling {
         lastHandledCallbackSignature = nil
         presentationAnchor = presenter?.view.window
 
-        print("[SteamLink] flowStarted")
+        print("[SteamLink] flowStarted url=\(url.absoluteString)")
 
         let authenticationSession = ASWebAuthenticationSession(
             url: url,
@@ -83,7 +83,7 @@ final class SteamLinkFlowController: NSObject, SteamLinkFlowControlling {
             return true
         }
 
-        print("[SteamLink] callbackReceived")
+        print("[SteamLink] callbackReceived url=\(callbackSignature)")
         print("[SteamLink] callbackParsed status=\(result.status.logValue) linked=\(result.linked.map(String.init) ?? "nil")")
 
         lastHandledCallbackSignature = callbackSignature

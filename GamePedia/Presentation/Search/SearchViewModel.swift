@@ -93,8 +93,16 @@ final class SearchViewModel {
         activeSearchID = searchID
         apply(.prepareSearch)
 
+        // Captured by value so the task never owns the view model: the loader
+        // and debounce run without a strong `self`, and every state change
+        // re-enters `self` weakly on the MainActor. Releasing the view model
+        // therefore runs `deinit`, which cancels this task, and cancellation
+        // propagates into the loader await.
+        let loadGames = self.loadGames
+        let debounceNanoseconds = self.debounceNanoseconds
+        let genreParameter = genre == .all ? nil : genre.rawValue
+
         searchTask = Task { [weak self] in
-            guard let self else { return }
             if debounce {
                 do {
                     try await Task.sleep(nanoseconds: debounceNanoseconds)
@@ -102,33 +110,33 @@ final class SearchViewModel {
                     return
                 }
             }
-            guard !Task.isCancelled else { return }
-            await performSearch(query: normalizedQuery, genre: genre, searchID: searchID)
+            guard self?.beginSearchIfCurrent(searchID) == true else { return }
+
+            print("[GameSearch] request queryLength=\(normalizedQuery.count)")
+
+            do {
+                let games = try await loadGames(normalizedQuery, genreParameter)
+                guard !Task.isCancelled else { return }
+                print("[GameSearch] decodeSuccess resultCount=\(games.count)")
+                self?.completeSearch(searchID, with: .setResults(games))
+            } catch {
+                guard !Task.isCancelled else { return }
+                print("[GameSearch] requestFailed queryLength=\(normalizedQuery.count) errorType=\(String(describing: type(of: error)))")
+                self?.completeSearch(searchID, with: .setError(L10n.Search.Error.loadFailed))
+            }
         }
     }
 
-    private func performSearch(query: String, genre: SearchGenre, searchID: UUID) async {
-        guard activeSearchID == searchID else { return }
+    private func beginSearchIfCurrent(_ searchID: UUID) -> Bool {
+        guard !Task.isCancelled, activeSearchID == searchID else { return false }
         apply(.setSearching(true))
+        return true
+    }
 
-        print("[GameSearch] request queryLength=\(query.count)")
-
-        do {
-            let games = try await loadGames(
-                query,
-                genre == .all ? nil : genre.rawValue
-            )
-            print("[GameSearch] decodeSuccess resultCount=\(games.count)")
-            guard activeSearchID == searchID else { return }
-            activeSearchID = nil
-            apply(.setResults(games))
-        } catch {
-            guard !Task.isCancelled else { return }
-            print("[GameSearch] requestFailed queryLength=\(query.count) errorType=\(String(describing: type(of: error)))")
-            guard activeSearchID == searchID else { return }
-            activeSearchID = nil
-            apply(.setError(L10n.Search.Error.loadFailed))
-        }
+    private func completeSearch(_ searchID: UUID, with mutation: SearchMutation) {
+        guard activeSearchID == searchID else { return }
+        activeSearchID = nil
+        apply(mutation)
     }
 
     private func invalidateSearch() {

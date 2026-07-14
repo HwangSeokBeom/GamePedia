@@ -7,6 +7,7 @@ final class AuthRemoteDataSource {
     private let urlSession: URLSession
     private let tokenStore: any TokenStore
     private let jsonEncoder: JSONEncoder
+    private let jsonDecoder: JSONDecoder
 
     init(
         baseURL: URL = AppConfig.authBaseURL,
@@ -24,6 +25,8 @@ final class AuthRemoteDataSource {
             self.urlSession = URLSession(configuration: configuration)
         }
         self.jsonEncoder = JSONEncoder()
+        self.jsonDecoder = JSONDecoder()
+        self.jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
     }
 
     func login(requestDTO: LoginRequestDTO) -> AnyPublisher<AuthResponseDTO, AuthError> {
@@ -186,7 +189,7 @@ final class AuthRemoteDataSource {
                 [ProfileEdit] request sending \
                 requestURL=\(url.absoluteString) \
                 nicknameLength=\(requestDTO.nickname.count) \
-                selectedTitleCount=\(requestDTO.selectedTitleKeys.count)
+                selectedTitleKeys=\(requestDTO.selectedTitleKeys)
                 """
             )
         }
@@ -233,8 +236,8 @@ final class AuthRemoteDataSource {
 
         print(
             "[ProfileEdit] response " +
-            "selectedTitleKeyCount=\(selectedTitleKeys?.count ?? 0) " +
-            "selectedTitleCount=\(selectedTitles?.count ?? 0) " +
+            "selectedTitleKeys=\(selectedTitleKeys ?? []) " +
+            "selectedTitles=\(selectedTitles ?? []) " +
             "explicitSelected=\(explicitSelected.map(String.init(describing:)) ?? "nil")"
         )
     }
@@ -251,8 +254,6 @@ final class AuthRemoteDataSource {
         guard 200...299 ~= httpResponse.statusCode else {
             throw decodeFailure(from: data, statusCode: httpResponse.statusCode)
         }
-
-        let jsonDecoder = APIJSONCoding.makeDecoder()
 
         if responseType == AuthResponseDTO.self {
             let authResponseDTO = try jsonDecoder.decode(AuthResponseDTO.self, from: data)
@@ -292,7 +293,6 @@ final class AuthRemoteDataSource {
 
         guard !data.isEmpty else { return }
 
-        let jsonDecoder = APIJSONCoding.makeDecoder()
         if let envelope = try? jsonDecoder.decode(AuthFailureEnvelopeDTO<EmptyResponseDTO>.self, from: data),
            envelope.success == false,
            let errorPayload = envelope.error {
@@ -301,7 +301,6 @@ final class AuthRemoteDataSource {
     }
 
     private func decodeFailure(from data: Data, statusCode: Int) -> AuthError {
-        let jsonDecoder = APIJSONCoding.makeDecoder()
         if let envelope = try? jsonDecoder.decode(AuthFailureEnvelopeDTO<EmptyResponseDTO>.self, from: data),
            let errorPayload = envelope.error {
             return AuthError.from(serverCode: errorPayload.code, message: errorPayload.message)

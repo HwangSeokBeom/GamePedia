@@ -61,6 +61,7 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
             "reviewsCount=\(reviewsCount) " +
             "reviewAverageRating=\(reviewAverageRatingText)"
         )
+        logRecentPlayDecode(screen: "Library.overview", items: data.recentlyPlayed ?? [])
         return data
     }
 
@@ -104,6 +105,7 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
             "steamSyncStatus=\(response.data.steamSyncStatus ?? "nil") " +
             "recentlyPlayedCount=\(response.data.recentlyPlayed?.count ?? 0)"
         )
+        logRecentPlayDecode(screen: "Library.recentlyPlayedEndpoint", items: response.data.recentlyPlayed ?? [])
         return response.data
     }
 
@@ -154,7 +156,8 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
         )
         print(
             "[SteamLink] response endpoint=GET /users/me/steam " +
-            "isLinked=\(response.data.isLinked)"
+            "isLinked=\(response.data.isLinked) " +
+            "steamId=\(response.data.steamId ?? "nil")"
         )
         return response.data
     }
@@ -165,7 +168,7 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
             .startSteamLink,
             as: LibraryResponseEnvelopeDTO<SteamLinkStartResponseDataDTO>.self
         )
-        print("[SteamLink] response endpoint=POST /users/me/library/steam/link authUrlAvailable=\(response.data.steamLink.authUrl?.isEmpty == false)")
+        print("[SteamLink] response authUrl=\(response.data.steamLink.authUrl ?? "nil")")
         return response.data
     }
 
@@ -205,6 +208,8 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
     func updateGameStatus(requestDTO: UpdateLibraryStatusRequestDTO) async throws -> LibraryStatusMutationResponseDataDTO {
         print(
             "[Library] request endpoint=POST /users/me/library/status " +
+            "externalGameId=\(requestDTO.externalGameId) " +
+            "title=\(requestDTO.title) " +
             "gameSource=\(requestDTO.gameSource.uppercased()) " +
             "status=\(requestDTO.status)"
         )
@@ -214,8 +219,30 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
         )
         print(
             "[Library] response endpoint=POST /users/me/library/status " +
+            "externalGameId=\(response.data.libraryEntry.externalGameId ?? "nil") " +
             "status=\(response.data.libraryEntry.status)"
         )
         return response.data.libraryEntry
+    }
+
+    private func logRecentPlayDecode(screen: String, items: [LibraryGameItemDTO]) {
+        items.forEach { item in
+            let title = item.originalTitle
+                ?? item.originalName
+                ?? item.gameName
+                ?? item.title
+                ?? item.name
+                ?? L10n.tr("Localizable", "common.label.untitledGame")
+            print(
+                "[RecentPlayDecode] " +
+                "screen=\(screen) " +
+                "title=\(title) " +
+                "recentPlaytimeMinutes=\(item.recentPlaytimeMinutes.map(String.init) ?? "nil") " +
+                "lastPlayedAt=\(item.lastPlayedAt ?? "nil") " +
+                "hasReliableLastPlayedAt=\(item.hasReliableLastPlayedAt.map(String.init) ?? "nil") " +
+                "lastPlayedAtSource=\(item.lastPlayedAtSource ?? "nil") " +
+                "fallbackReason=\(item.fallbackReason ?? "nil")"
+            )
+        }
     }
 }

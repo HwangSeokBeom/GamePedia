@@ -19,6 +19,3 @@ DerivedData/
 build/
 *.ipa
 *.xcarchive
-
-# Claude Code machine-local settings
-.claude/settings.local.json

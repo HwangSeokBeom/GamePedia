@@ -81,7 +81,7 @@ final class FriendSearchViewModel {
                     if let relationshipStatus = self.relationshipStatus(for: error) {
                         self.updateRelationshipStatus(for: userID, status: relationshipStatus)
                         self.state.errorMessage = nil
-                        print("[FriendSearch] sendFriendRequest conflict mappedStatus=\(relationshipStatus.rawValue)")
+                        print("[FriendSearch] sendFriendRequest conflict userId=\(userID) mappedStatus=\(relationshipStatus.rawValue)")
                         return
                     }
                     self.state.errorMessage = L10n.Friend.Search.requestFailed
