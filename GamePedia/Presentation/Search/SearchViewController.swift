@@ -7,10 +7,12 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
     // MARK: Properties
     private let viewModel: SearchViewModel
     private let aiSearchAssistViewModel: AISearchAssistViewModel
-    private var genres: [String] = []
-    private var selectedGenre: String = ""
+    private var genres: [SearchGenre] = []
+    private var selectedGenre: SearchGenre = .all
     private var results: [Game] = []
+    private var latestSearchState = SearchState()
     private var latestAISearchAssistState = AISearchAssistState()
+    private var lastAnnouncedSearchError: String?
 
     // Set by SearchCoordinator.
     var onGameSelected: ((Int) -> Void)?
@@ -20,10 +22,12 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
     // MARK: Init
     init(
         rootView: SearchRootView,
-        viewModel: SearchViewModel = SearchViewModel(),
+        viewModel: SearchViewModel? = nil,
         aiSearchAssistViewModel: AISearchAssistViewModel = AISearchAssistViewModel()
     ) {
-        self.viewModel = viewModel
+        // SearchViewModel is @MainActor; it cannot be a default-argument
+        // expression, so it is constructed here inside the main-actor init.
+        self.viewModel = viewModel ?? SearchViewModel()
         self.aiSearchAssistViewModel = aiSearchAssistViewModel
         super.init(rootView: rootView)
         NavigationBarStyler.apply(.opaque, to: navigationItem, buttonTintColor: .gpPrimary)
@@ -53,6 +57,9 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
     }
 
     deinit {
+        // SearchViewModel is @MainActor and cancels its own in-flight task in
+        // its deinit; its search task holds self weakly, so releasing the
+        // controller releases the view model.
         aiSearchAssistViewModel.cancelInFlightRequest()
     }
 
@@ -78,6 +85,9 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
         rootView.searchTextField.addTarget(self, action: #selector(textFieldChanged), for: .editingChanged)
         rootView.searchTextField.delegate = self
         rootView.clearButton.addTarget(self, action: #selector(didTapClearButton), for: .touchUpInside)
+        rootView.errorStateView.onRetryTapped = { [weak self] in
+            self?.viewModel.send(.retryTapped)
+        }
         rootView.aiSearchAssistView.assistButton.addTarget(self, action: #selector(didTapAISearchAssistButton), for: .touchUpInside)
         rootView.aiSearchAssistView.retryButton.addTarget(self, action: #selector(didTapAISearchAssistRetryButton), for: .touchUpInside)
         rootView.aiSearchAssistView.onSuggestedQueryTapped = { [weak self] query in
@@ -105,15 +115,14 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
 
     private func bindViewModel() {
         viewModel.onStateChanged = { [weak self] state in
-            DispatchQueue.main.async {
-                self?.render(state)
-            }
+            self?.render(state)
         }
         aiSearchAssistViewModel.onStateChanged = { [weak self] state in
             DispatchQueue.main.async {
-                self?.latestAISearchAssistState = state
-                self?.rootView.renderAISearchAssist(state)
-                self?.updateSearchResultVisibility()
+                guard let self else { return }
+                self.latestAISearchAssistState = state
+                self.rootView.renderAISearchAssist(state)
+                self.renderSearchPresentation(self.latestSearchState)
             }
         }
         aiSearchAssistViewModel.onRouteToGameDetail = { [weak self] gameId in
@@ -125,8 +134,13 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
     }
 
     override func render(_ state: SearchState) {
-        // Base state rendering (clear button visibility, search indicator, etc.)
-        rootView.render(state, hasAISearchAssistResults: latestAISearchAssistState.hasResults)
+        latestSearchState = state
+        if state.errorMessage != lastAnnouncedSearchError {
+            lastAnnouncedSearchError = state.errorMessage
+            if let errorMessage = state.errorMessage {
+                UIAccessibility.post(notification: .announcement, argument: errorMessage)
+            }
+        }
 
         // Track genre selection changes reliably with a local variable.
         // (viewModel.state is already the new state when this fires, so comparing
@@ -142,23 +156,14 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
 
         // Client-side genre filter applied on top of API results.
         // Covers the case where the backend does not support genre filtering.
-        if selectedGenre == L10n.Search.Filter.all || selectedGenre.isEmpty {
+        if selectedGenre == .all {
             results = state.results
         } else {
-            results = state.results.filter {
-                $0.genre.localizedCaseInsensitiveContains(selectedGenre)
-            }
+            results = state.results.filter { selectedGenre.matches(canonicalGenre: $0.genre) }
         }
         GameDetailSeedStore.shared.store(games: results, screen: "Search.render")
 
-        // Override the count label to reflect the client-filtered count.
-        if !state.query.isEmpty {
-            rootView.resultCountLabel.isHidden = false
-            rootView.resultCountLabel.text = L10n.Search.Count.results(results.count)
-        }
-
-        // Sync empty state with the filtered result set.
-        updateSearchResultVisibility()
+        renderSearchPresentation(state)
 
         rootView.tableView.reloadData()
         rootView.updateSearchResultsTableHeight(resultCount: results.count)
@@ -206,11 +211,10 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
         aiSearchAssistViewModel.send(.suggestedQueryTapped(query))
     }
 
-    private func updateSearchResultVisibility() {
-        let queryIsEmpty = viewModel.state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        rootView.updateSearchResultVisibility(
-            queryIsEmpty: queryIsEmpty,
-            hasSearchResults: !results.isEmpty,
+    private func renderSearchPresentation(_ state: SearchState) {
+        rootView.render(
+            state,
+            displayedResultCount: results.count,
             hasAISearchAssistResults: latestAISearchAssistState.hasResults
         )
     }
@@ -269,7 +273,7 @@ extension SearchViewController: UICollectionViewDataSource, UICollectionViewDele
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: GenreChipCell.reuseId, for: indexPath) as! GenreChipCell
         let genre = genres[indexPath.item]
-        cell.configure(genre: genre, isSelected: genre == selectedGenre)
+        cell.configure(genre: genre.displayName, isSelected: genre == selectedGenre)
         return cell
     }
 
@@ -279,7 +283,7 @@ extension SearchViewController: UICollectionViewDataSource, UICollectionViewDele
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let genre = genres[indexPath.item]
-        return CGSize(width: GenreChipCell.estimatedWidth(for: genre), height: 36)
+        return CGSize(width: GenreChipCell.estimatedWidth(for: genre.displayName), height: 36)
     }
 }
 

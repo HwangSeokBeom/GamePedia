@@ -96,6 +96,13 @@ final class SearchRootView: UIView {
         return emptyStateView
     }()
 
+    let errorStateView: SearchErrorStateView = {
+        let view = SearchErrorStateView()
+        view.isHidden = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+
     let activityIndicator: UIActivityIndicatorView = {
         let activityIndicator = UIActivityIndicatorView(style: .medium)
         activityIndicator.color = .gpTextSecondary
@@ -111,6 +118,7 @@ final class SearchRootView: UIView {
     private let resultCountContainerView = UIView()
     private let tableContainerView = UIView()
     private let emptyStateContainerView = UIView()
+    private let errorStateContainerView = UIView()
     private var tableHeightConstraint: NSLayoutConstraint?
     private var scrollViewBottomInset: CGFloat = Layout.minimumBottomInset
 
@@ -147,7 +155,7 @@ final class SearchRootView: UIView {
         contentStackView.axis = .vertical
         contentStackView.spacing = 10
         contentStackView.translatesAutoresizingMaskIntoConstraints = false
-        [searchContainerView, aiSearchAssistContainerView, resultCountContainerView, tableContainerView, emptyStateContainerView].forEach {
+        [searchContainerView, aiSearchAssistContainerView, resultCountContainerView, tableContainerView, emptyStateContainerView, errorStateContainerView].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
 
@@ -166,6 +174,7 @@ final class SearchRootView: UIView {
         resultCountContainerView.addSubview(resultCountLabel)
         tableContainerView.addSubview(tableView)
         emptyStateContainerView.addSubview(emptyStateView)
+        errorStateContainerView.addSubview(errorStateView)
 
         [
             searchContainerView,
@@ -173,7 +182,8 @@ final class SearchRootView: UIView {
             aiSearchAssistContainerView,
             resultCountContainerView,
             tableContainerView,
-            emptyStateContainerView
+            emptyStateContainerView,
+            errorStateContainerView
         ].forEach {
             contentStackView.addArrangedSubview($0)
         }
@@ -182,6 +192,7 @@ final class SearchRootView: UIView {
         resultCountContainerView.isHidden = true
         tableContainerView.isHidden = true
         emptyStateContainerView.isHidden = true
+        errorStateContainerView.isHidden = true
 
         let tableHeightConstraint = tableView.heightAnchor.constraint(equalToConstant: 0)
         self.tableHeightConstraint = tableHeightConstraint
@@ -233,6 +244,12 @@ final class SearchRootView: UIView {
             emptyStateView.leadingAnchor.constraint(greaterThanOrEqualTo: emptyStateContainerView.leadingAnchor, constant: Layout.horizontalMargin),
             emptyStateView.trailingAnchor.constraint(lessThanOrEqualTo: emptyStateContainerView.trailingAnchor, constant: -Layout.horizontalMargin),
 
+            errorStateContainerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 220),
+            errorStateView.centerXAnchor.constraint(equalTo: errorStateContainerView.centerXAnchor),
+            errorStateView.centerYAnchor.constraint(equalTo: errorStateContainerView.centerYAnchor),
+            errorStateView.leadingAnchor.constraint(greaterThanOrEqualTo: errorStateContainerView.leadingAnchor, constant: Layout.horizontalMargin),
+            errorStateView.trailingAnchor.constraint(lessThanOrEqualTo: errorStateContainerView.trailingAnchor, constant: -Layout.horizontalMargin),
+
             activityIndicator.centerXAnchor.constraint(equalTo: centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
@@ -247,21 +264,34 @@ final class SearchRootView: UIView {
 
     // MARK: - State Rendering
 
-    func render(_ state: SearchState, hasAISearchAssistResults: Bool = false) {
+    func render(
+        _ state: SearchState,
+        displayedResultCount: Int,
+        hasAISearchAssistResults: Bool = false
+    ) {
         searchTextField.rightViewMode = state.query.isEmpty ? .never : .always
 
         if !state.query.isEmpty {
-            resultCountLabel.text = L10n.Search.Count.results(state.resultCount)
+            resultCountLabel.text = L10n.Search.Count.results(displayedResultCount)
         }
-        resultCountContainerView.isHidden = state.query.isEmpty
 
-        let shouldShowEmptyResult = state.showEmptyResult && !hasAISearchAssistResults
-        emptyStateContainerView.isHidden = !shouldShowEmptyResult
-        emptyStateView.isHidden = !shouldShowEmptyResult
-        tableContainerView.isHidden = shouldShowEmptyResult || state.resultCount == 0
-        updateSearchResultsTableHeight(resultCount: state.resultCount)
+        let presentationState = SearchPresentationState.resolve(
+            state: state,
+            displayedResultCount: displayedResultCount,
+            hasAISearchAssistResults: hasAISearchAssistResults
+        )
+        errorStateContainerView.isHidden = !presentationState.showError
+        errorStateView.isHidden = !presentationState.showError
+        errorStateView.configure(message: state.errorMessage)
 
-        if state.isSearching {
+        emptyStateContainerView.isHidden = !presentationState.showEmpty
+        emptyStateView.isHidden = !presentationState.showEmpty
+        tableContainerView.isHidden = !presentationState.showResults
+        resultCountContainerView.isHidden = !presentationState.showResultCount
+        aiSearchAssistView.setShowsNoSearchResultsNotice(presentationState.showAISearchAssistNotice)
+        updateSearchResultsTableHeight(resultCount: displayedResultCount)
+
+        if presentationState.isLoading {
             activityIndicator.startAnimating()
         } else {
             activityIndicator.stopAnimating()
@@ -273,20 +303,6 @@ final class SearchRootView: UIView {
         aiSearchAssistView.render(state)
         setNeedsLayout()
         layoutIfNeeded()
-    }
-
-    func updateSearchResultVisibility(
-        queryIsEmpty: Bool,
-        hasSearchResults: Bool,
-        hasAISearchAssistResults: Bool
-    ) {
-        let shouldShowEmptyResult = !queryIsEmpty && !hasSearchResults && !hasAISearchAssistResults
-        emptyStateContainerView.isHidden = !shouldShowEmptyResult
-        emptyStateView.isHidden = !shouldShowEmptyResult
-        tableContainerView.isHidden = !hasSearchResults || shouldShowEmptyResult
-        resultCountContainerView.isHidden = queryIsEmpty || (!hasSearchResults && hasAISearchAssistResults)
-        aiSearchAssistView.setShowsNoSearchResultsNotice(!queryIsEmpty && !hasSearchResults && hasAISearchAssistResults)
-        updateSearchResultsTableHeight(resultCount: hasSearchResults ? Int(tableView.numberOfRows(inSection: 0)) : 0)
     }
 
     func updateSearchResultsTableHeight(resultCount: Int) {
@@ -302,5 +318,76 @@ final class SearchRootView: UIView {
         scrollViewBottomInset = resolvedBottomInset
         scrollView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: resolvedBottomInset, right: 0)
         scrollView.verticalScrollIndicatorInsets.bottom = resolvedBottomInset
+    }
+}
+
+final class SearchErrorStateView: UIView {
+    var onRetryTapped: (() -> Void)?
+
+    private let iconImageView: UIImageView = {
+        let imageView = UIImageView(image: UIImage(systemName: "wifi.exclamationmark"))
+        imageView.tintColor = .gpTextTertiary
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let messageLabel: UILabel = {
+        let label = UILabel()
+        label.font = .preferredFont(forTextStyle: .body)
+        label.adjustsFontForContentSizeCategory = true
+        label.textColor = .gpTextSecondary
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        return label
+    }()
+
+    private let retryButton: UIButton = {
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = L10n.Common.Button.retry
+        configuration.cornerStyle = .medium
+        let button = UIButton(configuration: configuration)
+        button.accessibilityHint = L10n.Search.Error.loadFailed
+        return button
+    }()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setup()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setup()
+    }
+
+    func configure(message: String?) {
+        messageLabel.text = message
+    }
+
+    private func setup() {
+        let stackView = UIStackView(arrangedSubviews: [iconImageView, messageLabel, retryButton])
+        stackView.axis = .vertical
+        stackView.alignment = .center
+        stackView.spacing = 12
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stackView)
+
+        retryButton.addTarget(self, action: #selector(didTapRetry), for: .touchUpInside)
+
+        NSLayoutConstraint.activate([
+            iconImageView.widthAnchor.constraint(equalToConstant: 44),
+            iconImageView.heightAnchor.constraint(equalToConstant: 44),
+            messageLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 300),
+            retryButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            stackView.topAnchor.constraint(equalTo: topAnchor),
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    @objc private func didTapRetry() {
+        onRetryTapped?()
     }
 }

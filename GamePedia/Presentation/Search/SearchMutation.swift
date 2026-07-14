@@ -4,8 +4,10 @@ import Foundation
 
 enum SearchMutation {
     case setQuery(String)
-    case setGenre(String)
+    case setGenre(SearchGenre)
+    case prepareSearch
     case setResults([Game])
     case setSearching(Bool)
+    case setError(String)
     case clearResults
 }

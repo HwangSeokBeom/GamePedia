@@ -6,7 +6,10 @@ import Foundation
 // Korean (or other non-English) queries are translated server-side before
 // hitting IGDB, so the client sends the raw user query as-is.
 
+@MainActor
 final class SearchViewModel {
+
+    typealias SearchLoader = (_ query: String, _ genre: String?) async throws -> [Game]
 
     // MARK: State
     private(set) var state: SearchState = SearchState() {
@@ -16,15 +19,32 @@ final class SearchViewModel {
     var onStateChanged: ((SearchState) -> Void)?
 
     // MARK: Dependencies
-    private let apiClient: APIClient
+    private let loadGames: SearchLoader
 
     // MARK: Debounce
     private var searchTask: Task<Void, Never>? = nil
-    private let debounceMilliseconds: UInt64 = 400
+    private let debounceNanoseconds: UInt64
+    private var activeSearchID: UUID?
 
     // MARK: Init
-    init(apiClient: APIClient = .shared) {
-        self.apiClient = apiClient
+    init(
+        apiClient: APIClient = .shared,
+        debounceNanoseconds: UInt64 = 400_000_000,
+        loadGames: SearchLoader? = nil
+    ) {
+        self.debounceNanoseconds = debounceNanoseconds
+        self.loadGames = loadGames ?? { query, genre in
+            let endpoint = Endpoint.searchGames(query: query, genre: genre)
+            let response = try await apiClient.request(
+                endpoint,
+                as: GameResponseEnvelopeDTO<GameListResponseDataDTO>.self
+            )
+            return response.data.games.map { GameMapper.toEntity($0) }
+        }
+    }
+
+    deinit {
+        searchTask?.cancel()
     }
 
     // MARK: - Intent Processing
@@ -38,16 +58,21 @@ final class SearchViewModel {
             scheduleSearch(query: query, genre: state.selectedGenre)
         case .queryCleared:
             apply(.setQuery(""))
-            apply(.clearResults)
-            searchTask?.cancel()
+            invalidateSearch()
         case .genreSelected(let genre):
             apply(.setGenre(genre))
-            if !state.query.isEmpty {
-                scheduleSearch(query: state.query, genre: genre)
-            }
+            // The canonical search endpoint does not accept a genre parameter yet.
+            // SearchViewController filters the complete result set locally, so a
+            // chip change must not issue an identical network request.
+        case .retryTapped:
+            scheduleSearch(query: state.query, genre: state.selectedGenre, debounce: false)
         case .didTapGame:
             break   // handled by ViewController
         }
+    }
+
+    func cancelInFlightRequest() {
+        invalidateSearch()
     }
 
     // MARK: - Private
@@ -56,42 +81,68 @@ final class SearchViewModel {
         state = SearchReducer.reduce(state, mutation)
     }
 
-    private func scheduleSearch(query: String, genre: String) {
+    private func scheduleSearch(query: String, genre: SearchGenre, debounce: Bool = true) {
         searchTask?.cancel()
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
-            apply(.clearResults)
+        let normalizedQuery = SearchQueryPolicy.normalizedQuery(from: query)
+        guard !normalizedQuery.isEmpty else {
+            invalidateSearch()
             return
         }
 
-        searchTask = Task {
-            try? await Task.sleep(nanoseconds: debounceMilliseconds * 1_000_000)
-            guard !Task.isCancelled else { return }
-            await performSearch(query: query, genre: genre)
+        let searchID = UUID()
+        activeSearchID = searchID
+        apply(.prepareSearch)
+
+        // Captured by value so the task never owns the view model: the loader
+        // and debounce run without a strong `self`, and every state change
+        // re-enters `self` weakly on the MainActor. Releasing the view model
+        // therefore runs `deinit`, which cancels this task, and cancellation
+        // propagates into the loader await.
+        let loadGames = self.loadGames
+        let debounceNanoseconds = self.debounceNanoseconds
+        let genreParameter = genre == .all ? nil : genre.rawValue
+
+        searchTask = Task { [weak self] in
+            if debounce {
+                do {
+                    try await Task.sleep(nanoseconds: debounceNanoseconds)
+                } catch {
+                    return
+                }
+            }
+            guard self?.beginSearchIfCurrent(searchID) == true else { return }
+
+            print("[GameSearch] request queryLength=\(normalizedQuery.count)")
+
+            do {
+                let games = try await loadGames(normalizedQuery, genreParameter)
+                guard !Task.isCancelled else { return }
+                print("[GameSearch] decodeSuccess resultCount=\(games.count)")
+                self?.completeSearch(searchID, with: .setResults(games))
+            } catch {
+                guard !Task.isCancelled else { return }
+                print("[GameSearch] requestFailed queryLength=\(normalizedQuery.count) errorType=\(String(describing: type(of: error)))")
+                self?.completeSearch(searchID, with: .setError(L10n.Search.Error.loadFailed))
+            }
         }
     }
 
-    private func performSearch(query: String, genre: String) async {
-        await MainActor.run { apply(.setSearching(true)) }
+    private func beginSearchIfCurrent(_ searchID: UUID) -> Bool {
+        guard !Task.isCancelled, activeSearchID == searchID else { return false }
+        apply(.setSearching(true))
+        return true
+    }
 
-        print("[GameSearch] originalQuery=\"\(query)\"")
+    private func completeSearch(_ searchID: UUID, with mutation: SearchMutation) {
+        guard activeSearchID == searchID else { return }
+        activeSearchID = nil
+        apply(mutation)
+    }
 
-        do {
-            let endpoint = Endpoint.searchGames(
-                query: query,
-                genre: genre == L10n.Search.Filter.all ? nil : genre
-            )
-            let response = try await apiClient.request(
-                endpoint,
-                as: GameResponseEnvelopeDTO<GameListResponseDataDTO>.self
-            )
-            let games = response.data.games.map { GameMapper.toEntity($0) }
-            print("[GameSearch] decodeSuccess resultCount=\(games.count)")
-            await MainActor.run {
-                self.apply(.setResults(games))
-            }
-        } catch {
-            print("[GameSearch] decodeFailed query=\"\(query)\" error=\(error.localizedDescription)")
-            await MainActor.run { self.apply(.setResults([])) }
-        }
+    private func invalidateSearch() {
+        searchTask?.cancel()
+        searchTask = nil
+        activeSearchID = nil
+        apply(.clearResults)
     }
 }

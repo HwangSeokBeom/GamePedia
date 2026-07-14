@@ -59,6 +59,7 @@
 "search.tab.title" = "検索";
 "search.placeholder" = "ゲームを検索";
 "search.empty.noResults" = "結果がありません";
+"search.error.loadFailed" = "検索結果を読み込めませんでした。接続を確認して再試行してください。";
 "search.filter.all" = "すべて";
 
 "aiRecommendation.navigation.title" = "AIおすすめ";

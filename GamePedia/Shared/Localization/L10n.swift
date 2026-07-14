@@ -138,6 +138,10 @@ enum L10n {
       static let noResults = L10n.tr("Localizable", "search.empty.noResults")
     }
 
+    enum Error {
+      static let loadFailed = L10n.tr("Localizable", "search.error.loadFailed")
+    }
+
     enum Filter {
       static let all = L10n.tr("Localizable", "search.filter.all")
     }
