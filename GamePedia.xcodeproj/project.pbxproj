@@ -109,13 +109,6 @@
 			);
 			target = 8B9A88482F6EDC9A00D5F380 /* GamePedia */;
 		};
-		AD5E4C012F9A000100D5F380 /* Exceptions for "GamePediaTests" folder in "GamePediaTests" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				AuthRefreshConcurrencyTests.swift,
-			);
-			target = 8B9A885E2F6EDC9B00D5F380 /* GamePediaTests */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -129,9 +122,6 @@
 		};
 		8B9A88622F6EDC9B00D5F380 /* GamePediaTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				AD5E4C012F9A000100D5F380 /* Exceptions for "GamePediaTests" folder in "GamePediaTests" target */,
-			);
 			path = GamePediaTests;
 			sourceTree = "<group>";
 		};
