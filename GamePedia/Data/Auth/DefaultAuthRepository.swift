@@ -5,33 +5,77 @@ final class DefaultAuthRepository: AuthRepository {
 
     // The shared result publisher is a Future, so a downstream cancellation
     // never propagates to the privately retained upstream sink on its own.
-    // The flight therefore counts active waiters itself: when the last one
-    // cancels before a terminal result, it atomically invalidates the flight,
-    // detaches it from the repository, and cancels the upstream request so a
-    // late response can neither persist nor clear credentials. It shares the
-    // repository's recursive lock so that this invalidation is atomic with
-    // commitRefresh/failRefresh and free of lock-order inversions.
+    // The flight therefore tracks its waiters and models an explicit
+    // lifecycle so that publication, upstream installation, cancellation,
+    // and replacement form one coherent state transition:
+    //
+    //   starting          published in the repository slot; the creator has
+    //                     not installed the upstream subscription yet
+    //   active            upstream installed; waiters share one request
+    //   abandonRequested  the final waiter cancelled during startup; the
+    //                     flight keeps occupying the slot until the creator
+    //                     suppresses or cancels the upstream, so no
+    //                     replacement can overlap an abandoned request
+    //   abandoning        the final waiter cancelled an active flight; the
+    //                     slot stays occupied until the upstream
+    //                     cancellation has actually been issued
+    //   finished          terminal; the slot is released and a late result
+    //                     can neither persist nor clear credentials
+    //
+    // It shares the repository's recursive lock so that every transition is
+    // atomic with commitRefresh/failRefresh/supersede and free of lock-order
+    // inversions. Waiter resolution and upstream cancellation are always
+    // invoked outside the lock; the resolver and slot-cleared signal are
+    // consumed at most once, so completion, cancellation, and detachment
+    // stay idempotent.
     private final class RefreshFlight {
+        private enum State {
+            case starting
+            case active
+            case abandonRequested
+            case abandoning
+            case finished
+        }
+
         let generation: UInt64
         private(set) var publisher: AnyPublisher<AuthSession, AuthError>
+        // Completes only once the flight has released the repository slot,
+        // i.e. after any upstream cancellation has been issued. Callers that
+        // observed a dying flight wait on this before starting a replacement.
+        let slotCleared: AnyPublisher<Void, Never>
+
         private let lock: NSRecursiveLock
-        private let resolve: (Result<AuthSession, AuthError>) -> Void
-        private var onAbandoned: ((RefreshFlight) -> Void)?
+        private var state: State = .starting
         private var upstream: AnyCancellable?
         private var activeWaiters = 0
-        private var isCompleted = false
+        private var resolver: ((Result<AuthSession, AuthError>) -> Void)?
+        private var slotClearedSignal: (() -> Void)?
+        private var onAbandoned: ((RefreshFlight) -> Void)?
+        private let upstreamWillCancelForAbandonment: (() -> Void)?
 
         init(
             result: AnyPublisher<AuthSession, AuthError>,
             generation: UInt64,
             lock: NSRecursiveLock,
             resolve: @escaping (Result<AuthSession, AuthError>) -> Void,
+            upstreamWillCancelForAbandonment: (() -> Void)?,
             onAbandoned: @escaping (RefreshFlight) -> Void
         ) {
             self.generation = generation
             self.lock = lock
-            self.resolve = resolve
+            self.resolver = resolve
+            self.upstreamWillCancelForAbandonment = upstreamWillCancelForAbandonment
             self.onAbandoned = onAbandoned
+
+            var clearedPromise: ((Result<Void, Never>) -> Void)?
+            self.slotCleared = Future<Void, Never> { promise in
+                clearedPromise = promise
+            }
+            .eraseToAnyPublisher()
+            if let clearedPromise {
+                self.slotClearedSignal = { clearedPromise(.success(())) }
+            }
+
             self.publisher = result
             self.publisher = result
                 .handleEvents(
@@ -41,33 +85,90 @@ final class DefaultAuthRepository: AuthRepository {
                 .eraseToAnyPublisher()
         }
 
-        func install(_ cancellable: AnyCancellable) {
+        var isJoinable: Bool {
             lock.lock()
-            if isCompleted {
+            defer { lock.unlock() }
+            return state == .starting || state == .active
+        }
+
+        // MARK: Creator-side startup
+
+        func shouldStartUpstream() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return state == .starting
+        }
+
+        // The creator never built the upstream subscription because the
+        // flight stopped being startable while startup was parked.
+        func declineUpstream() {
+            lock.lock()
+            let wasAbandonRequested = state == .abandonRequested
+            lock.unlock()
+            if wasAbandonRequested {
+                finishAbandonment()
+            }
+            // .finished: a supersede already resolved the waiters and
+            // released the slot; nothing is left to do.
+        }
+
+        func activateUpstream(_ cancellable: AnyCancellable) {
+            lock.lock()
+            switch state {
+            case .starting:
+                upstream = cancellable
+                state = .active
+                lock.unlock()
+            case .abandonRequested:
+                // The final waiter cancelled while startup was in flight:
+                // cancel the just-created request before the slot becomes
+                // replaceable so no replacement can overlap it.
                 lock.unlock()
                 cancellable.cancel()
-                return
-            }
-            upstream = cancellable
-            lock.unlock()
-        }
-
-        func complete(_ result: Result<AuthSession, AuthError>) {
-            lock.lock()
-            guard isCompleted == false else {
+                finishAbandonment()
+            case .active, .abandoning, .finished:
+                // Terminal or foreign state: never adopt the subscription.
                 lock.unlock()
-                return
+                cancellable.cancel()
             }
-            isCompleted = true
-            onAbandoned = nil
+        }
+
+        // MARK: Repository-side completion
+
+        // Atomically claims the right to complete. Must be called with the
+        // shared lock held so the claim is atomic with the repository's
+        // identity check and slot release; an abandoning or finished flight
+        // can no longer be claimed, which keeps late results inert.
+        func tryBeginCompletion() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            guard state == .starting || state == .active else { return false }
+            state = .finished
+            return true
+        }
+
+        // Runs the externally visible part of a claimed completion. Must be
+        // called outside the repository lock: it cancels the upstream and
+        // resolves waiter callbacks, either of which may re-enter Combine.
+        func finishCompletion(_ result: Result<AuthSession, AuthError>) {
+            lock.lock()
+            let upstream = self.upstream
+            self.upstream = nil
+            self.onAbandoned = nil
+            let resolver = takeResolverLocked()
+            let signalSlotCleared = takeSlotClearedSignalLocked()
             lock.unlock()
 
-            resolve(result)
+            upstream?.cancel()
+            resolver?(result)
+            signalSlotCleared?()
         }
+
+        // MARK: Waiter tracking
 
         private func waiterDidSubscribe() {
             lock.lock()
-            if isCompleted == false {
+            if state == .starting || state == .active {
                 activeWaiters += 1
             }
             lock.unlock()
@@ -75,7 +176,7 @@ final class DefaultAuthRepository: AuthRepository {
 
         private func waiterDidCancel() {
             lock.lock()
-            guard isCompleted == false else {
+            guard state == .starting || state == .active else {
                 lock.unlock()
                 return
             }
@@ -84,20 +185,58 @@ final class DefaultAuthRepository: AuthRepository {
                 lock.unlock()
                 return
             }
-            isCompleted = true
+
+            if state == .starting {
+                // Startup has not installed the upstream yet. Record the
+                // abandonment but keep occupying the slot: the creator will
+                // suppress or cancel the request before releasing it.
+                state = .abandonRequested
+                let resolver = takeResolverLocked()
+                lock.unlock()
+                // Resolve so a subscriber that grabbed the shared publisher
+                // before abandonment terminates instead of hanging forever.
+                resolver?(.failure(.unauthorized))
+                return
+            }
+
+            state = .abandoning
             let upstream = self.upstream
             self.upstream = nil
+            lock.unlock()
+
+            // The slot stays occupied until this cancellation has been
+            // issued, so no replacement can overlap the rotating request.
+            upstreamWillCancelForAbandonment?()
+            upstream?.cancel()
+            finishAbandonment()
+        }
+
+        private func finishAbandonment() {
+            lock.lock()
+            state = .finished
             let onAbandoned = self.onAbandoned
             self.onAbandoned = nil
             // Detach from the repository while still holding the shared lock
             // so a concurrent commit/fail cannot pass its identity check.
             onAbandoned?(self)
+            let resolver = takeResolverLocked()
+            let signalSlotCleared = takeSlotClearedSignalLocked()
             lock.unlock()
 
-            upstream?.cancel()
-            // Resolve so a subscriber that grabbed the shared publisher
-            // before abandonment terminates instead of hanging forever.
-            resolve(.failure(.unauthorized))
+            resolver?(.failure(.unauthorized))
+            signalSlotCleared?()
+        }
+
+        private func takeResolverLocked() -> ((Result<AuthSession, AuthError>) -> Void)? {
+            let resolver = self.resolver
+            self.resolver = nil
+            return resolver
+        }
+
+        private func takeSlotClearedSignalLocked() -> (() -> Void)? {
+            let signal = slotClearedSignal
+            slotClearedSignal = nil
+            return signal
         }
     }
 
@@ -107,6 +246,8 @@ final class DefaultAuthRepository: AuthRepository {
     private let apiClient: APIClient
     private let refreshWillResolve: (() -> Void)?
     private let refreshDidResolve: (() -> Void)?
+    private let refreshUpstreamWillStart: (() -> Void)?
+    private let refreshUpstreamWillCancel: (() -> Void)?
     private var cancellables = Set<AnyCancellable>()
     private let refreshLock = NSRecursiveLock()
     private var refreshGeneration: UInt64 = 0
@@ -118,7 +259,9 @@ final class DefaultAuthRepository: AuthRepository {
         userSessionStore: any UserSessionStore,
         apiClient: APIClient = .shared,
         refreshWillResolve: (() -> Void)? = nil,
-        refreshDidResolve: (() -> Void)? = nil
+        refreshDidResolve: (() -> Void)? = nil,
+        refreshUpstreamWillStart: (() -> Void)? = nil,
+        refreshUpstreamWillCancel: (() -> Void)? = nil
     ) {
         self.authRemoteDataSource = authRemoteDataSource
         self.tokenStore = tokenStore
@@ -126,6 +269,8 @@ final class DefaultAuthRepository: AuthRepository {
         self.apiClient = apiClient
         self.refreshWillResolve = refreshWillResolve
         self.refreshDidResolve = refreshDidResolve
+        self.refreshUpstreamWillStart = refreshUpstreamWillStart
+        self.refreshUpstreamWillCancel = refreshUpstreamWillCancel
     }
 
     func login(email: String, password: String) -> AnyPublisher<AuthSession, AuthError> {
@@ -253,8 +398,26 @@ final class DefaultAuthRepository: AuthRepository {
     func refreshSession() -> AnyPublisher<AuthSession, AuthError> {
         refreshLock.lock()
         if let inFlightRefresh {
+            if inFlightRefresh.isJoinable {
+                refreshLock.unlock()
+                return inFlightRefresh.publisher
+            }
+            // The previous flight is being abandoned and its upstream
+            // cancellation has not been issued yet. A replacement must not
+            // overlap the still-live rotating request, so start the new
+            // refresh only once the flight has actually released the slot.
+            let slotCleared = inFlightRefresh.slotCleared
             refreshLock.unlock()
-            return inFlightRefresh.publisher
+            return slotCleared
+                .setFailureType(to: AuthError.self)
+                .flatMap { [weak self] _ -> AnyPublisher<AuthSession, AuthError> in
+                    guard let self else {
+                        return Fail(error: AuthError.unknown(message: "Repository was released"))
+                            .eraseToAnyPublisher()
+                    }
+                    return self.refreshSession()
+                }
+                .eraseToAnyPublisher()
         }
 
         guard let refreshToken = tokenStore.fetchRefreshToken() else {
@@ -276,6 +439,7 @@ final class DefaultAuthRepository: AuthRepository {
             generation: refreshGeneration,
             lock: refreshLock,
             resolve: resolve,
+            upstreamWillCancelForAbandonment: refreshUpstreamWillCancel,
             onAbandoned: { [weak self] abandoned in
                 guard let self else { return }
                 if self.inFlightRefresh === abandoned {
@@ -285,6 +449,17 @@ final class DefaultAuthRepository: AuthRepository {
         )
         inFlightRefresh = flight
         refreshLock.unlock()
+
+        refreshUpstreamWillStart?()
+
+        // The final waiter may have cancelled (or the session may have been
+        // superseded) while the flight was still starting. In that case the
+        // abandoned provider request is suppressed entirely; the slot is
+        // released only here, so no replacement could have overlapped it.
+        guard flight.shouldStartUpstream() else {
+            flight.declineUpstream()
+            return flight.publisher
+        }
 
         let cancellable = authRemoteDataSource.refreshSession(refreshToken: refreshToken)
             .tryMap { try $0.toDomainSession() }
@@ -305,7 +480,7 @@ final class DefaultAuthRepository: AuthRepository {
                     self.refreshDidResolve?()
                 }
             )
-        flight.install(cancellable)
+        flight.activateUpstream(cancellable)
 
         return flight.publisher
     }
@@ -437,34 +612,42 @@ final class DefaultAuthRepository: AuthRepository {
         refreshGeneration &+= 1
         let supersededFlight = inFlightRefresh
         inFlightRefresh = nil
+        let claimedSupersededFlight = supersededFlight?.tryBeginCompletion() ?? false
         persist(session)
-        supersededFlight?.complete(.failure(.unauthorized))
         refreshLock.unlock()
+
+        if claimedSupersededFlight {
+            supersededFlight?.finishCompletion(.failure(.unauthorized))
+        }
     }
 
     private func commitRefresh(_ session: AuthSession, flight: RefreshFlight) {
         refreshLock.lock()
-        guard inFlightRefresh === flight, flight.generation == refreshGeneration else {
+        guard inFlightRefresh === flight,
+              flight.generation == refreshGeneration,
+              flight.tryBeginCompletion() else {
             refreshLock.unlock()
             return
         }
-        persist(session)
         inFlightRefresh = nil
-        flight.complete(.success(session))
+        persist(session)
         refreshLock.unlock()
+
+        flight.finishCompletion(.success(session))
     }
 
     private func failRefresh(_ error: AuthError, flight: RefreshFlight) {
         refreshLock.lock()
-        guard inFlightRefresh === flight else {
+        guard inFlightRefresh === flight, flight.tryBeginCompletion() else {
             refreshLock.unlock()
             return
         }
         refreshGeneration &+= 1
         inFlightRefresh = nil
         clearStoredSession()
-        flight.complete(.failure(error))
         refreshLock.unlock()
+
+        flight.finishCompletion(.failure(error))
     }
 
     private func invalidateStoredSession() {
@@ -472,8 +655,12 @@ final class DefaultAuthRepository: AuthRepository {
         refreshGeneration &+= 1
         let flight = inFlightRefresh
         inFlightRefresh = nil
+        let claimedFlight = flight?.tryBeginCompletion() ?? false
         clearStoredSession()
-        flight?.complete(.failure(.unauthorized))
         refreshLock.unlock()
+
+        if claimedFlight {
+            flight?.finishCompletion(.failure(.unauthorized))
+        }
     }
 }
