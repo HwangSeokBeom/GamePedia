@@ -1112,6 +1112,426 @@ final class AuthRefreshConcurrencyTests: XCTestCase {
         XCTAssertEqual(unauthenticatedNotifications.count, 0)
     }
 
+    // MARK: - Session adoption vs. dying flights
+
+    func testLoginDuringFinalWaiterCancellationKeepsSlotOccupiedUntilCancellationIssued() {
+        let cancelParked = DispatchSemaphore(value: 0)
+        let releaseCancel = DispatchSemaphore(value: 0)
+        let context = makeContext(
+            initialRefreshToken: "old-refresh",
+            refreshUpstreamWillCancel: {
+                cancelParked.signal()
+                _ = releaseCancel.wait(timeout: .now() + 4)
+            }
+        )
+        defer { context.session.invalidateAndCancel() }
+        defer { releaseCancel.signal() }
+
+        RefreshURLProtocol.responseDelay = 5
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "abandoned-access", refreshToken: "abandoned-refresh")
+        )
+        RefreshURLProtocol.routeResponses["auth/login"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "login-access", refreshToken: "login-refresh")
+        )
+
+        // An active refresh exists with exactly one, final, waiter.
+        let requestStarted = expectation(description: "refresh request started")
+        RefreshURLProtocol.signalNextStartLoading { requestStarted.fulfill() }
+        let onlyWaiter = context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { _ in
+                    XCTFail("A cancelled waiter must not receive a completion.")
+                },
+                receiveValue: { _ in
+                    XCTFail("A cancelled waiter must not receive a session.")
+                }
+            )
+        wait(for: [requestStarted], timeout: 2)
+        RefreshURLProtocol.responseDelay = 0
+
+        // The final waiter cancels; the abandoning transition parks right
+        // before the upstream cancellation is issued.
+        let cancelReturned = expectation(description: "waiter cancellation returned")
+        DispatchQueue.global().async {
+            onlyWaiter.cancel()
+            cancelReturned.fulfill()
+        }
+        XCTAssertEqual(cancelParked.wait(timeout: .now() + 2), .success)
+
+        // Login succeeds and adopts a fresh session while the abandoning
+        // flight's cancellation is still parked.
+        let loggedIn = expectation(description: "login completed")
+        context.repository.login(email: "fixture@example.test", password: "password-123")
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Login failed: \(error)")
+                    }
+                },
+                receiveValue: { _ in loggedIn.fulfill() }
+            )
+            .store(in: &cancellables)
+        wait(for: [loggedIn], timeout: 2)
+
+        // A replacement refresh subscribing inside the cancellation barrier
+        // must find the abandoning flight still registered and must not
+        // start a provider request.
+        let replacementSucceeded = expectation(description: "replacement refresh succeeds")
+        context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Replacement refresh failed: \(error)")
+                    }
+                },
+                receiveValue: { _ in replacementSucceeded.fulfill() }
+            )
+            .store(in: &cancellables)
+
+        XCTAssertEqual(
+            RefreshURLProtocol.refreshTokens, ["old-refresh"],
+            "No replacement provider request may start while the abandoned upstream cancellation is pending."
+        )
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "login-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "login-refresh")
+        XCTAssertEqual(context.apiClient.userAuthToken, "login-access")
+
+        // Once the cancellation is issued and abandonment finishes, exactly
+        // one replacement request starts, carrying the login-rotated token.
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "new-access", refreshToken: "new-refresh")
+        )
+        let cancellationIssued = expectation(description: "abandoned upstream cancellation issued")
+        RefreshURLProtocol.signalNextStopLoading { cancellationIssued.fulfill() }
+        releaseCancel.signal()
+
+        wait(for: [cancelReturned, cancellationIssued, replacementSucceeded], timeout: 4)
+
+        XCTAssertEqual(RefreshURLProtocol.refreshTokens, ["old-refresh", "login-refresh"])
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+        XCTAssertEqual(context.apiClient.userAuthToken, "new-access")
+    }
+
+    func testAbandoningFlightSurvivesSessionAdoptionUntilAbandonmentFinishes() {
+        let cancelParked = DispatchSemaphore(value: 0)
+        let releaseCancel = DispatchSemaphore(value: 0)
+        let context = makeContext(
+            initialRefreshToken: "old-refresh",
+            refreshUpstreamWillCancel: {
+                cancelParked.signal()
+                _ = releaseCancel.wait(timeout: .now() + 4)
+            }
+        )
+        defer { context.session.invalidateAndCancel() }
+        defer { releaseCancel.signal() }
+
+        RefreshURLProtocol.responseDelay = 5
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "abandoned-access", refreshToken: "abandoned-refresh")
+        )
+        RefreshURLProtocol.routeResponses["auth/login"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "login-access", refreshToken: "login-refresh")
+        )
+
+        let requestStarted = expectation(description: "refresh request started")
+        RefreshURLProtocol.signalNextStartLoading { requestStarted.fulfill() }
+        let onlyWaiter = context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { _ in
+                    XCTFail("A cancelled waiter must not receive a completion.")
+                },
+                receiveValue: { _ in
+                    XCTFail("A cancelled waiter must not receive a session.")
+                }
+            )
+        wait(for: [requestStarted], timeout: 2)
+        RefreshURLProtocol.responseDelay = 0
+
+        let cancelReturned = expectation(description: "waiter cancellation returned")
+        DispatchQueue.global().async {
+            onlyWaiter.cancel()
+            cancelReturned.fulfill()
+        }
+        XCTAssertEqual(cancelParked.wait(timeout: .now() + 2), .success)
+
+        let authenticatedNotifications = SessionChangeCounter(authenticated: true)
+        defer { authenticatedNotifications.stop() }
+        let unauthenticatedNotifications = SessionChangeCounter(authenticated: false)
+        defer { unauthenticatedNotifications.stop() }
+
+        // Session adoption advances the session and stores the new
+        // credentials without directly clearing the abandoning flight.
+        let loggedIn = expectation(description: "login completed")
+        context.repository.login(email: "fixture@example.test", password: "password-123")
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Login failed: \(error)")
+                    }
+                },
+                receiveValue: { _ in loggedIn.fulfill() }
+            )
+            .store(in: &cancellables)
+        wait(for: [loggedIn], timeout: 2)
+
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "login-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "login-refresh")
+        XCTAssertEqual(context.apiClient.userAuthToken, "login-access")
+        XCTAssertEqual(authenticatedNotifications.count, 1)
+        XCTAssertEqual(
+            RefreshURLProtocol.refreshTokens, ["old-refresh"],
+            "Adoption must not release the abandoning flight's slot for a replacement."
+        )
+
+        // finishAbandonment is the single point that clears the slot: the
+        // upstream cancellation is issued exactly once, and only afterwards
+        // may a later refresh start, exactly once.
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "new-access", refreshToken: "new-refresh")
+        )
+        let cancellationIssued = expectation(description: "abandoned upstream cancellation issued")
+        RefreshURLProtocol.signalNextStopLoading { cancellationIssued.fulfill() }
+        releaseCancel.signal()
+        wait(for: [cancelReturned, cancellationIssued], timeout: 4)
+
+        let refreshed = expectation(description: "later refresh succeeds")
+        context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Later refresh failed: \(error)")
+                    }
+                },
+                receiveValue: { _ in refreshed.fulfill() }
+            )
+            .store(in: &cancellables)
+        wait(for: [refreshed], timeout: 2)
+
+        XCTAssertEqual(RefreshURLProtocol.refreshTokens, ["old-refresh", "login-refresh"])
+        XCTAssertEqual(
+            unauthenticatedNotifications.count, 0,
+            "A late outcome of the abandoned refresh must not clear the adopted session."
+        )
+        XCTAssertEqual(
+            authenticatedNotifications.count, 2,
+            "Only the login and the later refresh may persist a session; the abandoned flight must stay inert."
+        )
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+        XCTAssertEqual(context.apiClient.userAuthToken, "new-access")
+    }
+
+    func testSupersessionAfterStartAuthorizationSuppressesUninstalledUpstream() {
+        let installParked = DispatchSemaphore(value: 0)
+        let releaseInstall = DispatchSemaphore(value: 0)
+        let parkFirstInstall = ParkOnce(parked: installParked, release: releaseInstall)
+        let context = makeContext(
+            initialRefreshToken: "old-refresh",
+            refreshUpstreamWillInstall: { parkFirstInstall.parkIfFirst() }
+        )
+        defer { context.session.invalidateAndCancel() }
+        defer { releaseInstall.signal() }
+
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "abandoned-access", refreshToken: "abandoned-refresh")
+        )
+        RefreshURLProtocol.routeResponses["auth/login"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "login-access", refreshToken: "login-refresh")
+        )
+
+        // The creator receives authorization to start (the flight is
+        // installing) and parks right before the provider subscription
+        // would be built.
+        let backgroundCancellables = LockedCancellableStore()
+        let superseded = expectation(description: "parked creator superseded")
+        DispatchQueue.global().async {
+            let cancellable = context.repository.refreshSession()
+                .sink(
+                    receiveCompletion: { completion in
+                        if case .failure(.unauthorized) = completion {
+                            superseded.fulfill()
+                        }
+                    },
+                    receiveValue: { _ in
+                        XCTFail("A superseded refresh must not deliver a session.")
+                    }
+                )
+            backgroundCancellables.store(cancellable)
+        }
+        XCTAssertEqual(installParked.wait(timeout: .now() + 2), .success)
+
+        // Login supersedes the installing flight.
+        let loggedIn = expectation(description: "login completed")
+        context.repository.login(email: "fixture@example.test", password: "password-123")
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Login failed: \(error)")
+                    }
+                },
+                receiveValue: { _ in loggedIn.fulfill() }
+            )
+            .store(in: &cancellables)
+        wait(for: [loggedIn], timeout: 2)
+
+        // A replacement refresh requested while the superseded flight is
+        // still installing must wait for the slot instead of starting.
+        let replacementSucceeded = expectation(description: "replacement refresh succeeds")
+        context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Replacement refresh failed: \(error)")
+                    }
+                },
+                receiveValue: { _ in replacementSucceeded.fulfill() }
+            )
+            .store(in: &cancellables)
+
+        XCTAssertEqual(
+            RefreshURLProtocol.refreshTokens, [],
+            "No provider refresh request may exist while the superseded flight is still installing."
+        )
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "login-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "login-refresh")
+
+        // Releasing the installation barrier suppresses the old-token
+        // request entirely and lets exactly one replacement start.
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "new-access", refreshToken: "new-refresh")
+        )
+        releaseInstall.signal()
+        wait(for: [superseded, replacementSucceeded], timeout: 4)
+
+        XCTAssertEqual(
+            RefreshURLProtocol.refreshTokens, ["login-refresh"],
+            "The old-token request must never start; exactly one replacement request may run."
+        )
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+        XCTAssertEqual(context.apiClient.userAuthToken, "new-access")
+    }
+
+    func testInstallingFlightSurvivesSessionAdoptionUntilInstallationResolves() {
+        let installParked = DispatchSemaphore(value: 0)
+        let releaseInstall = DispatchSemaphore(value: 0)
+        let parkFirstInstall = ParkOnce(parked: installParked, release: releaseInstall)
+        let context = makeContext(
+            initialRefreshToken: "old-refresh",
+            refreshUpstreamWillInstall: { parkFirstInstall.parkIfFirst() }
+        )
+        defer { context.session.invalidateAndCancel() }
+        defer { releaseInstall.signal() }
+
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "abandoned-access", refreshToken: "abandoned-refresh")
+        )
+        RefreshURLProtocol.routeResponses["auth/login"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "login-access", refreshToken: "login-refresh")
+        )
+
+        let backgroundCancellables = LockedCancellableStore()
+        let creatorSuperseded = expectation(description: "parked creator superseded")
+        DispatchQueue.global().async {
+            let cancellable = context.repository.refreshSession()
+                .sink(
+                    receiveCompletion: { completion in
+                        if case .failure(.unauthorized) = completion {
+                            creatorSuperseded.fulfill()
+                        }
+                    },
+                    receiveValue: { _ in
+                        XCTFail("A superseded refresh must not deliver a session.")
+                    }
+                )
+            backgroundCancellables.store(cancellable)
+        }
+        XCTAssertEqual(installParked.wait(timeout: .now() + 2), .success)
+
+        // A joiner registered with the installing flight resolves promptly
+        // when adoption supersedes it, even though the slot stays occupied.
+        let joinerSuperseded = expectation(description: "joiner resolved with unauthorized")
+        context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(.unauthorized) = completion {
+                        joinerSuperseded.fulfill()
+                    }
+                },
+                receiveValue: { _ in
+                    XCTFail("A superseded joiner must not receive a session.")
+                }
+            )
+            .store(in: &cancellables)
+
+        let loggedIn = expectation(description: "login completed")
+        context.repository.login(email: "fixture@example.test", password: "password-123")
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Login failed: \(error)")
+                    }
+                },
+                receiveValue: { _ in loggedIn.fulfill() }
+            )
+            .store(in: &cancellables)
+        wait(for: [loggedIn, joinerSuperseded], timeout: 2)
+
+        // The slot remains occupied and slotCleared is not signaled early:
+        // a replacement subscribed now must not start any provider request
+        // within a bounded observation window.
+        let replacementSucceeded = expectation(description: "replacement refresh succeeds")
+        context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Replacement refresh failed: \(error)")
+                    }
+                },
+                receiveValue: { _ in replacementSucceeded.fulfill() }
+            )
+            .store(in: &cancellables)
+
+        let prematureRequest = expectation(description: "no request may start while installation is unresolved")
+        prematureRequest.isInverted = true
+        RefreshURLProtocol.signalNextStartLoading { prematureRequest.fulfill() }
+        wait(for: [prematureRequest], timeout: 0.3)
+        // Disarm the one-shot before releasing the barrier so the
+        // replacement's legitimate request cannot fulfill it late.
+        RefreshURLProtocol.signalNextStartLoading {}
+
+        XCTAssertEqual(RefreshURLProtocol.refreshTokens, [])
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "login-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "login-refresh")
+
+        // Resolving the installation (suppression) clears the slot exactly
+        // once and lets the replacement run exactly one request.
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "new-access", refreshToken: "new-refresh")
+        )
+        releaseInstall.signal()
+        wait(for: [creatorSuperseded, replacementSucceeded], timeout: 4)
+
+        XCTAssertEqual(RefreshURLProtocol.refreshTokens, ["login-refresh"])
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+        XCTAssertEqual(context.apiClient.userAuthToken, "new-access")
+    }
+
     // MARK: - Credential logging privacy
 
     func testAuthenticationFlowsDoNotLogRawCredentials() {
@@ -1328,6 +1748,7 @@ final class AuthRefreshConcurrencyTests: XCTestCase {
         refreshWillResolve: (() -> Void)? = nil,
         refreshDidResolve: (() -> Void)? = nil,
         refreshUpstreamWillStart: (() -> Void)? = nil,
+        refreshUpstreamWillInstall: (() -> Void)? = nil,
         refreshUpstreamWillCancel: (() -> Void)? = nil
     ) -> TestContext {
         let tokenStore = InMemoryTokenStore(refreshToken: initialRefreshToken)
@@ -1355,6 +1776,7 @@ final class AuthRefreshConcurrencyTests: XCTestCase {
             refreshWillResolve: refreshWillResolve,
             refreshDidResolve: refreshDidResolve,
             refreshUpstreamWillStart: refreshUpstreamWillStart,
+            refreshUpstreamWillInstall: refreshUpstreamWillInstall,
             refreshUpstreamWillCancel: refreshUpstreamWillCancel
         )
         return TestContext(

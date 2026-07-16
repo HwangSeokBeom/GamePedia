@@ -7,20 +7,42 @@ final class DefaultAuthRepository: AuthRepository {
     // never propagates to the privately retained upstream sink on its own.
     // The flight therefore tracks its waiters and models an explicit
     // lifecycle so that publication, upstream installation, cancellation,
-    // and replacement form one coherent state transition:
+    // supersession, and replacement form one coherent state transition:
     //
-    //   starting          published in the repository slot; the creating
-    //                     subscription has not installed the upstream yet
-    //   active            upstream installed; waiters share one request
-    //   abandonRequested  every waiter cancelled during startup; the flight
-    //                     keeps occupying the slot until the creator
-    //                     suppresses or cancels the upstream, so no
-    //                     replacement can overlap an abandoned request
-    //   abandoning        the final waiter cancelled an active flight; the
-    //                     slot stays occupied until the upstream
-    //                     cancellation has actually been issued
-    //   finished          terminal; the slot is released and a late result
-    //                     can neither persist nor clear credentials
+    //   starting              published in the repository slot; the creating
+    //                         subscription has not been authorized to
+    //                         install the upstream yet
+    //   installing            the creator atomically claimed installation
+    //                         ownership and is constructing/subscribing the
+    //                         provider publisher outside the lock; the
+    //                         flight keeps occupying the slot the whole time
+    //   installingSuperseded  a fresh session or an invalidation superseded
+    //                         the flight while it was installing; the slot
+    //                         stays occupied until the creator suppresses
+    //                         the subscription entirely or cancels the
+    //                         just-created request
+    //   active                upstream installed; waiters share one request
+    //   abandonRequested      every waiter cancelled during startup; the
+    //                         flight keeps occupying the slot until the
+    //                         creator suppresses or cancels the upstream,
+    //                         so no replacement can overlap it
+    //   abandoning            the final waiter cancelled an active flight,
+    //                         or a fresh session superseded it; the slot
+    //                         stays occupied until the upstream cancellation
+    //                         has actually been issued
+    //   finished              terminal; the slot is released and a late
+    //                         result can neither persist nor clear
+    //                         credentials
+    //
+    // Slot ownership rule: the repository slot is only ever released by the
+    // flight itself, through supersession of a not-yet-installing flight,
+    // through a claimed completion, or through finishAbandonment() once any
+    // old upstream activity has been definitively suppressed or its
+    // cancellation has been issued. Login/signup/social-login adoption and
+    // logout/account-deletion invalidation supersede the flight and advance
+    // the session generation, but they never clear an installing or
+    // abandoning flight out of the slot directly, so a replacement refresh
+    // can never overlap a still-live superseded request.
     //
     // Ownership is subscription-driven: a flight is only ever created by an
     // actual downstream subscription, and that creating subscription is
@@ -39,6 +61,8 @@ final class DefaultAuthRepository: AuthRepository {
     private final class RefreshFlight {
         private enum State {
             case starting
+            case installing
+            case installingSuperseded
             case active
             case abandonRequested
             case abandoning
@@ -114,21 +138,47 @@ final class DefaultAuthRepository: AuthRepository {
         func joinWaiter() -> AnyPublisher<AuthSession, AuthError>? {
             lock.lock()
             defer { lock.unlock() }
-            guard state == .starting || state == .active else { return nil }
+            guard state == .starting || state == .installing || state == .active else { return nil }
             activeWaiters += 1
             return waiterPublisher
         }
 
         // MARK: Creator-side startup
 
-        func shouldStartUpstream() -> Bool {
+        // Atomically claims installation ownership: only the creator moves
+        // the flight from starting to installing, and from then on the
+        // flight keeps occupying the repository slot until installation is
+        // resolved, no matter what supersedes it in the meantime.
+        func tryBeginInstalling() -> Bool {
             lock.lock()
             defer { lock.unlock() }
-            return state == .starting
+            guard state == .starting else { return false }
+            state = .installing
+            return true
         }
 
-        // The creator never built the upstream subscription because the
-        // flight stopped being startable while startup was parked.
+        // Last atomic check before the provider publisher is subscribed. If
+        // the flight was superseded or abandoned while installing, the
+        // subscription is suppressed entirely and no request is issued.
+        func shouldSubscribeUpstream() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return state == .installing
+        }
+
+        // The creator suppressed the provider subscription because the
+        // flight stopped being installable; finalize and release the slot.
+        func abortInstallation() {
+            lock.lock()
+            let shouldFinish = state == .installingSuperseded || state == .abandonRequested
+            lock.unlock()
+            if shouldFinish {
+                finishAbandonment()
+            }
+        }
+
+        // The creator never claimed installation because the flight stopped
+        // being startable while startup was parked.
         func declineUpstream() {
             lock.lock()
             let wasAbandonRequested = state == .abandonRequested
@@ -143,34 +193,95 @@ final class DefaultAuthRepository: AuthRepository {
         func activateUpstream(_ cancellable: AnyCancellable) {
             lock.lock()
             switch state {
-            case .starting:
+            case .installing:
                 upstream = cancellable
                 state = .active
                 lock.unlock()
-            case .abandonRequested:
-                // The final waiter cancelled while startup was in flight:
-                // cancel the just-created request before the slot becomes
-                // replaceable so no replacement can overlap it.
+            case .installingSuperseded, .abandonRequested:
+                // Superseded or abandoned while the subscription was being
+                // built: cancel the just-issued request first; only
+                // finishAbandonment() afterwards releases the slot, so no
+                // replacement can overlap it.
                 lock.unlock()
                 cancellable.cancel()
                 finishAbandonment()
-            case .active, .abandoning, .finished:
+            case .starting, .active, .abandoning, .finished:
                 // Terminal or foreign state: never adopt the subscription.
                 lock.unlock()
                 cancellable.cancel()
             }
         }
 
+        // MARK: Supersession
+
+        // Called with the shared lock held by session adoption
+        // (login/signup/social login) and session invalidation
+        // (logout/account deletion). Returns the externally visible part of
+        // the supersession, which the caller must run outside the lock, or
+        // nil when the flight is already tearing itself down. The repository
+        // slot is released immediately only when no upstream can exist; in
+        // every other case it stays occupied until the old request has been
+        // suppressed or its cancellation has been issued.
+        func supersede() -> (() -> Void)? {
+            lock.lock()
+            defer { lock.unlock() }
+            switch state {
+            case .starting:
+                // No upstream exists and tryBeginInstalling can no longer
+                // succeed, so the creator's subscription is suppressed and
+                // the slot can be released immediately.
+                state = .finished
+                let onAbandoned = self.onAbandoned
+                self.onAbandoned = nil
+                onAbandoned?(self)
+                let resolver = takeResolverLocked()
+                let signalSlotCleared = takeSlotClearedSignalLocked()
+                return {
+                    resolver?(.failure(.unauthorized))
+                    signalSlotCleared?()
+                }
+            case .installing:
+                // The creator is building the provider subscription outside
+                // the lock. Keep occupying the slot: the creator will either
+                // suppress the subscription or immediately cancel the
+                // just-created request before finishAbandonment() releases
+                // the slot. Waiters resolve now so the superseded refresh
+                // fails promptly.
+                state = .installingSuperseded
+                let resolver = takeResolverLocked()
+                return { resolver?(.failure(.unauthorized)) }
+            case .active:
+                // A live request exists. Keep occupying the slot until its
+                // cancellation has actually been issued, exactly like a
+                // final-waiter abandonment.
+                state = .abandoning
+                let upstream = self.upstream
+                self.upstream = nil
+                let upstreamWillCancel = upstreamWillCancelForAbandonment
+                return { [self] in
+                    upstreamWillCancel?()
+                    upstream?.cancel()
+                    finishAbandonment()
+                }
+            case .installingSuperseded, .abandonRequested, .abandoning, .finished:
+                // Already tearing down; the slot clears through
+                // finishAbandonment() once the old upstream is dealt with.
+                return nil
+            }
+        }
+
         // MARK: Repository-side completion
 
-        // Atomically claims the right to complete. Must be called with the
-        // shared lock held so the claim is atomic with the repository's
-        // identity check and slot release; an abandoning or finished flight
-        // can no longer be claimed, which keeps late results inert.
+        // Atomically claims the right to complete with an upstream result.
+        // Must be called with the shared lock held so the claim is atomic
+        // with the repository's identity check and slot release. A response
+        // can legitimately arrive while still installing (before
+        // activateUpstream ran); a superseded, abandoning, or finished
+        // flight can no longer be claimed, which keeps late results inert.
         func tryBeginCompletion() -> Bool {
             lock.lock()
             defer { lock.unlock() }
-            guard state == .starting || state == .active else { return false }
+            guard state == .starting || state == .installing || state == .active else { return false }
             state = .finished
             return true
         }
@@ -196,7 +307,7 @@ final class DefaultAuthRepository: AuthRepository {
 
         private func waiterDidCancel() {
             lock.lock()
-            guard state == .starting || state == .active else {
+            guard state == .starting || state == .installing || state == .active else {
                 lock.unlock()
                 return
             }
@@ -206,7 +317,7 @@ final class DefaultAuthRepository: AuthRepository {
                 return
             }
 
-            if state == .starting {
+            if state == .starting || state == .installing {
                 // Defensive: with the creating subscription pre-registered
                 // at init and unable to cancel before the upstream is
                 // installed, the count cannot reach zero during startup. If
@@ -270,6 +381,7 @@ final class DefaultAuthRepository: AuthRepository {
     private let refreshWillResolve: (() -> Void)?
     private let refreshDidResolve: (() -> Void)?
     private let refreshUpstreamWillStart: (() -> Void)?
+    private let refreshUpstreamWillInstall: (() -> Void)?
     private let refreshUpstreamWillCancel: (() -> Void)?
     private var cancellables = Set<AnyCancellable>()
     private let refreshLock = NSRecursiveLock()
@@ -284,6 +396,7 @@ final class DefaultAuthRepository: AuthRepository {
         refreshWillResolve: (() -> Void)? = nil,
         refreshDidResolve: (() -> Void)? = nil,
         refreshUpstreamWillStart: (() -> Void)? = nil,
+        refreshUpstreamWillInstall: (() -> Void)? = nil,
         refreshUpstreamWillCancel: (() -> Void)? = nil
     ) {
         self.authRemoteDataSource = authRemoteDataSource
@@ -293,6 +406,7 @@ final class DefaultAuthRepository: AuthRepository {
         self.refreshWillResolve = refreshWillResolve
         self.refreshDidResolve = refreshDidResolve
         self.refreshUpstreamWillStart = refreshUpstreamWillStart
+        self.refreshUpstreamWillInstall = refreshUpstreamWillInstall
         self.refreshUpstreamWillCancel = refreshUpstreamWillCancel
     }
 
@@ -499,10 +613,21 @@ final class DefaultAuthRepository: AuthRepository {
 
         // The session may have been superseded or invalidated while the
         // flight was still starting. In that case the abandoned provider
-        // request is suppressed entirely; the slot is released only here,
-        // so no replacement could have overlapped it.
-        guard flight.shouldStartUpstream() else {
+        // request is suppressed entirely and never issued.
+        guard flight.tryBeginInstalling() else {
             flight.declineUpstream()
+            return flight.claimCreatingWaiter()
+        }
+
+        refreshUpstreamWillInstall?()
+
+        // Superseded or abandoned between claiming installation and
+        // subscribing the provider publisher: suppress the subscription
+        // entirely. The flight occupied the slot the whole time, so no
+        // replacement could have overlapped it; abortInstallation releases
+        // the slot only now.
+        guard flight.shouldSubscribeUpstream() else {
+            flight.abortInstallation()
             return flight.claimCreatingWaiter()
         }
 
@@ -651,19 +776,19 @@ final class DefaultAuthRepository: AuthRepository {
 
     // A fresh login/signup/social-login session owns the credential store from
     // this point on: any refresh still in flight was issued for the previous
-    // session and must not be allowed to commit or clear on top of it.
+    // session and must not be allowed to commit or clear on top of it. The
+    // generation advance makes every late old callback inert; the superseded
+    // flight itself keeps occupying the refresh slot until its old upstream
+    // request is definitively suppressed or cancelled, so adoption never
+    // opens a window for an overlapping replacement request.
     private func adoptAuthenticatedSession(_ session: AuthSession) {
         refreshLock.lock()
         refreshGeneration &+= 1
-        let supersededFlight = inFlightRefresh
-        inFlightRefresh = nil
-        let claimedSupersededFlight = supersededFlight?.tryBeginCompletion() ?? false
+        let supersededAction = inFlightRefresh?.supersede()
         persist(session)
         refreshLock.unlock()
 
-        if claimedSupersededFlight {
-            supersededFlight?.finishCompletion(.failure(.unauthorized))
-        }
+        supersededAction?()
     }
 
     private func commitRefresh(_ session: AuthSession, flight: RefreshFlight) {
@@ -683,7 +808,12 @@ final class DefaultAuthRepository: AuthRepository {
 
     private func failRefresh(_ error: AuthError, flight: RefreshFlight) {
         refreshLock.lock()
-        guard inFlightRefresh === flight, flight.tryBeginCompletion() else {
+        // The generation check keeps a late failure of a superseded flight
+        // (which may still occupy the slot while dying) from clearing a
+        // newly adopted session.
+        guard inFlightRefresh === flight,
+              flight.generation == refreshGeneration,
+              flight.tryBeginCompletion() else {
             refreshLock.unlock()
             return
         }
@@ -698,14 +828,10 @@ final class DefaultAuthRepository: AuthRepository {
     private func invalidateStoredSession() {
         refreshLock.lock()
         refreshGeneration &+= 1
-        let flight = inFlightRefresh
-        inFlightRefresh = nil
-        let claimedFlight = flight?.tryBeginCompletion() ?? false
+        let supersededAction = inFlightRefresh?.supersede()
         clearStoredSession()
         refreshLock.unlock()
 
-        if claimedFlight {
-            flight?.finishCompletion(.failure(.unauthorized))
-        }
+        supersededAction?()
     }
 }
