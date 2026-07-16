@@ -9,11 +9,11 @@ final class DefaultAuthRepository: AuthRepository {
     // lifecycle so that publication, upstream installation, cancellation,
     // and replacement form one coherent state transition:
     //
-    //   starting          published in the repository slot; the creator has
-    //                     not installed the upstream subscription yet
+    //   starting          published in the repository slot; the creating
+    //                     subscription has not installed the upstream yet
     //   active            upstream installed; waiters share one request
-    //   abandonRequested  the final waiter cancelled during startup; the
-    //                     flight keeps occupying the slot until the creator
+    //   abandonRequested  every waiter cancelled during startup; the flight
+    //                     keeps occupying the slot until the creator
     //                     suppresses or cancels the upstream, so no
     //                     replacement can overlap an abandoned request
     //   abandoning        the final waiter cancelled an active flight; the
@@ -22,12 +22,20 @@ final class DefaultAuthRepository: AuthRepository {
     //   finished          terminal; the slot is released and a late result
     //                     can neither persist nor clear credentials
     //
-    // It shares the repository's recursive lock so that every transition is
-    // atomic with commitRefresh/failRefresh/supersede and free of lock-order
-    // inversions. Waiter resolution and upstream cancellation are always
-    // invoked outside the lock; the resolver and slot-cleared signal are
-    // consumed at most once, so completion, cancellation, and detachment
-    // stay idempotent.
+    // Ownership is subscription-driven: a flight is only ever created by an
+    // actual downstream subscription, and that creating subscription is
+    // registered as the first waiter atomically at init, before the flight
+    // becomes visible in the repository slot. A joiner that subscribes and
+    // cancels while the creator is still installing the upstream therefore
+    // never counts as "the final waiter" and cannot abandon the refresh out
+    // from under the creator.
+    //
+    // The flight shares the repository's recursive lock so that every
+    // transition is atomic with commitRefresh/failRefresh/supersede and free
+    // of lock-order inversions. Waiter resolution and upstream cancellation
+    // are always invoked outside the lock; the resolver and slot-cleared
+    // signal are consumed at most once, so completion, cancellation, and
+    // detachment stay idempotent.
     private final class RefreshFlight {
         private enum State {
             case starting
@@ -38,7 +46,11 @@ final class DefaultAuthRepository: AuthRepository {
         }
 
         let generation: UInt64
-        private(set) var publisher: AnyPublisher<AuthSession, AuthError>
+        // One-subscription-per-waiter publisher: init and joinWaiter() each
+        // register exactly one waiter, and each returned publisher must be
+        // subscribed exactly once so its cancel callback pairs with that
+        // registration.
+        private var waiterPublisher: AnyPublisher<AuthSession, AuthError>!
         // Completes only once the flight has released the repository slot,
         // i.e. after any upstream cancellation has been issued. Callers that
         // observed a dying flight wait on this before starting a replacement.
@@ -76,19 +88,35 @@ final class DefaultAuthRepository: AuthRepository {
                 self.slotClearedSignal = { clearedPromise(.success(())) }
             }
 
-            self.publisher = result
-            self.publisher = result
+            self.waiterPublisher = result
                 .handleEvents(
-                    receiveSubscription: { [weak self] _ in self?.waiterDidSubscribe() },
                     receiveCancel: { [weak self] in self?.waiterDidCancel() }
                 )
                 .eraseToAnyPublisher()
+
+            // The creating subscription is registered before the flight is
+            // published to the repository slot, so during startup at least
+            // one waiter always exists and a joiner's cancellation can
+            // never abandon the refresh before the creator has attached.
+            self.activeWaiters = 1
         }
 
-        var isJoinable: Bool {
+        // The creating subscription's pre-registered waiter publisher. Must
+        // be subscribed exactly once, by the subscription that created the
+        // flight.
+        func claimCreatingWaiter() -> AnyPublisher<AuthSession, AuthError> {
+            waiterPublisher
+        }
+
+        // Atomically registers one additional waiter if the flight can still
+        // be joined. Returns nil for a dying or finished flight, in which
+        // case the caller must wait for the slot to clear instead.
+        func joinWaiter() -> AnyPublisher<AuthSession, AuthError>? {
             lock.lock()
             defer { lock.unlock() }
-            return state == .starting || state == .active
+            guard state == .starting || state == .active else { return nil }
+            activeWaiters += 1
+            return waiterPublisher
         }
 
         // MARK: Creator-side startup
@@ -166,14 +194,6 @@ final class DefaultAuthRepository: AuthRepository {
 
         // MARK: Waiter tracking
 
-        private func waiterDidSubscribe() {
-            lock.lock()
-            if state == .starting || state == .active {
-                activeWaiters += 1
-            }
-            lock.unlock()
-        }
-
         private func waiterDidCancel() {
             lock.lock()
             guard state == .starting || state == .active else {
@@ -187,9 +207,12 @@ final class DefaultAuthRepository: AuthRepository {
             }
 
             if state == .starting {
-                // Startup has not installed the upstream yet. Record the
-                // abandonment but keep occupying the slot: the creator will
-                // suppress or cancel the request before releasing it.
+                // Defensive: with the creating subscription pre-registered
+                // at init and unable to cancel before the upstream is
+                // installed, the count cannot reach zero during startup. If
+                // it ever does, record the abandonment but keep occupying
+                // the slot: the creator will suppress or cancel the request
+                // before releasing it.
                 state = .abandonRequested
                 let resolver = takeResolverLocked()
                 lock.unlock()
@@ -396,11 +419,33 @@ final class DefaultAuthRepository: AuthRepository {
     }
 
     func refreshSession() -> AnyPublisher<AuthSession, AuthError> {
+        // Creating the publisher is side-effect free: no provider request
+        // starts and the shared-flight slot stays untouched until a
+        // downstream subscriber actually attaches. Each subscription then
+        // atomically creates or joins the shared flight with its own waiter
+        // registration, so a publisher that is obtained early but subscribed
+        // late can never be abandoned by another subscriber's cancellation.
+        Deferred { [weak self] () -> AnyPublisher<AuthSession, AuthError> in
+            guard let self else {
+                return Fail(error: AuthError.unknown(message: "Repository was released"))
+                    .eraseToAnyPublisher()
+            }
+            return self.attachRefreshWaiter()
+        }
+        .eraseToAnyPublisher()
+    }
+
+    // Runs once per downstream subscription of refreshSession(). Atomically
+    // (under the repository lock) joins the in-flight refresh as one more
+    // waiter, or creates a new flight whose first waiter is this
+    // subscription; only after that waiter ownership exists is the upstream
+    // provider request built and installed, outside the lock.
+    private func attachRefreshWaiter() -> AnyPublisher<AuthSession, AuthError> {
         refreshLock.lock()
         if let inFlightRefresh {
-            if inFlightRefresh.isJoinable {
+            if let joined = inFlightRefresh.joinWaiter() {
                 refreshLock.unlock()
-                return inFlightRefresh.publisher
+                return joined
             }
             // The previous flight is being abandoned and its upstream
             // cancellation has not been issued yet. A replacement must not
@@ -415,7 +460,7 @@ final class DefaultAuthRepository: AuthRepository {
                         return Fail(error: AuthError.unknown(message: "Repository was released"))
                             .eraseToAnyPublisher()
                     }
-                    return self.refreshSession()
+                    return self.attachRefreshWaiter()
                 }
                 .eraseToAnyPublisher()
         }
@@ -452,13 +497,13 @@ final class DefaultAuthRepository: AuthRepository {
 
         refreshUpstreamWillStart?()
 
-        // The final waiter may have cancelled (or the session may have been
-        // superseded) while the flight was still starting. In that case the
-        // abandoned provider request is suppressed entirely; the slot is
-        // released only here, so no replacement could have overlapped it.
+        // The session may have been superseded or invalidated while the
+        // flight was still starting. In that case the abandoned provider
+        // request is suppressed entirely; the slot is released only here,
+        // so no replacement could have overlapped it.
         guard flight.shouldStartUpstream() else {
             flight.declineUpstream()
-            return flight.publisher
+            return flight.claimCreatingWaiter()
         }
 
         let cancellable = authRemoteDataSource.refreshSession(refreshToken: refreshToken)
@@ -482,7 +527,7 @@ final class DefaultAuthRepository: AuthRepository {
             )
         flight.activateUpstream(cancellable)
 
-        return flight.publisher
+        return flight.claimCreatingWaiter()
     }
 
     func fetchCurrentUser() -> AnyPublisher<AuthUser, AuthError> {

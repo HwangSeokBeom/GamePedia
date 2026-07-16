@@ -472,7 +472,7 @@ final class AuthRefreshConcurrencyTests: XCTestCase {
         XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
     }
 
-    func testFinalWaiterCancelBeforeUpstreamInstallationSuppressesAbandonedRequest() {
+    func testSessionSupersededDuringStartupSuppressesAbandonedRequest() {
         let startupParked = DispatchSemaphore(value: 0)
         let releaseStartup = DispatchSemaphore(value: 0)
         let parkFirstStartup = ParkOnce(parked: startupParked, release: releaseStartup)
@@ -486,44 +486,60 @@ final class AuthRefreshConcurrencyTests: XCTestCase {
             statusCode: 200,
             data: Self.authResponseJSON(accessToken: "abandoned-access", refreshToken: "abandoned-refresh")
         )
+        RefreshURLProtocol.routeResponses["auth/login"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "login-access", refreshToken: "login-refresh")
+        )
 
-        // The creator publishes the flight and then parks before building
-        // the provider request, leaving the flight in its starting state.
-        let startupFinished = expectation(description: "parked startup finished")
+        // The first subscriber creates the flight and parks right before
+        // the provider request would be installed, leaving the flight in
+        // its starting state.
+        let backgroundCancellables = LockedCancellableStore()
+        let superseded = expectation(description: "parked subscriber superseded")
         DispatchQueue.global().async {
-            _ = context.repository.refreshSession()
-            startupFinished.fulfill()
+            let cancellable = context.repository.refreshSession()
+                .sink(
+                    receiveCompletion: { completion in
+                        if case .failure(.unauthorized) = completion {
+                            superseded.fulfill()
+                        }
+                    },
+                    receiveValue: { _ in
+                        XCTFail("A superseded refresh must not deliver a session.")
+                    }
+                )
+            backgroundCancellables.store(cancellable)
         }
         XCTAssertEqual(startupParked.wait(timeout: .now() + 2), .success)
 
-        // Join the starting flight and cancel as the final waiter while the
-        // upstream has not been installed yet.
-        let waiter = context.repository.refreshSession()
+        // A fresh login supersedes the starting flight while it is parked.
+        let loggedIn = expectation(description: "login completed")
+        context.repository.login(email: "fixture@example.test", password: "password-123")
             .sink(
-                receiveCompletion: { _ in
-                    XCTFail("A cancelled waiter must not receive a completion.")
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Login failed: \(error)")
+                    }
                 },
-                receiveValue: { _ in
-                    XCTFail("A cancelled waiter must not receive a session.")
-                }
+                receiveValue: { _ in loggedIn.fulfill() }
             )
-        waiter.cancel()
+            .store(in: &cancellables)
+        wait(for: [loggedIn], timeout: 2)
 
         releaseStartup.signal()
-        wait(for: [startupFinished], timeout: 2)
+        wait(for: [superseded], timeout: 2)
 
-        // The abandoned flight never started a provider request, so nothing
-        // could have consumed or rotated the refresh token, and there is no
-        // result the cancelled flight could commit.
-        XCTAssertEqual(RefreshURLProtocol.requestCount, 0)
-        XCTAssertNil(context.tokenStore.fetchAccessToken())
-        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "old-refresh")
-        XCTAssertNil(context.apiClient.userAuthToken)
-        XCTAssertNil(context.userStore.fetchUser())
+        // The superseded flight never started a provider refresh request,
+        // so nothing could have consumed or rotated the refresh token
+        // behind the fresh login session.
+        XCTAssertEqual(RefreshURLProtocol.refreshTokens, [])
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "login-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "login-refresh")
+        XCTAssertEqual(context.apiClient.userAuthToken, "login-access")
 
-        // The slot was released only after the abandoned startup resolved:
-        // a fresh refresh starts exactly one request with the unconsumed
-        // token instead of reusing the cancelled flight.
+        // The slot was released when the suppressed startup resolved: a
+        // fresh refresh starts exactly one request with the login-rotated
+        // token instead of reusing the abandoned flight.
         RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
             statusCode: 200,
             data: Self.authResponseJSON(accessToken: "new-access", refreshToken: "new-refresh")
@@ -541,10 +557,247 @@ final class AuthRefreshConcurrencyTests: XCTestCase {
             .store(in: &cancellables)
         wait(for: [refreshed], timeout: 2)
 
+        XCTAssertEqual(RefreshURLProtocol.refreshTokens, ["login-refresh"])
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+    }
+
+    // MARK: - Subscription-driven flight ownership
+
+    func testRefreshPublisherWithoutSubscriptionStartsNoRequestAndDoesNotOccupySlot() {
+        let startupLock = NSLock()
+        var startupCount = 0
+        let context = makeContext(
+            initialRefreshToken: "old-refresh",
+            refreshUpstreamWillStart: {
+                startupLock.lock()
+                startupCount += 1
+                startupLock.unlock()
+            }
+        )
+        defer { context.session.invalidateAndCancel() }
+
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "new-access", refreshToken: "new-refresh")
+        )
+
+        // Obtain a refresh publisher but never subscribe to it. Creating the
+        // publisher alone must not begin startup or start a provider request.
+        let unsubscribedPublisher = context.repository.refreshSession()
+
+        startupLock.lock()
+        XCTAssertEqual(startupCount, 0, "An unsubscribed refresh publisher must not begin startup.")
+        startupLock.unlock()
+        XCTAssertEqual(RefreshURLProtocol.requestCount, 0)
+
+        // The shared-flight slot must still be free: an actual subscriber
+        // creates its own flight and completes with exactly one request. If
+        // the unsubscribed publisher had occupied the slot with a flight
+        // that never starts, this refresh would join it and never complete.
+        let refreshed = expectation(description: "subscribed refresh succeeds")
+        context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Subscribed refresh failed: \(error)")
+                    }
+                },
+                receiveValue: { _ in refreshed.fulfill() }
+            )
+            .store(in: &cancellables)
+        wait(for: [refreshed], timeout: 2)
+
+        startupLock.lock()
+        XCTAssertEqual(startupCount, 1, "Exactly one startup may run, owned by the actual subscriber.")
+        startupLock.unlock()
         XCTAssertEqual(RefreshURLProtocol.requestCount, 1)
         XCTAssertEqual(RefreshURLProtocol.refreshTokens, ["old-refresh"])
         XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
         XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+        withExtendedLifetime(unsubscribedPublisher) {}
+    }
+
+    func testDelayedSubscriberIsNotFailedByAnotherSubscriberCancellation() {
+        let context = makeContext(initialRefreshToken: "old-refresh")
+        defer { context.session.invalidateAndCancel() }
+
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "new-access", refreshToken: "new-refresh")
+        )
+
+        // Caller A obtains its refresh publisher first but delays its
+        // subscription past another caller's entire subscribe/cancel cycle.
+        let delayedPublisher = context.repository.refreshSession()
+
+        // Caller B subscribes (creating and owning its own flight) and then
+        // cancels as that flight's only waiter, abandoning it.
+        RefreshURLProtocol.responseDelay = 5
+        let requestStarted = expectation(description: "B's refresh request started")
+        RefreshURLProtocol.signalNextStartLoading { requestStarted.fulfill() }
+        let cancelledWaiter = context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { _ in
+                    XCTFail("A cancelled waiter must not receive a completion.")
+                },
+                receiveValue: { _ in
+                    XCTFail("A cancelled waiter must not receive a session.")
+                }
+            )
+        wait(for: [requestStarted], timeout: 2)
+
+        let cancellationIssued = expectation(description: "B's upstream cancellation issued")
+        RefreshURLProtocol.signalNextStopLoading { cancellationIssued.fulfill() }
+        cancelledWaiter.cancel()
+        wait(for: [cancellationIssued], timeout: 2)
+
+        XCTAssertEqual(RefreshURLProtocol.requestCount, 1)
+        XCTAssertEqual(RefreshURLProtocol.stopLoadingCount, 1)
+
+        // A subscribes afterward. A never registered with B's flight, so
+        // B's abandonment must not fail A with .unauthorized; A runs its
+        // own single valid request and succeeds.
+        RefreshURLProtocol.responseDelay = 0
+        let delayedReceived = expectation(description: "delayed subscriber receives a fresh session")
+        delayedPublisher
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        XCTFail("Delayed subscriber must not inherit the cancelled flight: \(error)")
+                    }
+                },
+                receiveValue: { session in
+                    XCTAssertEqual(session.refreshToken, "new-refresh")
+                    delayedReceived.fulfill()
+                }
+            )
+            .store(in: &cancellables)
+        wait(for: [delayedReceived], timeout: 2)
+
+        XCTAssertEqual(RefreshURLProtocol.requestCount, 2, "B's abandoned request plus exactly one valid request for A.")
+        XCTAssertEqual(RefreshURLProtocol.refreshTokens, ["old-refresh", "old-refresh"])
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+        XCTAssertEqual(context.apiClient.userAuthToken, "new-access")
+    }
+
+    func testConcurrentFirstSubscriptionsShareExactlyOneRequest() {
+        let context = makeContext(initialRefreshToken: "old-refresh")
+        defer { context.session.invalidateAndCancel() }
+
+        RefreshURLProtocol.responseDelay = 0.5
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "new-access", refreshToken: "new-refresh")
+        )
+
+        let backgroundCancellables = LockedCancellableStore()
+        let resultLock = NSLock()
+        var receivedRefreshTokens: [String] = []
+        let readyBarrier = DispatchSemaphore(value: 0)
+        let startBarrier = DispatchSemaphore(value: 0)
+        let firstReceived = expectation(description: "first concurrent subscriber receives the session")
+        let secondReceived = expectation(description: "second concurrent subscriber receives the session")
+
+        // Two subscribers race their first subscriptions from separate
+        // threads, released through a shared barrier.
+        for received in [firstReceived, secondReceived] {
+            DispatchQueue.global().async {
+                readyBarrier.signal()
+                XCTAssertEqual(startBarrier.wait(timeout: .now() + 4), .success)
+                let cancellable = context.repository.refreshSession()
+                    .sink(
+                        receiveCompletion: { completion in
+                            if case .failure(let error) = completion {
+                                XCTFail("Concurrent refresh failed: \(error)")
+                            }
+                        },
+                        receiveValue: { session in
+                            resultLock.lock()
+                            receivedRefreshTokens.append(session.refreshToken)
+                            resultLock.unlock()
+                            received.fulfill()
+                        }
+                    )
+                backgroundCancellables.store(cancellable)
+            }
+        }
+        XCTAssertEqual(readyBarrier.wait(timeout: .now() + 2), .success)
+        XCTAssertEqual(readyBarrier.wait(timeout: .now() + 2), .success)
+        startBarrier.signal()
+        startBarrier.signal()
+
+        wait(for: [firstReceived, secondReceived], timeout: 4)
+
+        XCTAssertEqual(RefreshURLProtocol.requestCount, 1, "Concurrent first subscriptions must share one request.")
+        XCTAssertEqual(RefreshURLProtocol.refreshTokens, ["old-refresh"])
+        resultLock.lock()
+        XCTAssertEqual(receivedRefreshTokens, ["new-refresh", "new-refresh"])
+        resultLock.unlock()
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+    }
+
+    func testWaiterCancellationDuringStartupDoesNotAbandonCreatingSubscriber() {
+        let startupParked = DispatchSemaphore(value: 0)
+        let releaseStartup = DispatchSemaphore(value: 0)
+        let parkFirstStartup = ParkOnce(parked: startupParked, release: releaseStartup)
+        let context = makeContext(
+            initialRefreshToken: "old-refresh",
+            refreshUpstreamWillStart: { parkFirstStartup.parkIfFirst() }
+        )
+        defer { context.session.invalidateAndCancel() }
+
+        RefreshURLProtocol.routeResponses["auth/refresh"] = StubRoute(
+            statusCode: 200,
+            data: Self.authResponseJSON(accessToken: "new-access", refreshToken: "new-refresh")
+        )
+
+        // The creating subscriber parks during startup: its waiter
+        // registration exists, but the provider request is not installed.
+        let backgroundCancellables = LockedCancellableStore()
+        let creatorReceived = expectation(description: "creating subscriber receives the shared result")
+        DispatchQueue.global().async {
+            let cancellable = context.repository.refreshSession()
+                .sink(
+                    receiveCompletion: { completion in
+                        if case .failure(let error) = completion {
+                            XCTFail("Creating subscriber failed: \(error)")
+                        }
+                    },
+                    receiveValue: { session in
+                        XCTAssertEqual(session.refreshToken, "new-refresh")
+                        creatorReceived.fulfill()
+                    }
+                )
+            backgroundCancellables.store(cancellable)
+        }
+        XCTAssertEqual(startupParked.wait(timeout: .now() + 2), .success)
+        XCTAssertEqual(RefreshURLProtocol.requestCount, 0)
+
+        // Join the starting flight and cancel. The parked creating
+        // subscriber still owns a waiter registration, so this cancellation
+        // must neither abandon the flight nor suppress the provider request.
+        let joiner = context.repository.refreshSession()
+            .sink(
+                receiveCompletion: { _ in
+                    XCTFail("A cancelled waiter must not receive a completion.")
+                },
+                receiveValue: { _ in
+                    XCTFail("A cancelled waiter must not receive a session.")
+                }
+            )
+        joiner.cancel()
+
+        releaseStartup.signal()
+        wait(for: [creatorReceived], timeout: 2)
+
+        XCTAssertEqual(RefreshURLProtocol.requestCount, 1)
+        XCTAssertEqual(RefreshURLProtocol.refreshTokens, ["old-refresh"])
+        XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
+        XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+        XCTAssertEqual(context.apiClient.userAuthToken, "new-access")
     }
 
     func testReplacementRefreshWaitsUntilAbandonedUpstreamCancellationIsIssued() {
@@ -1241,6 +1494,19 @@ final class AuthRefreshConcurrencyTests: XCTestCase {
             }
             """.utf8
         )
+    }
+}
+
+// Retains cancellables handed over from concurrently subscribing threads
+// without racing the test case's main-thread cancellable set.
+private final class LockedCancellableStore: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancellables: [AnyCancellable] = []
+
+    func store(_ cancellable: AnyCancellable) {
+        lock.lock()
+        cancellables.append(cancellable)
+        lock.unlock()
     }
 }
 
