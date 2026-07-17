@@ -425,112 +425,154 @@ private final class StubLibraryCuratorUseCase: FetchLibraryCuratorUseCase {
     }
 }
 
+/// Synchronizes request capture with continuation-based waiting for the
+/// use-case doubles. `execute()` runs on the view model's unstructured `Task`
+/// while `waitForRequestCount`/`finish` run on the test's executor, so the
+/// state check and continuation registration must be a single atomic step:
+/// every check-then-register happens inside the lock within
+/// `withCheckedContinuation`'s synchronous body, and continuations are removed
+/// from storage under the lock before being resumed, so each is resumed
+/// exactly once and a concurrent `record`/`finish` can never slip between the
+/// check and the registration.
+private final class UseCaseSynchronizer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var requests: [LibraryCuratorRequest] = []
+    private var requestWaiters: [(target: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var isFinished = false
+    private var finishWaiters: [CheckedContinuation<Void, Never>] = []
+
+    var capturedRequests: [LibraryCuratorRequest] {
+        lock.lock()
+        defer { lock.unlock() }
+        return requests
+    }
+
+    @discardableResult
+    func record(_ request: LibraryCuratorRequest) -> Int {
+        lock.lock()
+        requests.append(request)
+        let count = requests.count
+        var resumable: [CheckedContinuation<Void, Never>] = []
+        requestWaiters.removeAll { waiter in
+            guard waiter.target <= count else { return false }
+            resumable.append(waiter.continuation)
+            return true
+        }
+        lock.unlock()
+        resumable.forEach { $0.resume() }
+        return count
+    }
+
+    func waitForRequestCount(_ target: Int) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            lock.lock()
+            if requests.count >= target {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                requestWaiters.append((target: target, continuation: continuation))
+                lock.unlock()
+            }
+        }
+    }
+
+    func waitUntilFinished() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            lock.lock()
+            if isFinished {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                finishWaiters.append(continuation)
+                lock.unlock()
+            }
+        }
+    }
+
+    func finish() {
+        lock.lock()
+        isFinished = true
+        let resumable = finishWaiters
+        finishWaiters = []
+        lock.unlock()
+        resumable.forEach { $0.resume() }
+    }
+}
+
 private final class CapturingLibraryCuratorUseCase: FetchLibraryCuratorUseCase {
     let result: LibraryCuratorResult
-    private(set) var capturedRequest: LibraryCuratorRequest?
-    private(set) var capturedRequests: [LibraryCuratorRequest] = []
-    private var waitTargetCount = 1
-    private var continuation: CheckedContinuation<Void, Never>?
+    private let synchronizer = UseCaseSynchronizer()
+
+    var capturedRequest: LibraryCuratorRequest? { synchronizer.capturedRequests.last }
+    var capturedRequests: [LibraryCuratorRequest] { synchronizer.capturedRequests }
 
     init(result: LibraryCuratorResult) {
         self.result = result
     }
 
     func execute(request: LibraryCuratorRequest) async throws -> LibraryCuratorResult {
-        capturedRequest = request
-        capturedRequests.append(request)
-        if capturedRequests.count >= waitTargetCount {
-            continuation?.resume()
-            continuation = nil
-        }
+        synchronizer.record(request)
         return result
     }
 
     func waitForRequest() async {
-        await waitForRequestCount(1)
+        await synchronizer.waitForRequestCount(1)
     }
 
     func waitForRequestCount(_ count: Int) async {
-        if capturedRequests.count >= count { return }
-        waitTargetCount = count
-        await withCheckedContinuation { continuation in
-            self.continuation = continuation
-        }
+        await synchronizer.waitForRequestCount(count)
     }
 }
 
 private final class SequencedLibraryCuratorUseCase: FetchLibraryCuratorUseCase {
-    private var results: [Result<LibraryCuratorResult, Error>]
-    private(set) var capturedRequests: [LibraryCuratorRequest] = []
-    private var waitTargetCount = 1
-    private var continuation: CheckedContinuation<Void, Never>?
+    private let results: [Result<LibraryCuratorResult, Error>]
+    private let synchronizer = UseCaseSynchronizer()
+
+    var capturedRequests: [LibraryCuratorRequest] { synchronizer.capturedRequests }
 
     init(results: [Result<LibraryCuratorResult, Error>]) {
         self.results = results
     }
 
     func execute(request: LibraryCuratorRequest) async throws -> LibraryCuratorResult {
-        capturedRequests.append(request)
-        if capturedRequests.count >= waitTargetCount {
-            continuation?.resume()
-            continuation = nil
+        let requestIndex = synchronizer.record(request) - 1
+        guard requestIndex < results.count else {
+            throw LibraryCuratorError.invalidResponse
         }
-        let result = results.isEmpty ? nil : results.removeFirst()
-        switch result {
+        switch results[requestIndex] {
         case .success(let curatorResult):
             return curatorResult
         case .failure(let error):
             throw error
-        case .none:
-            throw LibraryCuratorError.invalidResponse
         }
     }
 
     func waitForRequestCount(_ count: Int) async {
-        if capturedRequests.count >= count { return }
-        waitTargetCount = count
-        await withCheckedContinuation { continuation in
-            self.continuation = continuation
-        }
+        await synchronizer.waitForRequestCount(count)
     }
 }
 
 private final class DelayedLibraryCuratorUseCase: FetchLibraryCuratorUseCase {
     let result: LibraryCuratorResult
-    private(set) var capturedRequests: [LibraryCuratorRequest] = []
-    private var requestContinuation: CheckedContinuation<Void, Never>?
-    private var finishContinuation: CheckedContinuation<Void, Never>?
-    private var shouldFinish = false
+    private let synchronizer = UseCaseSynchronizer()
+
+    var capturedRequests: [LibraryCuratorRequest] { synchronizer.capturedRequests }
 
     init(result: LibraryCuratorResult) {
         self.result = result
     }
 
     func execute(request: LibraryCuratorRequest) async throws -> LibraryCuratorResult {
-        capturedRequests.append(request)
-        if shouldFinish {
-            requestContinuation?.resume()
-            requestContinuation = nil
-            return result
-        }
-        await withCheckedContinuation { continuation in
-            finishContinuation = continuation
-            requestContinuation?.resume()
-            requestContinuation = nil
-        }
+        synchronizer.record(request)
+        await synchronizer.waitUntilFinished()
         return result
     }
 
     func waitForRequest() async {
-        if !capturedRequests.isEmpty { return }
-        await withCheckedContinuation { continuation in
-            requestContinuation = continuation
-        }
+        await synchronizer.waitForRequestCount(1)
     }
 
     func finish() {
-        shouldFinish = true
-        finishContinuation?.resume()
-        finishContinuation = nil
+        synchronizer.finish()
     }
 }
