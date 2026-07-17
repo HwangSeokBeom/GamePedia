@@ -402,7 +402,16 @@ final class AuthRefreshConcurrencyTests: XCTestCase {
     }
 
     func testLastWaiterCancellationCancelsRequestAndLeavesSessionUntouched() {
-        let context = makeContext(initialRefreshToken: "old-refresh")
+        let upstreamCancelLock = NSLock()
+        var upstreamCancelCount = 0
+        let context = makeContext(
+            initialRefreshToken: "old-refresh",
+            refreshUpstreamWillCancel: {
+                upstreamCancelLock.lock()
+                upstreamCancelCount += 1
+                upstreamCancelLock.unlock()
+            }
+        )
         defer { context.session.invalidateAndCancel() }
 
         // The stub would only answer after 2 seconds, so any stopLoading
@@ -438,6 +447,12 @@ final class AuthRefreshConcurrencyTests: XCTestCase {
 
         wait(for: [noDelivery], timeout: 0.8)
 
+        upstreamCancelLock.lock()
+        XCTAssertEqual(
+            upstreamCancelCount, 1,
+            "The repository must issue exactly one upstream cancellation for the abandoned flight."
+        )
+        upstreamCancelLock.unlock()
         XCTAssertEqual(RefreshURLProtocol.stopLoadingCount, 1, "Cancelling the last waiter must cancel the underlying request.")
         XCTAssertNil(context.tokenStore.fetchAccessToken())
         XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "old-refresh")
@@ -470,6 +485,14 @@ final class AuthRefreshConcurrencyTests: XCTestCase {
         XCTAssertEqual(RefreshURLProtocol.refreshTokens, ["old-refresh", "old-refresh"])
         XCTAssertEqual(context.tokenStore.fetchAccessToken(), "new-access")
         XCTAssertEqual(context.tokenStore.fetchRefreshToken(), "new-refresh")
+
+        upstreamCancelLock.lock()
+        XCTAssertEqual(
+            upstreamCancelCount, 1,
+            "A completed refresh must not issue an abandonment cancellation."
+        )
+        upstreamCancelLock.unlock()
+        XCTAssertEqual(RefreshURLProtocol.stopLoadingCount, 1)
     }
 
     func testSessionSupersededDuringStartupSuppressesAbandonedRequest() {
@@ -2060,6 +2083,12 @@ private struct StubRoute {
 private final class RefreshURLProtocol: URLProtocol {
     private static let lock = NSLock()
     private static var storedRequestCount = 0
+    // Counts unique protocol requests that were cancelled before delivering
+    // their response. The URL loading system may invoke stopLoading() more
+    // than once on the same instance (task cancellation and connection
+    // teardown are separate paths), so only an instance's first stopped
+    // transition — and only when no response was delivered — feeds this
+    // counter and the one-shot stopLoading signal.
     private static var storedStopLoadingCount = 0
     private static var storedRefreshTokens: [String] = []
     private static var storedRouteResponses: [String: StubRoute] = [:]
@@ -2126,6 +2155,12 @@ private final class RefreshURLProtocol: URLProtocol {
         lock.unlock()
     }
 
+    // Per-instance lifecycle, guarded by the shared lock so the stopLoading
+    // path and the delayed response delivery decide atomically which of the
+    // two happens first; the loser is suppressed entirely.
+    private var isStopped = false
+    private var hasDeliveredResponse = false
+
     override class func canInit(with request: URLRequest) -> Bool { true }
 
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -2154,6 +2189,17 @@ private final class RefreshURLProtocol: URLProtocol {
 
         DispatchQueue.global().asyncAfter(deadline: .now() + responseDelay) { [weak self] in
             guard let self, let url = self.request.url else { return }
+            // A stopped instance must never talk to its client again: the
+            // scheduled response is dropped instead of racing the
+            // cancellation with late client callbacks.
+            Self.lock.lock()
+            let canDeliver = !self.isStopped && !self.hasDeliveredResponse
+            if canDeliver {
+                self.hasDeliveredResponse = true
+            }
+            Self.lock.unlock()
+            guard canDeliver else { return }
+
             let response = HTTPURLResponse(
                 url: url,
                 statusCode: statusCode,
@@ -2168,9 +2214,20 @@ private final class RefreshURLProtocol: URLProtocol {
 
     override func stopLoading() {
         Self.lock.lock()
-        Self.storedStopLoadingCount += 1
-        let stopLoadingSignal = Self.storedNextStopLoadingSignal
-        Self.storedNextStopLoadingSignal = nil
+        guard !isStopped else {
+            Self.lock.unlock()
+            return
+        }
+        isStopped = true
+        // Only a stop that beat the response delivery is a cancellation of
+        // this request; a stop during load teardown after a finished
+        // delivery is ordinary URLProtocol lifecycle noise.
+        var stopLoadingSignal: (() -> Void)?
+        if !hasDeliveredResponse {
+            Self.storedStopLoadingCount += 1
+            stopLoadingSignal = Self.storedNextStopLoadingSignal
+            Self.storedNextStopLoadingSignal = nil
+        }
         Self.lock.unlock()
 
         stopLoadingSignal?()
