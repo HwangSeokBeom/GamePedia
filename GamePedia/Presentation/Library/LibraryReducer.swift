@@ -81,6 +81,9 @@ enum LibraryReducer {
             }
         case .clearAddingToPlaying:
             state.addingToPlayingIdentifiers.removeAll()
+        case .setLibrarySyncQueue(let pending, let parked):
+            state.pendingSyncCount = pending
+            state.parkedSyncCount = parked
         case .setSyncingOwnedSteamLibrary(let isSyncing):
             state.isSyncingOwnedSteamLibrary = isSyncing
         case .setUnlinkingSteamAccount(let isUnlinking):

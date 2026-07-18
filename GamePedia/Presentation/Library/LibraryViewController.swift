@@ -29,6 +29,7 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
     private let refreshControl = UIRefreshControl()
     private var toastHideWorkItem: DispatchWorkItem?
     private weak var toastView: LibraryToastView?
+    private var syncStatusBannerView: LibrarySyncStatusBannerView?
     private var summaryLoadStartedAt: CFTimeInterval?
     private var didLogFirstSnapshotApplyForCurrentLoad = false
     private var wasSummaryLoading = false
@@ -156,6 +157,8 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         } else if state.steamConnectionOnboarding == nil {
             lastPresentedSteamOnboarding = nil
         }
+
+        updateSyncStatusBanner(pendingCount: state.pendingSyncCount, parkedCount: state.parkedSyncCount)
 
         updateNavigationItems(with: state)
         wasSummaryLoading = state.isSummaryLoading
@@ -477,6 +480,40 @@ final class LibraryViewController: BaseViewController<LibraryRootView, LibrarySt
         present(alert, animated: true)
     }
 
+    /// Offline-first queue banner: visible while library changes are
+    /// pending local sync; offers a manual retry once automatic retries
+    /// are exhausted (parked operations).
+    private func updateSyncStatusBanner(pendingCount: Int, parkedCount: Int) {
+        guard pendingCount > 0 else {
+            syncStatusBannerView?.removeFromSuperview()
+            syncStatusBannerView = nil
+            return
+        }
+
+        let banner: LibrarySyncStatusBannerView
+        if let existing = syncStatusBannerView {
+            banner = existing
+        } else {
+            banner = LibrarySyncStatusBannerView()
+            banner.translatesAutoresizingMaskIntoConstraints = false
+            banner.onRetryTapped = { [weak self] in
+                self?.viewModel.send(.retryLibrarySyncTapped)
+            }
+            view.addSubview(banner)
+            NSLayoutConstraint.activate([
+                banner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+                banner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+                banner.bottomAnchor.constraint(
+                    equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+                    constant: -8
+                )
+            ])
+            syncStatusBannerView = banner
+        }
+
+        banner.update(pendingCount: pendingCount, showsRetry: parkedCount > 0)
+    }
+
     private func showToast(message: String) {
         toastHideWorkItem?.cancel()
         toastView?.removeFromSuperview()
@@ -763,6 +800,67 @@ private final class LibrarySectionHeaderReusableView: UICollectionReusableView {
     @objc
     private func didTapSeeMore() {
         onSeeMoreTapped?()
+    }
+}
+
+private final class LibrarySyncStatusBannerView: UIView {
+    var onRetryTapped: (() -> Void)?
+
+    private let messageLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.textColor = .gpTextPrimary
+        label.numberOfLines = 0
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return label
+    }()
+
+    private lazy var retryButton: UIButton = {
+        var configuration = UIButton.Configuration.plain()
+        configuration.title = L10n.tr("Localizable", "library.sync.retry")
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
+        let button = UIButton(configuration: configuration)
+        button.titleLabel?.font = .systemFont(ofSize: 13, weight: .bold)
+        button.addTarget(self, action: #selector(retryTapped), for: .touchUpInside)
+        return button
+    }()
+
+    init() {
+        super.init(frame: .zero)
+        backgroundColor = UIColor.gpSurface.withAlphaComponent(0.96)
+        layer.cornerRadius = 14
+        layer.masksToBounds = true
+
+        let stackView = UIStackView(arrangedSubviews: [messageLabel, retryButton])
+        stackView.axis = .horizontal
+        stackView.alignment = .center
+        stackView.spacing = 8
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stackView)
+
+        NSLayoutConstraint.activate([
+            stackView.topAnchor.constraint(equalTo: topAnchor, constant: 10),
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(pendingCount: Int, showsRetry: Bool) {
+        messageLabel.text = String(
+            format: L10n.tr("Localizable", "library.sync.pendingBanner"),
+            pendingCount
+        )
+        retryButton.isHidden = !showsRetry
+    }
+
+    @objc
+    private func retryTapped() {
+        onRetryTapped?()
     }
 }
 

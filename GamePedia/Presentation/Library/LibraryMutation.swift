@@ -36,6 +36,7 @@ enum LibraryMutation {
     case setSteamOwnedSyncErrorCode(String?)
     case setAddingToPlaying(LibraryGameIdentifier, isUpdating: Bool)
     case clearAddingToPlaying
+    case setLibrarySyncQueue(pending: Int, parked: Int)
     case setSyncingOwnedSteamLibrary(Bool)
     case setUnlinkingSteamAccount(Bool)
     case setSections([LibrarySectionViewState])
@@ -87,6 +88,8 @@ extension LibraryMutation {
             return "setAddingToPlaying"
         case .clearAddingToPlaying:
             return "clearAddingToPlaying"
+        case .setLibrarySyncQueue:
+            return "setLibrarySyncQueue"
         case .setSyncingOwnedSteamLibrary:
             return "setSyncingOwnedSteamLibrary"
         case .setUnlinkingSteamAccount:

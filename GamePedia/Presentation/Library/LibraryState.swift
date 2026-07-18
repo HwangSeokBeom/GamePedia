@@ -142,6 +142,12 @@ struct LibraryState: Equatable {
     var reviews: [ReviewedGame] = []
     var steamOwnedSyncErrorCode: String? = nil
     var addingToPlayingIdentifiers: Set<LibraryGameIdentifier> = []
+    /// Library mutations accepted locally but not yet confirmed by the
+    /// server (offline-first queue depth for the current account).
+    var pendingSyncCount: Int = 0
+    /// Pending mutations whose automatic retries are exhausted; they wait
+    /// for a manual retry, foreground, or connectivity event.
+    var parkedSyncCount: Int = 0
     var isSyncingOwnedSteamLibrary: Bool = false
     var isUnlinkingSteamAccount: Bool = false
     var sections: [LibrarySectionViewState] = []

@@ -9,6 +9,11 @@ struct FeatureFlags {
     // The realtime foundation stays REST-only until one exists
     // (docs/backend/REALTIME_CONTRACT_REQUEST.md).
     let enableRealtimeActivity: Bool
+    // Kill-switch for the offline-first library sync queue. The queue only
+    // replays committed, replay-convergent REST mutations; disabling it
+    // reverts every library mutation to the pre-2.2 direct call path
+    // (docs/backend/LIBRARY_SYNC_CONTRACT_REQUEST.md).
+    let enableOfflineLibrarySync: Bool
 
     static func defaults(for environment: APIEnvironment) -> FeatureFlags {
         switch environment {
@@ -18,7 +23,8 @@ struct FeatureFlags {
                 enableReportFeature: true,
                 enableNewReviewUI: false,
                 useExperimentalSearch: false,
-                enableRealtimeActivity: false
+                enableRealtimeActivity: false,
+                enableOfflineLibrarySync: true
             )
         }
     }

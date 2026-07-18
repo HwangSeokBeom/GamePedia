@@ -34,6 +34,19 @@ final class DeveloperDiagnosticsTests: XCTestCase {
             refreshTokenPresent: true,
             realtimeEnabled: false,
             realtime: makeSnapshot(lastSafeErrorCode: lastSafeErrorCode),
+            librarySyncEnabled: true,
+            librarySync: LibrarySyncDiagnosticsSnapshot(
+                hasActiveAccount: true,
+                sessionGeneration: 2,
+                pendingOperationCount: 1,
+                parkedOperationCount: 0,
+                inFlightEntityCount: 1,
+                completedOperationCount: 4,
+                permanentlyFailedOperationCount: 0,
+                recoveredFromCorruptedStore: false,
+                isBlockedOnAuth: false,
+                lastSafeErrorCode: "NETWORK"
+            ),
             metrics: [
                 MetricSample(
                     metric: .authRefresh,

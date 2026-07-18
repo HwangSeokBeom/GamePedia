@@ -14,6 +14,7 @@ final class HomeGameListViewModel {
 
     var onStateChanged: ((HomeGameListState) -> Void)?
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
+    private let librarySync: (any LibraryMutationSyncing)?
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -22,7 +23,8 @@ final class HomeGameListViewModel {
         wishlistedGameIDs: Set<Int>,
         toggleFavoriteUseCase: ToggleFavoriteUseCase = ToggleFavoriteUseCase(
             favoriteRepository: DefaultFavoriteRepository()
-        )
+        ),
+        librarySync: (any LibraryMutationSyncing)? = LibrarySyncRuntime.shared.mutationRouter
     ) {
         self.state = HomeGameListState(
             section: section,
@@ -30,7 +32,9 @@ final class HomeGameListViewModel {
             wishlistedGameIDs: wishlistedGameIDs
         )
         self.toggleFavoriteUseCase = toggleFavoriteUseCase
+        self.librarySync = librarySync
         observeFavoriteChanges()
+        observeLibrarySyncFailures()
     }
 
     func send(_ intent: HomeGameListIntent) {
@@ -72,7 +76,31 @@ final class HomeGameListViewModel {
         let isCurrentlyFavorite = state.wishlistedGameIDs.contains(gameId)
         applyFavoriteChange(gameId: gameId, isFavorite: !isCurrentlyFavorite)
 
+        // Offline-first path: accept locally; the engine posts the
+        // server-authoritative `.favoriteDidChange` on success and
+        // `.librarySyncOperationDidFail` on permanent failure.
+        if let librarySync {
+            Task {
+                let accepted = await librarySync.enqueueFavoriteChange(
+                    gameID: String(gameId),
+                    isFavorite: !isCurrentlyFavorite
+                )
+                if !accepted {
+                    await self.performDirectFavoriteToggle(
+                        gameId: gameId,
+                        isCurrentlyFavorite: isCurrentlyFavorite
+                    )
+                }
+            }
+            return
+        }
+
         Task {
+            await performDirectFavoriteToggle(gameId: gameId, isCurrentlyFavorite: isCurrentlyFavorite)
+        }
+    }
+
+    private func performDirectFavoriteToggle(gameId: Int, isCurrentlyFavorite: Bool) async {
             do {
                 let result = try await toggleFavoriteUseCase.execute(
                     gameId: String(gameId),
@@ -98,7 +126,25 @@ final class HomeGameListViewModel {
                 }
                 print("[HomeGameList] favoriteToggleFailed gameId=\(gameId) error=\(error.localizedDescription)")
             }
-        }
+    }
+
+    /// A queued favorite change permanently failed after the optimistic
+    /// update: revert that game's local entry.
+    private func observeLibrarySyncFailures() {
+        NotificationCenter.default.publisher(for: .librarySyncOperationDidFail)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let kind = notification.userInfo?[LibrarySyncFailureUserInfoKey.entityKind] as? String,
+                      kind == LibrarySyncEntityKind.favorite.rawValue,
+                      let failedGameID = notification.userInfo?[LibrarySyncFailureUserInfoKey.gameID] as? String,
+                      let gameId = Int(failedGameID) else {
+                    return
+                }
+                let isCurrentlyMarked = self.state.wishlistedGameIDs.contains(gameId)
+                self.applyFavoriteChange(gameId: gameId, isFavorite: !isCurrentlyMarked)
+            }
+            .store(in: &cancellables)
     }
 
     private func applyFavoriteChange(gameId: Int, isFavorite: Bool) {

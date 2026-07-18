@@ -18,6 +18,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         AppObservability.shared.start()
         AppObservability.shared.markColdLaunchStart()
         RealtimeRuntime.shared.start()
+        LibrarySyncRuntime.shared.start()
         AppConfig.logRuntimeConfiguration()
         UNUserNotificationCenter.current().delegate = self
         PushNotificationService.shared.start(application: application)

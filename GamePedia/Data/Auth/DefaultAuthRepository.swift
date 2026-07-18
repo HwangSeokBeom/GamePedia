@@ -738,8 +738,16 @@ final class DefaultAuthRepository: AuthRepository {
             }
             .handleEvents(receiveOutput: { [weak self] _ in
                 let accessToken = self?.tokenStore.fetchAccessToken()
+                let deletedUserId = self?.userSessionStore.fetchUser()?.id
                 self?.invalidateStoredSession()
                 PushNotificationService.shared.deleteRegisteredTokenOnLogout(accessToken: accessToken)
+                if let deletedUserId {
+                    NotificationCenter.default.post(
+                        name: .authAccountDidDelete,
+                        object: nil,
+                        userInfo: [AuthSessionChangeUserInfoKey.userId: deletedUserId]
+                    )
+                }
             })
             .eraseToAnyPublisher()
     }
