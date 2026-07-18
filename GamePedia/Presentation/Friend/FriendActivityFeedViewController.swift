@@ -29,9 +29,12 @@ final class FriendActivityFeedViewModel {
     private let realtimeInvalidationSource: ActivityFeedInvalidationSignaling?
     private var realtimeInvalidationTask: Task<Void, Never>?
     private var hasPendingRealtimeInvalidation = false
-    private var hasLoadedOnce = false
-    private var isLoadInFlight = false
+    // Single-flight, duplicate-page, and stale-completion decisions live
+    // in the shared machine; this view model keeps only items/rendering.
+    private var pagination = PaginationStateMachine<String>()
     private var activityItemsByID: [String: FriendActivityItem] = [:]
+
+    private var hasLoadedOnce: Bool { pagination.hasLoadedInitialPage }
 
     // Realtime is an invalidation channel only: with the flag off or the
     // backend contract missing (today's production state) the source is nil
@@ -69,7 +72,6 @@ final class FriendActivityFeedViewModel {
         case .didPullToRefresh:
             load(reset: true, isUserInitiatedRefresh: true)
         case .didReachListBottom:
-            guard state.nextCursor != nil else { return }
             load(reset: false, isUserInitiatedRefresh: false)
         }
     }
@@ -101,7 +103,7 @@ final class FriendActivityFeedViewModel {
         defer { onRealtimeInvalidationHandled?() }
 #endif
         guard hasLoadedOnce else { return }
-        guard !isLoadInFlight else {
+        guard !pagination.isLoadInFlight else {
             // Coalesce: one follow-up reconciliation after the current load.
             hasPendingRealtimeInvalidation = true
             return
@@ -121,29 +123,29 @@ final class FriendActivityFeedViewModel {
     }
 
     private func load(reset: Bool, isUserInitiatedRefresh: Bool) {
-        guard !isLoadInFlight else { return }
-        isLoadInFlight = true
-
+        let beganLoad: PaginationLoad<String>?
         if reset {
-            if hasLoadedOnce, isUserInitiatedRefresh {
-                state.isRefreshing = true
-            } else {
-                state.isLoading = true
-            }
+            beganLoad = hasLoadedOnce ? pagination.beginRefresh() : pagination.beginInitial()
         } else {
-            state.isLoadingMore = true
+            beganLoad = pagination.beginNextPage()
         }
+        guard let load = beganLoad else { return }
+
+        state.isLoading = pagination.isLoadingInitial
+        state.isRefreshing = pagination.isRefreshing
+        state.isLoadingMore = pagination.isLoadingMore
 
         let currentItems = state.items
-        let cursor = reset ? nil : state.nextCursor
-        print("[FriendActivity] loadStarted reset=\(reset) cursor=\(cursor ?? "nil")")
+        let wasLoadedOnce = hasLoadedOnce
+        print("[FriendActivity] loadStarted reset=\(reset) cursor=\(load.token ?? "nil")")
         let metricToken = metricRecorder.begin(.friendActivityRefresh)
 
         Task {
             do {
-                let page = try await fetchFriendActivityFeedUseCase.execute(cursor: cursor)
+                let page = try await fetchFriendActivityFeedUseCase.execute(cursor: load.token)
                 self.metricRecorder.end(metricToken, outcome: .success)
                 await MainActor.run {
+                    guard self.pagination.completeLoad(load, nextToken: page.nextCursor) else { return }
                     let newItems = page.activities.map(FriendActivityFeedItemFormatter.makeViewState(from:))
                     self.activityItemsByID.merge(
                         MappingSafety.dictionary(
@@ -160,7 +162,7 @@ final class FriendActivityFeedViewModel {
                         incomingItems: newItems
                     )
 
-                    if reset, self.hasLoadedOnce {
+                    if reset, wasLoadedOnce {
                         self.enqueueBannersIfNeeded(incomingItems: newItems, existingItems: currentItems)
                     }
 
@@ -168,21 +170,20 @@ final class FriendActivityFeedViewModel {
                     self.state.isRefreshing = false
                     self.state.isLoadingMore = false
                     self.state.items = mergedItems
-                    self.state.nextCursor = page.nextCursor
+                    self.state.nextCursor = self.pagination.nextPageToken
                     self.state.errorMessage = nil
-                    self.hasLoadedOnce = true
-                    self.isLoadInFlight = false
                     self.persistWidgetSnapshot(items: mergedItems)
 
                     print(
                         "[FriendActivity] loadSuccess count=\(mergedItems.count) " +
-                        "nextCursor=\(page.nextCursor ?? "nil")"
+                        "nextCursor=\(self.pagination.nextPageToken ?? "nil")"
                     )
                     self.drainPendingRealtimeInvalidationIfNeeded()
                 }
             } catch {
                 self.metricRecorder.end(metricToken, outcome: .failure)
                 await MainActor.run {
+                    guard self.pagination.failLoad(load) else { return }
                     self.state.isLoading = false
                     self.state.isRefreshing = false
                     self.state.isLoadingMore = false
@@ -190,7 +191,6 @@ final class FriendActivityFeedViewModel {
                         self.state.items = []
                     }
                     self.state.errorMessage = L10n.Friend.Activity.loadFailed
-                    self.isLoadInFlight = false
                     print("[FriendActivity] loadFailure error=\(error.localizedDescription)")
                     // Deliberately no drain here: after a failed load the
                     // user-visible retry path (pull-to-refresh) remains the
@@ -267,6 +267,7 @@ final class FriendActivityFeedViewController: BaseViewController<UIView, FriendA
     private let loadingIndicatorView = UIActivityIndicatorView(style: .medium)
     private let footerLoadingIndicatorView = UIActivityIndicatorView(style: .medium)
     private let refreshControl = UIRefreshControl()
+    private let imagePrefetcher = GameImagePrefetcher()
     private var items: [FriendActivityFeedItemViewState] = []
 
     var onRoute: ((SocialActivityRoute) -> Void)?
@@ -316,6 +317,7 @@ final class FriendActivityFeedViewController: BaseViewController<UIView, FriendA
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.dataSource = self
         tableView.delegate = self
+        tableView.prefetchDataSource = self
         tableView.register(FriendActivityCell.self, forCellReuseIdentifier: FriendActivityCell.reuseID)
         tableView.refreshControl = refreshControl
 
@@ -393,5 +395,18 @@ extension FriendActivityFeedViewController: UITableViewDataSource, UITableViewDe
     func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
         guard indexPath.row >= items.count - 2 else { return }
         viewModel.send(.didReachListBottom)
+    }
+}
+
+extension FriendActivityFeedViewController: UITableViewDataSourcePrefetching {
+    func tableView(_ tableView: UITableView, prefetchRowsAt indexPaths: [IndexPath]) {
+        let candidates = indexPaths
+            .filter { $0.row < items.count }
+            .flatMap { [items[$0.row].gameCoverURL, items[$0.row].actorAvatarURL] }
+        imagePrefetcher.prefetch(candidates: candidates)
+    }
+
+    func tableView(_ tableView: UITableView, cancelPrefetchingForRowsAt indexPaths: [IndexPath]) {
+        imagePrefetcher.cancelAll()
     }
 }

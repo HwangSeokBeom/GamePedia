@@ -24,7 +24,9 @@ final class SearchViewModel {
     // MARK: Debounce
     private var searchTask: Task<Void, Never>? = nil
     private let debounceNanoseconds: UInt64
-    private var activeSearchID: UUID?
+    // Latest-request-wins identity: the inline `activeSearchID` UUID this
+    // view model pioneered, now provided by the shared gate.
+    private let searchGate = LatestRequestGate()
     private let metricRecorder: PerformanceMetricRecorder
     private var searchMetricToken: MetricIntervalToken?
 
@@ -93,8 +95,7 @@ final class SearchViewModel {
             return
         }
 
-        let searchID = UUID()
-        activeSearchID = searchID
+        let searchID = searchGate.begin()
         apply(.prepareSearch)
 
         // Captured by value so the task never owns the view model: the loader
@@ -131,17 +132,16 @@ final class SearchViewModel {
         }
     }
 
-    private func beginSearchIfCurrent(_ searchID: UUID) -> Bool {
-        guard !Task.isCancelled, activeSearchID == searchID else { return false }
+    private func beginSearchIfCurrent(_ searchID: LatestRequestGate.Token) -> Bool {
+        guard !Task.isCancelled, searchGate.isCurrent(searchID) else { return false }
         endSearchMetric(outcome: .cancelled)
         searchMetricToken = metricRecorder.begin(.searchRoundTrip)
         apply(.setSearching(true))
         return true
     }
 
-    private func completeSearch(_ searchID: UUID, with mutation: SearchMutation) {
-        guard activeSearchID == searchID else { return }
-        activeSearchID = nil
+    private func completeSearch(_ searchID: LatestRequestGate.Token, with mutation: SearchMutation) {
+        guard searchGate.commit(searchID) else { return }
         if case .setError = mutation {
             endSearchMetric(outcome: .failure)
         } else {
@@ -153,7 +153,7 @@ final class SearchViewModel {
     private func invalidateSearch() {
         searchTask?.cancel()
         searchTask = nil
-        activeSearchID = nil
+        searchGate.invalidate()
         endSearchMetric(outcome: .cancelled)
         apply(.clearResults)
     }
