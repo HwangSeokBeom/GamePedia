@@ -25,23 +25,45 @@ final class FriendActivityFeedViewModel {
 
     private let fetchFriendActivityFeedUseCase: FetchFriendActivityFeedUseCase
     private let widgetSnapshotStore: SocialWidgetSnapshotStore
+    private let metricRecorder: PerformanceMetricRecorder
+    private let realtimeInvalidationSource: ActivityFeedInvalidationSignaling?
+    private var realtimeInvalidationTask: Task<Void, Never>?
+    private var hasPendingRealtimeInvalidation = false
     private var hasLoadedOnce = false
     private var isLoadInFlight = false
     private var activityItemsByID: [String: FriendActivityItem] = [:]
+
+    // Realtime is an invalidation channel only: with the flag off or the
+    // backend contract missing (today's production state) the source is nil
+    // and the feed's behavior is byte-for-byte the existing REST behavior.
+    static func makeDefaultInvalidationSource() -> ActivityFeedInvalidationSignaling? {
+        guard RealtimeRuntime.shared.isRealtimeEnabled else { return nil }
+        return RealtimeActivityFeedInvalidationSource()
+    }
 
     init(
         fetchFriendActivityFeedUseCase: FetchFriendActivityFeedUseCase = FetchFriendActivityFeedUseCase(
             repository: DefaultFriendRepository()
         ),
-        widgetSnapshotStore: SocialWidgetSnapshotStore = .shared
+        widgetSnapshotStore: SocialWidgetSnapshotStore = .shared,
+        metricRecorder: PerformanceMetricRecorder = AppObservability.shared.recorder,
+        realtimeInvalidationSource: ActivityFeedInvalidationSignaling? =
+            FriendActivityFeedViewModel.makeDefaultInvalidationSource()
     ) {
         self.fetchFriendActivityFeedUseCase = fetchFriendActivityFeedUseCase
         self.widgetSnapshotStore = widgetSnapshotStore
+        self.metricRecorder = metricRecorder
+        self.realtimeInvalidationSource = realtimeInvalidationSource
+    }
+
+    deinit {
+        realtimeInvalidationTask?.cancel()
     }
 
     func send(_ intent: FriendActivityFeedIntent) {
         switch intent {
         case .viewDidLoad:
+            startRealtimeInvalidationObservationIfNeeded()
             guard !hasLoadedOnce else { return }
             load(reset: true, isUserInitiatedRefresh: false)
         case .didPullToRefresh:
@@ -50,6 +72,48 @@ final class FriendActivityFeedViewModel {
             guard state.nextCursor != nil else { return }
             load(reset: false, isUserInitiatedRefresh: false)
         }
+    }
+
+    // MARK: - Realtime invalidation (REST stays authoritative)
+
+    private func startRealtimeInvalidationObservationIfNeeded() {
+        guard realtimeInvalidationTask == nil,
+              let source = realtimeInvalidationSource else { return }
+        let signals = source.signals()
+        realtimeInvalidationTask = Task { [weak self] in
+            for await _ in signals {
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    self?.handleRealtimeInvalidation()
+                }
+            }
+        }
+    }
+
+#if DEBUG
+    // Deterministic test hook: fires after each invalidation signal has been
+    // fully evaluated (applied, coalesced, or dropped).
+    var onRealtimeInvalidationHandled: (() -> Void)?
+#endif
+
+    private func handleRealtimeInvalidation() {
+#if DEBUG
+        defer { onRealtimeInvalidationHandled?() }
+#endif
+        guard hasLoadedOnce else { return }
+        guard !isLoadInFlight else {
+            // Coalesce: one follow-up reconciliation after the current load.
+            hasPendingRealtimeInvalidation = true
+            return
+        }
+        print("[FriendActivity] realtimeInvalidation -> restReconciliation")
+        load(reset: true, isUserInitiatedRefresh: true)
+    }
+
+    private func drainPendingRealtimeInvalidationIfNeeded() {
+        guard hasPendingRealtimeInvalidation else { return }
+        hasPendingRealtimeInvalidation = false
+        handleRealtimeInvalidation()
     }
 
     func item(for identity: String) -> FriendActivityItem? {
@@ -73,10 +137,12 @@ final class FriendActivityFeedViewModel {
         let currentItems = state.items
         let cursor = reset ? nil : state.nextCursor
         print("[FriendActivity] loadStarted reset=\(reset) cursor=\(cursor ?? "nil")")
+        let metricToken = metricRecorder.begin(.friendActivityRefresh)
 
         Task {
             do {
                 let page = try await fetchFriendActivityFeedUseCase.execute(cursor: cursor)
+                self.metricRecorder.end(metricToken, outcome: .success)
                 await MainActor.run {
                     let newItems = page.activities.map(FriendActivityFeedItemFormatter.makeViewState(from:))
                     self.activityItemsByID.merge(
@@ -112,8 +178,10 @@ final class FriendActivityFeedViewModel {
                         "[FriendActivity] loadSuccess count=\(mergedItems.count) " +
                         "nextCursor=\(page.nextCursor ?? "nil")"
                     )
+                    self.drainPendingRealtimeInvalidationIfNeeded()
                 }
             } catch {
+                self.metricRecorder.end(metricToken, outcome: .failure)
                 await MainActor.run {
                     self.state.isLoading = false
                     self.state.isRefreshing = false
@@ -124,6 +192,9 @@ final class FriendActivityFeedViewModel {
                     self.state.errorMessage = L10n.Friend.Activity.loadFailed
                     self.isLoadInFlight = false
                     print("[FriendActivity] loadFailure error=\(error.localizedDescription)")
+                    // Deliberately no drain here: after a failed load the
+                    // user-visible retry path (pull-to-refresh) remains the
+                    // recovery mechanism; realtime must not retry-loop.
                 }
             }
         }

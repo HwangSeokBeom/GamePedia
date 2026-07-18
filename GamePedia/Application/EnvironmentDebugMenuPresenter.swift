@@ -7,7 +7,8 @@ enum EnvironmentDebugMenuPresenter {
         currentEnvironment: APIEnvironment,
         onRefreshWidgetSnapshots: (() -> Void)? = nil,
         onSeedWidgetSamples: (() -> Void)? = nil,
-        onSeedLoggedOutWidgetSamples: (() -> Void)? = nil
+        onSeedLoggedOutWidgetSamples: (() -> Void)? = nil,
+        onShowDeveloperDiagnostics: (() -> Void)? = nil
     ) {
         let alertController = UIAlertController(
             title: "서버 환경 정보",
@@ -40,6 +41,14 @@ enum EnvironmentDebugMenuPresenter {
             alertController.addAction(
                 UIAlertAction(title: "위젯 Logged Out 샘플 주입", style: .default) { _ in
                     onSeedLoggedOutWidgetSamples()
+                }
+            )
+        }
+
+        if let onShowDeveloperDiagnostics {
+            alertController.addAction(
+                UIAlertAction(title: "개발자 진단 (realtime/metrics)", style: .default) { _ in
+                    onShowDeveloperDiagnostics()
                 }
             )
         }

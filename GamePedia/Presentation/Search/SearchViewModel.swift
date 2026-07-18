@@ -25,13 +25,17 @@ final class SearchViewModel {
     private var searchTask: Task<Void, Never>? = nil
     private let debounceNanoseconds: UInt64
     private var activeSearchID: UUID?
+    private let metricRecorder: PerformanceMetricRecorder
+    private var searchMetricToken: MetricIntervalToken?
 
     // MARK: Init
     init(
         apiClient: APIClient = .shared,
         debounceNanoseconds: UInt64 = 400_000_000,
-        loadGames: SearchLoader? = nil
+        loadGames: SearchLoader? = nil,
+        metricRecorder: PerformanceMetricRecorder = AppObservability.shared.recorder
     ) {
+        self.metricRecorder = metricRecorder
         self.debounceNanoseconds = debounceNanoseconds
         self.loadGames = loadGames ?? { query, genre in
             let endpoint = Endpoint.searchGames(query: query, genre: genre)
@@ -129,6 +133,8 @@ final class SearchViewModel {
 
     private func beginSearchIfCurrent(_ searchID: UUID) -> Bool {
         guard !Task.isCancelled, activeSearchID == searchID else { return false }
+        endSearchMetric(outcome: .cancelled)
+        searchMetricToken = metricRecorder.begin(.searchRoundTrip)
         apply(.setSearching(true))
         return true
     }
@@ -136,6 +142,11 @@ final class SearchViewModel {
     private func completeSearch(_ searchID: UUID, with mutation: SearchMutation) {
         guard activeSearchID == searchID else { return }
         activeSearchID = nil
+        if case .setError = mutation {
+            endSearchMetric(outcome: .failure)
+        } else {
+            endSearchMetric(outcome: .success)
+        }
         apply(mutation)
     }
 
@@ -143,6 +154,13 @@ final class SearchViewModel {
         searchTask?.cancel()
         searchTask = nil
         activeSearchID = nil
+        endSearchMetric(outcome: .cancelled)
         apply(.clearResults)
+    }
+
+    private func endSearchMetric(outcome: MetricOutcome) {
+        guard let token = searchMetricToken else { return }
+        searchMetricToken = nil
+        metricRecorder.end(token, outcome: outcome)
     }
 }

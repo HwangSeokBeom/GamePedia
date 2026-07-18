@@ -270,15 +270,20 @@ final class AppCoordinator {
             return
         }
 
+        // Consumer-side duration of the shared refresh flight; the auth
+        // repository's own single-flight semantics are unchanged.
+        let refreshMetricToken = AppObservability.shared.recorder.begin(.authRefresh)
         refreshSessionUseCase.execute()
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { completion in
                     if case .failure = completion {
+                        AppObservability.shared.recorder.end(refreshMetricToken, outcome: .failure)
                         print("[GuestMode] refreshFailed continuingAsGuest=true")
                     }
                 },
                 receiveValue: { _ in
+                    AppObservability.shared.recorder.end(refreshMetricToken, outcome: .success)
                     print("[GuestMode] sessionRestored mode=authenticated")
                     self.refreshWidgetSnapshots(reason: "sessionRestored")
                 }
@@ -727,6 +732,14 @@ final class AppCoordinator {
             },
             onSeedLoggedOutWidgetSamples: {
                 WidgetDebugQAHelper.seedLoggedOutSnapshots()
+            },
+            onShowDeveloperDiagnostics: { [weak presenter] in
+                guard let presenter else { return }
+                let diagnosticsViewController = DeveloperDiagnosticsViewController()
+                let navigationController = UINavigationController(
+                    rootViewController: diagnosticsViewController
+                )
+                presenter.present(navigationController, animated: true)
             }
         )
     }

@@ -21,6 +21,7 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
     // Set by HomeCoordinator — called when the user taps a game cell.
     var onGameSelected: ((Int) -> Void)?
     var onRoute: ((HomeRoute) -> Void)?
+    private var firstRenderMetricToken: MetricIntervalToken?
 
     // MARK: Init
     init(
@@ -36,6 +37,7 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
     // MARK: Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        firstRenderMetricToken = AppObservability.shared.recorder.begin(.firstHomeRender)
         setupDataSource()
         bindViewModel()
         setupSearchHintAction()
@@ -244,6 +246,7 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
     }
 
     override func render(_ state: HomeState) {
+        completeFirstRenderMetricIfNeeded(state: state)
         GameDetailSeedStore.shared.store(
             games: Array(
                 Set(
@@ -267,6 +270,20 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
         }
 
         applySnapshot(state: state)
+    }
+
+    // Ends the first-render interval on the first render that shows real
+    // content (skeleton dismissed with at least one populated section).
+    private func completeFirstRenderMetricIfNeeded(state: HomeState) {
+        guard let token = firstRenderMetricToken, !state.showsSkeleton else { return }
+        let hasContent = !state.highlights.isEmpty
+            || !state.todayRecommendations.isEmpty
+            || !state.popularGames.isEmpty
+            || !state.trendingGames.isEmpty
+        guard hasContent else { return }
+        firstRenderMetricToken = nil
+        AppObservability.shared.recorder.end(token, outcome: .success)
+        AppObservability.shared.markFirstMeaningfulRenderIfNeeded()
     }
 
     private func handle(_ route: HomeRoute) {
