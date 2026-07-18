@@ -134,14 +134,7 @@ final class AppCoordinator {
         }
 
         if let widgetDeepLink = WidgetDeepLink(url: url) {
-            let reviewItem = reviewPromptItem(for: widgetDeepLink)
-
-            if window.rootViewController is SplashViewController || mainTabBarController == nil {
-                pendingWidgetDeepLink = widgetDeepLink
-                pendingWidgetReviewItem = reviewItem
-            } else {
-                handleWidgetDeepLink(widgetDeepLink, reviewItem: reviewItem)
-            }
+            handleWidgetDeepLink(widgetDeepLink, reviewItem: reviewPromptItem(for: widgetDeepLink))
             return true
         }
 
@@ -618,6 +611,51 @@ final class AppCoordinator {
         _ deepLink: WidgetDeepLink,
         reviewItem: ReviewPromptWidgetSnapshot.Item?
     ) {
+        let isInterfaceReady = !(window.rootViewController is SplashViewController)
+            && mainTabBarController != nil
+        let decision = WidgetDeepLinkPolicy.decision(
+            for: deepLink,
+            isInterfaceReady: isInterfaceReady,
+            isAuthenticated: currentSessionAccessMode() == .authenticated
+        )
+
+        switch decision {
+        case .perform:
+            performWidgetDeepLink(deepLink, reviewItem: reviewItem)
+        case .requireAuthentication:
+            resumeDeepLinkAfterAuthentication(deepLink, reviewItem: reviewItem)
+        case .ignore:
+            return
+        case .deferUntilInterfaceReady:
+            pendingWidgetDeepLink = deepLink
+            pendingWidgetReviewItem = reviewItem
+        }
+    }
+
+    /// Parks a session-gated link, presents authentication, and replays
+    /// the link once the flow completes. Previously duplicated inline for
+    /// every gated destination.
+    private func resumeDeepLinkAfterAuthentication(
+        _ deepLink: WidgetDeepLink,
+        reviewItem: ReviewPromptWidgetSnapshot.Item?
+    ) {
+        pendingWidgetDeepLink = deepLink
+        pendingWidgetReviewItem = reviewItem ?? reviewPromptItem(for: deepLink)
+
+        guard let presenter = topPresenter(from: window.rootViewController) else { return }
+        presentAuthFlow(from: presenter) { [weak self] in
+            guard let self, let pendingWidgetDeepLink = self.pendingWidgetDeepLink else { return }
+            let pendingReviewItem = self.pendingWidgetReviewItem
+            self.pendingWidgetDeepLink = nil
+            self.pendingWidgetReviewItem = nil
+            self.handleWidgetDeepLink(pendingWidgetDeepLink, reviewItem: pendingReviewItem)
+        }
+    }
+
+    private func performWidgetDeepLink(
+        _ deepLink: WidgetDeepLink,
+        reviewItem: ReviewPromptWidgetSnapshot.Item?
+    ) {
         switch deepLink {
         case .game(let gameID):
             ensureMainInterface(selectedIndex: 0)
@@ -630,40 +668,11 @@ final class AppCoordinator {
             }
             homeCoordinator?.navigateToTrendingGameList(items: items)
         case .profile:
-            guard currentSessionAccessMode() == .authenticated else {
-                pendingWidgetDeepLink = deepLink
-                pendingWidgetReviewItem = nil
-
-                guard let presenter = topPresenter(from: window.rootViewController) else { return }
-                presentAuthFlow(from: presenter) { [weak self] in
-                    guard let self, let pendingWidgetDeepLink = self.pendingWidgetDeepLink else { return }
-                    self.pendingWidgetDeepLink = nil
-                    self.handleWidgetDeepLink(pendingWidgetDeepLink, reviewItem: nil)
-                }
-                return
-            }
-
             ensureMainInterface(selectedIndex: 3)
         case .login:
-            guard currentSessionAccessMode() == .guest,
-                  let presenter = topPresenter(from: window.rootViewController) else {
-                return
-            }
+            guard let presenter = topPresenter(from: window.rootViewController) else { return }
             presentAuthFlow(from: presenter) {}
         case .review(let reviewID):
-            guard currentSessionAccessMode() == .authenticated else {
-                pendingWidgetDeepLink = deepLink
-                pendingWidgetReviewItem = nil
-
-                guard let presenter = topPresenter(from: window.rootViewController) else { return }
-                presentAuthFlow(from: presenter) { [weak self] in
-                    guard let self, let pendingWidgetDeepLink = self.pendingWidgetDeepLink else { return }
-                    self.pendingWidgetDeepLink = nil
-                    self.handleWidgetDeepLink(pendingWidgetDeepLink, reviewItem: nil)
-                }
-                return
-            }
-
             guard let reviewItem = activityReviewItem(for: reviewID) else {
                 ensureMainInterface(selectedIndex: 3)
                 return
@@ -677,25 +686,8 @@ final class AppCoordinator {
                 gameTitle: reviewItem.gameTitle
             )
         case .reviewNew(let gameID):
-            let resolvedItem = reviewItem ?? reviewPromptItem(forGameID: gameID)
-
-            guard currentSessionAccessMode() == .authenticated else {
-                pendingWidgetDeepLink = deepLink
-                pendingWidgetReviewItem = resolvedItem
-
-                guard let presenter = topPresenter(from: window.rootViewController) else { return }
-                presentAuthFlow(from: presenter) { [weak self] in
-                    guard let self, let pendingWidgetDeepLink = self.pendingWidgetDeepLink else { return }
-                    let pendingReviewItem = self.pendingWidgetReviewItem
-                    self.pendingWidgetDeepLink = nil
-                    self.pendingWidgetReviewItem = nil
-                    self.handleWidgetDeepLink(pendingWidgetDeepLink, reviewItem: pendingReviewItem)
-                }
-                return
-            }
-
             ensureMainInterface(selectedIndex: 0)
-            if let resolvedItem {
+            if let resolvedItem = reviewItem ?? reviewPromptItem(forGameID: gameID) {
                 homeCoordinator?.navigateToReviewComposer(item: resolvedItem)
             } else {
                 homeCoordinator?.navigateToGameDetail(gameID: gameID)

@@ -4,6 +4,17 @@ final class DefaultGameRepository: GameRepository {
 
     private let apiClient: APIClient
     private static let detailStore = GameDetailRequestStore()
+    // Coalesces duplicate list loads. At launch the widget snapshot
+    // refresh and HomeViewModel both run LoadHomeFeedUseCase back to back
+    // (measured: every home list endpoint requested twice, seconds
+    // apart), so a short success TTL is required — in-flight joining
+    // alone cannot dedupe sequential duplicates. 30s is well under the
+    // widget refresh TTL (45s) and the game-detail cache TTL (600s), so
+    // no surface becomes staler than an existing accepted policy.
+    private static let listStore = RequestCoordinator<String, [Game]>(
+        logLabel: "gameLists",
+        successTTL: 30
+    )
 
     init(apiClient: APIClient = .shared) {
         self.apiClient = apiClient
@@ -13,7 +24,9 @@ final class DefaultGameRepository: GameRepository {
         try await fetchGames(
             endpoint: .highlightGames(limit: limit, filter: filter),
             logLabel: "highlights",
-            isTrending: false
+            isTrending: false,
+            limit: limit,
+            filter: filter
         )
     }
 
@@ -25,7 +38,9 @@ final class DefaultGameRepository: GameRepository {
         try await fetchGames(
             endpoint: .popularGames(limit: limit, filter: filter),
             logLabel: "popular",
-            isTrending: false
+            isTrending: false,
+            limit: limit,
+            filter: filter
         )
     }
 
@@ -33,7 +48,9 @@ final class DefaultGameRepository: GameRepository {
         try await fetchGames(
             endpoint: .recommendedGames(limit: limit, filter: filter),
             logLabel: "recommended",
-            isTrending: true
+            isTrending: true,
+            limit: limit,
+            filter: filter
         )
     }
 
@@ -92,15 +109,26 @@ final class DefaultGameRepository: GameRepository {
     private func fetchGames(
         endpoint: Endpoint,
         logLabel: String,
-        isTrending: Bool
+        isTrending: Bool,
+        limit: Int,
+        filter: HomeContentFilter?
     ) async throws -> [Game] {
-        let response = try await apiClient.request(
-            endpoint,
-            as: GameResponseEnvelopeDTO<GameListResponseDataDTO>.self
-        )
-        let games = response.data.games.map { GameMapper.toEntity($0, isTrending: isTrending) }
-        print("[GameRepository] \(logLabel) count=\(games.count)")
-        return games
+        // Privacy-safe key: endpoint label and enum/int values only.
+        let key = "list:\(logLabel):\(Self.filterKey(limit: limit, filter: filter))"
+        return try await Self.listStore.value(for: key) { [apiClient] in
+            let response = try await apiClient.request(
+                endpoint,
+                as: GameResponseEnvelopeDTO<GameListResponseDataDTO>.self
+            )
+            let games = response.data.games.map { GameMapper.toEntity($0, isTrending: isTrending) }
+            print("[GameRepository] \(logLabel) count=\(games.count)")
+            return games
+        }
+    }
+
+    private static func filterKey(limit: Int, filter: HomeContentFilter?) -> String {
+        guard let filter else { return "\(limit):default" }
+        return "\(limit):\(filter.platform.rawValue):\(filter.category.rawValue):\(filter.gameMode.rawValue)"
     }
 }
 

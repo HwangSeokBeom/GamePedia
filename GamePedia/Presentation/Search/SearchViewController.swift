@@ -10,6 +10,7 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
     private var genres: [SearchGenre] = []
     private var selectedGenre: SearchGenre = .all
     private var results: [Game] = []
+    private let imagePrefetcher = GameImagePrefetcher()
     private var latestSearchState = SearchState()
     private var latestAISearchAssistState = AISearchAssistState()
     private var lastAnnouncedSearchError: String?
@@ -103,6 +104,7 @@ final class SearchViewController: BaseViewController<SearchRootView, SearchState
 
         rootView.tableView.dataSource = self
         rootView.tableView.delegate = self
+        rootView.tableView.prefetchDataSource = self
     }
 
     private func setupKeyboardDismissal() {
@@ -310,5 +312,18 @@ extension SearchViewController: UITableViewDataSource, UITableViewDelegate {
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         rootView.searchTextField.resignFirstResponder()
+    }
+}
+
+extension SearchViewController: UITableViewDataSourcePrefetching {
+    func tableView(_ tableView: UITableView, prefetchRowsAt indexPaths: [IndexPath]) {
+        let candidates = indexPaths
+            .filter { $0.row < results.count }
+            .map { results[$0.row].coverImageURL }
+        imagePrefetcher.prefetch(candidates: candidates)
+    }
+
+    func tableView(_ tableView: UITableView, cancelPrefetchingForRowsAt indexPaths: [IndexPath]) {
+        imagePrefetcher.cancelAll()
     }
 }

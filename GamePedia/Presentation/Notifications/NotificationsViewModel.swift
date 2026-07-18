@@ -16,6 +16,13 @@ final class NotificationsViewModel {
     private let fetchNotificationsUseCase: FetchNotificationsUseCase
     private let markAllNotificationsReadUseCase: MarkAllNotificationsReadUseCase
     private var hasLoaded = false
+    // Single-flight + stale-completion decisions come from the shared
+    // machine: rapid retry taps coalesce into the one in-flight request,
+    // and an older completion can never overwrite a newer one. This list
+    // is a single page by contract (the repository merges local
+    // notifications into every fetch), so `nextToken` is always nil.
+    private var pagination = PaginationStateMachine<Int>()
+    private var hasPendingReload = false
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -52,6 +59,15 @@ final class NotificationsViewModel {
     }
 
     private func loadNotifications() {
+        guard let load = pagination.beginRefresh() else {
+            // A load is already in flight: coalesce instead of duplicating
+            // the request, but reconcile once more afterwards so an event
+            // that arrived mid-load is not lost.
+            hasPendingReload = true
+            print("[Notifications] loadCoalesced reason=inFlight")
+            return
+        }
+
         state.isLoading = true
         state.errorMessage = nil
         print("[Notifications] loadNotifications page=1 limit=30")
@@ -60,6 +76,7 @@ final class NotificationsViewModel {
             do {
                 let page = try await fetchNotificationsUseCase.execute(page: 1, limit: 30)
                 await MainActor.run {
+                    guard self.pagination.completeLoad(load, nextToken: nil) else { return }
                     self.state.notifications = page.notifications
                     self.state.isLoading = false
                     self.state.errorMessage = nil
@@ -72,6 +89,7 @@ final class NotificationsViewModel {
                         "[Notifications] stateUpdated success itemCount=\(page.notifications.count) " +
                         "unreadCount=\(page.unreadCount)"
                     )
+                    self.drainPendingReloadIfNeeded()
                 }
 
                 guard page.unreadCount > 0 else { return }
@@ -90,12 +108,22 @@ final class NotificationsViewModel {
                 }
             } catch {
                 await MainActor.run {
+                    guard self.pagination.failLoad(load) else { return }
                     self.state.isLoading = false
                     self.state.notifications = []
                     self.state.errorMessage = L10n.tr("Localizable", "notifications.loadFailed")
                     print("[Notifications] stateUpdated failure error=\(error)")
+                    // No pending drain on failure: retry stays user-driven,
+                    // mirroring the friend activity feed's policy.
+                    self.hasPendingReload = false
                 }
             }
         }
+    }
+
+    private func drainPendingReloadIfNeeded() {
+        guard hasPendingReload else { return }
+        hasPendingReload = false
+        loadNotifications()
     }
 }
