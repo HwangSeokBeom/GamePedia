@@ -55,7 +55,8 @@ CORE_PRESENTATION=$(grep -rn "ViewModel\b\|ViewController\b" \
     GamePedia/Core/Images \
     GamePedia/Core/Observability \
     GamePedia/Core/Realtime \
-    GamePedia/Core/Sync 2>/dev/null \
+    GamePedia/Core/Sync \
+    GamePedia/Core/LiveService 2>/dev/null \
     | grep -v "^.*://" | grep -v "\.swift:.*//")
 if [ -n "$CORE_PRESENTATION" ]; then
     fail "Core infrastructure references Presentation types" "$CORE_PRESENTATION"
@@ -73,6 +74,16 @@ CROSS_FEATURE=$(grep -rn "class .*: .*\(Friend\|Search\|Home\|Library\|Profile\|
 # Same-folder subclassing is fine; the awk above keeps only cross-feature hits.
 if [ -n "$CROSS_FEATURE" ]; then
     fail "Cross-feature ViewController subclassing" "$CROSS_FEATURE"
+fi
+
+# Rule 7: Core/LiveService is generic infrastructure; it must not
+# reference Domain entities (mappings into the canonical activity model
+# live in Domain, not in Core).
+LIVESERVICE_DOMAIN=$(grep -rn "AppNotification\b\|FriendActivityItem\b\|ActivityCenterItem\b\|SocialActivityRoute\b" \
+    GamePedia/Core/LiveService 2>/dev/null \
+    | grep -v "\.swift:.*//")
+if [ -n "$LIVESERVICE_DOMAIN" ]; then
+    fail "Core/LiveService references Domain types" "$LIVESERVICE_DOMAIN"
 fi
 
 # Rule 6: no raw print of URLs with query values in Core request

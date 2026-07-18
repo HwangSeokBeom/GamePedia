@@ -20,6 +20,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         GameImagePipelinePolicy.apply()
         RealtimeRuntime.shared.start()
         LibrarySyncRuntime.shared.start()
+        LiveServiceRuntime.shared.start()
         AppConfig.logRuntimeConfiguration()
         UNUserNotificationCenter.current().delegate = self
         PushNotificationService.shared.start(application: application)
@@ -90,7 +91,12 @@ extension AppDelegate {
             NotificationBadgeRefreshService.shared.refresh(reason: "pushForeground")
         }
 
-        if let payload = SocialActivityPushPayload.parse(userInfo: userInfo),
+        // In-app social banner path, gated by the availability boundary.
+        // When the banner feature is switched off the push falls through
+        // to the system presentation below — degraded mode never silently
+        // drops the notification.
+        if LiveServiceRuntime.shared.availability.availability(for: .socialPushBanners).isAvailable,
+           let payload = SocialActivityPushPayload.parse(userInfo: userInfo),
            SocialActivityDeduplicator.shared.shouldProcess("push:\(payload.stableIdentity)", timeToLive: 60 * 5) {
             SocialActivityEventDispatcher.shared.send(.showBanner(payload.bannerPayload))
             completionHandler([])

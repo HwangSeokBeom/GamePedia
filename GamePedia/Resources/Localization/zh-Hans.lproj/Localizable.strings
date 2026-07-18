@@ -448,6 +448,11 @@
 
 "notifications.title" = "通知";
 "notifications.loadFailed" = "无法加载通知。";
+"activityCenter.title" = "动态中心";
+"activityCenter.empty" = "暂无动态";
+"activityCenter.loadFailed" = "无法加载动态。请检查网络连接后重试。";
+"activityCenter.degraded.partial" = "部分更新加载失败。";
+"activityCenter.degraded.lastKnown" = "当前离线。正在显示最近一次的动态。";
 
 "home.meta.ratingRelease" = "%1$@ %2$@ · %3$@";
 
