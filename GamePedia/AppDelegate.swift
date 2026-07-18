@@ -15,6 +15,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        AppObservability.shared.start()
+        AppObservability.shared.markColdLaunchStart()
+        RealtimeRuntime.shared.start()
         AppConfig.logRuntimeConfiguration()
         UNUserNotificationCenter.current().delegate = self
         PushNotificationService.shared.start(application: application)

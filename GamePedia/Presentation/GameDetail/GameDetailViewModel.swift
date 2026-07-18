@@ -32,6 +32,8 @@ final class GameDetailViewModel {
     private let seedStore: GameDetailSeedStore
     private let widgetSnapshotStore: GameWidgetSnapshotStore
     private var currentGameID: Int?
+    private let metricRecorder: PerformanceMetricRecorder
+    private var detailMetricToken: MetricIntervalToken?
     private var aiReviewSummaryTask: Task<Void, Never>?
     private var aiReviewSummaryRequestGameID: Int?
     private var reactingReviewIds = Set<String>()
@@ -70,8 +72,10 @@ final class GameDetailViewModel {
         translationProvider: any TranslationProviding = makeTranslationProvider(),
         translationCache: any TranslationCaching = DefaultTranslationCache.shared,
         seedStore: GameDetailSeedStore = .shared,
-        widgetSnapshotStore: GameWidgetSnapshotStore = .shared
+        widgetSnapshotStore: GameWidgetSnapshotStore = .shared,
+        metricRecorder: PerformanceMetricRecorder = AppObservability.shared.recorder
     ) {
+        self.metricRecorder = metricRecorder
         self.apiClient = apiClient
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
         self.fetchReviewCommentCountsUseCase = FetchReviewCommentCountsUseCase(repository: reviewCommentRepository)
@@ -140,6 +144,10 @@ final class GameDetailViewModel {
 
     private func loadDetail(gameId: Int) {
         currentGameID = gameId
+        if let previousToken = detailMetricToken {
+            metricRecorder.end(previousToken, outcome: .cancelled)
+        }
+        detailMetricToken = metricRecorder.begin(.gameDetailLoad)
         apply(.clearError)
         apply(.setBlockingLoadError(nil))
         apply(.setInlineNotice(nil))
@@ -277,10 +285,14 @@ final class GameDetailViewModel {
             print("[GameDetail] success id=\(id) title=\(entity.title)")
             await MainActor.run {
                 self.apply(.setGame(entity))
+                self.endDetailMetric(gameId: id, outcome: .success)
             }
             recordRecentViewed(entity)
             await prepareTranslation(for: entity)
         } catch {
+            await MainActor.run {
+                self.endDetailMetric(gameId: id, outcome: .failure)
+            }
             print("[GameDetail] failed id=\(id) error=\(error.localizedDescription)")
             let degradedMessage = temporaryDegradedMessage(for: error)
             let hasRenderableContent = await MainActor.run { self.state.hasRenderableContent }
@@ -305,6 +317,12 @@ final class GameDetailViewModel {
                 self.apply(.setBlockingLoadError(error.localizedDescription))
             }
         }
+    }
+
+    private func endDetailMetric(gameId: Int, outcome: MetricOutcome) {
+        guard currentGameID == gameId, let token = detailMetricToken else { return }
+        detailMetricToken = nil
+        metricRecorder.end(token, outcome: outcome)
     }
 
     private func recordRecentViewed(_ game: GameDetail) {
