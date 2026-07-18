@@ -84,6 +84,7 @@ final class LibraryViewModel {
     private let removeFavoriteUseCase: RemoveFavoriteUseCase
     private let translateTextUseCase: TranslateTextUseCase
     private let libraryCacheStore: LibraryCacheStore
+    private let librarySync: (any LibraryMutationSyncing)?
     private var cancellables = Set<AnyCancellable>()
     private var loadTask: Task<Void, Never>?
     private var fetchSequence = 0
@@ -145,8 +146,10 @@ final class LibraryViewModel {
             repository: DefaultTranslationRepository(),
             languageProvider: DefaultLanguageProvider.shared
         ),
-        libraryCacheStore: LibraryCacheStore = .shared
+        libraryCacheStore: LibraryCacheStore = .shared,
+        librarySync: (any LibraryMutationSyncing)? = LibrarySyncRuntime.shared.mutationRouter
     ) {
+        self.librarySync = librarySync
         self.state = LibraryState(selectedTab: initialTab, pendingFocusSection: initialTab.focusedSection)
         self.fetchLibraryOverviewUseCase = fetchLibraryOverviewUseCase
         self.fetchOwnedLibraryUseCase = fetchOwnedLibraryUseCase
@@ -163,6 +166,7 @@ final class LibraryViewModel {
         self.translateTextUseCase = translateTextUseCase
         self.libraryCacheStore = libraryCacheStore
         observeLibraryChanges()
+        observeLibrarySyncSignals()
     }
 
     func send(_ intent: LibraryIntent) {
@@ -257,6 +261,11 @@ final class LibraryViewModel {
         case .retrySteamSyncTapped:
             beginSummaryLoading(reason: "retrySteamSync")
             loadLibrary(trigger: .refresh)
+
+        case .retryLibrarySyncTapped:
+            print("[LibraryAction] intent=retryLibrarySync")
+            guard let librarySync else { return }
+            Task { await librarySync.retryNow() }
 
         case .retryFriendRecommendationsTapped:
             beginSummaryLoading(reason: "retryFriendRecommendations")
@@ -2285,7 +2294,29 @@ final class LibraryViewModel {
             "status=\(request.status.rawValue)"
         )
 
+        // Offline-first path: accept the intent locally. The pending chip
+        // stays until the engine posts `.libraryDidChange` (success — the
+        // triggered reload clears it) or `.librarySyncOperationDidFail`
+        // (permanent failure — cleared in observeLibrarySyncSignals()).
+        if let librarySync {
+            Task {
+                let accepted = await librarySync.enqueueLibraryStatusUpdate(request)
+                if !accepted {
+                    await self.performDirectStatusUpdate(request: request, identifier: identifier)
+                }
+            }
+            return
+        }
+
         Task {
+            await performDirectStatusUpdate(request: request, identifier: identifier)
+        }
+    }
+
+    private func performDirectStatusUpdate(
+        request: LibraryGameStatusUpdateRequest,
+        identifier: LibraryGameIdentifier
+    ) async {
             do {
                 _ = try await updateLibraryGameStatusUseCase.execute(request: request)
                 await MainActor.run {
@@ -2303,7 +2334,6 @@ final class LibraryViewModel {
                     self.apply(.setError(libraryError.errorDescription ?? L10n.tr("Localizable", "library.error.addToPlayingSaveFailed")))
                 }
             }
-        }
     }
 
     private func removeFavorite(_ identifier: LibraryGameIdentifier) {
@@ -2311,7 +2341,28 @@ final class LibraryViewModel {
               let gameID = identifier.detailGameID,
               !state.isLoading else { return }
 
+        // Offline-first path: the engine posts server-authoritative
+        // `.favoriteDidChange` on success (triggering the existing reload)
+        // and `.librarySyncOperationDidFail` on permanent failure.
+        if let librarySync {
+            Task {
+                let accepted = await librarySync.enqueueFavoriteChange(
+                    gameID: String(gameID),
+                    isFavorite: false
+                )
+                if !accepted {
+                    await self.performDirectRemoveFavorite(gameID: gameID)
+                }
+            }
+            return
+        }
+
         Task {
+            await performDirectRemoveFavorite(gameID: gameID)
+        }
+    }
+
+    private func performDirectRemoveFavorite(gameID: Int) async {
             do {
                 let result = try await removeFavoriteUseCase.execute(gameId: String(gameID))
 
@@ -2332,7 +2383,43 @@ final class LibraryViewModel {
                     self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
                 }
             }
-        }
+    }
+
+    private func observeLibrarySyncSignals() {
+        NotificationCenter.default.publisher(for: .librarySyncQueueDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self else { return }
+                let pending = notification.userInfo?[LibrarySyncQueueUserInfoKey.pendingCount] as? Int ?? 0
+                let parked = notification.userInfo?[LibrarySyncQueueUserInfoKey.parkedCount] as? Int ?? 0
+                self.apply(.setLibrarySyncQueue(pending: pending, parked: parked))
+            }
+            .store(in: &cancellables)
+
+        // A queued library mutation permanently failed: clear any pending
+        // chip for that game and surface the failure. The queue-count banner
+        // updates via the queueDidChange signal above.
+        NotificationCenter.default.publisher(for: .librarySyncOperationDidFail)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let kind = notification.userInfo?[LibrarySyncFailureUserInfoKey.entityKind] as? String else {
+                    return
+                }
+                if kind == LibrarySyncEntityKind.libraryStatus.rawValue,
+                   let failedGameID = notification.userInfo?[LibrarySyncFailureUserInfoKey.gameID] as? String {
+                    let clearedIdentifiers = self.state.addingToPlayingIdentifiers
+                        .filter { $0.sourceID == failedGameID }
+                    for identifier in clearedIdentifiers {
+                        self.apply(.setAddingToPlaying(identifier, isUpdating: false))
+                    }
+                    self.apply(.setError(L10n.tr("Localizable", "library.error.addToPlayingSaveFailed")))
+                } else if kind == LibrarySyncEntityKind.favorite.rawValue {
+                    self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
+                    self.loadLibrary(trigger: .refresh)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     private func observeLibraryChanges() {

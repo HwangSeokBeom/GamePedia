@@ -11,6 +11,7 @@ enum LibraryIntent {
     case steamPrivacyGuideButtonTapped
     case retrySteamPrivacyGuideTapped
     case retrySteamSyncTapped
+    case retryLibrarySyncTapped
     case retryFriendRecommendationsTapped
     case retryPlaytimeRecommendationsTapped
     case unlinkSteamConfirmed

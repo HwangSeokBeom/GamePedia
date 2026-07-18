@@ -25,6 +25,7 @@ final class HomeViewModel {
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
     private let translateTextUseCase: TranslateTextUseCase
     private let fetchUnreadNotificationCountUseCase: FetchUnreadNotificationCountUseCase
+    private let librarySync: (any LibraryMutationSyncing)?
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: Init
@@ -40,8 +41,10 @@ final class HomeViewModel {
         translateTextUseCase: TranslateTextUseCase? = nil,
         fetchUnreadNotificationCountUseCase: FetchUnreadNotificationCountUseCase = FetchUnreadNotificationCountUseCase(
             notificationRepository: DefaultNotificationRepository()
-        )
+        ),
+        librarySync: (any LibraryMutationSyncing)? = LibrarySyncRuntime.shared.mutationRouter
     ) {
+        self.librarySync = librarySync
         let resolvedActivityRepository = userActivityRepository ?? LocalUserActivityRepository.shared
         self.userActivityRepository = resolvedActivityRepository
         self.loadHomeFeedUseCase = loadHomeFeedUseCase ?? LoadHomeFeedUseCase.live(
@@ -56,6 +59,7 @@ final class HomeViewModel {
         self.fetchUnreadNotificationCountUseCase = fetchUnreadNotificationCountUseCase
         observeFavoriteChanges()
         observeNotificationChanges()
+        observeLibrarySyncFailures()
     }
 
     // MARK: - Intent Processing
@@ -184,7 +188,41 @@ final class HomeViewModel {
     private func toggleFavorite(gameId: Int) {
         let isCurrentlyFavorite = state.wishlistedGameIDs.contains(gameId)
 
+        // Offline-first path: accept locally and update the wishlist set
+        // optimistically. The engine posts server-authoritative
+        // `.favoriteDidChange` on success (already observed) and
+        // `.librarySyncOperationDidFail` on permanent failure (observed
+        // below), which re-syncs this screen.
+        if let librarySync {
+            var updatedIDs = state.wishlistedGameIDs
+            if isCurrentlyFavorite {
+                updatedIDs.remove(gameId)
+            } else {
+                updatedIDs.insert(gameId)
+            }
+            apply(.setWishlistedGameIDs(updatedIDs))
+
+            Task {
+                let accepted = await librarySync.enqueueFavoriteChange(
+                    gameID: String(gameId),
+                    isFavorite: !isCurrentlyFavorite
+                )
+                if !accepted {
+                    await self.performDirectFavoriteToggle(
+                        gameId: gameId,
+                        isCurrentlyFavorite: isCurrentlyFavorite
+                    )
+                }
+            }
+            return
+        }
+
         Task {
+            await performDirectFavoriteToggle(gameId: gameId, isCurrentlyFavorite: isCurrentlyFavorite)
+        }
+    }
+
+    private func performDirectFavoriteToggle(gameId: Int, isCurrentlyFavorite: Bool) async {
             do {
                 let result = try await toggleFavoriteUseCase.execute(
                     gameId: String(gameId),
@@ -210,7 +248,31 @@ final class HomeViewModel {
                     self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
                 }
             }
-        }
+    }
+
+    /// A queued favorite change permanently failed after the optimistic
+    /// wishlist update: revert that game's local entry and surface an error.
+    private func observeLibrarySyncFailures() {
+        NotificationCenter.default.publisher(for: .librarySyncOperationDidFail)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let kind = notification.userInfo?[LibrarySyncFailureUserInfoKey.entityKind] as? String,
+                      kind == LibrarySyncEntityKind.favorite.rawValue,
+                      let failedGameID = notification.userInfo?[LibrarySyncFailureUserInfoKey.gameID] as? String,
+                      let gameId = Int(failedGameID) else {
+                    return
+                }
+                var updatedIDs = self.state.wishlistedGameIDs
+                if updatedIDs.contains(gameId) {
+                    updatedIDs.remove(gameId)
+                } else {
+                    updatedIDs.insert(gameId)
+                }
+                self.apply(.setWishlistedGameIDs(updatedIDs))
+                self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
+            }
+            .store(in: &cancellables)
     }
 
     private func translateHomeFeed(_ feed: HomeFeed) async -> HomeFeed {

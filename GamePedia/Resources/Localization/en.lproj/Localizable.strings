@@ -608,6 +608,8 @@
 "library.error.steamAccountNotLinked" = "Please connect your Steam account first.";
 "library.error.addToPlayingInvalidGame" = "Couldn't verify the game information to add it to Playing.";
 "library.error.addToPlayingSaveFailed" = "Couldn't save the Playing status.";
+"library.sync.pendingBanner" = "Syncing %d pending change(s)…";
+"library.sync.retry" = "Retry";
 "library.success.recentlySynced" = "Sync completed recently.";
 "library.success.libraryUpdated" = "Your library is up to date.";
 "library.recentlyPlayed.connect.title" = "No recent play history yet";

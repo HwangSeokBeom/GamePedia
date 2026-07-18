@@ -608,6 +608,8 @@
 "library.error.steamAccountNotLinked" = "请先连接 Steam 账号。";
 "library.error.addToPlayingInvalidGame" = "无法确认游戏信息，因此无法添加到正在玩。";
 "library.error.addToPlayingSaveFailed" = "无法保存正在玩状态。";
+"library.sync.pendingBanner" = "正在等待同步 %d 项更改…";
+"library.sync.retry" = "重试";
 "library.success.recentlySynced" = "最近已完成同步。";
 "library.success.libraryUpdated" = "库已更新到最新状态。";
 "library.recentlyPlayed.connect.title" = "还没有最近游玩记录";

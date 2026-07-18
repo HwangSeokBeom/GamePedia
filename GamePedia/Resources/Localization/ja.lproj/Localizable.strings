@@ -608,6 +608,8 @@
 "library.error.steamAccountNotLinked" = "先にSteamアカウントを連携してください。";
 "library.error.addToPlayingInvalidGame" = "ゲーム情報を確認できないため、プレイ中に追加できません。";
 "library.error.addToPlayingSaveFailed" = "プレイ中の状態を保存できませんでした。";
+"library.sync.pendingBanner" = "%d件の変更を同期待機中…";
+"library.sync.retry" = "再試行";
 "library.success.recentlySynced" = "最近同期が完了しました。";
 "library.success.libraryUpdated" = "ライブラリは最新の状態です。";
 "library.recentlyPlayed.connect.title" = "最近のプレイ履歴がありません";

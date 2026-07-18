@@ -23,6 +23,8 @@ struct DeveloperDiagnosticsReport {
         refreshTokenPresent: Bool,
         realtimeEnabled: Bool,
         realtime: RealtimeDiagnosticsSnapshot,
+        librarySyncEnabled: Bool,
+        librarySync: LibrarySyncDiagnosticsSnapshot?,
         metrics: [MetricSample],
         metricKit: MetricKitReceiptSummary,
         imageDiskCacheBytes: UInt?
@@ -54,6 +56,23 @@ struct DeveloperDiagnosticsReport {
         lines.append("unknownEventTypeCount: \(realtime.unknownEventTypeCount)")
         lines.append("lastEventSequence: \(realtime.lastEventSequence.map(String.init) ?? "none")")
         lines.append("lastSafeErrorCode: \(realtime.lastSafeErrorCode ?? "none")")
+        lines.append("")
+        lines.append("== Library sync (offline-first queue) ==")
+        lines.append("featureEnabled: \(librarySyncEnabled)")
+        if let librarySync {
+            lines.append("hasActiveAccount: \(librarySync.hasActiveAccount)")
+            lines.append("sessionGeneration: \(librarySync.sessionGeneration)")
+            lines.append("pendingOperationCount: \(librarySync.pendingOperationCount)")
+            lines.append("parkedOperationCount: \(librarySync.parkedOperationCount)")
+            lines.append("inFlightEntityCount: \(librarySync.inFlightEntityCount)")
+            lines.append("completedOperationCount: \(librarySync.completedOperationCount)")
+            lines.append("permanentlyFailedOperationCount: \(librarySync.permanentlyFailedOperationCount)")
+            lines.append("recoveredFromCorruptedStore: \(librarySync.recoveredFromCorruptedStore)")
+            lines.append("isBlockedOnAuth: \(librarySync.isBlockedOnAuth)")
+            lines.append("lastSafeErrorCode: \(librarySync.lastSafeErrorCode ?? "none")")
+        } else {
+            lines.append("engine: disabled")
+        }
         lines.append("")
         lines.append("== Local metrics (this process, simulator/device local) ==")
         if metrics.isEmpty {
@@ -127,6 +146,7 @@ final class DeveloperDiagnosticsViewController: UIViewController {
         let hub = self.hub
         Task { [weak self] in
             let realtimeSnapshot = await hub.diagnosticsSnapshot()
+            let librarySyncSnapshot = await LibrarySyncRuntime.shared.engine?.diagnosticsSnapshot()
             let diskCacheBytes: UInt? = await withCheckedContinuation { continuation in
                 ImageCache.default.calculateDiskStorageSize { result in
                     continuation.resume(returning: try? result.get())
@@ -143,6 +163,8 @@ final class DeveloperDiagnosticsViewController: UIViewController {
                     refreshTokenPresent: tokenStore.fetchRefreshToken() != nil,
                     realtimeEnabled: RealtimeRuntime.shared.isRealtimeEnabled,
                     realtime: realtimeSnapshot,
+                    librarySyncEnabled: LibrarySyncRuntime.shared.isEnabled,
+                    librarySync: librarySyncSnapshot,
                     metrics: AppObservability.shared.recorder.latestSamplesSnapshot(),
                     metricKit: AppObservability.shared.metricKit.receiptSummary(),
                     imageDiskCacheBytes: diskCacheBytes

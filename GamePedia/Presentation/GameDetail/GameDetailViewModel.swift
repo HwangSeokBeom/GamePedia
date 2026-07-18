@@ -33,6 +33,7 @@ final class GameDetailViewModel {
     private let widgetSnapshotStore: GameWidgetSnapshotStore
     private var currentGameID: Int?
     private let metricRecorder: PerformanceMetricRecorder
+    private let librarySync: (any LibraryMutationSyncing)?
     private var detailMetricToken: MetricIntervalToken?
     private var aiReviewSummaryTask: Task<Void, Never>?
     private var aiReviewSummaryRequestGameID: Int?
@@ -73,9 +74,11 @@ final class GameDetailViewModel {
         translationCache: any TranslationCaching = DefaultTranslationCache.shared,
         seedStore: GameDetailSeedStore = .shared,
         widgetSnapshotStore: GameWidgetSnapshotStore = .shared,
-        metricRecorder: PerformanceMetricRecorder = AppObservability.shared.recorder
+        metricRecorder: PerformanceMetricRecorder = AppObservability.shared.recorder,
+        librarySync: (any LibraryMutationSyncing)? = LibrarySyncRuntime.shared.mutationRouter
     ) {
         self.metricRecorder = metricRecorder
+        self.librarySync = librarySync
         self.apiClient = apiClient
         self.fetchGameReviewsUseCase = fetchGameReviewsUseCase
         self.fetchReviewCommentCountsUseCase = FetchReviewCommentCountsUseCase(repository: reviewCommentRepository)
@@ -93,6 +96,27 @@ final class GameDetailViewModel {
         observeReviewLikeChanges()
         observeFavoriteChanges()
         observeReviewChanges()
+        observeLibrarySyncFailures()
+    }
+
+    /// A queued favorite change for this game permanently failed after the
+    /// optimistic flip: re-fetch server truth and surface the error.
+    private func observeLibrarySyncFailures() {
+        NotificationCenter.default.publisher(for: .librarySyncOperationDidFail)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let gameID = self.state.game?.id ?? self.currentGameID,
+                      let kind = notification.userInfo?[LibrarySyncFailureUserInfoKey.entityKind] as? String,
+                      kind == LibrarySyncEntityKind.favorite.rawValue,
+                      let failedGameID = notification.userInfo?[LibrarySyncFailureUserInfoKey.gameID] as? String,
+                      failedGameID == String(gameID) else {
+                    return
+                }
+                self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
+                Task { await self.fetchFavoriteStatus(gameId: gameID) }
+            }
+            .store(in: &cancellables)
     }
 
     deinit {
@@ -391,8 +415,12 @@ final class GameDetailViewModel {
     private func fetchFavoriteStatus(gameId: Int) async {
         do {
             let favoriteStatus = try await fetchFavoriteStatusUseCase.execute(gameId: String(gameId))
+            // A locally pending (not yet synced) favorite change overrides
+            // the server value on screen; the server answer predates the
+            // queued intent and would visually undo the user's action.
+            let pendingIntent = await librarySync?.pendingFavoriteIntent(gameID: String(gameId))
             await MainActor.run {
-                self.apply(.setFavorite(favoriteStatus.isFavorite))
+                self.apply(.setFavorite(pendingIntent ?? favoriteStatus.isFavorite))
             }
         } catch {
             // Favorite status should not block detail rendering.
@@ -408,10 +436,42 @@ final class GameDetailViewModel {
         let previousFavoriteState = state.isFavorite
 
         apply(.setFavorite(!previousFavoriteState))
+
+        // Offline-first path: accept the intent locally (stable idempotency
+        // key, durable queue) and return immediately. The engine posts the
+        // server-authoritative `.favoriteDidChange` on success and
+        // `.librarySyncOperationDidFail` on permanent failure, both of which
+        // this view model already observes.
+        if let librarySync {
+            Task {
+                let accepted = await librarySync.enqueueFavoriteChange(
+                    gameID: String(gameID),
+                    isFavorite: !previousFavoriteState
+                )
+                if !accepted {
+                    // No authenticated account: fall back to the direct call
+                    // so the existing unauthorized error surfaces unchanged.
+                    await self.performDirectFavoriteToggle(
+                        gameID: gameID,
+                        previousFavoriteState: previousFavoriteState
+                    )
+                }
+            }
+            return
+        }
+
         apply(.setFavoriteLoading(true))
 
         Task {
-            do {
+            await performDirectFavoriteToggle(
+                gameID: gameID,
+                previousFavoriteState: previousFavoriteState
+            )
+        }
+    }
+
+    private func performDirectFavoriteToggle(gameID: Int, previousFavoriteState: Bool) async {
+        do {
                 let result = try await toggleFavoriteUseCase.execute(
                     gameId: String(gameID),
                     isCurrentlyFavorite: previousFavoriteState
@@ -440,7 +500,6 @@ final class GameDetailViewModel {
                     self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
                 }
             }
-        }
     }
 
     private func observeFavoriteChanges() {
