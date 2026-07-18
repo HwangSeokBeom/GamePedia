@@ -34,3 +34,16 @@ jobs:
         env:
           CI: "true"
         run: bundle exec fastlane ios ci_build
+
+      - name: Upload iOS test diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-test-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            fastlane/test_output
+            DerivedData/Logs/Test
+            /Users/runner/Library/Logs/scan
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0

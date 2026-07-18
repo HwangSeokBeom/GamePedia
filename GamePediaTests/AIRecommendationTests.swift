@@ -348,6 +348,7 @@ final class AIRecommendationTests: XCTestCase {
         XCTAssertEqual(state.helperMessage, L10n.tr("Localizable", "ai_recommendation_fallback_notice"))
     }
 
+    @MainActor
     func testViewModel_buildsDisplayTagsFromMatchTagsAndGenresAndMarksReviewChangesStale() async {
         let useCase = ImmediateAIRecommendationUseCase()
         let viewModel = AIRecommendationViewModel(
@@ -358,18 +359,23 @@ final class AIRecommendationTests: XCTestCase {
 
         viewModel.send(.queryChanged("퇴근 후 힐링 게임"))
         viewModel.send(.recommendButtonTapped)
-        await waitForRecommendationCount(1, in: viewModel)
+        await waitForState(of: viewModel, description: "1 recommendation loaded and loading finished") {
+            $0.recommendations.count == 1 && !$0.isLoading
+        }
 
         XCTAssertEqual(viewModel.state.recommendations.first?.displayTags, ["맞춤", "힐링", "시뮬레이션"])
         XCTAssertEqual(viewModel.state.helperMessage, L10n.tr("Localizable", "ai_recommendation_personalized_notice"))
 
         NotificationCenter.default.post(name: .reviewDidChange, object: nil)
-        try? await Task.sleep(nanoseconds: 30_000_000)
+        await waitForState(of: viewModel, description: "recommendations marked stale after reviewDidChange") {
+            $0.isStale
+        }
 
         XCTAssertTrue(viewModel.state.isStale)
         XCTAssertEqual(viewModel.state.helperMessage, L10n.tr("Localizable", "ai_recommendation_stale_notice"))
     }
 
+    @MainActor
     func testViewModel_localizesServerDisplayTagsAndFallbackTag() async {
         let useCase = EnglishTagAIRecommendationUseCase()
         let viewModel = AIRecommendationViewModel(
@@ -380,7 +386,9 @@ final class AIRecommendationTests: XCTestCase {
 
         viewModel.send(.queryChanged("짧은 비주얼 노벨"))
         viewModel.send(.recommendButtonTapped)
-        await waitForRecommendationCount(1, in: viewModel)
+        await waitForState(of: viewModel, description: "1 recommendation loaded and loading finished") {
+            $0.recommendations.count == 1 && !$0.isLoading
+        }
 
         let displayTags = viewModel.state.recommendations.first?.displayTags
         XCTAssertEqual(displayTags, ["힐링 비주얼 노벨", "짧은 인터랙티브 스토리", "비주얼 노벨"])
@@ -389,6 +397,7 @@ final class AIRecommendationTests: XCTestCase {
         XCTAssertFalse(displayTags?.contains("Visual Novel") == true)
     }
 
+    @MainActor
     func testViewModel_localizesFallbackRankingAndLimitsTags() async {
         let useCase = FallbackAIRecommendationUseCase()
         let viewModel = AIRecommendationViewModel(
@@ -399,7 +408,9 @@ final class AIRecommendationTests: XCTestCase {
 
         viewModel.send(.queryChanged("추천"))
         viewModel.send(.recommendButtonTapped)
-        await waitForRecommendationCount(1, in: viewModel)
+        await waitForState(of: viewModel, description: "1 recommendation loaded and loading finished") {
+            $0.recommendations.count == 1 && !$0.isLoading
+        }
 
         XCTAssertEqual(viewModel.state.recommendations.first?.displayTags, ["힐링", "RPG", "기본 정렬"])
     }
@@ -420,16 +431,47 @@ final class AIRecommendationTests: XCTestCase {
         )
     }
 
-    private func waitForRecommendationCount(
-        _ expectedCount: Int,
-        in viewModel: AIRecommendationViewModel,
-        retryCount: Int = 50
+    /// Suspends until `predicate` matches the view model state, driven by `onStateChanged`
+    /// on the main actor. Fails the test with a state snapshot if `timeout` elapses first.
+    @MainActor
+    private func waitForState(
+        of viewModel: AIRecommendationViewModel,
+        timeout: TimeInterval = 5,
+        description: String,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        until predicate: @escaping (AIRecommendationState) -> Bool
     ) async {
-        for _ in 0..<retryCount {
-            if viewModel.state.recommendations.count == expectedCount {
-                return
+        defer { viewModel.onStateChanged = nil }
+
+        if predicate(viewModel.state) {
+            return
+        }
+
+        let stateExpectation = XCTestExpectation(description: description)
+        stateExpectation.assertForOverFulfill = false
+        viewModel.onStateChanged = { state in
+            if predicate(state) {
+                stateExpectation.fulfill()
             }
-            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        let result = await XCTWaiter.fulfillment(of: [stateExpectation], timeout: timeout)
+        if result != .completed {
+            let state = viewModel.state
+            XCTFail(
+                """
+                Timed out waiting for: \(description). Final state: \
+                recommendations.count=\(state.recommendations.count), \
+                isLoading=\(state.isLoading), \
+                isStale=\(state.isStale), \
+                helperMessage=\(state.helperMessage ?? "nil"), \
+                errorMessage=\(state.errorMessage ?? "nil"), \
+                firstDisplayTags=\(state.recommendations.first?.displayTags ?? [])
+                """,
+                file: file,
+                line: line
+            )
         }
     }
 }

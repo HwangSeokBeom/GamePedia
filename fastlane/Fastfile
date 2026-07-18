@@ -432,6 +432,16 @@ platform :ios do
       output_directory: "fastlane/test_output",
       buildlog_path: "fastlane/test_output/buildlogs",
       output_types: "junit",
+      force_quit_simulator: true,
+      reset_simulator: true,
+      prelaunch_simulator: true,
+      disable_concurrent_testing: true,
+      parallel_testing: false,
+      concurrent_workers: 1,
+      max_concurrent_simulators: 1,
+      result_bundle: true,
+      result_bundle_path: "fastlane/test_output/GamePediaTests.xcresult",
+      include_simulator_logs: true,
       fail_build: true,
       xcargs: 'CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""'
     )
