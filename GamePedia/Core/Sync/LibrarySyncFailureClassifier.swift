@@ -6,14 +6,25 @@ import Foundation
 // stable `error.code` values and typed error cases only — never by localized
 // message text.
 //
-// - permanent: deterministic validation rejections. Retrying the identical
-//   payload can only fail identically, so the operation is dropped.
+// - permanent: deterministic rejections proven BEFORE or BY the server
+//   (validation, contract violations, a request that can never be built).
+//   Retrying the identical payload can only fail identically, so the
+//   operation is dropped.
 // - authRequired: the session cannot authorize right now. The queue pauses
 //   and resumes on the next authenticated session event; retrying before
 //   that would just burn attempts (and must never trigger its own refresh —
 //   refresh ownership stays with the auth layer).
 // - transient: everything reachability- or availability-shaped. Pending work
 //   is preserved and retried with backoff.
+//
+// Ambiguous post-send failures — the transport layer succeeded but the
+// response was missing, empty, or undecodable — are classified TRANSIENT
+// (code AMBIGUOUS_RESPONSE), never permanent: the server may well have
+// committed the mutation, so the operation must not be discarded (and
+// optimistic state must not be rolled back) merely because the response
+// body was lost. The retry replays the same idempotent absolute-state
+// mutation and reconciles from the server's authoritative response; the
+// automatic-attempt cap and parking bound the retries.
 
 enum LibrarySyncFailureClassifier {
 
@@ -55,7 +66,8 @@ enum LibrarySyncFailureClassifier {
             case .validationFailed:
                 return .permanent(code: "VALIDATION_ERROR")
             case .invalidResponse:
-                return .permanent(code: "INVALID_RESPONSE")
+                // Post-send ambiguity: the server may have committed.
+                return .transient(code: "AMBIGUOUS_RESPONSE")
             case .network:
                 return .transient(code: "NETWORK")
             case .server(let code, _):
@@ -74,7 +86,8 @@ enum LibrarySyncFailureClassifier {
             case .invalidStatus:
                 return .permanent(code: "INVALID_STATUS")
             case .invalidResponse:
-                return .permanent(code: "INVALID_RESPONSE")
+                // Post-send ambiguity: the server may have committed.
+                return .transient(code: "AMBIGUOUS_RESPONSE")
             case .network:
                 return .transient(code: "NETWORK")
             case .server(let code, _):
@@ -92,8 +105,12 @@ enum LibrarySyncFailureClassifier {
                 return .transient(code: "RATE_LIMITED")
             case .serverError(_, let code, _):
                 return classifyServerCode(code ?? "SERVER_ERROR")
-            case .invalidURL, .noData, .decodingFailed:
-                return .permanent(code: "INVALID_RESPONSE")
+            case .invalidURL:
+                // The request can never be built: deterministic, pre-send.
+                return .permanent(code: "INVALID_REQUEST_URL")
+            case .noData, .decodingFailed:
+                // Post-send ambiguity: the server may have committed.
+                return .transient(code: "AMBIGUOUS_RESPONSE")
             case .configurationMissing:
                 return .permanent(code: "CONFIGURATION_MISSING")
             case .unknown:
