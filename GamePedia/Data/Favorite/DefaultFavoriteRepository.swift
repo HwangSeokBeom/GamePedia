@@ -7,10 +7,11 @@ final class DefaultFavoriteRepository: FavoriteRepository {
         self.favoriteRemoteDataSource = favoriteRemoteDataSource
     }
 
-    func addFavorite(gameId: String) async throws -> FavoriteMutationResult {
+    func addFavorite(gameId: String, authorization: RequestAuthorization) async throws -> FavoriteMutationResult {
         do {
             let data = try await favoriteRemoteDataSource.addFavorite(
-                requestDTO: AddFavoriteRequestDTO(gameId: gameId)
+                requestDTO: AddFavoriteRequestDTO(gameId: gameId),
+                authorization: authorization
             )
             return try FavoriteMapper.toMutationResult(data)
         } catch {
@@ -18,9 +19,12 @@ final class DefaultFavoriteRepository: FavoriteRepository {
         }
     }
 
-    func removeFavorite(gameId: String) async throws -> FavoriteMutationResult {
+    func removeFavorite(gameId: String, authorization: RequestAuthorization) async throws -> FavoriteMutationResult {
         do {
-            let data = try await favoriteRemoteDataSource.removeFavorite(gameId: gameId)
+            let data = try await favoriteRemoteDataSource.removeFavorite(
+                gameId: gameId,
+                authorization: authorization
+            )
             return try FavoriteMapper.toMutationResult(data)
         } catch {
             throw FavoriteError.from(error: error)

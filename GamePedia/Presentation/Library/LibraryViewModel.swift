@@ -2318,33 +2318,48 @@ final class LibraryViewModel {
                 case .accepted, .staleOwnership, .supersededByNewerIntent:
                     // accepted: the engine owns delivery. stale/superseded:
                     // the owning scope ended or a newer gesture governs —
-                    // the direct path must never run for this intent.
+                    // this intent is terminal and must never touch the
+                    // network or newer UI state.
                     break
                 case .storageBlocked, .serviceUnavailable:
-                    await self.performCoordinatedDirectStatusUpdate(
-                        request: request,
-                        identifier: identifier,
-                        ownership: ownership,
-                        librarySync: librarySync
-                    )
+                    // The engine could not durably own the intent. No second
+                    // transport path: clear the pending chip and surface a
+                    // retryable failure. Guarded so a stale scope never
+                    // touches the current account's UI and an old gesture
+                    // never overwrites a newer one's pending state.
+                    await MainActor.run {
+                        guard librarySync.isNewestOwnedIntent(ownership) else { return }
+                        self.apply(.setAddingToPlaying(identifier, isUpdating: false))
+                        self.apply(.setError(L10n.tr("Localizable", "library.error.addToPlayingSaveFailed")))
+                    }
                 }
             }
             return
         }
 
         Task {
-            await performDirectStatusUpdate(request: request, identifier: identifier)
+            await performDirectStatusUpdate(
+                request: request,
+                identifier: identifier,
+                authorization: .currentSession
+            )
         }
     }
 
-    /// Guest / kill-switch direct path (pre-2.2), unchanged: no ownership
-    /// context exists, so there is no authenticated scope to adjudicate.
+    /// Direct path for gestures the engine does not own. `.guestOnly` for
+    /// guest gestures (can never attach a bearer token, so a login racing
+    /// the gesture cannot be mutated); `.currentSession` only for the
+    /// explicit offline-sync kill-switch (librarySync == nil).
     private func performDirectStatusUpdate(
         request: LibraryGameStatusUpdateRequest,
-        identifier: LibraryGameIdentifier
+        identifier: LibraryGameIdentifier,
+        authorization: RequestAuthorization = .guestOnly
     ) async {
             do {
-                _ = try await updateLibraryGameStatusUseCase.execute(request: request)
+                _ = try await updateLibraryGameStatusUseCase.execute(
+                    request: request,
+                    authorization: authorization
+                )
                 await MainActor.run {
                     NotificationCenter.default.post(
                         name: .libraryDidChange,
@@ -2360,51 +2375,6 @@ final class LibraryViewModel {
                     self.apply(.setError(libraryError.errorDescription ?? L10n.tr("Localizable", "library.error.addToPlayingSaveFailed")))
                 }
             }
-    }
-
-    /// Authenticated engine fallback (`.storageBlocked` /
-    /// `.serviceUnavailable` only): the shared coordinator is the only path
-    /// to the repository. It suppresses out-of-order gesture sequences,
-    /// serializes requests per (scope, entity) — across every ViewModel —
-    /// and revalidates scope ownership immediately before the request is
-    /// constructed and again before this outcome applies.
-    private func performCoordinatedDirectStatusUpdate(
-        request: LibraryGameStatusUpdateRequest,
-        identifier: LibraryGameIdentifier,
-        ownership: LibraryMutationOwnership,
-        librarySync: any LibraryMutationSyncing
-    ) async {
-        let useCase = updateLibraryGameStatusUseCase
-        await librarySync.runAuthenticatedDirectFallback(
-            ownership: ownership,
-            operation: {
-                try await useCase.execute(request: request)
-            },
-            apply: { outcome in
-                await MainActor.run {
-                    // A completion from a scope that ended mid-request must
-                    // not touch the current account's UI.
-                    guard self.librarySync?.isOwnershipCurrent(ownership) == true else { return }
-                    switch outcome {
-                    case .success:
-                        NotificationCenter.default.post(
-                            name: .libraryDidChange,
-                            object: nil,
-                            userInfo: [LibraryChangeUserInfoKey.source: "libraryStatusUpdated"]
-                        )
-                        self.loadLibrary(trigger: .refresh)
-                    case .failure(let error):
-                        let libraryError = LibraryError.from(error: error)
-                        self.apply(.setAddingToPlaying(identifier, isUpdating: false))
-                        self.apply(.setError(libraryError.errorDescription ?? L10n.tr("Localizable", "library.error.addToPlayingSaveFailed")))
-                    case .suppressed:
-                        // A newer gesture governs this entity (or the scope
-                        // ended); the newest intent posts its own outcome.
-                        break
-                    }
-                }
-            }
-        )
     }
 
     private func removeFavorite(_ identifier: LibraryGameIdentifier) {
@@ -2438,29 +2408,43 @@ final class LibraryViewModel {
                 case .accepted, .staleOwnership, .supersededByNewerIntent:
                     // accepted: the engine owns delivery. stale/superseded:
                     // the owning scope ended or a newer gesture governs —
-                    // the direct path must never run for this intent.
+                    // this intent is terminal and must never touch the
+                    // network or newer UI state.
                     break
                 case .storageBlocked, .serviceUnavailable:
-                    await self.performCoordinatedDirectRemoveFavorite(
-                        gameID: gameID,
-                        ownership: ownership,
-                        librarySync: librarySync
-                    )
+                    // The engine could not durably own the intent. No second
+                    // transport path: surface a retryable failure (the list
+                    // still shows the last acknowledged state — removal only
+                    // applies on server-authoritative reload). Guarded so a
+                    // stale scope never touches the current account's UI and
+                    // an old gesture never overwrites a newer one.
+                    await MainActor.run {
+                        guard librarySync.isNewestOwnedIntent(ownership) else { return }
+                        self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
+                    }
                 }
             }
             return
         }
 
         Task {
-            await performDirectRemoveFavorite(gameID: gameID)
+            await performDirectRemoveFavorite(gameID: gameID, authorization: .currentSession)
         }
     }
 
-    /// Guest / kill-switch direct path (pre-2.2), unchanged: no ownership
-    /// context exists, so there is no authenticated scope to adjudicate.
-    private func performDirectRemoveFavorite(gameID: Int) async {
+    /// Direct path for gestures the engine does not own. `.guestOnly` for
+    /// guest gestures (can never attach a bearer token, so a login racing
+    /// the gesture cannot be mutated); `.currentSession` only for the
+    /// explicit offline-sync kill-switch (librarySync == nil).
+    private func performDirectRemoveFavorite(
+        gameID: Int,
+        authorization: RequestAuthorization = .guestOnly
+    ) async {
             do {
-                let result = try await removeFavoriteUseCase.execute(gameId: String(gameID))
+                let result = try await removeFavoriteUseCase.execute(
+                    gameId: String(gameID),
+                    authorization: authorization
+                )
 
                 await MainActor.run {
                     NotificationCenter.default.post(
@@ -2479,52 +2463,6 @@ final class LibraryViewModel {
                     self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
                 }
             }
-    }
-
-    /// Authenticated engine fallback (`.storageBlocked` /
-    /// `.serviceUnavailable` only): the shared coordinator is the only path
-    /// to the repository. It suppresses out-of-order gesture sequences,
-    /// serializes requests per (scope, entity) — across every ViewModel —
-    /// and revalidates scope ownership immediately before the request is
-    /// constructed and again before this outcome applies.
-    private func performCoordinatedDirectRemoveFavorite(
-        gameID: Int,
-        ownership: LibraryMutationOwnership,
-        librarySync: any LibraryMutationSyncing
-    ) async {
-        let useCase = removeFavoriteUseCase
-        await librarySync.runAuthenticatedDirectFallback(
-            ownership: ownership,
-            operation: {
-                try await useCase.execute(gameId: String(gameID))
-            },
-            apply: { outcome in
-                await MainActor.run {
-                    // A completion from a scope that ended mid-request must
-                    // not touch the current account's UI.
-                    guard self.librarySync?.isOwnershipCurrent(ownership) == true else { return }
-                    switch outcome {
-                    case .success(let result):
-                        NotificationCenter.default.post(
-                            name: .favoriteDidChange,
-                            object: nil,
-                            userInfo: [
-                                FavoriteChangeUserInfoKey.gameId: result.gameId,
-                                FavoriteChangeUserInfoKey.isFavorite: result.isFavorite,
-                                FavoriteChangeUserInfoKey.action: FavoriteChangeAction.removed.rawValue
-                            ]
-                        )
-                    case .failure(let error):
-                        let favoriteError = FavoriteError.from(error: error)
-                        self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
-                    case .suppressed:
-                        // A newer gesture governs this entity (or the scope
-                        // ended); the newest intent posts its own outcome.
-                        break
-                    }
-                }
-            }
-        )
     }
 
     private func observeLibrarySyncSignals() {

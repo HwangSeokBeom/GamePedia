@@ -153,7 +153,8 @@ final class LibraryMutationOwnershipTests: XCTestCase {
         // Token refresh re-issues the session for the SAME account.
         await engine.sessionDidChange(isAuthenticated: true, userID: "user-a")
 
-        XCTAssertTrue(engine.isOwnershipCurrent(ownership))
+        XCTAssertTrue(engine.ownershipContext.isCurrent(ownership))
+        XCTAssertTrue(engine.isNewestOwnedIntent(ownership))
         let result = await engine.enqueueFavoriteChange(gameID: "42", isFavorite: true, ownership: ownership)
         XCTAssertEqual(result, .accepted)
         let generationAfter = await engine.diagnosticsSnapshot().sessionGeneration
@@ -171,7 +172,8 @@ final class LibraryMutationOwnershipTests: XCTestCase {
 
         // A owns the session again, but under a NEW scope: the old capture
         // stays permanently stale.
-        XCTAssertFalse(engine.isOwnershipCurrent(oldOwnership))
+        XCTAssertFalse(engine.ownershipContext.isCurrent(oldOwnership))
+        XCTAssertFalse(engine.isNewestOwnedIntent(oldOwnership))
         let staleResult = await engine.enqueueFavoriteChange(gameID: "42", isFavorite: true, ownership: oldOwnership)
         XCTAssertEqual(staleResult, .staleOwnership)
 
@@ -214,8 +216,9 @@ final class LibraryMutationOwnershipTests: XCTestCase {
         }
     }
 
-    // MARK: - View-model coverage (11–14): capture at gesture, stale never
-    // falls back, fallback revalidates, stale completions stay inert
+    // MARK: - View-model coverage (11–14): capture at gesture, non-accepted
+    // enqueue results are terminal (no second transport path), stale
+    // refusals stay inert
 
     private final class RecordingFavoriteRepository: FavoriteRepository, @unchecked Sendable {
         private let lock = NSLock()
@@ -231,7 +234,7 @@ final class LibraryMutationOwnershipTests: XCTestCase {
             return addedGameIDs.count + removedGameIDs.count
         }
 
-        func addFavorite(gameId: String) async throws -> FavoriteMutationResult {
+        func addFavorite(gameId: String, authorization: RequestAuthorization) async throws -> FavoriteMutationResult {
             lock.lock()
             addedGameIDs.append(gameId)
             let callback = onMutation
@@ -240,7 +243,7 @@ final class LibraryMutationOwnershipTests: XCTestCase {
             return FavoriteMutationResult(gameId: Int(gameId) ?? -1, isFavorite: true)
         }
 
-        func removeFavorite(gameId: String) async throws -> FavoriteMutationResult {
+        func removeFavorite(gameId: String, authorization: RequestAuthorization) async throws -> FavoriteMutationResult {
             lock.lock()
             removedGameIDs.append(gameId)
             let callback = onMutation
@@ -294,7 +297,7 @@ final class LibraryMutationOwnershipTests: XCTestCase {
         XCTAssertEqual(router.ownershipRevalidationCount, 0, "the stale intent must be dropped before any fallback step")
     }
 
-    func testHomeViewModelDirectFallbackRevalidatesOwnershipBeforeRequest() async {
+    func testHomeViewModelRefusedEnqueueWithStaleScopeNeverTouchesNetworkOrUI() async {
         let repository = RecordingFavoriteRepository()
         let router = MockLibraryMutationRouter()
         router.enqueueResult = .serviceUnavailable
@@ -307,11 +310,17 @@ final class LibraryMutationOwnershipTests: XCTestCase {
         let revalidated = expectation(description: "ownership revalidated")
         router.onOwnershipRevalidation = { revalidated.fulfill() }
         viewModel.send(.didTapFavorite(gameId: 42))
+        let optimisticIDs = viewModel.state.wishlistedGameIDs
         await fulfillment(of: [revalidated], timeout: 10)
         await drainConcurrentWork()
 
         XCTAssertGreaterThanOrEqual(router.ownershipRevalidationCount, 1)
-        XCTAssertEqual(repository.mutationCount, 0, "a stale scope must never construct the direct request")
+        XCTAssertEqual(repository.mutationCount, 0, "a refused enqueue must never construct a network request")
+        XCTAssertEqual(
+            viewModel.state.wishlistedGameIDs, optimisticIDs,
+            "a stale scope's refusal must not rewrite the current account's UI"
+        )
+        XCTAssertNil(viewModel.state.errorMessage, "a stale scope's refusal must not surface into the new context")
     }
 
     // MARK: 12. HomeGameListViewModel
@@ -359,7 +368,7 @@ final class LibraryMutationOwnershipTests: XCTestCase {
         XCTAssertEqual(router.ownershipRevalidationCount, 0)
     }
 
-    func testHomeGameListFallbackProceedsOnlyWhileOwnershipStaysCurrent() async {
+    func testHomeGameListRefusedEnqueueReconcilesWithoutAnyNetworkRequest() async {
         let repository = RecordingFavoriteRepository()
         let router = MockLibraryMutationRouter()
         router.enqueueResult = .storageBlocked
@@ -370,28 +379,32 @@ final class LibraryMutationOwnershipTests: XCTestCase {
             toggleFavoriteUseCase: ToggleFavoriteUseCase(favoriteRepository: repository),
             librarySync: router
         )
+        let recorder = NotificationRecorder(center: .default, names: [.favoriteDidChange])
 
-        // Current ownership: storageBlocked legitimately falls back.
-        let posted = XCTNSNotificationExpectation(
-            name: .favoriteDidChange,
-            object: nil,
-            notificationCenter: .default
-        )
-        posted.handler = { notification in
-            notification.userInfo?[FavoriteChangeUserInfoKey.gameId] as? Int == 7
+        // Current ownership: the refusal reconciles the optimistic flip —
+        // never a second transport path, never a fabricated success.
+        let reconciled = expectation(description: "optimistic state reconciled")
+        viewModel.onStateChanged = { state in
+            if !state.wishlistedGameIDs.contains(7) {
+                reconciled.fulfill()
+            }
         }
         viewModel.send(.didTapFavorite(gameId: 7))
-        await fulfillment(of: [posted], timeout: 10)
-        XCTAssertEqual(repository.addedGameIDs, ["7"])
-        XCTAssertGreaterThanOrEqual(router.ownershipRevalidationCount, 1, "the fallback must revalidate before the request")
+        XCTAssertTrue(viewModel.state.wishlistedGameIDs.contains(7))
+        await fulfillment(of: [reconciled], timeout: 10)
+        await drainConcurrentWork()
+
+        XCTAssertEqual(repository.mutationCount, 0, "storageBlocked must never reach the repository")
+        XCTAssertGreaterThanOrEqual(router.ownershipRevalidationCount, 1, "reconciliation must be ownership-guarded")
+        XCTAssertEqual(recorder.count(of: .favoriteDidChange), 0, "a refused intent must not fabricate a favorite change")
     }
 
-    // MARK: 10. Completion from stale ownership cannot change current UI
+    // MARK: 10. Refusal delivered after the scope ended cannot change current UI
 
-    func testHomeGameListStaleCompletionLeavesCurrentUIUntouched() async {
+    func testHomeGameListStaleRefusalLeavesCurrentUIUntouched() async {
         let repository = RecordingFavoriteRepository()
         let router = MockLibraryMutationRouter()
-        router.enqueueResult = .serviceUnavailable
+        router.holdEnqueues = true
         let viewModel = HomeGameListViewModel(
             section: .popular,
             games: [],
@@ -401,21 +414,26 @@ final class LibraryMutationOwnershipTests: XCTestCase {
         )
         let recorder = NotificationRecorder(center: .default, names: [.favoriteDidChange])
 
-        // The scope ends exactly while the direct request is on the wire:
-        // the pre-request revalidation passes, the completion one must fail.
-        let requestOnWire = expectation(description: "direct request reached the repository")
-        repository.onMutation = {
-            router.ownershipIsCurrent = false
-            requestOnWire.fulfill()
-        }
-
+        // The enqueue parks; the owning scope ends while it is in flight,
+        // then the engine refuses it. The stale refusal must not touch the
+        // (new) current UI state.
+        let enqueued = expectation(description: "enqueue parked")
+        router.onEnqueue = { enqueued.fulfill() }
         viewModel.send(.didTapFavorite(gameId: 9))
         let optimisticState = viewModel.state.wishlistedGameIDs
-        await fulfillment(of: [requestOnWire], timeout: 10)
+        await fulfillment(of: [enqueued], timeout: 10)
+
+        router.ownershipIsCurrent = false
+        router.resolveHeldEnqueue(
+            entityKey: LibrarySyncEntityKey.favorite(gameID: "9"),
+            sequence: 1,
+            with: .storageBlocked
+        )
         await drainConcurrentWork()
 
-        XCTAssertEqual(recorder.count(of: .favoriteDidChange), 0, "a stale completion must not publish a favorite change")
-        XCTAssertEqual(viewModel.state.wishlistedGameIDs, optimisticState, "a stale completion must not rewrite current UI state")
+        XCTAssertEqual(repository.mutationCount, 0, "a stale refusal must never reach the repository")
+        XCTAssertEqual(recorder.count(of: .favoriteDidChange), 0, "a stale refusal must not publish a favorite change")
+        XCTAssertEqual(viewModel.state.wishlistedGameIDs, optimisticState, "a stale refusal must not rewrite current UI state")
     }
 
     // MARK: 13. GameDetailViewModel
@@ -474,7 +492,7 @@ final class LibraryMutationOwnershipTests: XCTestCase {
         XCTAssertEqual(router.ownershipRevalidationCount, 0)
     }
 
-    func testGameDetailDirectFallbackRevalidatesOwnershipBeforeRequest() async {
+    func testGameDetailRefusedEnqueueWithStaleScopeNeverTouchesNetworkOrUI() async {
         let repository = RecordingFavoriteRepository()
         let router = MockLibraryMutationRouter()
         router.enqueueResult = .serviceUnavailable
@@ -488,7 +506,14 @@ final class LibraryMutationOwnershipTests: XCTestCase {
         await fulfillment(of: [revalidated], timeout: 10)
         await drainConcurrentWork()
 
-        XCTAssertEqual(repository.mutationCount, 0, "a stale scope must never construct the direct request")
+        XCTAssertEqual(repository.mutationCount, 0, "a refused enqueue must never construct a network request")
+        // The favorite value itself is owned by the screen's background
+        // status load here; the stale refusal's obligation is to publish
+        // nothing — no error banner and no fabricated outcome.
+        XCTAssertNil(
+            viewModel.state.errorMessage,
+            "a stale scope's refusal must not surface into the new context"
+        )
     }
 
     // MARK: 14. LibraryViewModel
@@ -540,7 +565,7 @@ final class LibraryMutationOwnershipTests: XCTestCase {
         XCTAssertEqual(router.ownershipRevalidationCount, 0)
     }
 
-    func testLibraryViewModelDirectFallbackRevalidatesOwnershipBeforeRequest() async {
+    func testLibraryViewModelRefusedEnqueueWithStaleScopeNeverTouchesNetwork() async {
         let repository = RecordingFavoriteRepository()
         let router = MockLibraryMutationRouter()
         router.enqueueResult = .storageBlocked
@@ -560,7 +585,7 @@ final class LibraryMutationOwnershipTests: XCTestCase {
         await fulfillment(of: [revalidated], timeout: 10)
         await drainConcurrentWork()
 
-        XCTAssertEqual(repository.mutationCount, 0, "a stale scope must never construct the direct request")
+        XCTAssertEqual(repository.mutationCount, 0, "a refused enqueue must never construct a network request")
     }
 
     // MARK: - Guest capture keeps the pre-2.2 direct path

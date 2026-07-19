@@ -198,31 +198,34 @@ enum LibrarySyncEntityKind: String, Codable {
 /// an intent as "queued offline" on `.accepted`, which is returned strictly
 /// after the queue file was durably written.
 ///
-/// Fallback contract: ONLY `.storageBlocked` and `.serviceUnavailable` may
-/// route the caller to the direct (legacy) mutation path, and only after the
-/// caller revalidates the same captured ownership context. `.staleOwnership`
-/// and `.supersededByNewerIntent` are terminal — a direct call for either
-/// would submit a dead scope's or an outdated gesture's intent with the
-/// current account's credentials.
+/// Every non-accepted result is TERMINAL for the intent: authenticated
+/// mutations are engine-only, and a mutation that could not be durably
+/// accepted is never submitted through a second transport path. For
+/// `.storageBlocked` / `.serviceUnavailable` the caller surfaces a
+/// retryable local failure and reconciles the optimistic UI back to the
+/// last acknowledged state (guarded by `isNewestOwnedIntent`, so a stale
+/// scope or an outdated gesture never rewrites newer UI state). This
+/// deliberately prefers a visible retryable failure over any cross-account
+/// or out-of-order mutation.
 enum LibrarySyncEnqueueResult: Equatable {
     /// Durably persisted; the engine owns delivery from here.
     case accepted
     /// The captured ownership scope no longer owns the session (logout,
     /// account replacement, or deletion since the gesture). The intent is
-    /// dropped; it must NEVER reach the direct path.
+    /// dropped silently — no networking, no stale UI completion.
     case staleOwnership
     /// A newer gesture (higher sequence) for the same entity already
-    /// governs; this older intent is obsolete and is dropped. No fallback —
-    /// the newest intent posts its own outcome.
+    /// governs; this older intent is obsolete and is dropped. The newest
+    /// intent posts its own outcome; its optimistic state is preserved.
     case supersededByNewerIntent
-    /// Durable persistence failed; the intent was NOT queued and must not be
-    /// presented as saved. Callers may fall back to the direct mutation path
-    /// after revalidating the captured ownership.
+    /// Durable persistence failed; the intent was NOT queued and must not
+    /// be presented as saved. No networking — surface a retryable failure
+    /// and reconcile the optimistic UI.
     case storageBlocked
     /// The engine cannot own the intent right now (no adopted account, or
     /// the ownership scope is current but the engine has not finished
-    /// adopting it). Callers may fall back to the direct mutation path
-    /// after revalidating the captured ownership.
+    /// adopting it). No networking — surface a retryable failure and
+    /// reconcile the optimistic UI.
     case serviceUnavailable
 }
 

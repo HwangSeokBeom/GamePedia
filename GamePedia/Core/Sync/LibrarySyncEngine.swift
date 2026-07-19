@@ -12,8 +12,14 @@ import Foundation
 //   synchronously in the gesture handler; enqueue validates it against the
 //   ownership authority and revalidates after every suspension — the engine
 //   never binds an intent to whichever account is active when enqueue runs.
-//   A stale scope returns `.staleOwnership`, which callers must never route
-//   to the direct (legacy) network path
+//   A stale scope returns `.staleOwnership`; every non-accepted result is
+//   terminal for the intent — no second transport path exists
+// - the engine is the ONLY authority for authenticated favorite/library
+//   mutations: ownership, gesture order, compaction, persistence, retry,
+//   remote execution, and completion settlement. Remote execution binds the
+//   adoption-time authorization expectation (account + session epoch,
+//   identifiers only) atomically to that account's credential at request
+//   construction; a stale expectation fails before transmission
 // - gesture-time sequences, not Task-arrival order, decide which intent is
 //   newest: an equal-or-higher sequence that is queued, in-flight, or
 //   already settled in the same scope rejects a late lower sequence with
@@ -79,32 +85,21 @@ protocol LibraryMutationSyncing: Sendable {
     /// Synchronous gesture-time ownership capture. Called inside the gesture
     /// handler BEFORE the submission Task is created; assigns the gesture's
     /// intent sequence. nil when no authenticated account owns the gesture
-    /// (guest), which routes the caller to the direct path unchanged.
+    /// (guest), which routes the caller to the guest-only direct path.
     func captureFavoriteIntent(gameID: String, isFavorite: Bool) -> LibraryMutationOwnership?
     func captureLibraryStatusIntent(_ request: LibraryGameStatusUpdateRequest) -> LibraryMutationOwnership?
-    /// True while the captured scope still owns the session. The direct
-    /// (legacy) fallback must revalidate with this immediately before
-    /// constructing its request and before applying its completion.
-    func isOwnershipCurrent(_ ownership: LibraryMutationOwnership) -> Bool
-    /// Runs an authenticated direct mutation as the engine-fallback path
-    /// (permitted only after `.storageBlocked` / `.serviceUnavailable`)
-    /// under the single shared per-(account scope, entity) gesture-sequence
-    /// coordinator. `operation` executes only while the captured scope is
-    /// current and the gesture sequence is the newest observed for its
-    /// entity; `apply` receives the adjudicated outcome exactly once
-    /// (`.suppressed` when the request was never sent or lost authority)
-    /// and, for executed requests, runs before the entity is released to a
-    /// newer waiting sequence. No ViewModel may call the favorite/library
-    /// repository directly for an authenticated intent outside this method.
-    func runAuthenticatedDirectFallback<Value: Sendable>(
-        ownership: LibraryMutationOwnership,
-        operation: @escaping @Sendable () async throws -> Value,
-        apply: @escaping @Sendable (LibraryDirectFallbackOutcome<Value>) async -> Void
-    ) async
-    /// `.accepted` only after durable persistence. See
-    /// `LibrarySyncEnqueueResult` for which results permit the direct
-    /// (legacy) fallback — `.staleOwnership` and `.supersededByNewerIntent`
-    /// never do.
+    /// True while the captured scope still owns the session AND the capture
+    /// is still the newest gesture for its entity. Completion handlers use
+    /// this to decide whether a local failure may reconcile the optimistic
+    /// UI: a stale scope must not touch the current account's UI, and an
+    /// old gesture must not overwrite a newer one's optimistic intent.
+    func isNewestOwnedIntent(_ ownership: LibraryMutationOwnership) -> Bool
+    /// `.accepted` only after durable persistence. Every other result is
+    /// terminal for the intent: there is NO second transport path. In
+    /// particular `.storageBlocked` / `.serviceUnavailable` mean the intent
+    /// was refused locally — callers surface a retryable failure and
+    /// reconcile the optimistic UI; they must never invoke the favorite or
+    /// library repositories directly for an authenticated intent.
     func enqueueFavoriteChange(
         gameID: String,
         isFavorite: Bool,
@@ -143,12 +138,20 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
     /// and non-isolated so gesture handlers capture synchronously.
     nonisolated let ownershipContext: LibraryMutationOwnershipContext
 
-    /// Single shared adjudicator for authenticated direct fallbacks
-    /// (`.storageBlocked` / `.serviceUnavailable`). Every ViewModel reaches
-    /// it through this router, so independent fallback Tasks can never race
-    /// an entity's gesture order. Validates scopes against
-    /// `ownershipContext` — it holds no account or credential state itself.
-    nonisolated let directFallbackCoordinator: LibraryDirectMutationCoordinator
+    /// Captures the expected authorization context (account + session
+    /// epoch, identifiers only — never credentials) for an adopted account.
+    /// Backed by the auth/network boundary's credential authority in
+    /// production; injectable for tests.
+    private let authorizationProvider: @Sendable (String) -> AuthorizationExpectation?
+
+    /// The expected authorization context of the currently adopted account
+    /// session. Captured at adoption and passed by value into every remote
+    /// execution, so a request the engine validated for this session can
+    /// only bind this session's credential — an account transition (
+    /// replacement, logout, deletion, A → B → A) invalidates the
+    /// expectation and every not-yet-transmitted request with it. A
+    /// same-account credential refresh preserves the expectation.
+    private var activeAuthorization: AuthorizationExpectation?
 
     private var activeAccountID: String?
     private var sessionGeneration: UInt64 = 0
@@ -193,7 +196,10 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
         jitterSource: any JitterSourcing = SystemJitterSource(),
         sleeper: any RealtimeSleeping = TaskRealtimeSleeper(),
         notificationCenter: NotificationCenter = .default,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        authorizationProvider: @escaping @Sendable (String) -> AuthorizationExpectation? = { accountID in
+            APIClient.shared.credentialAuthority.expectation(accountID: accountID)
+        }
     ) {
         self.store = store
         self.transport = transport
@@ -202,14 +208,8 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
         self.sleeper = sleeper
         self.notificationCenter = notificationCenter
         self.now = now
-        let ownershipContext = LibraryMutationOwnershipContext()
-        self.ownershipContext = ownershipContext
-        // The coordinator consults the gesture-time authority per check —
-        // it never snapshots account state, so a scope transition observed
-        // by the context is instantly visible to every pending fallback.
-        self.directFallbackCoordinator = LibraryDirectMutationCoordinator(
-            isScopeCurrent: { ownershipContext.isScopeCurrent($0) }
-        )
+        self.authorizationProvider = authorizationProvider
+        self.ownershipContext = LibraryMutationOwnershipContext()
     }
 
     // MARK: - Session lifecycle
@@ -228,6 +228,11 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
             // adopted this event synchronously): same account → the
             // ownership scope, and every capture made under it, stays valid.
             ownershipContext.adoptSession(isAuthenticated: true, userID: userID)
+            // Same account → the authority preserved the session epoch, so
+            // this re-capture yields the same expectation (now backed by the
+            // refreshed credential). Kept as a fallback for the rare case
+            // where adoption raced the credential write.
+            activeAuthorization = authorizationProvider(userID) ?? activeAuthorization
             adoptSameAccountCredentialRefresh()
             return
         }
@@ -252,6 +257,7 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
             // stay isolated on disk for this account; nothing is submitted
             // while unauthenticated.
             activeAccountID = nil
+            activeAuthorization = nil
             operations = []
             attemptCounts = [:]
             parkedEntityKeys = []
@@ -260,6 +266,13 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
         }
 
         activeAccountID = userID
+        // Expected authorization for everything this session will submit:
+        // captured once at adoption (identifiers only) and passed by value
+        // into each remote execution. The auth layer adopted the credential
+        // before posting the session event, so the expectation is available
+        // here; if it is not (no credential yet), remote execution fails
+        // closed with an auth pause until the next session event.
+        activeAuthorization = authorizationProvider(userID)
         // Detach the previous account's queue BEFORE suspending: its
         // durable copy is already on disk (every mutation persists), so
         // clearing memory here is what guarantees the arrays of two
@@ -344,6 +357,7 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
             cancelAllEntityTasks()
             resolveAccountLoad()
             activeAccountID = nil
+            activeAuthorization = nil
             operations = []
             attemptCounts = [:]
             parkedEntityKeys = []
@@ -427,20 +441,8 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
         )
     }
 
-    nonisolated func isOwnershipCurrent(_ ownership: LibraryMutationOwnership) -> Bool {
-        ownershipContext.isCurrent(ownership)
-    }
-
-    nonisolated func runAuthenticatedDirectFallback<Value: Sendable>(
-        ownership: LibraryMutationOwnership,
-        operation: @escaping @Sendable () async throws -> Value,
-        apply: @escaping @Sendable (LibraryDirectFallbackOutcome<Value>) async -> Void
-    ) async {
-        await directFallbackCoordinator.run(
-            ownership: ownership,
-            operation: operation,
-            apply: apply
-        )
+    nonisolated func isNewestOwnedIntent(_ ownership: LibraryMutationOwnership) -> Bool {
+        ownershipContext.isNewestIntent(ownership)
     }
 
     func enqueueFavoriteChange(
@@ -669,9 +671,15 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
 
         while true {
             guard generation == sessionGeneration, !Task.isCancelled else { return false }
+            // Captured by value while still inside the generation guard: the
+            // request can only bind the credential of the session the engine
+            // validated this operation against. Any account transition after
+            // this point makes the expectation unbindable, so the request
+            // fails before transmission instead of reading a newer token.
+            let authorization = activeAuthorization
 
             do {
-                let outcome = try await transport.perform(operation)
+                let outcome = try await transport.perform(operation, authorization: authorization)
                 guard generation == sessionGeneration else {
                     // Late completion from a superseded session: inert.
                     return false

@@ -12,7 +12,10 @@ protocol LibraryRemoteDataSource {
     func startSteamLink() async throws -> SteamLinkStartResponseDataDTO
     func unlinkSteamAccount() async throws -> SteamUnlinkResponseDataDTO
     func syncOwnedSteamLibrary() async throws -> SyncOwnedSteamLibraryResponseDataDTO
-    func updateGameStatus(requestDTO: UpdateLibraryStatusRequestDTO) async throws -> LibraryStatusMutationResponseDataDTO
+    func updateGameStatus(
+        requestDTO: UpdateLibraryStatusRequestDTO,
+        authorization: RequestAuthorization
+    ) async throws -> LibraryStatusMutationResponseDataDTO
 }
 
 final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
@@ -205,7 +208,10 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
         return response.data
     }
 
-    func updateGameStatus(requestDTO: UpdateLibraryStatusRequestDTO) async throws -> LibraryStatusMutationResponseDataDTO {
+    func updateGameStatus(
+        requestDTO: UpdateLibraryStatusRequestDTO,
+        authorization: RequestAuthorization
+    ) async throws -> LibraryStatusMutationResponseDataDTO {
         print(
             "[Library] request endpoint=POST /users/me/library/status " +
             "externalGameId=\(requestDTO.externalGameId) " +
@@ -215,7 +221,8 @@ final class DefaultLibraryRemoteDataSource: LibraryRemoteDataSource {
         )
         let response = try await apiClient.request(
             .updateLibraryStatus(body: requestDTO),
-            as: LibraryResponseEnvelopeDTO<LibraryStatusMutationResponseEnvelopeDataDTO>.self
+            as: LibraryResponseEnvelopeDTO<LibraryStatusMutationResponseEnvelopeDataDTO>.self,
+            authorization: authorization
         )
         print(
             "[Library] response endpoint=POST /users/me/library/status " +

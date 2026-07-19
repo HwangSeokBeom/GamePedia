@@ -472,19 +472,20 @@ final class GameDetailViewModel {
                 case .accepted, .staleOwnership, .supersededByNewerIntent:
                     // accepted: the engine owns delivery. stale/superseded:
                     // the owning scope ended or a newer gesture governs —
-                    // the direct path must never run for this intent.
+                    // this intent is terminal and must never touch the
+                    // network or newer UI state.
                     break
                 case .storageBlocked, .serviceUnavailable:
-                    // The queue could not own the durable intent: fall back
-                    // to the coordinated direct call so the user gets a real
-                    // success or a real error instead of a false "queued"
-                    // acknowledgement.
-                    await self.performCoordinatedDirectFavoriteToggle(
-                        gameID: gameID,
-                        previousFavoriteState: previousFavoriteState,
-                        ownership: ownership,
-                        librarySync: librarySync
-                    )
+                    // The engine could not durably own the intent. No second
+                    // transport path: restore the last acknowledged favorite
+                    // state and surface a retryable failure. Guarded so a
+                    // stale scope never touches the current account's UI and
+                    // an old gesture never overwrites a newer one.
+                    await MainActor.run {
+                        guard librarySync.isNewestOwnedIntent(ownership) else { return }
+                        self.apply(.setFavorite(previousFavoriteState))
+                        self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
+                    }
                 }
             }
             return
@@ -496,21 +497,26 @@ final class GameDetailViewModel {
         Task {
             await performDirectFavoriteToggle(
                 gameID: gameID,
-                previousFavoriteState: previousFavoriteState
+                previousFavoriteState: previousFavoriteState,
+                authorization: .currentSession
             )
         }
     }
 
-    /// Guest / kill-switch direct path (pre-2.2), unchanged: no ownership
-    /// context exists, so there is no authenticated scope to adjudicate.
+    /// Direct path for gestures the engine does not own. `.guestOnly` for
+    /// guest gestures (can never attach a bearer token, so a login racing
+    /// the gesture cannot be mutated); `.currentSession` only for the
+    /// explicit offline-sync kill-switch (librarySync == nil).
     private func performDirectFavoriteToggle(
         gameID: Int,
-        previousFavoriteState: Bool
+        previousFavoriteState: Bool,
+        authorization: RequestAuthorization = .guestOnly
     ) async {
         do {
                 let result = try await toggleFavoriteUseCase.execute(
                     gameId: String(gameID),
-                    isCurrentlyFavorite: previousFavoriteState
+                    isCurrentlyFavorite: previousFavoriteState,
+                    authorization: authorization
                 )
 
                 await MainActor.run {
@@ -536,62 +542,6 @@ final class GameDetailViewModel {
                     self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
                 }
             }
-    }
-
-    /// Authenticated engine fallback (`.storageBlocked` /
-    /// `.serviceUnavailable` only): the shared coordinator is the only path
-    /// to the repository. It suppresses out-of-order gesture sequences,
-    /// serializes requests per (scope, entity) — across every ViewModel —
-    /// and revalidates scope ownership immediately before the request is
-    /// constructed and again before this outcome applies.
-    private func performCoordinatedDirectFavoriteToggle(
-        gameID: Int,
-        previousFavoriteState: Bool,
-        ownership: LibraryMutationOwnership,
-        librarySync: any LibraryMutationSyncing
-    ) async {
-        let useCase = toggleFavoriteUseCase
-        await librarySync.runAuthenticatedDirectFallback(
-            ownership: ownership,
-            operation: {
-                try await useCase.execute(
-                    gameId: String(gameID),
-                    isCurrentlyFavorite: previousFavoriteState
-                )
-            },
-            apply: { outcome in
-                await MainActor.run {
-                    // A completion from a scope that ended mid-request must
-                    // not touch the current account's UI.
-                    guard self.librarySync?.isOwnershipCurrent(ownership) == true else { return }
-                    switch outcome {
-                    case .success(let result):
-                        self.apply(.setFavorite(result.isFavorite))
-                        self.apply(.setFavoriteLoading(false))
-                        NotificationCenter.default.post(
-                            name: .favoriteDidChange,
-                            object: nil,
-                            userInfo: [
-                                FavoriteChangeUserInfoKey.gameId: result.gameId,
-                                FavoriteChangeUserInfoKey.isFavorite: result.isFavorite,
-                                FavoriteChangeUserInfoKey.action: result.isFavorite
-                                    ? FavoriteChangeAction.added.rawValue
-                                    : FavoriteChangeAction.removed.rawValue
-                            ]
-                        )
-                    case .failure(let error):
-                        let favoriteError = FavoriteError.from(error: error)
-                        self.apply(.setFavorite(previousFavoriteState))
-                        self.apply(.setFavoriteLoading(false))
-                        self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
-                    case .suppressed:
-                        // A newer gesture governs this entity (or the scope
-                        // ended); the newest intent posts its own outcome.
-                        break
-                    }
-                }
-            }
-        )
     }
 
     private func observeFavoriteChanges() {

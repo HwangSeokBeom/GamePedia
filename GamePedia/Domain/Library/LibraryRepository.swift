@@ -12,5 +12,11 @@ protocol LibraryRepository {
     func startSteamLink() async throws -> URL
     func unlinkSteamAccount() async throws -> SteamUnlinkResult
     func syncOwnedSteamLibrary() async throws -> SteamOwnedLibrarySyncResult
-    func updateGameStatus(request: LibraryGameStatusUpdateRequest) async throws -> LibraryGameStatusMutationResult
+    /// Status mutations carry an explicit authorization mode so account
+    /// ownership and credential selection bind atomically at the network
+    /// boundary — see `FavoriteRepository` for the mode contract.
+    func updateGameStatus(
+        request: LibraryGameStatusUpdateRequest,
+        authorization: RequestAuthorization
+    ) async throws -> LibraryGameStatusMutationResult
 }

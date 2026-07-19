@@ -756,7 +756,14 @@ final class DefaultAuthRepository: AuthRepository {
         tokenStore.saveAccessToken(session.accessToken)
         tokenStore.saveRefreshToken(session.refreshToken)
         saveCurrentUser(session.user)
-        apiClient.userAuthToken = session.accessToken
+        // Account-aware adoption: a same-account refresh swaps the token
+        // and preserves the session epoch (outstanding account-bound
+        // requests stay valid); a different account advances the epoch and
+        // permanently invalidates every expectation captured before it.
+        apiClient.credentialAuthority.adoptAuthenticatedSession(
+            accountID: session.user.id,
+            accessToken: session.accessToken
+        )
         NotificationCenter.default.post(
             name: .authSessionDidChange,
             object: nil,
@@ -774,7 +781,7 @@ final class DefaultAuthRepository: AuthRepository {
     private func clearStoredSession() {
         tokenStore.clear()
         userSessionStore.clear()
-        apiClient.userAuthToken = nil
+        apiClient.credentialAuthority.clearSession()
         NotificationCenter.default.post(
             name: .authSessionDidChange,
             object: nil,

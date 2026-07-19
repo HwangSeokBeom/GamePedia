@@ -14,11 +14,11 @@ import Foundation
 // - the absolute state the user intended (`intendedState`)
 //
 // The context is threaded through every asynchronous boundary — submission
-// Task → engine enqueue → persisted operation → direct-fallback decision →
-// remote mutation → completion — and is revalidated after each one. The
-// engine never infers ownership from whichever account happens to be active
-// when the enqueue executes, and the direct (legacy) path never runs for a
-// scope that is no longer current.
+// Task → engine enqueue → persisted operation → remote mutation →
+// completion — and is revalidated after each one. The engine never infers
+// ownership from whichever account happens to be active when the enqueue
+// executes, and a locally refused intent (storage blocked, engine
+// unavailable) reconciles the UI instead of taking any second network path.
 //
 // No credential material is ever captured: the context holds account and
 // scope identifiers only. The network layer keeps obtaining current
@@ -119,7 +119,7 @@ final class LibraryMutationOwnershipContext: @unchecked Sendable {
 
     /// Synchronous gesture-time capture. Returns nil when no authenticated
     /// account owns the gesture (guest), which routes callers to the
-    /// pre-2.2 direct path exactly as before.
+    /// guest-only direct path.
     func captureIntent(
         entityKey: String,
         intendedState: LibraryMutationIntendedState
@@ -147,13 +147,16 @@ final class LibraryMutationOwnershipContext: @unchecked Sendable {
         return scope?.id == ownership.scopeID
     }
 
-    /// Scope-id form of `isCurrent`, for authorities (the direct-fallback
-    /// coordinator) that adjudicate by scope id alone. Same permanence:
-    /// ids are never reused, so once false this stays false forever.
-    func isScopeCurrent(_ scopeID: UUID) -> Bool {
+    /// True while the captured scope still owns the session AND the capture
+    /// is the newest gesture handed out for its entity. Failure handlers
+    /// reconcile optimistic UI only under this predicate: a stale scope
+    /// must not touch the current account's UI, and an old gesture must not
+    /// overwrite a newer gesture's optimistic intent.
+    func isNewestIntent(_ ownership: LibraryMutationOwnership) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        return scope?.id == scopeID
+        return scope?.id == ownership.scopeID
+            && sequencesByEntityKey[ownership.entityKey] == ownership.sequence
     }
 
     /// Currently owning account, if any (tests/diagnostics).

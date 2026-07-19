@@ -578,11 +578,11 @@ private final class FallbackAIRecommendationUseCase: FetchAIRecommendationsUseCa
 }
 
 private struct EmptyFavoriteRepository: FavoriteRepository {
-    func addFavorite(gameId: String) async throws -> FavoriteMutationResult {
+    func addFavorite(gameId: String, authorization: RequestAuthorization) async throws -> FavoriteMutationResult {
         FavoriteMutationResult(gameId: Int(gameId) ?? 0, isFavorite: true)
     }
 
-    func removeFavorite(gameId: String) async throws -> FavoriteMutationResult {
+    func removeFavorite(gameId: String, authorization: RequestAuthorization) async throws -> FavoriteMutationResult {
         FavoriteMutationResult(gameId: Int(gameId) ?? 0, isFavorite: false)
     }
 

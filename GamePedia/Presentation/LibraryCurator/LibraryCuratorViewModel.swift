@@ -47,6 +47,7 @@ final class LibraryCuratorViewModel {
 
     private let fetchLibraryCuratorUseCase: any FetchLibraryCuratorUseCase
     private let toggleFavoriteUseCase: ToggleFavoriteUseCase
+    private let librarySync: (any LibraryMutationSyncing)?
     private var currentTask: Task<Void, Never>?
     private var currentRequestToken: UUID?
     private var currentRequestKey: RequestKey?
@@ -65,11 +66,14 @@ final class LibraryCuratorViewModel {
         fetchLibraryCuratorUseCase: any FetchLibraryCuratorUseCase = DefaultFetchLibraryCuratorUseCase(),
         toggleFavoriteUseCase: ToggleFavoriteUseCase = ToggleFavoriteUseCase(
             favoriteRepository: DefaultFavoriteRepository()
-        )
+        ),
+        librarySync: (any LibraryMutationSyncing)? = LibrarySyncRuntime.shared.mutationRouter
     ) {
         self.fetchLibraryCuratorUseCase = fetchLibraryCuratorUseCase
         self.toggleFavoriteUseCase = toggleFavoriteUseCase
+        self.librarySync = librarySync
         observeInvalidationEvents()
+        observeLibrarySyncFailures()
     }
 
     deinit {
@@ -588,6 +592,78 @@ final class LibraryCuratorViewModel {
         guard !state.isLoading else { return }
         guard !updatingFavoriteGameIds.contains(gameId) else { return }
         let isCurrentlyFavorite = state.sections.flatMap(\.items).first { $0.gameId == gameId }?.isFavorite ?? false
+
+        // Authenticated route: gesture-time ownership is captured
+        // synchronously HERE, before the submission Task exists, and the
+        // intent is owned end-to-end by LibrarySyncEngine — this screen
+        // never calls the favorite repository for an authenticated gesture.
+        // The engine posts server-authoritative `.favoriteDidChange` on
+        // success (observed via invalidation events) and
+        // `.librarySyncOperationDidFail` on permanent failure (observed in
+        // observeLibrarySyncFailures()). Rapid gestures are ordered by the
+        // engine's gesture-time sequence authority, so no per-item request
+        // lock is needed on this path.
+        if let librarySync {
+            if let ownership = librarySync.captureFavoriteIntent(
+                gameID: gameId,
+                isFavorite: !isCurrentlyFavorite
+            ) {
+                apply(.setFavorite(gameId: gameId, isFavorite: !isCurrentlyFavorite))
+                Task { [weak self] in
+                    guard let self else { return }
+                    let result = await librarySync.enqueueFavoriteChange(
+                        gameID: gameId,
+                        isFavorite: !isCurrentlyFavorite,
+                        ownership: ownership
+                    )
+                    switch result {
+                    case .accepted, .staleOwnership, .supersededByNewerIntent:
+                        // accepted: the engine owns delivery. stale/
+                        // superseded: terminal — no networking, and neither
+                        // the new account's UI nor a newer gesture's
+                        // optimistic state may be touched.
+                        break
+                    case .storageBlocked, .serviceUnavailable:
+                        // No second transport path: restore the last
+                        // acknowledged state and surface a retryable
+                        // failure. Guarded so a stale scope never touches
+                        // the current account's UI and an old gesture never
+                        // overwrites a newer one.
+                        await MainActor.run {
+                            guard librarySync.isNewestOwnedIntent(ownership) else { return }
+                            self.apply(.setFavorite(gameId: gameId, isFavorite: isCurrentlyFavorite))
+                            self.apply(.setErrorMessage(L10n.tr("Localizable", "favorite.error.updateFailed")))
+                        }
+                    }
+                }
+                return
+            }
+            // Guest gesture: the direct path can never attach a bearer
+            // token (`.guestOnly`), so it deterministically fails
+            // unauthorized and drives the existing auth gate — a login
+            // racing the gesture cannot be mutated.
+            performDirectFavoriteToggle(
+                gameId: gameId,
+                isCurrentlyFavorite: isCurrentlyFavorite,
+                authorization: .guestOnly
+            )
+            return
+        }
+
+        // Offline-sync kill-switch (compile-time unreachable while the
+        // feature flag is on): the pre-2.2 legacy behavior.
+        performDirectFavoriteToggle(
+            gameId: gameId,
+            isCurrentlyFavorite: isCurrentlyFavorite,
+            authorization: .currentSession
+        )
+    }
+
+    private func performDirectFavoriteToggle(
+        gameId: String,
+        isCurrentlyFavorite: Bool,
+        authorization: RequestAuthorization
+    ) {
         updatingFavoriteGameIds.insert(gameId)
         apply(.setFavorite(gameId: gameId, isFavorite: !isCurrentlyFavorite))
         apply(.setFavoriteUpdating(gameId: gameId, isUpdating: true))
@@ -597,7 +673,8 @@ final class LibraryCuratorViewModel {
             do {
                 let result = try await toggleFavoriteUseCase.execute(
                     gameId: gameId,
-                    isCurrentlyFavorite: isCurrentlyFavorite
+                    isCurrentlyFavorite: isCurrentlyFavorite,
+                    authorization: authorization
                 )
                 await MainActor.run {
                     self.updatingFavoriteGameIds.remove(gameId)
@@ -635,6 +712,32 @@ final class LibraryCuratorViewModel {
                 }
             }
         }
+    }
+
+    /// A queued favorite change permanently failed after the optimistic
+    /// flip: reconcile against the failed operation's intended state (never
+    /// by inverting whatever is on screen) and surface the failure. A newer
+    /// queued intent supersedes the failure entirely.
+    private func observeLibrarySyncFailures() {
+        NotificationCenter.default.publisher(for: .librarySyncOperationDidFail)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let kind = notification.userInfo?[LibrarySyncFailureUserInfoKey.entityKind] as? String,
+                      kind == LibrarySyncEntityKind.favorite.rawValue,
+                      let failedGameID = notification.userInfo?[LibrarySyncFailureUserInfoKey.gameID] as? String,
+                      let intended = notification
+                        .userInfo?[LibrarySyncFailureUserInfoKey.intendedIsFavorite] as? Bool,
+                      self.state.sections.flatMap(\.items).contains(where: { $0.gameId == failedGameID }) else {
+                    return
+                }
+                let superseded = notification
+                    .userInfo?[LibrarySyncFailureUserInfoKey.supersededByNewerIntent] as? Bool ?? false
+                guard superseded == false else { return }
+                self.apply(.setFavorite(gameId: failedGameID, isFavorite: !intended))
+                self.apply(.setErrorMessage(L10n.tr("Localizable", "favorite.error.updateFailed")))
+            }
+            .store(in: &cancellables)
     }
 
     private func observeInvalidationEvents() {

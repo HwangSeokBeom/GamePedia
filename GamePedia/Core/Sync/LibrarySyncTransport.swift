@@ -10,9 +10,16 @@ import Foundation
 
 protocol LibrarySyncTransporting: Sendable {
     /// Performs one operation against the server. Called at most once
-    /// concurrently per entity key. Throws typed repository errors
+    /// concurrently per entity key. `authorization` is the engine's expected
+    /// account/session context, captured when the engine adopted the
+    /// operation's account: the request must bind to that exact expectation
+    /// or fail before transmission — it must never read whichever mutable
+    /// credential happens to be current. Throws typed repository errors
     /// (`FavoriteError`, `LibraryError`) or `LibrarySyncFailure`.
-    func perform(_ operation: LibrarySyncOperation) async throws -> LibrarySyncOutcome
+    func perform(
+        _ operation: LibrarySyncOperation,
+        authorization: AuthorizationExpectation?
+    ) async throws -> LibrarySyncOutcome
 }
 
 // @unchecked: the repository protocols predate Sendable annotations; the
@@ -30,17 +37,39 @@ struct RESTLibrarySyncTransport: LibrarySyncTransporting, @unchecked Sendable {
         self.libraryRepository = libraryRepository
     }
 
-    func perform(_ operation: LibrarySyncOperation) async throws -> LibrarySyncOutcome {
+    func perform(
+        _ operation: LibrarySyncOperation,
+        authorization: AuthorizationExpectation?
+    ) async throws -> LibrarySyncOutcome {
+        // Defensive: an expectation that does not belong to the operation's
+        // owner could bind another account's credential. Refuse before any
+        // request exists; the engine classifies this as an auth pause.
+        guard let authorization, authorization.accountID == operation.accountID else {
+            throw NetworkError.unauthorized
+        }
         switch operation.kind {
         case .setFavorite(let gameID, let isFavorite):
             if isFavorite {
-                return .favorite(try await favoriteRepository.addFavorite(gameId: gameID))
+                return .favorite(
+                    try await favoriteRepository.addFavorite(
+                        gameId: gameID,
+                        authorization: .boundAccount(authorization)
+                    )
+                )
             } else {
-                return .favorite(try await favoriteRepository.removeFavorite(gameId: gameID))
+                return .favorite(
+                    try await favoriteRepository.removeFavorite(
+                        gameId: gameID,
+                        authorization: .boundAccount(authorization)
+                    )
+                )
             }
         case .setLibraryStatus(let payload):
             return .libraryStatus(
-                try await libraryRepository.updateGameStatus(request: payload.domainRequest)
+                try await libraryRepository.updateGameStatus(
+                    request: payload.domainRequest,
+                    authorization: .boundAccount(authorization)
+                )
             )
         }
     }
