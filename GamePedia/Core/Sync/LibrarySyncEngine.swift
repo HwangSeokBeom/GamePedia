@@ -36,6 +36,17 @@ import Foundation
 // - auth failures pause the whole queue (work preserved) until the next
 //   authenticated session event; the engine never triggers a token refresh
 //   itself
+// - the ACCOUNT-SCOPE generation is distinct from credential state: a
+//   same-account credential refresh (token refreshed, session re-issued
+//   for the identical account ID) never advances the generation, never
+//   cancels an in-flight request (it may already be on the wire and is
+//   not retractable), never clears in-flight ownership, and never reloads
+//   the persisted queue — it only lifts an auth pause and refreshes retry
+//   budgets. The engine holds no credentials; requests pick up the newly
+//   adopted token through the existing auth/network layer per call
+// - the account-scope generation advances only when the scope itself
+//   changes: account A → B, authenticated → logged out, account deletion,
+//   or any transition after which the old account's data must be unusable
 // - logout: the queue is persisted and isolated, not submitted, and is
 //   reloaded only when the SAME account authenticates again
 // - account deletion: the account's persisted queue is purged
@@ -132,14 +143,27 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
     // MARK: - Session lifecycle
 
     func sessionDidChange(isAuthenticated: Bool, userID: String?) async {
+        // Same-account credential refresh: the account SCOPE is unchanged,
+        // so nothing owned by this scope may be disturbed. An in-flight
+        // mutation's request may already have reached the server and is not
+        // retractable — cancelling and replaying it here would submit the
+        // same intent twice and let the original commit after a newer one.
+        // This also covers a refresh arriving while this same account's
+        // queue load is still suspended: the load stays valid (generation
+        // unchanged) and adopts normally when it resolves.
+        if isAuthenticated, let userID, !userID.isEmpty, userID == activeAccountID {
+            adoptSameAccountCredentialRefresh()
+            return
+        }
+
+        // Account-scope transition: first login, account replacement,
+        // logout, or scope invalidation. The old scope's work must become
+        // unusable, so the generation advances and its tasks are cancelled.
         sessionGeneration &+= 1
         cancelAllEntityTasks()
         isBlockedOnAuth = false
         // Any in-flight account load now belongs to a superseded generation;
-        // release its waiters so they revalidate and reject. Remember that
-        // it was abandoned: a same-account event must reload rather than
-        // run against the empty detached queue.
-        let abandonedUnresolvedLoad = isAccountLoadInFlight
+        // release its waiters so they revalidate and reject.
         resolveAccountLoad()
 
         guard isAuthenticated, let userID, !userID.isEmpty else {
@@ -154,36 +178,48 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
             return
         }
 
-        if userID != activeAccountID || abandonedUnresolvedLoad {
-            activeAccountID = userID
-            // Detach the previous account's queue BEFORE suspending: its
-            // durable copy is already on disk (every mutation persists), so
-            // clearing memory here is what guarantees the arrays of two
-            // accounts can never mix across the load suspension.
-            operations = []
-            attemptCounts = [:]
-            parkedEntityKeys = []
-            let generation = sessionGeneration
-            isAccountLoadInFlight = true
-            let result = await store.load(accountID: userID)
-            guard generation == sessionGeneration else {
-                // Stale load: a newer session event owns all state (and has
-                // already resolved this load's waiters). Commit nothing.
-                return
-            }
-            if result.recoveredFromCorruption {
-                recoveredFromCorruptedStore = true
-                lastSafeErrorCode = "STORE_CORRUPTED"
-            }
-            await adoptLoadedOperations(result.operations, accountID: userID, generation: generation)
-            guard generation == sessionGeneration else { return }
-        } else {
-            // Same account re-authenticated (e.g. token refresh): parked
-            // work gets a fresh automatic-retry budget.
-            parkedEntityKeys = []
-            attemptCounts = [:]
+        activeAccountID = userID
+        // Detach the previous account's queue BEFORE suspending: its
+        // durable copy is already on disk (every mutation persists), so
+        // clearing memory here is what guarantees the arrays of two
+        // accounts can never mix across the load suspension.
+        operations = []
+        attemptCounts = [:]
+        parkedEntityKeys = []
+        let generation = sessionGeneration
+        isAccountLoadInFlight = true
+        let result = await store.load(accountID: userID)
+        guard generation == sessionGeneration else {
+            // Stale load: a newer session event owns all state (and has
+            // already resolved this load's waiters). Commit nothing.
+            return
         }
+        if result.recoveredFromCorruption {
+            recoveredFromCorruptedStore = true
+            lastSafeErrorCode = "STORE_CORRUPTED"
+        }
+        await adoptLoadedOperations(result.operations, accountID: userID, generation: generation)
+        guard generation == sessionGeneration else { return }
         postQueueDidChange()
+        drain()
+    }
+
+    /// Same-account credential refresh. The account-scope generation does
+    /// NOT advance, no entity task is cancelled, in-flight ownership is
+    /// untouched, and the persisted queue is not reloaded. The event still
+    /// (a) lifts an auth pause — this is how the queue resumes after the
+    /// auth layer's single-flight refresh succeeds — and (b) grants parked
+    /// work a fresh automatic-retry budget. Credentials live in the
+    /// auth/network layer, never in the engine, so subsequent requests use
+    /// the newly adopted token without any engine-side state.
+    private func adoptSameAccountCredentialRefresh() {
+        isBlockedOnAuth = false
+        parkedEntityKeys = []
+        attemptCounts = [:]
+        postQueueDidChange()
+        // Entities with an in-flight or backing-off operation still own an
+        // entity task and are skipped by drain(); only idle queued work
+        // (e.g. paused by the auth failure) starts here.
         drain()
     }
 
@@ -658,6 +694,10 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
 
     /// Callers currently suspended on the account-load gate (tests).
     var accountLoadWaiterCount: Int { accountLoadWaiters.count }
+
+    /// Ids of operations whose request is currently owned by an entity
+    /// loop — possibly already on the wire (tests).
+    var inFlightOperationIDsSnapshot: Set<UUID> { inFlightOperationIDs }
 
     var pendingOperationCount: Int { operations.filter { $0.state == .queued }.count }
 

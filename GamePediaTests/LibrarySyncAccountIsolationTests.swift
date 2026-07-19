@@ -177,27 +177,29 @@ final class LibrarySyncAccountIsolationTests: XCTestCase {
         XCTAssertFalse(snapshot.hasActiveAccount)
     }
 
-    func testSameAccountReauthDuringSuspendedLoadReloadsInsteadOfClobbering() async {
-        // A token refresh arriving while A's own load is still suspended
-        // abandons that load; the engine must reload rather than run
-        // against the empty detached queue (which a later enqueue would
-        // persist, clobbering A's durable operations).
+    func testSameAccountReauthDuringSuspendedLoadKeepsTheLoadAndNeverClobbers() async {
+        // A credential refresh arriving while A's own load is still
+        // suspended is a same-scope event: the in-flight load stays valid
+        // (the generation did not advance), completes, and adopts A's
+        // durable queue — no abandon, no second load, and a later enqueue
+        // supersedes within the adopted queue instead of clobbering it.
         store.seed([makeOperation(accountID: "user-a", gameID: "1")], accountID: "user-a")
         store.holdLoads = true
         transport.behavior = { _, _ in .hold }
         let engine = makeEngine()
 
         let first = await startSessionChange(engine, userID: "user-a", expectedLoadIndex: 0)
-        let second = await startSessionChange(engine, userID: "user-a", expectedLoadIndex: 1)
+        // Same-account refresh while the load is suspended: no new load may
+        // start, and the suspended one must remain resolvable.
+        await engine.sessionDidChange(isAuthenticated: true, userID: "user-a")
 
         store.resolveHeldLoad(index: 0)
         await first.value
-        store.resolveHeldLoad(index: 1)
-        await second.value
 
         let pending = await engine.pendingOperations
-        XCTAssertEqual(pending.count, 1, "the abandoned load must be replaced by a fresh one")
+        XCTAssertEqual(pending.count, 1, "the surviving load must adopt A's durable queue exactly once")
         XCTAssertEqual(pending.first?.accountID, "user-a")
+        XCTAssertEqual(store.heldLoadIndices, [], "no second load may be issued for a same-account refresh")
 
         // A new enqueue supersedes within the loaded queue, never clobbers.
         _ = await engine.enqueueFavoriteChange(gameID: "5", isFavorite: true)
