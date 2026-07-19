@@ -202,13 +202,65 @@ final class InMemorySyncOperationStore: SyncOperationStoring, @unchecked Sendabl
 // MARK: - Router double for view-model tests
 
 final class MockLibraryMutationRouter: LibraryMutationSyncing, @unchecked Sendable {
+
+    /// How one direct-fallback submission resolved through the hosted
+    /// coordinator (mirrors `LibraryDirectFallbackOutcome` without its
+    /// generic payload).
+    enum FallbackResolution: Equatable {
+        case success
+        case failure
+        case suppressed
+    }
+
+    /// Scope-currency truth shared with the hosted coordinator. Mirrors
+    /// the real ownership context: exactly one live scope id, never reused.
+    private final class ScopeAuthority: @unchecked Sendable {
+        private let lock = NSLock()
+        private var scopeID = UUID()
+        private var isCurrentFlag = true
+
+        var currentScopeID: UUID {
+            lock.lock()
+            defer { lock.unlock() }
+            return scopeID
+        }
+
+        var isCurrent: Bool {
+            get {
+                lock.lock()
+                defer { lock.unlock() }
+                return isCurrentFlag
+            }
+            set {
+                lock.lock()
+                isCurrentFlag = newValue
+                lock.unlock()
+            }
+        }
+
+        func isScopeCurrent(_ id: UUID) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return isCurrentFlag && id == scopeID
+        }
+
+        func advance() {
+            lock.lock()
+            scopeID = UUID()
+            isCurrentFlag = true
+            lock.unlock()
+        }
+    }
+
     private let lock = NSLock()
-    private let scopeID = UUID()
+    private let scopeAuthority: ScopeAuthority
     private var sequencesByEntityKey: [String: UInt64] = [:]
+    private var heldEnqueues: [String: CheckedContinuation<LibrarySyncEnqueueResult, Never>] = [:]
     private(set) var favoriteChanges: [(gameID: String, isFavorite: Bool)] = []
     private(set) var statusUpdates: [LibraryGameStatusUpdateRequest] = []
     private(set) var capturedOwnerships: [LibraryMutationOwnership] = []
     private(set) var enqueuedOwnerships: [LibraryMutationOwnership] = []
+    private(set) var fallbackResolutions: [(ownership: LibraryMutationOwnership, resolution: FallbackResolution)] = []
     private(set) var ownershipRevalidationCount = 0
     private(set) var retryNowCallCount = 0
     /// Result every enqueue reports; only `.storageBlocked` and
@@ -217,16 +269,59 @@ final class MockLibraryMutationRouter: LibraryMutationSyncing, @unchecked Sendab
     /// Account minted into captured ownership; nil simulates a guest gesture
     /// (capture fails and the caller uses the direct path).
     var accountID: String? = "mock-user"
-    /// Answer for `isOwnershipCurrent` — set false to simulate the owning
-    /// scope ending between gesture and fallback/completion.
-    var ownershipIsCurrent = true
     var pendingFavoriteIntentValue: Bool?
+    /// When true, every enqueue parks until the test resolves it via
+    /// `resolveHeldEnqueue` — the deterministic Task-arrival inversion
+    /// window for fallback-ordering tests.
+    var holdEnqueues = false
     /// Fired after an enqueue is recorded (safe place to fulfill expectations).
     var onEnqueue: (() -> Void)?
     /// Fired after retryNow is recorded.
     var onRetryNow: (() -> Void)?
     /// Fired after an ownership revalidation is recorded.
     var onOwnershipRevalidation: (() -> Void)?
+    /// Fired after a direct-fallback submission fully resolved (its outcome
+    /// was applied and recorded).
+    var onFallbackResolved: ((LibraryMutationOwnership, FallbackResolution) -> Void)?
+    /// Real shared adjudicator, exactly as the engine hosts it: every
+    /// ViewModel handed this router reaches the same instance.
+    let directFallbackCoordinator: LibraryDirectMutationCoordinator
+
+    init() {
+        let authority = ScopeAuthority()
+        scopeAuthority = authority
+        directFallbackCoordinator = LibraryDirectMutationCoordinator(
+            isScopeCurrent: { authority.isScopeCurrent($0) }
+        )
+    }
+
+    /// Answer for `isOwnershipCurrent` — set false to simulate the owning
+    /// scope ending between gesture and fallback/completion.
+    var ownershipIsCurrent: Bool {
+        get { scopeAuthority.isCurrent }
+        set { scopeAuthority.isCurrent = newValue }
+    }
+
+    /// Replaces the live scope with a fresh id (account replacement or
+    /// A → B → A re-login). Sequences restart per scope, like the real
+    /// ownership context.
+    func advanceScope() {
+        lock.lock()
+        sequencesByEntityKey = [:]
+        lock.unlock()
+        scopeAuthority.advance()
+    }
+
+    func resolveHeldEnqueue(
+        entityKey: String,
+        sequence: UInt64,
+        with result: LibrarySyncEnqueueResult
+    ) {
+        lock.lock()
+        let continuation = heldEnqueues.removeValue(forKey: "\(entityKey)#\(sequence)")
+        lock.unlock()
+        continuation?.resume(returning: result)
+    }
 
     func captureFavoriteIntent(gameID: String, isFavorite: Bool) -> LibraryMutationOwnership? {
         mintOwnership(
@@ -248,9 +343,9 @@ final class MockLibraryMutationRouter: LibraryMutationSyncing, @unchecked Sendab
     func isOwnershipCurrent(_ ownership: LibraryMutationOwnership) -> Bool {
         lock.lock()
         ownershipRevalidationCount += 1
-        let result = ownershipIsCurrent
         let callback = onOwnershipRevalidation
         lock.unlock()
+        let result = scopeAuthority.isScopeCurrent(ownership.scopeID)
         callback?()
         return result
     }
@@ -264,10 +359,19 @@ final class MockLibraryMutationRouter: LibraryMutationSyncing, @unchecked Sendab
         favoriteChanges.append((gameID, isFavorite))
         enqueuedOwnerships.append(ownership)
         let result = enqueueResult
+        let shouldHold = holdEnqueues
         let callback = onEnqueue
         lock.unlock()
-        callback?()
-        return result
+        guard shouldHold else {
+            callback?()
+            return result
+        }
+        return await withCheckedContinuation { continuation in
+            lock.lock()
+            heldEnqueues["\(ownership.entityKey)#\(ownership.sequence)"] = continuation
+            lock.unlock()
+            callback?()
+        }
     }
 
     func enqueueLibraryStatusUpdate(
@@ -278,10 +382,40 @@ final class MockLibraryMutationRouter: LibraryMutationSyncing, @unchecked Sendab
         statusUpdates.append(request)
         enqueuedOwnerships.append(ownership)
         let result = enqueueResult
+        let shouldHold = holdEnqueues
         let callback = onEnqueue
         lock.unlock()
-        callback?()
-        return result
+        guard shouldHold else {
+            callback?()
+            return result
+        }
+        return await withCheckedContinuation { continuation in
+            lock.lock()
+            heldEnqueues["\(ownership.entityKey)#\(ownership.sequence)"] = continuation
+            lock.unlock()
+            callback?()
+        }
+    }
+
+    func runAuthenticatedDirectFallback<Value: Sendable>(
+        ownership: LibraryMutationOwnership,
+        operation: @escaping @Sendable () async throws -> Value,
+        apply: @escaping @Sendable (LibraryDirectFallbackOutcome<Value>) async -> Void
+    ) async {
+        await directFallbackCoordinator.run(
+            ownership: ownership,
+            operation: operation,
+            apply: { [weak self] outcome in
+                let resolution: FallbackResolution
+                switch outcome {
+                case .success: resolution = .success
+                case .failure: resolution = .failure
+                case .suppressed: resolution = .suppressed
+                }
+                await apply(outcome)
+                self?.recordFallbackResolution(ownership, resolution: resolution)
+            }
+        )
     }
 
     func pendingFavoriteIntent(gameID: String) async -> Bool? {
@@ -296,6 +430,17 @@ final class MockLibraryMutationRouter: LibraryMutationSyncing, @unchecked Sendab
         callback?()
     }
 
+    private func recordFallbackResolution(
+        _ ownership: LibraryMutationOwnership,
+        resolution: FallbackResolution
+    ) {
+        lock.lock()
+        fallbackResolutions.append((ownership, resolution))
+        let callback = onFallbackResolved
+        lock.unlock()
+        callback?(ownership, resolution)
+    }
+
     private func mintOwnership(
         entityKey: String,
         intendedState: LibraryMutationIntendedState
@@ -307,7 +452,7 @@ final class MockLibraryMutationRouter: LibraryMutationSyncing, @unchecked Sendab
         sequencesByEntityKey[entityKey] = sequence
         let ownership = LibraryMutationOwnership(
             accountID: accountID,
-            scopeID: scopeID,
+            scopeID: scopeAuthority.currentScopeID,
             generation: 1,
             entityKey: entityKey,
             sequence: sequence,

@@ -147,6 +147,15 @@ final class LibraryMutationOwnershipContext: @unchecked Sendable {
         return scope?.id == ownership.scopeID
     }
 
+    /// Scope-id form of `isCurrent`, for authorities (the direct-fallback
+    /// coordinator) that adjudicate by scope id alone. Same permanence:
+    /// ids are never reused, so once false this stays false forever.
+    func isScopeCurrent(_ scopeID: UUID) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return scope?.id == scopeID
+    }
+
     /// Currently owning account, if any (tests/diagnostics).
     var currentAccountID: String? {
         lock.lock()

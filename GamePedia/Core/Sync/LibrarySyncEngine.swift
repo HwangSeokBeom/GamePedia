@@ -86,6 +86,21 @@ protocol LibraryMutationSyncing: Sendable {
     /// (legacy) fallback must revalidate with this immediately before
     /// constructing its request and before applying its completion.
     func isOwnershipCurrent(_ ownership: LibraryMutationOwnership) -> Bool
+    /// Runs an authenticated direct mutation as the engine-fallback path
+    /// (permitted only after `.storageBlocked` / `.serviceUnavailable`)
+    /// under the single shared per-(account scope, entity) gesture-sequence
+    /// coordinator. `operation` executes only while the captured scope is
+    /// current and the gesture sequence is the newest observed for its
+    /// entity; `apply` receives the adjudicated outcome exactly once
+    /// (`.suppressed` when the request was never sent or lost authority)
+    /// and, for executed requests, runs before the entity is released to a
+    /// newer waiting sequence. No ViewModel may call the favorite/library
+    /// repository directly for an authenticated intent outside this method.
+    func runAuthenticatedDirectFallback<Value: Sendable>(
+        ownership: LibraryMutationOwnership,
+        operation: @escaping @Sendable () async throws -> Value,
+        apply: @escaping @Sendable (LibraryDirectFallbackOutcome<Value>) async -> Void
+    ) async
     /// `.accepted` only after durable persistence. See
     /// `LibrarySyncEnqueueResult` for which results permit the direct
     /// (legacy) fallback — `.staleOwnership` and `.supersededByNewerIntent`
@@ -126,7 +141,14 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
     /// notification handler, before the engine's async event lands) and kept
     /// aligned by the engine's own session methods. Deliberately lock-based
     /// and non-isolated so gesture handlers capture synchronously.
-    let ownershipContext = LibraryMutationOwnershipContext()
+    nonisolated let ownershipContext: LibraryMutationOwnershipContext
+
+    /// Single shared adjudicator for authenticated direct fallbacks
+    /// (`.storageBlocked` / `.serviceUnavailable`). Every ViewModel reaches
+    /// it through this router, so independent fallback Tasks can never race
+    /// an entity's gesture order. Validates scopes against
+    /// `ownershipContext` — it holds no account or credential state itself.
+    nonisolated let directFallbackCoordinator: LibraryDirectMutationCoordinator
 
     private var activeAccountID: String?
     private var sessionGeneration: UInt64 = 0
@@ -180,6 +202,14 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
         self.sleeper = sleeper
         self.notificationCenter = notificationCenter
         self.now = now
+        let ownershipContext = LibraryMutationOwnershipContext()
+        self.ownershipContext = ownershipContext
+        // The coordinator consults the gesture-time authority per check —
+        // it never snapshots account state, so a scope transition observed
+        // by the context is instantly visible to every pending fallback.
+        self.directFallbackCoordinator = LibraryDirectMutationCoordinator(
+            isScopeCurrent: { ownershipContext.isScopeCurrent($0) }
+        )
     }
 
     // MARK: - Session lifecycle
@@ -399,6 +429,18 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
 
     nonisolated func isOwnershipCurrent(_ ownership: LibraryMutationOwnership) -> Bool {
         ownershipContext.isCurrent(ownership)
+    }
+
+    nonisolated func runAuthenticatedDirectFallback<Value: Sendable>(
+        ownership: LibraryMutationOwnership,
+        operation: @escaping @Sendable () async throws -> Value,
+        apply: @escaping @Sendable (LibraryDirectFallbackOutcome<Value>) async -> Void
+    ) async {
+        await directFallbackCoordinator.run(
+            ownership: ownership,
+            operation: operation,
+            apply: apply
+        )
     }
 
     func enqueueFavoriteChange(
