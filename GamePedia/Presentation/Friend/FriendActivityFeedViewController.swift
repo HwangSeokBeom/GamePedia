@@ -145,6 +145,13 @@ final class FriendActivityFeedViewModel {
         let wasLoadedOnce = hasLoadedOnce
         // The session that owns this load; revalidated before every commit.
         let session = sessionProvider()
+        // The widget-generation token this load is allowed to write under,
+        // captured while the session above still owns it. The store
+        // compares and stamps this exact token atomically — if an account
+        // transition rotates the generation before the save runs, the save
+        // is rejected instead of being stamped with the new session's
+        // generation.
+        let widgetGeneration = widgetSnapshotStore.captureGenerationToken()
         print("[FriendActivity] loadStarted reset=\(reset) cursor=\(load.token ?? "nil")")
         let metricToken = metricRecorder.begin(.friendActivityRefresh)
 
@@ -181,7 +188,11 @@ final class FriendActivityFeedViewModel {
                     self.state.items = mergedItems
                     self.state.nextCursor = self.pagination.nextPageToken
                     self.state.errorMessage = nil
-                    self.persistWidgetSnapshot(items: mergedItems, session: session)
+                    self.persistWidgetSnapshot(
+                        items: mergedItems,
+                        session: session,
+                        expectedGeneration: widgetGeneration
+                    )
 
                     print(
                         "[FriendActivity] loadSuccess count=\(mergedItems.count) " +
@@ -248,7 +259,19 @@ final class FriendActivityFeedViewModel {
             }
     }
 
-    private func persistWidgetSnapshot(items: [FriendActivityFeedItemViewState], session: LiveServiceSession) {
+#if DEBUG
+    // Deterministic test seam: fires after this producer's session
+    // validation passes and immediately before the atomic store save — the
+    // exact window in which another account's transition can rotate the
+    // widget generation.
+    var onWidgetSnapshotWillSave: (() -> Void)?
+#endif
+
+    private func persistWidgetSnapshot(
+        items: [FriendActivityFeedItemViewState],
+        session: LiveServiceSession,
+        expectedGeneration: String?
+    ) {
         // Widget writes are for authenticated sessions only, and only while
         // the session that produced the items is still the current one — a
         // stale session's data must never reach the shared app group.
@@ -270,7 +293,19 @@ final class FriendActivityFeedViewModel {
             summary: widgetItems.first?.subtitle ?? L10n.Friend.Activity.feedSummary,
             items: Array(widgetItems)
         )
-        widgetSnapshotStore.saveFriendActivitySummary(snapshot)
+#if DEBUG
+        onWidgetSnapshotWillSave?()
+#endif
+        // The save compares, stamps, and persists this load's captured
+        // token atomically; a stale rejection is a refusal, never success.
+        let result = widgetSnapshotStore.saveFriendActivitySummary(
+            snapshot,
+            expectedGeneration: expectedGeneration
+        )
+        if result != .saved {
+            let code = result == .rejectedStaleGeneration ? "STALE_GENERATION" : "STORAGE_FAILURE"
+            print("[FriendActivity] widgetSnapshotRejected code=\(code)")
+        }
     }
 }
 

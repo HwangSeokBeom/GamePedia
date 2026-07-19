@@ -52,20 +52,32 @@ final class SocialWidgetIsolationTests: XCTestCase {
     // MARK: - Store: generation scoping
 
     func test_saveAndLoad_roundTripWithinOneSession() {
-        store.saveFriendActivitySummary(makeSummary())
+        XCTAssertEqual(
+            store.saveFriendActivitySummary(makeSummary(), expectedGeneration: store.currentSessionGeneration),
+            .saved
+        )
         XCTAssertEqual(store.loadFriendActivitySummary()?.items.first?.id, "item-1")
     }
 
     func test_sessionTransition_clearsPayloadsAndRotatesGeneration() {
-        store.saveFriendActivitySummary(makeSummary())
-        store.saveRecommendedGame(RecommendedGameWidgetData(
-            generatedAt: Date(timeIntervalSince1970: 9_000),
-            gameID: 7,
-            title: "Game",
-            subtitle: "s",
-            coverImageURL: nil,
-            ratingText: nil
-        ))
+        XCTAssertEqual(
+            store.saveFriendActivitySummary(makeSummary(), expectedGeneration: store.currentSessionGeneration),
+            .saved
+        )
+        XCTAssertEqual(
+            store.saveRecommendedGame(
+                RecommendedGameWidgetData(
+                    generatedAt: Date(timeIntervalSince1970: 9_000),
+                    gameID: 7,
+                    title: "Game",
+                    subtitle: "s",
+                    coverImageURL: nil,
+                    ratingText: nil
+                ),
+                expectedGeneration: store.currentSessionGeneration
+            ),
+            .saved
+        )
         let generationBefore = store.currentSessionGeneration
 
         store.handleSessionTransition()
@@ -79,7 +91,10 @@ final class SocialWidgetIsolationTests: XCTestCase {
     func test_staleGenerationSnapshot_isRejectedAndDeleted() {
         // A payload stamped by a previous session generation lands in the
         // app group AFTER the rotation (the delayed-write race).
-        store.saveFriendActivitySummary(makeSummary())
+        XCTAssertEqual(
+            store.saveFriendActivitySummary(makeSummary(), expectedGeneration: store.currentSessionGeneration),
+            .saved
+        )
         let staleBlob = userDefaults.data(forKey: friendActivityKey)
         store.handleSessionTransition()
         userDefaults.set(staleBlob, forKey: friendActivityKey)
@@ -99,7 +114,10 @@ final class SocialWidgetIsolationTests: XCTestCase {
 
     func test_persistedWidgetDataContainsNoAccountIdentifier() throws {
         let accountID = "raw-account-uuid-1234"
-        store.saveFriendActivitySummary(makeSummary())
+        XCTAssertEqual(
+            store.saveFriendActivitySummary(makeSummary(), expectedGeneration: store.currentSessionGeneration),
+            .saved
+        )
 
         let blob = try XCTUnwrap(userDefaults.data(forKey: friendActivityKey))
         let text = String(decoding: blob, as: UTF8.self)
@@ -129,7 +147,10 @@ final class SocialWidgetIsolationTests: XCTestCase {
 
         runtime.handleSessionChange(isAuthenticated: true, userID: "acct-a")
         let loginSession = runtime.currentSession
-        store.saveFriendActivitySummary(makeSummary())
+        XCTAssertEqual(
+            store.saveFriendActivitySummary(makeSummary(), expectedGeneration: store.currentSessionGeneration),
+            .saved
+        )
 
         // Same-account token refresh: session and widget data survive.
         runtime.handleSessionChange(isAuthenticated: true, userID: "acct-a")
@@ -143,7 +164,10 @@ final class SocialWidgetIsolationTests: XCTestCase {
         XCTAssertNil(store.loadFriendActivitySummary())
 
         // Logout: another rotation.
-        store.saveFriendActivitySummary(makeSummary())
+        XCTAssertEqual(
+            store.saveFriendActivitySummary(makeSummary(), expectedGeneration: store.currentSessionGeneration),
+            .saved
+        )
         runtime.handleSessionChange(isAuthenticated: false, userID: nil)
         XCTAssertNil(runtime.currentSession.accountID)
         XCTAssertNil(store.loadFriendActivitySummary())
@@ -153,7 +177,10 @@ final class SocialWidgetIsolationTests: XCTestCase {
         let runtime = makeRuntime(store: store, center: NotificationCenter())
         runtime.handleSessionChange(isAuthenticated: true, userID: "acct-a")
         let before = runtime.currentSession
-        store.saveFriendActivitySummary(makeSummary())
+        XCTAssertEqual(
+            store.saveFriendActivitySummary(makeSummary(), expectedGeneration: store.currentSessionGeneration),
+            .saved
+        )
 
         runtime.handleAccountDeletionMarker(userID: "acct-a")
 
@@ -166,7 +193,10 @@ final class SocialWidgetIsolationTests: XCTestCase {
         let runtime = makeRuntime(store: store, center: NotificationCenter())
         runtime.handleSessionChange(isAuthenticated: true, userID: "acct-a")
         let before = runtime.currentSession
-        store.saveFriendActivitySummary(makeSummary())
+        XCTAssertEqual(
+            store.saveFriendActivitySummary(makeSummary(), expectedGeneration: store.currentSessionGeneration),
+            .saved
+        )
 
         runtime.handleAccountDeletionMarker(userID: "acct-other")
 
@@ -400,6 +430,38 @@ final class SocialWidgetIsolationTests: XCTestCase {
         XCTAssertEqual(
             store.loadFriendActivitySummary()?.items.first?.title, "friend-of-b",
             "old account work must not overwrite the new account's widget state"
+        )
+    }
+
+    // H-IOS-2 producer barrier: the account transition lands AFTER the
+    // producer's session validation has already passed but BEFORE the
+    // store save runs — the widget-generation token captured at load start
+    // must make the save atomically rejected, never stamped with the new
+    // session's generation.
+    @MainActor
+    func test_rotationBetweenProducerValidationAndSave_rejectsTheStaleWrite() async {
+        let repository = GatedFeedRepository()
+        repository.activities = [makeActivity(id: "a1", nickname: "friend-of-a")]
+        let session = SessionBox(accountID: "acct-a")
+        let viewModel = makeFeedViewModel(repository: repository, session: session)
+
+        let saveReached = expectation(description: "producer reached the save boundary")
+        viewModel.onWidgetSnapshotWillSave = { [store] in
+            // A's session guard has passed; B's transition rotates the
+            // generation in exactly this window.
+            store?.handleSessionTransition()
+            saveReached.fulfill()
+        }
+        viewModel.send(.viewDidLoad)
+        await fulfillment(of: [saveReached], timeout: 10)
+
+        XCTAssertNil(
+            store.loadFriendActivitySummary(),
+            "a producer that lost its generation between validation and save must be rejected"
+        )
+        XCTAssertNil(
+            userDefaults.data(forKey: friendActivityKey),
+            "no payload may exist stamped with the rotated generation"
         )
     }
 }
