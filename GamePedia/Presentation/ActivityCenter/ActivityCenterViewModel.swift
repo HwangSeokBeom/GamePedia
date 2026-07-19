@@ -15,6 +15,18 @@ enum ActivityCenterIntent {
 // Load coalescing reuses the shared PaginationStateMachine exactly like
 // the legacy Notifications screen: rapid retries share one in-flight
 // request and stale completions can never overwrite newer state.
+//
+// Session ownership: every load is bound to the LiveServiceSession captured
+// when it starts and revalidates it after every await. Work from a
+// superseded session (logout, login, account switch, account deletion)
+// cannot render, persist, post badge changes, or invoke mark-read; a
+// session transition also cancels the in-flight load and resets the
+// pagination machine so its stale completions are structurally rejected.
+//
+// Badge policy: the global notification badge is updated only from a fresh
+// authoritative inbox response (`serverInboxUnreadCount`) or a confirmed
+// remote mark-read. Friend activity, cached fallbacks, and failed remote
+// marks never touch the badge.
 
 final class ActivityCenterViewModel {
     private(set) var state = ActivityCenterState() {
@@ -25,10 +37,11 @@ final class ActivityCenterViewModel {
 
     private let fetchActivityCenterUseCase: FetchActivityCenterUseCase
     private let markActivityCenterReadUseCase: MarkActivityCenterReadUseCase
-    private let accountIDProvider: () -> String?
+    private let sessionProvider: () -> LiveServiceSession
     private var hasLoaded = false
     private var pagination = PaginationStateMachine<Int>()
     private var hasPendingReload = false
+    private var loadTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -42,11 +55,11 @@ final class ActivityCenterViewModel {
             notificationRepository: DefaultNotificationRepository(),
             readStateStore: LiveServiceRuntime.shared.readStateStore
         ),
-        accountIDProvider: @escaping () -> String? = { LiveServiceRuntime.shared.currentAccountID }
+        sessionProvider: @escaping () -> LiveServiceSession = { LiveServiceRuntime.shared.currentSession }
     ) {
         self.fetchActivityCenterUseCase = fetchActivityCenterUseCase
         self.markActivityCenterReadUseCase = markActivityCenterReadUseCase
-        self.accountIDProvider = accountIDProvider
+        self.sessionProvider = sessionProvider
         ReviewCommentSyncCenter.events
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -54,6 +67,11 @@ final class ActivityCenterViewModel {
                 self.load()
             }
             .store(in: &cancellables)
+        observeSessionTransitions()
+    }
+
+    deinit {
+        loadTask?.cancel()
     }
 
     func send(_ intent: ActivityCenterIntent) {
@@ -70,6 +88,42 @@ final class ActivityCenterViewModel {
         }
     }
 
+    // MARK: - Session transitions
+
+    private func observeSessionTransitions() {
+        let names: [Notification.Name] = [.authSessionDidChange, .authAccountDidDelete]
+        for name in names {
+            NotificationCenter.default.publisher(for: name)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    self?.handleSessionTransitionIfNeeded()
+                }
+                .store(in: &cancellables)
+        }
+    }
+
+    private var lastKnownSession: LiveServiceSession?
+
+    private func handleSessionTransitionIfNeeded() {
+        let session = sessionProvider()
+        guard session != lastKnownSession else { return }
+        lastKnownSession = session
+        // Invalidate everything owned by the previous session: the task is
+        // cancelled, and a fresh pagination machine structurally rejects
+        // completions of loads it never began.
+        loadTask?.cancel()
+        loadTask = nil
+        pagination = PaginationStateMachine<Int>()
+        hasPendingReload = false
+        guard hasLoaded else { return }
+        state = ActivityCenterState()
+        if session.accountID != nil {
+            load()
+        }
+    }
+
+    // MARK: - Load
+
     private func load() {
         guard let load = pagination.beginRefresh() else {
             hasPendingReload = true
@@ -79,13 +133,24 @@ final class ActivityCenterViewModel {
 
         state.isLoading = true
         state.errorMessage = nil
-        let accountID = accountIDProvider()
-        print("[ActivityCenter] load hasAccount=\(accountID != nil)")
+        let session = sessionProvider()
+        lastKnownSession = session
+        let sessionProvider = self.sessionProvider
+        let isSessionStillCurrent: @Sendable () -> Bool = { sessionProvider() == session }
+        print("[ActivityCenter] load hasAccount=\(session.accountID != nil)")
 
-        Task {
+        let fetchUseCase = fetchActivityCenterUseCase
+        let markUseCase = markActivityCenterReadUseCase
+        loadTask = Task { [weak self] in
             do {
-                let outcome = try await fetchActivityCenterUseCase.execute(accountID: accountID)
+                let outcome = try await fetchUseCase.execute(
+                    accountID: session.accountID,
+                    isSessionStillCurrent: isSessionStillCurrent
+                )
                 await MainActor.run {
+                    // Session first: a stale load may not even complete the
+                    // (already replaced) pagination machine, let alone render.
+                    guard let self, isSessionStillCurrent() else { return }
                     guard self.pagination.completeLoad(load, nextToken: nil) else { return }
                     self.state.items = outcome.snapshot.items
                     self.state.sourceHealth = outcome.snapshot.sourceHealth
@@ -95,14 +160,15 @@ final class ActivityCenterViewModel {
                         : nil
                     self.state.isLoading = false
                     self.state.errorMessage = nil
-                    // Badge updates only reflect fresh server-backed
-                    // counts; a cached fallback never rewrites the badge.
-                    if outcome.isFromCache == false {
+                    // Badge authority: only the fresh remote inbox's own
+                    // unread count. Friend activity, local fallbacks, and
+                    // cached snapshots never rewrite the badge.
+                    if let serverUnread = outcome.serverInboxUnreadCount {
                         NotificationCenter.default.post(
                             name: .appNotificationsDidChange,
                             object: nil,
                             userInfo: [
-                                AppNotificationChangeUserInfoKey.unreadCount: outcome.snapshot.unreadCount
+                                AppNotificationChangeUserInfoKey.unreadCount: serverUnread
                             ]
                         )
                     }
@@ -115,12 +181,21 @@ final class ActivityCenterViewModel {
                     self.drainPendingReloadIfNeeded()
                 }
 
-                guard outcome.isFromCache == false, outcome.snapshot.unreadCount > 0 else { return }
-                await markActivityCenterReadUseCase.execute(
-                    accountID: accountID,
-                    snapshot: outcome.snapshot
+                guard outcome.isFromCache == false,
+                      outcome.snapshot.unreadCount > 0 || (outcome.serverInboxUnreadCount ?? 0) > 0,
+                      isSessionStillCurrent() else { return }
+                let markResult = await markUseCase.execute(
+                    accountID: session.accountID,
+                    snapshot: outcome.snapshot,
+                    serverInboxUnreadCount: outcome.serverInboxUnreadCount,
+                    isSessionStillCurrent: isSessionStillCurrent
                 )
+                // Zero is published only when the server confirmed the mark
+                // AND the session is still the one that requested it. A
+                // failed remote mark leaves the known unread count standing.
+                guard markResult == .remoteConfirmed else { return }
                 await MainActor.run {
+                    guard self != nil, isSessionStillCurrent() else { return }
                     NotificationCenter.default.post(
                         name: .appNotificationsDidChange,
                         object: nil,
@@ -129,6 +204,7 @@ final class ActivityCenterViewModel {
                 }
             } catch {
                 await MainActor.run {
+                    guard let self, isSessionStillCurrent() else { return }
                     guard self.pagination.failLoad(load) else { return }
                     self.state.isLoading = false
                     self.state.items = []

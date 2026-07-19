@@ -84,6 +84,37 @@ struct ActivityCenterLoadOutcome: Hashable {
     /// True when the snapshot is the persisted last-known state rather
     /// than a fresh fetch (full offline/degraded fallback).
     let isFromCache: Bool
+    /// The server-reported notification unread count, present ONLY when the
+    /// remote inbox responded fresh on this load. This is the single badge
+    /// authority: friend activity, local read-state overlays, and cached
+    /// snapshots never contribute to it, and a nil here means no source in
+    /// this load is allowed to touch the global badge.
+    let serverInboxUnreadCount: Int?
+
+    init(
+        snapshot: ActivityCenterSnapshot,
+        isFromCache: Bool,
+        serverInboxUnreadCount: Int? = nil
+    ) {
+        self.snapshot = snapshot
+        self.isFromCache = isFromCache
+        self.serverInboxUnreadCount = serverInboxUnreadCount
+    }
+}
+
+/// Result of a mark-read pass, separating the remote (badge-authoritative)
+/// outcome from the local watermark bookkeeping.
+enum ActivityCenterMarkReadResult: Equatable {
+    /// The server confirmed mark-all-read; the badge may publish zero.
+    case remoteConfirmed
+    /// The remote call failed; the server unread count is unchanged and the
+    /// badge must NOT publish zero. The idempotent call repeats next visit.
+    case remoteFailed
+    /// No remote call was needed (server unread count already zero); only
+    /// the local watermark advanced.
+    case localOnly
+    /// The session was superseded before any side effect ran.
+    case skippedStaleSession
 }
 
 enum ActivityCenterError: Error, Equatable {

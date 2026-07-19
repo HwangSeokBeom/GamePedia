@@ -54,7 +54,15 @@ final class FetchActivityCenterUseCase {
         self.dateProvider = dateProvider
     }
 
-    func execute(accountID: String?) async throws -> ActivityCenterLoadOutcome {
+    /// `isSessionStillCurrent` binds the load to the session that started
+    /// it: when it returns false after the remote fetches, nothing is
+    /// persisted — the responses were produced with whatever credentials
+    /// are active NOW and must not be written into the captured account's
+    /// snapshot file.
+    func execute(
+        accountID: String?,
+        isSessionStillCurrent: @escaping @Sendable () -> Bool = { true }
+    ) async throws -> ActivityCenterLoadOutcome {
         async let inboxPage: AppNotificationPage? = try? notificationRepository
             .fetchNotifications(page: 1, limit: 30)
         async let feedPage: FriendActivityFeedPage? = try? friendRepository
@@ -99,7 +107,7 @@ final class FetchActivityCenterUseCase {
             generatedAt: dateProvider()
         )
 
-        if let accountID {
+        if let accountID, isSessionStillCurrent() {
             await snapshotStore.persistSnapshot(
                 PersistedActivityCenterSnapshot(snapshot: snapshot),
                 accountID: accountID
@@ -127,7 +135,14 @@ final class FetchActivityCenterUseCase {
             )
         }
 
-        return ActivityCenterLoadOutcome(snapshot: snapshot, isFromCache: false)
+        // The badge authority is the server's own unread count from a fresh
+        // inbox response — never the merged item list, which mixes in friend
+        // activity and local read state.
+        return ActivityCenterLoadOutcome(
+            snapshot: snapshot,
+            isFromCache: false,
+            serverInboxUnreadCount: inbox?.unreadCount
+        )
     }
 
     // MARK: Merge (pure, deterministic)
@@ -188,9 +203,12 @@ final class FetchActivityCenterUseCase {
 // MARK: - MarkActivityCenterReadUseCase
 //
 // Server contract limitation: only "mark ALL notifications read" exists.
-// The remote call and the local watermark advance together; a remote
-// failure is recorded (breadcrumb) but never blocks local read state —
-// the call is idempotent and repeats on the next visit.
+// The remote call is issued only when the server itself reported unread
+// notifications (fresh inbox response); the local watermark covers friend
+// activity and local read state and advances independently. The result
+// separates the two so callers publish a zero badge ONLY on a confirmed
+// remote mark — a failed remote call leaves the known server unread count
+// standing (the idempotent call repeats on the next visit).
 
 final class MarkActivityCenterReadUseCase {
 
@@ -208,20 +226,35 @@ final class MarkActivityCenterReadUseCase {
         self.breadcrumbs = breadcrumbs
     }
 
-    func execute(accountID: String?, snapshot: ActivityCenterSnapshot) async {
-        guard snapshot.unreadCount > 0 else { return }
-
-        let hasUnreadInboxItems = snapshot.items.contains {
-            $0.source == .notificationInbox && $0.isRead == false
+    /// `serverInboxUnreadCount` is the fresh inbox's own unread count (the
+    /// badge authority); pass nil when the inbox was not fresh — no remote
+    /// call is made then. `isSessionStillCurrent` is revalidated before
+    /// every side effect so a superseded session can neither drive a
+    /// credential-bearing repository call nor advance another account's
+    /// watermark.
+    func execute(
+        accountID: String?,
+        snapshot: ActivityCenterSnapshot,
+        serverInboxUnreadCount: Int?,
+        isSessionStillCurrent: @escaping @Sendable () -> Bool = { true }
+    ) async -> ActivityCenterMarkReadResult {
+        guard snapshot.unreadCount > 0 || (serverInboxUnreadCount ?? 0) > 0 else {
+            return .localOnly
         }
-        if hasUnreadInboxItems {
+        guard isSessionStillCurrent() else { return .skippedStaleSession }
+
+        var result = ActivityCenterMarkReadResult.localOnly
+        if let serverInboxUnreadCount, serverInboxUnreadCount > 0 {
             do {
                 try await notificationRepository.markAllNotificationsRead()
+                result = .remoteConfirmed
             } catch {
                 breadcrumbs.record(.activityCenter, code: "mark_read_remote_failed")
+                result = .remoteFailed
             }
         }
 
+        guard isSessionStillCurrent() else { return .skippedStaleSession }
         if let accountID,
            let newestOccurredAt = snapshot.items.map(\.occurredAt).max() {
             await readStateStore.advanceWatermark(to: newestOccurredAt, accountID: accountID)
@@ -231,5 +264,6 @@ final class MarkActivityCenterReadUseCase {
             code: "mark_read_local",
             metadata: ["markedCount": String(snapshot.unreadCount)]
         )
+        return result
     }
 }

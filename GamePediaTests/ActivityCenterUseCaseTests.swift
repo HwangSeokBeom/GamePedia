@@ -359,11 +359,15 @@ final class ActivityCenterUseCaseTests: XCTestCase {
         let first = try await makeUseCase().execute(accountID: "acct-1")
         XCTAssertEqual(first.snapshot.unreadCount, 1)
 
-        await MarkActivityCenterReadUseCase(
+        _ = await MarkActivityCenterReadUseCase(
             notificationRepository: notificationRepository,
             readStateStore: readStateStore,
             breadcrumbs: OperationBreadcrumbRecorder()
-        ).execute(accountID: "acct-1", snapshot: first.snapshot)
+        ).execute(
+            accountID: "acct-1",
+            snapshot: first.snapshot,
+            serverInboxUnreadCount: first.serverInboxUnreadCount
+        )
 
         // Server still reports the item unread (no per-item contract);
         // a fresh store instance simulates process restart.
@@ -423,11 +427,16 @@ final class ActivityCenterUseCaseTests: XCTestCase {
             breadcrumbs: OperationBreadcrumbRecorder()
         )
 
-        await useCase.execute(accountID: "acct-1", snapshot: snapshotWithFriendUnread)
+        let result = await useCase.execute(
+            accountID: "acct-1",
+            snapshot: snapshotWithFriendUnread,
+            serverInboxUnreadCount: 0
+        )
         XCTAssertEqual(
             notificationRepository.markAllCallCount, 0,
-            "mark-all-read must not fire when the inbox has nothing unread"
+            "mark-all-read must not fire when the server reports nothing unread"
         )
+        XCTAssertEqual(result, .localOnly)
 
         let state = await readStateStore.readState(accountID: "acct-1")
         XCTAssertEqual(state.readWatermark, Date(timeIntervalSince1970: 9_000))
@@ -443,13 +452,17 @@ final class ActivityCenterUseCaseTests: XCTestCase {
             generatedAt: Date(timeIntervalSince1970: 10_000)
         )
 
-        await MarkActivityCenterReadUseCase(
+        let result = await MarkActivityCenterReadUseCase(
             notificationRepository: notificationRepository,
             readStateStore: readStateStore,
             breadcrumbs: OperationBreadcrumbRecorder()
-        ).execute(accountID: "acct-1", snapshot: snapshot)
+        ).execute(accountID: "acct-1", snapshot: snapshot, serverInboxUnreadCount: 1)
 
         XCTAssertEqual(notificationRepository.markAllCallCount, 1)
+        XCTAssertEqual(
+            result, .remoteFailed,
+            "a failed remote mark must be reported so the badge never publishes zero from it"
+        )
         let state = await readStateStore.readState(accountID: "acct-1")
         XCTAssertEqual(state.readWatermark, Date(timeIntervalSince1970: 9_000))
     }
@@ -463,13 +476,14 @@ final class ActivityCenterUseCaseTests: XCTestCase {
             generatedAt: Date(timeIntervalSince1970: 10_000)
         )
 
-        await MarkActivityCenterReadUseCase(
+        let result = await MarkActivityCenterReadUseCase(
             notificationRepository: notificationRepository,
             readStateStore: readStateStore,
             breadcrumbs: OperationBreadcrumbRecorder()
-        ).execute(accountID: "acct-1", snapshot: snapshot)
+        ).execute(accountID: "acct-1", snapshot: snapshot, serverInboxUnreadCount: 0)
 
         XCTAssertEqual(notificationRepository.markAllCallCount, 0)
+        XCTAssertEqual(result, .localOnly)
         let state = await readStateStore.readState(accountID: "acct-1")
         XCTAssertNil(state.readWatermark)
     }

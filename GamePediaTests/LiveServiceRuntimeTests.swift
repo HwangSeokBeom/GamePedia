@@ -39,7 +39,8 @@ final class LiveServiceRuntimeTests: XCTestCase {
             notificationCenter: notificationCenter,
             breadcrumbs: breadcrumbs,
             readStateStore: ActivityReadStateStore(directoryURL: directoryURL),
-            snapshotStore: FileActivityCenterSnapshotStore(directoryURL: directoryURL)
+            snapshotStore: FileActivityCenterSnapshotStore(directoryURL: directoryURL),
+            socialWidgetStore: SocialWidgetSnapshotStore(userDefaults: nil)
         )
     }
 

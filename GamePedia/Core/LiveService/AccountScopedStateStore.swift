@@ -92,7 +92,9 @@ actor AccountScopedStateStore<Payload: Codable & Sendable> {
             try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
             let envelope = Envelope(schemaVersion: schemaVersion, payload: payload)
             let data = try encoder.encode(envelope)
-            try data.write(to: url, options: .atomic)
+            // File protection: readable after the first unlock (matches the
+            // sync queue). Enforced by the OS on device hardware only.
+            try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         } catch {
             // Persistence failure must never crash or drop in-memory state;
             // the state only loses restart durability until the next write.

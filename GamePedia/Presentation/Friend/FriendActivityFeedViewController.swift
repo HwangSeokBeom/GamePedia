@@ -27,6 +27,10 @@ final class FriendActivityFeedViewModel {
     private let widgetSnapshotStore: SocialWidgetSnapshotStore
     private let metricRecorder: PerformanceMetricRecorder
     private let realtimeInvalidationSource: ActivityFeedInvalidationSignaling?
+    // Session binding (H6): every load captures the LiveServiceSession that
+    // started it and revalidates before committing state or widget writes,
+    // so delayed account-A work can never land after logout or a B login.
+    private let sessionProvider: () -> LiveServiceSession
     private var realtimeInvalidationTask: Task<Void, Never>?
     private var hasPendingRealtimeInvalidation = false
     // Single-flight, duplicate-page, and stale-completion decisions live
@@ -51,12 +55,14 @@ final class FriendActivityFeedViewModel {
         widgetSnapshotStore: SocialWidgetSnapshotStore = .shared,
         metricRecorder: PerformanceMetricRecorder = AppObservability.shared.recorder,
         realtimeInvalidationSource: ActivityFeedInvalidationSignaling? =
-            FriendActivityFeedViewModel.makeDefaultInvalidationSource()
+            FriendActivityFeedViewModel.makeDefaultInvalidationSource(),
+        sessionProvider: @escaping () -> LiveServiceSession = { LiveServiceRuntime.shared.currentSession }
     ) {
         self.fetchFriendActivityFeedUseCase = fetchFriendActivityFeedUseCase
         self.widgetSnapshotStore = widgetSnapshotStore
         self.metricRecorder = metricRecorder
         self.realtimeInvalidationSource = realtimeInvalidationSource
+        self.sessionProvider = sessionProvider
     }
 
     deinit {
@@ -137,6 +143,8 @@ final class FriendActivityFeedViewModel {
 
         let currentItems = state.items
         let wasLoadedOnce = hasLoadedOnce
+        // The session that owns this load; revalidated before every commit.
+        let session = sessionProvider()
         print("[FriendActivity] loadStarted reset=\(reset) cursor=\(load.token ?? "nil")")
         let metricToken = metricRecorder.begin(.friendActivityRefresh)
 
@@ -145,6 +153,7 @@ final class FriendActivityFeedViewModel {
                 let page = try await fetchFriendActivityFeedUseCase.execute(cursor: load.token)
                 self.metricRecorder.end(metricToken, outcome: .success)
                 await MainActor.run {
+                    guard self.sessionProvider() == session else { return }
                     guard self.pagination.completeLoad(load, nextToken: page.nextCursor) else { return }
                     let newItems = page.activities.map(FriendActivityFeedItemFormatter.makeViewState(from:))
                     self.activityItemsByID.merge(
@@ -172,7 +181,7 @@ final class FriendActivityFeedViewModel {
                     self.state.items = mergedItems
                     self.state.nextCursor = self.pagination.nextPageToken
                     self.state.errorMessage = nil
-                    self.persistWidgetSnapshot(items: mergedItems)
+                    self.persistWidgetSnapshot(items: mergedItems, session: session)
 
                     print(
                         "[FriendActivity] loadSuccess count=\(mergedItems.count) " +
@@ -183,6 +192,7 @@ final class FriendActivityFeedViewModel {
             } catch {
                 self.metricRecorder.end(metricToken, outcome: .failure)
                 await MainActor.run {
+                    guard self.sessionProvider() == session else { return }
                     guard self.pagination.failLoad(load) else { return }
                     self.state.isLoading = false
                     self.state.isRefreshing = false
@@ -238,7 +248,11 @@ final class FriendActivityFeedViewModel {
             }
     }
 
-    private func persistWidgetSnapshot(items: [FriendActivityFeedItemViewState]) {
+    private func persistWidgetSnapshot(items: [FriendActivityFeedItemViewState], session: LiveServiceSession) {
+        // Widget writes are for authenticated sessions only, and only while
+        // the session that produced the items is still the current one — a
+        // stale session's data must never reach the shared app group.
+        guard session.accountID != nil, sessionProvider() == session else { return }
         let widgetItems = items.prefix(3).map { item in
             FriendActivitySummaryWidgetData.Item(
                 id: item.id,
