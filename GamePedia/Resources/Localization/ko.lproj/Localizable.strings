@@ -448,6 +448,11 @@
 
 "notifications.title" = "알림";
 "notifications.loadFailed" = "알림을 불러오지 못했어요.";
+"activityCenter.title" = "활동 센터";
+"activityCenter.empty" = "아직 활동이 없어요";
+"activityCenter.loadFailed" = "활동을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.";
+"activityCenter.degraded.partial" = "일부 업데이트를 불러오지 못했어요.";
+"activityCenter.degraded.lastKnown" = "오프라인 상태예요. 마지막으로 확인한 활동을 보여드려요.";
 
 "home.meta.ratingRelease" = "%1$@ %2$@ · %3$@";
 

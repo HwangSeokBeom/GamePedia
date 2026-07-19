@@ -31,7 +31,8 @@ final class LibrarySyncRuntimeTests: XCTestCase {
             enableNewReviewUI: false,
             useExperimentalSearch: false,
             enableRealtimeActivity: false,
-            enableOfflineLibrarySync: false
+            enableOfflineLibrarySync: false,
+            enableUnifiedActivityCenter: true
         )
         let runtime = LibrarySyncRuntime(
             featureFlags: flags,

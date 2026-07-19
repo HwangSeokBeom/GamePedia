@@ -448,6 +448,11 @@
 
 "notifications.title" = "Notifications";
 "notifications.loadFailed" = "Couldn't load notifications.";
+"activityCenter.title" = "Activity Center";
+"activityCenter.empty" = "No activity yet";
+"activityCenter.loadFailed" = "Couldn't load activity. Check your connection and try again.";
+"activityCenter.degraded.partial" = "Some updates couldn't be loaded.";
+"activityCenter.degraded.lastKnown" = "Offline. Showing last known activity.";
 
 "home.meta.ratingRelease" = "%1$@ %2$@ · %3$@";
 

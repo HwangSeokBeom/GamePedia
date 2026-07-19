@@ -27,7 +27,9 @@ struct DeveloperDiagnosticsReport {
         librarySync: LibrarySyncDiagnosticsSnapshot?,
         metrics: [MetricSample],
         metricKit: MetricKitReceiptSummary,
-        imageDiskCacheBytes: UInt?
+        imageDiskCacheBytes: UInt?,
+        featureAvailability: [(feature: String, state: String)] = [],
+        breadcrumbs: [OperationBreadcrumb] = []
     ) -> String {
         let timestampFormatter = ISO8601DateFormatter()
 
@@ -100,6 +102,30 @@ struct DeveloperDiagnosticsReport {
             "imageDiskCacheBytes: " +
             (imageDiskCacheBytes.map(String.init) ?? "unknown")
         )
+        lines.append("")
+        lines.append("== Feature availability (local kill-switch boundary) ==")
+        if featureAvailability.isEmpty {
+            lines.append("no provider snapshot")
+        }
+        for entry in featureAvailability {
+            lines.append("\(entry.feature): \(entry.state)")
+        }
+        lines.append("")
+        lines.append("== Operation breadcrumbs (sanitized codes only, oldest first) ==")
+        if breadcrumbs.isEmpty {
+            lines.append("no breadcrumbs yet")
+        }
+        for breadcrumb in breadcrumbs {
+            let metadata = breadcrumb.metadata
+                .sorted { $0.key < $1.key }
+                .map { "\($0.key)=\($0.value)" }
+                .joined(separator: " ")
+            lines.append(
+                "\(timestampFormatter.string(from: breadcrumb.occurredAt)) " +
+                "[\(breadcrumb.category.rawValue)] \(breadcrumb.code)" +
+                (metadata.isEmpty ? "" : " " + metadata)
+            )
+        }
         return lines.joined(separator: "\n")
     }
 }
@@ -167,7 +193,14 @@ final class DeveloperDiagnosticsViewController: UIViewController {
                     librarySync: librarySyncSnapshot,
                     metrics: AppObservability.shared.recorder.latestSamplesSnapshot(),
                     metricKit: AppObservability.shared.metricKit.receiptSummary(),
-                    imageDiskCacheBytes: diskCacheBytes
+                    imageDiskCacheBytes: diskCacheBytes,
+                    featureAvailability: LiveServiceFeature.allCases.map { feature in
+                        (
+                            feature: feature.rawValue,
+                            state: LiveServiceRuntime.shared.availability.availability(for: feature).code
+                        )
+                    },
+                    breadcrumbs: LiveServiceRuntime.shared.breadcrumbs.snapshot()
                 )
             }
         }

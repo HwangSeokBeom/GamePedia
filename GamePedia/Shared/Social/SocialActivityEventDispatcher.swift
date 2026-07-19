@@ -18,25 +18,27 @@ final class SocialActivityEventDispatcher {
     }
 }
 
+// Thin façade over the unified live-activity dedup registry (2.4). Push
+// banner and push route suppression now share the same registry that the
+// Activity Center pipeline uses, so one logical activity is processed
+// once regardless of the channel that delivered it. A suppressed
+// duplicate leaves an incident breadcrumb (identity keys are built from
+// stable identifiers only — safe to record).
 final class SocialActivityDeduplicator {
     static let shared = SocialActivityDeduplicator()
 
-    private let lock = NSLock()
-    private var seenEvents: [String: Date] = [:]
-    private let defaultTimeToLive: TimeInterval = 60 * 10
+    private let deduplicator = LiveActivityDeduplicator()
 
     private init() {}
 
     func shouldProcess(_ identity: String, timeToLive: TimeInterval? = nil) -> Bool {
-        let ttl = timeToLive ?? defaultTimeToLive
-        let now = Date()
-
-        lock.lock()
-        defer { lock.unlock() }
-
-        seenEvents = seenEvents.filter { now.timeIntervalSince($0.value) < ttl }
-        guard seenEvents[identity] == nil else { return false }
-        seenEvents[identity] = now
-        return true
+        let shouldProcess = deduplicator.shouldProcess(
+            LiveActivityIdentity(rawValue: identity),
+            timeToLive: timeToLive
+        )
+        if shouldProcess == false {
+            OperationBreadcrumbRecorder.shared.record(.push, code: "duplicate_suppressed")
+        }
+        return shouldProcess
     }
 }

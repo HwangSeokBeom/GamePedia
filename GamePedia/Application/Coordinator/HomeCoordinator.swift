@@ -179,6 +179,14 @@ final class HomeCoordinator {
             return
         }
 
+        // 2.4 unified Activity Center behind the availability boundary;
+        // disabling the feature reverts to the legacy inbox unchanged.
+        if LiveServiceRuntime.shared.availability
+            .availability(for: .unifiedActivityCenter).isAvailable {
+            showActivityCenter()
+            return
+        }
+
         let viewController = NotificationsViewController(rootView: NotificationsRootView())
         viewController.onGameSelected = { [weak self] gameID in
             self?.showDetail(gameId: gameID)
@@ -191,6 +199,19 @@ final class HomeCoordinator {
         }
         viewController.onSocialRoute = { [weak self] route in
             self?.handleSocialActivityRoute(route)
+        }
+        navigationController.pushViewController(viewController, animated: true)
+    }
+
+    private func showActivityCenter() {
+        let viewController = ActivityCenterViewController(rootView: ActivityCenterRootView())
+        viewController.onSocialRoute = { [weak self] route in
+            self?.handleSocialActivityRoute(route)
+        }
+        viewController.onAuthenticationRequired = { [weak self, weak viewController] context, action in
+            guard let self else { return }
+            let presenter = viewController ?? self.navigationController.topViewController ?? self.navigationController
+            self.onAuthenticationRequested?(presenter, context, action)
         }
         navigationController.pushViewController(viewController, animated: true)
     }

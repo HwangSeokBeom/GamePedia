@@ -448,6 +448,11 @@
 
 "notifications.title" = "通知";
 "notifications.loadFailed" = "通知を読み込めませんでした。";
+"activityCenter.title" = "アクティビティセンター";
+"activityCenter.empty" = "まだアクティビティがありません";
+"activityCenter.loadFailed" = "アクティビティを読み込めませんでした。接続を確認して再試行してください。";
+"activityCenter.degraded.partial" = "一部の更新を読み込めませんでした。";
+"activityCenter.degraded.lastKnown" = "オフラインです。最後に確認したアクティビティを表示しています。";
 
 "home.meta.ratingRelease" = "%1$@ %2$@ · %3$@";
 

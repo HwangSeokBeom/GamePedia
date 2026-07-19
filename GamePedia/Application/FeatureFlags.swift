@@ -14,6 +14,11 @@ struct FeatureFlags {
     // reverts every library mutation to the pre-2.2 direct call path
     // (docs/backend/LIBRARY_SYNC_CONTRACT_REQUEST.md).
     let enableOfflineLibrarySync: Bool
+    // Kill-switch for the unified Activity Center (2.4). The surface only
+    // composes the two existing committed REST contracts (notification
+    // inbox + friend activity feed); disabling it reverts the notification
+    // bell to the legacy Notifications screen unchanged.
+    let enableUnifiedActivityCenter: Bool
 
     static func defaults(for environment: APIEnvironment) -> FeatureFlags {
         switch environment {
@@ -24,7 +29,8 @@ struct FeatureFlags {
                 enableNewReviewUI: false,
                 useExperimentalSearch: false,
                 enableRealtimeActivity: false,
-                enableOfflineLibrarySync: true
+                enableOfflineLibrarySync: true,
+                enableUnifiedActivityCenter: true
             )
         }
     }
