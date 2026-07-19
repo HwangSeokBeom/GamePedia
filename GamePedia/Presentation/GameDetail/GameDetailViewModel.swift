@@ -440,44 +440,77 @@ final class GameDetailViewModel {
 
         let previousFavoriteState = state.isFavorite
 
-        apply(.setFavorite(!previousFavoriteState))
-
-        // Offline-first path: accept the intent locally (stable idempotency
-        // key, durable queue) and return immediately. The engine posts the
-        // server-authoritative `.favoriteDidChange` on success and
+        // Offline-first path: ownership (account scope + gesture sequence)
+        // is captured synchronously HERE, before the optimistic flip and the
+        // submission Task, so a later account switch can never re-bind the
+        // intent and rapid gestures keep their true order. The engine posts
+        // the server-authoritative `.favoriteDidChange` on success and
         // `.librarySyncOperationDidFail` on permanent failure, both of which
         // this view model already observes.
         if let librarySync {
+            let ownership = librarySync.captureFavoriteIntent(
+                gameID: String(gameID),
+                isFavorite: !previousFavoriteState
+            )
+            apply(.setFavorite(!previousFavoriteState))
             Task {
-                let result = await librarySync.enqueueFavoriteChange(
-                    gameID: String(gameID),
-                    isFavorite: !previousFavoriteState
-                )
-                if result != .accepted {
-                    // No authenticated account, or the queue could not be
-                    // durably written: fall back to the direct call so the
-                    // user gets a real success or a real error instead of a
-                    // false "queued" acknowledgement.
+                guard let ownership else {
+                    // No authenticated account owned the gesture: the
+                    // pre-2.2 direct path applies unchanged.
                     await self.performDirectFavoriteToggle(
                         gameID: gameID,
-                        previousFavoriteState: previousFavoriteState
+                        previousFavoriteState: previousFavoriteState,
+                        ownership: nil
+                    )
+                    return
+                }
+                let result = await librarySync.enqueueFavoriteChange(
+                    gameID: String(gameID),
+                    isFavorite: !previousFavoriteState,
+                    ownership: ownership
+                )
+                switch result {
+                case .accepted, .staleOwnership, .supersededByNewerIntent:
+                    // accepted: the engine owns delivery. stale/superseded:
+                    // the owning scope ended or a newer gesture governs —
+                    // the direct path must never run for this intent.
+                    break
+                case .storageBlocked, .serviceUnavailable:
+                    // The queue could not own the durable intent: fall back
+                    // to the direct call (after ownership revalidation) so
+                    // the user gets a real success or a real error instead
+                    // of a false "queued" acknowledgement.
+                    await self.performDirectFavoriteToggle(
+                        gameID: gameID,
+                        previousFavoriteState: previousFavoriteState,
+                        ownership: ownership
                     )
                 }
             }
             return
         }
 
+        apply(.setFavorite(!previousFavoriteState))
         apply(.setFavoriteLoading(true))
 
         Task {
             await performDirectFavoriteToggle(
                 gameID: gameID,
-                previousFavoriteState: previousFavoriteState
+                previousFavoriteState: previousFavoriteState,
+                ownership: nil
             )
         }
     }
 
-    private func performDirectFavoriteToggle(gameID: Int, previousFavoriteState: Bool) async {
+    private func performDirectFavoriteToggle(
+        gameID: Int,
+        previousFavoriteState: Bool,
+        ownership: LibraryMutationOwnership?
+    ) async {
+        // Revalidated immediately before the request is constructed: a stale
+        // scope must never reach the network with the current (different)
+        // account's credentials.
+        if let ownership, librarySync?.isOwnershipCurrent(ownership) != true { return }
         do {
                 let result = try await toggleFavoriteUseCase.execute(
                     gameId: String(gameID),
@@ -485,6 +518,9 @@ final class GameDetailViewModel {
                 )
 
                 await MainActor.run {
+                    // A completion from a scope that ended mid-request must
+                    // not touch the current account's UI.
+                    if let ownership, self.librarySync?.isOwnershipCurrent(ownership) != true { return }
                     self.apply(.setFavorite(result.isFavorite))
                     self.apply(.setFavoriteLoading(false))
                     NotificationCenter.default.post(
@@ -502,6 +538,7 @@ final class GameDetailViewModel {
             } catch {
                 let favoriteError = FavoriteError.from(error: error)
                 await MainActor.run {
+                    if let ownership, self.librarySync?.isOwnershipCurrent(ownership) != true { return }
                     self.apply(.setFavorite(previousFavoriteState))
                     self.apply(.setFavoriteLoading(false))
                     self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))

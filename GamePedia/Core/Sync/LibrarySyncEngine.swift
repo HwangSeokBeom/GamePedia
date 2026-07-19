@@ -7,6 +7,20 @@ import Foundation
 // Invariants (each covered by deterministic tests):
 // - every user intent gets exactly one operation with a stable idempotency
 //   key (`LibrarySyncOperation.id`); retries reuse the operation verbatim
+// - every UI-originated mutation carries a gesture-time ownership context
+//   (account, scope id, entity, sequence, intended state) captured
+//   synchronously in the gesture handler; enqueue validates it against the
+//   ownership authority and revalidates after every suspension — the engine
+//   never binds an intent to whichever account is active when enqueue runs.
+//   A stale scope returns `.staleOwnership`, which callers must never route
+//   to the direct (legacy) network path
+// - gesture-time sequences, not Task-arrival order, decide which intent is
+//   newest: an equal-or-higher sequence that is queued, in-flight, or
+//   already settled in the same scope rejects a late lower sequence with
+//   `.supersededByNewerIntent`; compaction therefore always preserves the
+//   highest gesture sequence. Sequences are scoped per (account scope,
+//   entity); scope ids are never reused, and legacy records (nil scope,
+//   sequence 0) deterministically lose to any new gesture
 // - operations are scoped to the authenticated account; a different account
 //   can never submit them, and switching accounts swaps the whole queue
 // - the in-memory queue is detached BEFORE the engine suspends to load the
@@ -62,12 +76,29 @@ import Foundation
 //   pre-2.2 direct call paths
 
 protocol LibraryMutationSyncing: Sendable {
-    /// `.accepted` only after durable persistence. `.unavailable` when no
-    /// authenticated account owns the intent; `.storageBlocked` when the
-    /// queue write failed. Both non-accepted results route callers to the
-    /// direct (legacy) mutation path.
-    func enqueueFavoriteChange(gameID: String, isFavorite: Bool) async -> LibrarySyncEnqueueResult
-    func enqueueLibraryStatusUpdate(_ request: LibraryGameStatusUpdateRequest) async -> LibrarySyncEnqueueResult
+    /// Synchronous gesture-time ownership capture. Called inside the gesture
+    /// handler BEFORE the submission Task is created; assigns the gesture's
+    /// intent sequence. nil when no authenticated account owns the gesture
+    /// (guest), which routes the caller to the direct path unchanged.
+    func captureFavoriteIntent(gameID: String, isFavorite: Bool) -> LibraryMutationOwnership?
+    func captureLibraryStatusIntent(_ request: LibraryGameStatusUpdateRequest) -> LibraryMutationOwnership?
+    /// True while the captured scope still owns the session. The direct
+    /// (legacy) fallback must revalidate with this immediately before
+    /// constructing its request and before applying its completion.
+    func isOwnershipCurrent(_ ownership: LibraryMutationOwnership) -> Bool
+    /// `.accepted` only after durable persistence. See
+    /// `LibrarySyncEnqueueResult` for which results permit the direct
+    /// (legacy) fallback — `.staleOwnership` and `.supersededByNewerIntent`
+    /// never do.
+    func enqueueFavoriteChange(
+        gameID: String,
+        isFavorite: Bool,
+        ownership: LibraryMutationOwnership
+    ) async -> LibrarySyncEnqueueResult
+    func enqueueLibraryStatusUpdate(
+        _ request: LibraryGameStatusUpdateRequest,
+        ownership: LibraryMutationOwnership
+    ) async -> LibrarySyncEnqueueResult
     /// Latest locally pending favorite intent for a game, or nil when none.
     func pendingFavoriteIntent(gameID: String) async -> Bool?
     /// Un-parks everything and drains now (user-initiated retry).
@@ -90,8 +121,19 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
     private let notificationCenter: NotificationCenter
     private let now: @Sendable () -> Date
 
+    /// Gesture-time ownership authority. Adopted synchronously by the
+    /// session-event bridges (LibrarySyncRuntime updates it inside the
+    /// notification handler, before the engine's async event lands) and kept
+    /// aligned by the engine's own session methods. Deliberately lock-based
+    /// and non-isolated so gesture handlers capture synchronously.
+    let ownershipContext = LibraryMutationOwnershipContext()
+
     private var activeAccountID: String?
     private var sessionGeneration: UInt64 = 0
+    /// Highest gesture sequence whose remote outcome is settled, per entity
+    /// key, valid only for the scope id that produced it. A later-arriving
+    /// LOWER sequence must lose even after the higher one completed.
+    private var settledIntentSequences: [String: (scopeID: String, sequence: UInt64)] = [:]
     private var operations: [LibrarySyncOperation] = []
     private var inFlightOperationIDs: Set<UUID> = []
     private var parkedEntityKeys: Set<String> = []
@@ -152,6 +194,10 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
         // queue load is still suspended: the load stays valid (generation
         // unchanged) and adopts normally when it resolves.
         if isAuthenticated, let userID, !userID.isEmpty, userID == activeAccountID {
+            // Idempotent context alignment (no-op when the runtime already
+            // adopted this event synchronously): same account → the
+            // ownership scope, and every capture made under it, stays valid.
+            ownershipContext.adoptSession(isAuthenticated: true, userID: userID)
             adoptSameAccountCredentialRefresh()
             return
         }
@@ -159,6 +205,11 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
         // Account-scope transition: first login, account replacement,
         // logout, or scope invalidation. The old scope's work must become
         // unusable, so the generation advances and its tasks are cancelled.
+        // Ownership captured under the old scope is invalidated first, so a
+        // gesture Task that has not reached enqueue yet can only observe
+        // staleness — never the new account.
+        ownershipContext.adoptSession(isAuthenticated: isAuthenticated, userID: userID)
+        settledIntentSequences = [:]
         sessionGeneration &+= 1
         cancelAllEntityTasks()
         isBlockedOnAuth = false
@@ -253,9 +304,13 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
     }
 
     func accountDidDelete(userID: String) async {
+        // Ownership dies before any suspension: a submission Task for the
+        // deleted account that reaches enqueue mid-purge is already stale.
+        ownershipContext.invalidateAccount(userID)
         await store.purge(accountID: userID)
         if userID == activeAccountID {
             sessionGeneration &+= 1
+            settledIntentSequences = [:]
             cancelAllEntityTasks()
             resolveAccountLoad()
             activeAccountID = nil
@@ -325,12 +380,43 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
 
     // MARK: - LibraryMutationSyncing
 
-    func enqueueFavoriteChange(gameID: String, isFavorite: Bool) async -> LibrarySyncEnqueueResult {
-        await enqueue(kind: .setFavorite(gameID: gameID, isFavorite: isFavorite))
+    nonisolated func captureFavoriteIntent(gameID: String, isFavorite: Bool) -> LibraryMutationOwnership? {
+        ownershipContext.captureIntent(
+            entityKey: LibrarySyncEntityKey.favorite(gameID: gameID),
+            intendedState: .favorite(isFavorite: isFavorite)
+        )
     }
 
-    func enqueueLibraryStatusUpdate(_ request: LibraryGameStatusUpdateRequest) async -> LibrarySyncEnqueueResult {
-        await enqueue(kind: .setLibraryStatus(LibraryStatusSyncPayload(request: request)))
+    nonisolated func captureLibraryStatusIntent(_ request: LibraryGameStatusUpdateRequest) -> LibraryMutationOwnership? {
+        ownershipContext.captureIntent(
+            entityKey: LibrarySyncEntityKey.libraryStatus(
+                source: request.gameSource,
+                externalGameID: request.externalGameId
+            ),
+            intendedState: .libraryStatus(request.status)
+        )
+    }
+
+    nonisolated func isOwnershipCurrent(_ ownership: LibraryMutationOwnership) -> Bool {
+        ownershipContext.isCurrent(ownership)
+    }
+
+    func enqueueFavoriteChange(
+        gameID: String,
+        isFavorite: Bool,
+        ownership: LibraryMutationOwnership
+    ) async -> LibrarySyncEnqueueResult {
+        await enqueue(kind: .setFavorite(gameID: gameID, isFavorite: isFavorite), ownership: ownership)
+    }
+
+    func enqueueLibraryStatusUpdate(
+        _ request: LibraryGameStatusUpdateRequest,
+        ownership: LibraryMutationOwnership
+    ) async -> LibrarySyncEnqueueResult {
+        await enqueue(
+            kind: .setLibraryStatus(LibraryStatusSyncPayload(request: request)),
+            ownership: ownership
+        )
     }
 
     func pendingFavoriteIntent(gameID: String) async -> Bool? {
@@ -353,27 +439,61 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
 
     // MARK: - Queue
 
-    private func enqueue(kind: LibrarySyncOperationKind) async -> LibrarySyncEnqueueResult {
+    private func enqueue(
+        kind: LibrarySyncOperationKind,
+        ownership: LibraryMutationOwnership
+    ) async -> LibrarySyncEnqueueResult {
+        // Ownership is validated against the gesture-time authority — never
+        // inferred from whichever account is active when this executes — and
+        // revalidated after every suspension point below.
+        guard ownershipContext.isCurrent(ownership) else { return .staleOwnership }
         let generation = sessionGeneration
         await waitForAccountLoadResolution()
-        guard generation == sessionGeneration, let accountID = activeAccountID else {
-            return .unavailable
+        guard ownershipContext.isCurrent(ownership) else { return .staleOwnership }
+        guard generation == sessionGeneration,
+              let accountID = activeAccountID,
+              accountID == ownership.accountID else {
+            // The gesture scope is still current but the engine has not
+            // finished adopting it (session event still in flight). The
+            // intent must never bind to the engine's outgoing account.
+            return .serviceUnavailable
         }
         let operation = LibrarySyncOperation(
             id: UUID(),
             accountID: accountID,
             kind: kind,
-            createdAt: now()
+            createdAt: now(),
+            scopeID: ownership.scopeID.uuidString,
+            sequence: ownership.sequence
         )
+        guard operation.entityKey == ownership.entityKey else {
+            // Defensive: ownership captured for a different entity can never
+            // authorize this mutation.
+            lastSafeErrorCode = "OWNERSHIP_ENTITY_MISMATCH"
+            return .serviceUnavailable
+        }
+        // Gesture-time ordering: a queued, in-flight, or already-settled
+        // intent with an equal-or-higher sequence in the same scope wins,
+        // however the submission Tasks were scheduled.
+        guard isSupersededByNewerIntent(ownership) == false else {
+            return .supersededByNewerIntent
+        }
 
         await acquireStoreWriteLock()
         defer { releaseStoreWriteLock() }
-        guard generation == sessionGeneration else { return .unavailable }
+        guard ownershipContext.isCurrent(ownership), generation == sessionGeneration else {
+            return .staleOwnership
+        }
+        guard isSupersededByNewerIntent(ownership) == false else {
+            return .supersededByNewerIntent
+        }
 
         // Compaction: pending (not in-flight) operations for the same entity
         // are superseded — every operation kind sets absolute state, so only
-        // the newest intent matters. FIFO order per entity is preserved
-        // because the survivor is always the newest. The superseded records
+        // the newest intent matters. The gesture-sequence guard above proved
+        // this operation carries the highest sequence of its scope (foreign
+        // scope ids are older epochs), so the survivor is always the newest
+        // USER intent, not merely the last arrival. The superseded records
         // are kept aside so a failed write can restore them exactly.
         let superseded = operations.filter { existing in
             existing.entityKey == operation.entityKey
@@ -408,6 +528,42 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
         postQueueDidChange()
         drain()
         return .accepted
+    }
+
+    /// True when a queued, in-flight, or settled operation for the same
+    /// entity already carries an equal-or-higher gesture sequence in the
+    /// same ownership scope. Sequences are only comparable within one scope
+    /// id: records from another scope (older epoch, legacy nil-scope
+    /// migrations) never block a current gesture.
+    private func isSupersededByNewerIntent(_ ownership: LibraryMutationOwnership) -> Bool {
+        let scopeID = ownership.scopeID.uuidString
+        if operations.contains(where: { existing in
+            existing.entityKey == ownership.entityKey
+                && existing.scopeID == scopeID
+                && existing.sequence >= ownership.sequence
+        }) {
+            return true
+        }
+        if let settled = settledIntentSequences[ownership.entityKey],
+           settled.scopeID == scopeID,
+           settled.sequence >= ownership.sequence {
+            return true
+        }
+        return false
+    }
+
+    /// Records a settled operation's gesture sequence so a slower Task
+    /// carrying an OLDER gesture can still be rejected after the newer one
+    /// completed. Failure callbacks settle through the same paths, so they
+    /// retain sequence ownership too.
+    private func recordSettledIntentSequence(_ operation: LibrarySyncOperation) {
+        guard let scopeID = operation.scopeID, operation.sequence > 0 else { return }
+        if let existing = settledIntentSequences[operation.entityKey],
+           existing.scopeID == scopeID,
+           existing.sequence >= operation.sequence {
+            return
+        }
+        settledIntentSequences[operation.entityKey] = (scopeID, operation.sequence)
     }
 
     // MARK: - Drain
@@ -533,6 +689,7 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
         // queued → remotelyConfirmed: the outcome is known; from this point
         // the operation must never be submitted again.
         operations[index].state = .remotelyConfirmed
+        recordSettledIntentSequence(operations[index])
         markSettled(operationID)
         completedOperationCount += 1
         attemptCounts[operationID] = nil
@@ -548,6 +705,7 @@ actor LibrarySyncEngine: LibraryMutationSyncing {
         // A deterministic remote rejection settles the operation exactly
         // like a success: the outcome is known and must never be replayed.
         operations[index].state = .remotelyConfirmed
+        recordSettledIntentSequence(operations[index])
         markSettled(operation.id)
         permanentlyFailedOperationCount += 1
         attemptCounts[operation.id] = nil

@@ -203,21 +203,66 @@ final class InMemorySyncOperationStore: SyncOperationStoring, @unchecked Sendabl
 
 final class MockLibraryMutationRouter: LibraryMutationSyncing, @unchecked Sendable {
     private let lock = NSLock()
+    private let scopeID = UUID()
+    private var sequencesByEntityKey: [String: UInt64] = [:]
     private(set) var favoriteChanges: [(gameID: String, isFavorite: Bool)] = []
     private(set) var statusUpdates: [LibraryGameStatusUpdateRequest] = []
+    private(set) var capturedOwnerships: [LibraryMutationOwnership] = []
+    private(set) var enqueuedOwnerships: [LibraryMutationOwnership] = []
+    private(set) var ownershipRevalidationCount = 0
     private(set) var retryNowCallCount = 0
-    /// Result every enqueue reports; `.unavailable`/`.storageBlocked` route
-    /// the caller to the direct path.
+    /// Result every enqueue reports; only `.storageBlocked` and
+    /// `.serviceUnavailable` may route the caller to the direct path.
     var enqueueResult: LibrarySyncEnqueueResult = .accepted
+    /// Account minted into captured ownership; nil simulates a guest gesture
+    /// (capture fails and the caller uses the direct path).
+    var accountID: String? = "mock-user"
+    /// Answer for `isOwnershipCurrent` — set false to simulate the owning
+    /// scope ending between gesture and fallback/completion.
+    var ownershipIsCurrent = true
     var pendingFavoriteIntentValue: Bool?
     /// Fired after an enqueue is recorded (safe place to fulfill expectations).
     var onEnqueue: (() -> Void)?
     /// Fired after retryNow is recorded.
     var onRetryNow: (() -> Void)?
+    /// Fired after an ownership revalidation is recorded.
+    var onOwnershipRevalidation: (() -> Void)?
 
-    func enqueueFavoriteChange(gameID: String, isFavorite: Bool) async -> LibrarySyncEnqueueResult {
+    func captureFavoriteIntent(gameID: String, isFavorite: Bool) -> LibraryMutationOwnership? {
+        mintOwnership(
+            entityKey: LibrarySyncEntityKey.favorite(gameID: gameID),
+            intendedState: .favorite(isFavorite: isFavorite)
+        )
+    }
+
+    func captureLibraryStatusIntent(_ request: LibraryGameStatusUpdateRequest) -> LibraryMutationOwnership? {
+        mintOwnership(
+            entityKey: LibrarySyncEntityKey.libraryStatus(
+                source: request.gameSource,
+                externalGameID: request.externalGameId
+            ),
+            intendedState: .libraryStatus(request.status)
+        )
+    }
+
+    func isOwnershipCurrent(_ ownership: LibraryMutationOwnership) -> Bool {
+        lock.lock()
+        ownershipRevalidationCount += 1
+        let result = ownershipIsCurrent
+        let callback = onOwnershipRevalidation
+        lock.unlock()
+        callback?()
+        return result
+    }
+
+    func enqueueFavoriteChange(
+        gameID: String,
+        isFavorite: Bool,
+        ownership: LibraryMutationOwnership
+    ) async -> LibrarySyncEnqueueResult {
         lock.lock()
         favoriteChanges.append((gameID, isFavorite))
+        enqueuedOwnerships.append(ownership)
         let result = enqueueResult
         let callback = onEnqueue
         lock.unlock()
@@ -225,9 +270,13 @@ final class MockLibraryMutationRouter: LibraryMutationSyncing, @unchecked Sendab
         return result
     }
 
-    func enqueueLibraryStatusUpdate(_ request: LibraryGameStatusUpdateRequest) async -> LibrarySyncEnqueueResult {
+    func enqueueLibraryStatusUpdate(
+        _ request: LibraryGameStatusUpdateRequest,
+        ownership: LibraryMutationOwnership
+    ) async -> LibrarySyncEnqueueResult {
         lock.lock()
         statusUpdates.append(request)
+        enqueuedOwnerships.append(ownership)
         let result = enqueueResult
         let callback = onEnqueue
         lock.unlock()
@@ -245,6 +294,51 @@ final class MockLibraryMutationRouter: LibraryMutationSyncing, @unchecked Sendab
         let callback = onRetryNow
         lock.unlock()
         callback?()
+    }
+
+    private func mintOwnership(
+        entityKey: String,
+        intendedState: LibraryMutationIntendedState
+    ) -> LibraryMutationOwnership? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let accountID else { return nil }
+        let sequence = (sequencesByEntityKey[entityKey] ?? 0) + 1
+        sequencesByEntityKey[entityKey] = sequence
+        let ownership = LibraryMutationOwnership(
+            accountID: accountID,
+            scopeID: scopeID,
+            generation: 1,
+            entityKey: entityKey,
+            sequence: sequence,
+            intendedState: intendedState
+        )
+        capturedOwnerships.append(ownership)
+        return ownership
+    }
+}
+
+// MARK: - Capture-at-enqueue conveniences for pre-ownership engine tests
+//
+// Engine tests written before gesture ownership existed enqueue while a
+// known account is active and never interleave a session change between
+// gesture and submission, so capturing immediately before enqueue preserves
+// their semantics exactly. Ownership/ordering interleaving tests capture
+// explicitly instead.
+
+extension LibrarySyncEngine {
+    func enqueueFavoriteChange(gameID: String, isFavorite: Bool) async -> LibrarySyncEnqueueResult {
+        guard let ownership = captureFavoriteIntent(gameID: gameID, isFavorite: isFavorite) else {
+            return .serviceUnavailable
+        }
+        return await enqueueFavoriteChange(gameID: gameID, isFavorite: isFavorite, ownership: ownership)
+    }
+
+    func enqueueLibraryStatusUpdate(_ request: LibraryGameStatusUpdateRequest) async -> LibrarySyncEnqueueResult {
+        guard let ownership = captureLibraryStatusIntent(request) else {
+            return .serviceUnavailable
+        }
+        return await enqueueLibraryStatusUpdate(request, ownership: ownership)
     }
 }
 

@@ -126,7 +126,7 @@ final class LibraryOfflineMutationViewModelTests: XCTestCase {
     func testHomeGameListFallsBackToDirectPathWhenEnqueueIsRejected() {
         let repository = MockFavoriteRepository()
         let router = MockLibraryMutationRouter()
-        router.enqueueResult = .unavailable
+        router.enqueueResult = .serviceUnavailable
         let viewModel = HomeGameListViewModel(
             section: .popular,
             games: [],

@@ -2294,32 +2294,64 @@ final class LibraryViewModel {
             "status=\(request.status.rawValue)"
         )
 
-        // Offline-first path: accept the intent locally. The pending chip
-        // stays until the engine posts `.libraryDidChange` (success — the
-        // triggered reload clears it) or `.librarySyncOperationDidFail`
-        // (permanent failure — cleared in observeLibrarySyncSignals()).
+        // Offline-first path: ownership (account scope + gesture sequence)
+        // is captured synchronously HERE, before the submission Task, so a
+        // later account switch can never re-bind the intent and rapid
+        // gestures keep their true order. The pending chip stays until the
+        // engine posts `.libraryDidChange` (success — the triggered reload
+        // clears it) or `.librarySyncOperationDidFail` (permanent failure —
+        // cleared in observeLibrarySyncSignals()).
         if let librarySync {
+            let ownership = librarySync.captureLibraryStatusIntent(request)
             Task {
-                let result = await librarySync.enqueueLibraryStatusUpdate(request)
-                if result != .accepted {
-                    await self.performDirectStatusUpdate(request: request, identifier: identifier)
+                guard let ownership else {
+                    // No authenticated account owned the gesture: the
+                    // pre-2.2 direct path applies unchanged.
+                    await self.performDirectStatusUpdate(
+                        request: request,
+                        identifier: identifier,
+                        ownership: nil
+                    )
+                    return
+                }
+                let result = await librarySync.enqueueLibraryStatusUpdate(request, ownership: ownership)
+                switch result {
+                case .accepted, .staleOwnership, .supersededByNewerIntent:
+                    // accepted: the engine owns delivery. stale/superseded:
+                    // the owning scope ended or a newer gesture governs —
+                    // the direct path must never run for this intent.
+                    break
+                case .storageBlocked, .serviceUnavailable:
+                    await self.performDirectStatusUpdate(
+                        request: request,
+                        identifier: identifier,
+                        ownership: ownership
+                    )
                 }
             }
             return
         }
 
         Task {
-            await performDirectStatusUpdate(request: request, identifier: identifier)
+            await performDirectStatusUpdate(request: request, identifier: identifier, ownership: nil)
         }
     }
 
     private func performDirectStatusUpdate(
         request: LibraryGameStatusUpdateRequest,
-        identifier: LibraryGameIdentifier
+        identifier: LibraryGameIdentifier,
+        ownership: LibraryMutationOwnership?
     ) async {
+            // Revalidated immediately before the request is constructed: a
+            // stale scope must never reach the network with the current
+            // (different) account's credentials.
+            if let ownership, librarySync?.isOwnershipCurrent(ownership) != true { return }
             do {
                 _ = try await updateLibraryGameStatusUseCase.execute(request: request)
                 await MainActor.run {
+                    // A completion from a scope that ended mid-request must
+                    // not touch the current account's UI.
+                    if let ownership, self.librarySync?.isOwnershipCurrent(ownership) != true { return }
                     NotificationCenter.default.post(
                         name: .libraryDidChange,
                         object: nil,
@@ -2330,6 +2362,7 @@ final class LibraryViewModel {
             } catch {
                 let libraryError = LibraryError.from(error: error)
                 await MainActor.run {
+                    if let ownership, self.librarySync?.isOwnershipCurrent(ownership) != true { return }
                     self.apply(.setAddingToPlaying(identifier, isUpdating: false))
                     self.apply(.setError(libraryError.errorDescription ?? L10n.tr("Localizable", "library.error.addToPlayingSaveFailed")))
                 }
@@ -2341,32 +2374,58 @@ final class LibraryViewModel {
               let gameID = identifier.detailGameID,
               !state.isLoading else { return }
 
-        // Offline-first path: the engine posts server-authoritative
-        // `.favoriteDidChange` on success (triggering the existing reload)
-        // and `.librarySyncOperationDidFail` on permanent failure.
+        // Offline-first path: ownership (account scope + gesture sequence)
+        // is captured synchronously HERE, before the submission Task. The
+        // engine posts server-authoritative `.favoriteDidChange` on success
+        // (triggering the existing reload) and
+        // `.librarySyncOperationDidFail` on permanent failure.
         if let librarySync {
+            let ownership = librarySync.captureFavoriteIntent(
+                gameID: String(gameID),
+                isFavorite: false
+            )
             Task {
+                guard let ownership else {
+                    // No authenticated account owned the gesture: the
+                    // pre-2.2 direct path applies unchanged.
+                    await self.performDirectRemoveFavorite(gameID: gameID, ownership: nil)
+                    return
+                }
                 let result = await librarySync.enqueueFavoriteChange(
                     gameID: String(gameID),
-                    isFavorite: false
+                    isFavorite: false,
+                    ownership: ownership
                 )
-                if result != .accepted {
-                    await self.performDirectRemoveFavorite(gameID: gameID)
+                switch result {
+                case .accepted, .staleOwnership, .supersededByNewerIntent:
+                    // accepted: the engine owns delivery. stale/superseded:
+                    // the owning scope ended or a newer gesture governs —
+                    // the direct path must never run for this intent.
+                    break
+                case .storageBlocked, .serviceUnavailable:
+                    await self.performDirectRemoveFavorite(gameID: gameID, ownership: ownership)
                 }
             }
             return
         }
 
         Task {
-            await performDirectRemoveFavorite(gameID: gameID)
+            await performDirectRemoveFavorite(gameID: gameID, ownership: nil)
         }
     }
 
-    private func performDirectRemoveFavorite(gameID: Int) async {
+    private func performDirectRemoveFavorite(gameID: Int, ownership: LibraryMutationOwnership?) async {
+            // Revalidated immediately before the request is constructed: a
+            // stale scope must never reach the network with the current
+            // (different) account's credentials.
+            if let ownership, librarySync?.isOwnershipCurrent(ownership) != true { return }
             do {
                 let result = try await removeFavoriteUseCase.execute(gameId: String(gameID))
 
                 await MainActor.run {
+                    // A completion from a scope that ended mid-request must
+                    // not touch the current account's UI.
+                    if let ownership, self.librarySync?.isOwnershipCurrent(ownership) != true { return }
                     NotificationCenter.default.post(
                         name: .favoriteDidChange,
                         object: nil,
@@ -2380,6 +2439,7 @@ final class LibraryViewModel {
             } catch {
                 let favoriteError = FavoriteError.from(error: error)
                 await MainActor.run {
+                    if let ownership, self.librarySync?.isOwnershipCurrent(ownership) != true { return }
                     self.apply(.setError(favoriteError.errorDescription ?? L10n.tr("Localizable", "favorite.error.updateFailed")))
                 }
             }

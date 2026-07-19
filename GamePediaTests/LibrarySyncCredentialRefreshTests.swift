@@ -334,7 +334,7 @@ final class LibrarySyncCredentialRefreshTests: XCTestCase {
         // Deterministic ordering: the engine's next queue signal follows a
         // rejected enqueue attempt while unauthenticated.
         let rejected = await engine.enqueueFavoriteChange(gameID: "10", isFavorite: true)
-        XCTAssertEqual(rejected, .unavailable)
+        XCTAssertEqual(rejected, .serviceUnavailable)
 
         XCTAssertEqual(recorder.count(of: .favoriteDidChange), 0, "A's completion after logout must be inert")
         XCTAssertEqual(store.storedOperations(accountID: "user-a").count, 1, "A's queue stays isolated on disk")

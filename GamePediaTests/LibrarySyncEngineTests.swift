@@ -238,7 +238,7 @@ final class LibrarySyncEngineTests: XCTestCase {
 
         // Enqueue attempts while unauthenticated are rejected.
         let rejected = await engine.enqueueFavoriteChange(gameID: "10", isFavorite: true)
-        XCTAssertEqual(rejected, .unavailable)
+        XCTAssertEqual(rejected, .serviceUnavailable)
 
         // Same account signs back in: the preserved operation replays once.
         let replayed = notificationExpectation(.favoriteDidChange, center: center)

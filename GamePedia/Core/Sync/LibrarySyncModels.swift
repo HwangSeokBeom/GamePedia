@@ -105,6 +105,15 @@ struct LibrarySyncOperation: Codable, Equatable, Identifiable {
     let accountID: String
     let kind: LibrarySyncOperationKind
     let createdAt: Date
+    /// Account-scope id of the gesture-time ownership that produced this
+    /// operation. nil in records persisted before ownership capture existed;
+    /// gesture-time sequences are only comparable within one scope id, so a
+    /// legacy (nil-scope) record is deterministically superseded by any new
+    /// gesture for its entity.
+    let scopeID: String?
+    /// Gesture-time intent sequence within (scope, entity). 0 in legacy
+    /// records, which sorts below every real sequence (they start at 1).
+    let sequence: UInt64
     /// Durable settlement state. Missing in files written before this field
     /// existed, which decodes as `queued` — the safe default (re-submission
     /// converges). Older readers ignore the extra key and also treat the
@@ -116,17 +125,21 @@ struct LibrarySyncOperation: Codable, Equatable, Identifiable {
         accountID: String,
         kind: LibrarySyncOperationKind,
         createdAt: Date,
+        scopeID: String? = nil,
+        sequence: UInt64 = 0,
         state: LibrarySyncDurableState = .queued
     ) {
         self.id = id
         self.accountID = accountID
         self.kind = kind
         self.createdAt = createdAt
+        self.scopeID = scopeID
+        self.sequence = sequence
         self.state = state
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, accountID, kind, createdAt, state
+        case id, accountID, kind, createdAt, scopeID, sequence, state
     }
 
     init(from decoder: Decoder) throws {
@@ -135,6 +148,11 @@ struct LibrarySyncOperation: Codable, Equatable, Identifiable {
         accountID = try container.decode(String.self, forKey: .accountID)
         kind = try container.decode(LibrarySyncOperationKind.self, forKey: .kind)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
+        // Ownership fields are absent in pre-ownership files; the defaults
+        // (nil scope, sequence 0) deterministically lose to any new gesture,
+        // and older readers ignore the extra keys on rollback.
+        scopeID = try container.decodeIfPresent(String.self, forKey: .scopeID)
+        sequence = try container.decodeIfPresent(UInt64.self, forKey: .sequence) ?? 0
         state = try container.decodeIfPresent(LibrarySyncDurableState.self, forKey: .state) ?? .queued
     }
 
@@ -143,9 +161,12 @@ struct LibrarySyncOperation: Codable, Equatable, Identifiable {
     var entityKey: String {
         switch kind {
         case .setFavorite(let gameID, _):
-            return "favorite:\(gameID)"
+            return LibrarySyncEntityKey.favorite(gameID: gameID)
         case .setLibraryStatus(let payload):
-            return "library-status:\(payload.source.rawValue):\(payload.externalGameID)"
+            return LibrarySyncEntityKey.libraryStatus(
+                source: payload.source,
+                externalGameID: payload.externalGameID
+            )
         }
     }
 
@@ -176,17 +197,33 @@ enum LibrarySyncEntityKind: String, Codable {
 /// Acknowledgement for an enqueue request. The optimistic UI may only treat
 /// an intent as "queued offline" on `.accepted`, which is returned strictly
 /// after the queue file was durably written.
+///
+/// Fallback contract: ONLY `.storageBlocked` and `.serviceUnavailable` may
+/// route the caller to the direct (legacy) mutation path, and only after the
+/// caller revalidates the same captured ownership context. `.staleOwnership`
+/// and `.supersededByNewerIntent` are terminal — a direct call for either
+/// would submit a dead scope's or an outdated gesture's intent with the
+/// current account's credentials.
 enum LibrarySyncEnqueueResult: Equatable {
     /// Durably persisted; the engine owns delivery from here.
     case accepted
-    /// No authenticated account owns the intent (guest, or the session was
-    /// superseded while the intent was being accepted). Callers fall back to
-    /// the direct (legacy) mutation path.
-    case unavailable
+    /// The captured ownership scope no longer owns the session (logout,
+    /// account replacement, or deletion since the gesture). The intent is
+    /// dropped; it must NEVER reach the direct path.
+    case staleOwnership
+    /// A newer gesture (higher sequence) for the same entity already
+    /// governs; this older intent is obsolete and is dropped. No fallback —
+    /// the newest intent posts its own outcome.
+    case supersededByNewerIntent
     /// Durable persistence failed; the intent was NOT queued and must not be
-    /// presented as saved. Callers fall back to the direct mutation path so
-    /// the user gets a real success or a real error.
+    /// presented as saved. Callers may fall back to the direct mutation path
+    /// after revalidating the captured ownership.
     case storageBlocked
+    /// The engine cannot own the intent right now (no adopted account, or
+    /// the ownership scope is current but the engine has not finished
+    /// adopting it). Callers may fall back to the direct mutation path
+    /// after revalidating the captured ownership.
+    case serviceUnavailable
 }
 
 /// Server-authoritative result of a successfully replayed operation.

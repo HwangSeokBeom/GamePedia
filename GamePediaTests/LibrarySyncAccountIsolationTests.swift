@@ -151,7 +151,7 @@ final class LibrarySyncAccountIsolationTests: XCTestCase {
         let pending = await engine.pendingOperationCount
         XCTAssertEqual(pending, 0)
         let rejected = await engine.enqueueFavoriteChange(gameID: "9", isFavorite: true)
-        XCTAssertEqual(rejected, .unavailable)
+        XCTAssertEqual(rejected, .serviceUnavailable)
         // The persisted queue stays isolated on disk for A.
         XCTAssertEqual(store.storedOperations(accountID: "user-a").count, 1)
     }

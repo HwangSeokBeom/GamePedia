@@ -74,33 +74,71 @@ final class HomeGameListViewModel {
 
     private func toggleFavorite(gameId: Int) {
         let isCurrentlyFavorite = state.wishlistedGameIDs.contains(gameId)
-        applyFavoriteChange(gameId: gameId, isFavorite: !isCurrentlyFavorite)
 
-        // Offline-first path: accept locally; the engine posts the
-        // server-authoritative `.favoriteDidChange` on success and
+        // Offline-first path: ownership (account scope + gesture sequence)
+        // is captured synchronously HERE, before the optimistic flip and the
+        // submission Task, so a later account switch can never re-bind the
+        // intent and rapid gestures keep their true order. The engine posts
+        // the server-authoritative `.favoriteDidChange` on success and
         // `.librarySyncOperationDidFail` on permanent failure.
         if let librarySync {
+            let ownership = librarySync.captureFavoriteIntent(
+                gameID: String(gameId),
+                isFavorite: !isCurrentlyFavorite
+            )
+            applyFavoriteChange(gameId: gameId, isFavorite: !isCurrentlyFavorite)
             Task {
-                let result = await librarySync.enqueueFavoriteChange(
-                    gameID: String(gameId),
-                    isFavorite: !isCurrentlyFavorite
-                )
-                if result != .accepted {
+                guard let ownership else {
+                    // No authenticated account owned the gesture: the
+                    // pre-2.2 direct path applies unchanged.
                     await self.performDirectFavoriteToggle(
                         gameId: gameId,
-                        isCurrentlyFavorite: isCurrentlyFavorite
+                        isCurrentlyFavorite: isCurrentlyFavorite,
+                        ownership: nil
+                    )
+                    return
+                }
+                let result = await librarySync.enqueueFavoriteChange(
+                    gameID: String(gameId),
+                    isFavorite: !isCurrentlyFavorite,
+                    ownership: ownership
+                )
+                switch result {
+                case .accepted, .staleOwnership, .supersededByNewerIntent:
+                    // accepted: the engine owns delivery. stale/superseded:
+                    // the owning scope ended or a newer gesture governs —
+                    // the direct path must never run for this intent.
+                    break
+                case .storageBlocked, .serviceUnavailable:
+                    await self.performDirectFavoriteToggle(
+                        gameId: gameId,
+                        isCurrentlyFavorite: isCurrentlyFavorite,
+                        ownership: ownership
                     )
                 }
             }
             return
         }
 
+        applyFavoriteChange(gameId: gameId, isFavorite: !isCurrentlyFavorite)
         Task {
-            await performDirectFavoriteToggle(gameId: gameId, isCurrentlyFavorite: isCurrentlyFavorite)
+            await performDirectFavoriteToggle(
+                gameId: gameId,
+                isCurrentlyFavorite: isCurrentlyFavorite,
+                ownership: nil
+            )
         }
     }
 
-    private func performDirectFavoriteToggle(gameId: Int, isCurrentlyFavorite: Bool) async {
+    private func performDirectFavoriteToggle(
+        gameId: Int,
+        isCurrentlyFavorite: Bool,
+        ownership: LibraryMutationOwnership?
+    ) async {
+            // Revalidated immediately before the request is constructed: a
+            // stale scope must never reach the network with the current
+            // (different) account's credentials.
+            if let ownership, librarySync?.isOwnershipCurrent(ownership) != true { return }
             do {
                 let result = try await toggleFavoriteUseCase.execute(
                     gameId: String(gameId),
@@ -108,6 +146,9 @@ final class HomeGameListViewModel {
                 )
 
                 await MainActor.run {
+                    // A completion from a scope that ended mid-request must
+                    // not touch the current account's UI.
+                    if let ownership, self.librarySync?.isOwnershipCurrent(ownership) != true { return }
                     NotificationCenter.default.post(
                         name: .favoriteDidChange,
                         object: nil,
@@ -122,6 +163,7 @@ final class HomeGameListViewModel {
                 }
             } catch {
                 await MainActor.run {
+                    if let ownership, self.librarySync?.isOwnershipCurrent(ownership) != true { return }
                     self.applyFavoriteChange(gameId: gameId, isFavorite: isCurrentlyFavorite)
                 }
                 print("[HomeGameList] favoriteToggleFailed gameId=\(gameId) error=\(error.localizedDescription)")
