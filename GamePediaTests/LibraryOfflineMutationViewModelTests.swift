@@ -88,7 +88,10 @@ final class LibraryOfflineMutationViewModelTests: XCTestCase {
             userInfo: [
                 LibrarySyncFailureUserInfoKey.entityKind: LibrarySyncEntityKind.favorite.rawValue,
                 LibrarySyncFailureUserInfoKey.gameID: "55",
-                LibrarySyncFailureUserInfoKey.errorCode: "INVALID_GAME_ID"
+                LibrarySyncFailureUserInfoKey.errorCode: "INVALID_GAME_ID",
+                LibrarySyncFailureUserInfoKey.operationID: UUID().uuidString,
+                LibrarySyncFailureUserInfoKey.intendedIsFavorite: true,
+                LibrarySyncFailureUserInfoKey.supersededByNewerIntent: false
             ]
         )
         wait(for: [reverted], timeout: 10)
@@ -123,7 +126,7 @@ final class LibraryOfflineMutationViewModelTests: XCTestCase {
     func testHomeGameListFallsBackToDirectPathWhenEnqueueIsRejected() {
         let repository = MockFavoriteRepository()
         let router = MockLibraryMutationRouter()
-        router.acceptsEnqueues = false
+        router.enqueueResult = .unavailable
         let viewModel = HomeGameListViewModel(
             section: .popular,
             games: [],
@@ -174,7 +177,10 @@ final class LibraryOfflineMutationViewModelTests: XCTestCase {
             userInfo: [
                 LibrarySyncFailureUserInfoKey.entityKind: LibrarySyncEntityKind.favorite.rawValue,
                 LibrarySyncFailureUserInfoKey.gameID: "900001",
-                LibrarySyncFailureUserInfoKey.errorCode: "INVALID_GAME_ID"
+                LibrarySyncFailureUserInfoKey.errorCode: "INVALID_GAME_ID",
+                LibrarySyncFailureUserInfoKey.operationID: UUID().uuidString,
+                LibrarySyncFailureUserInfoKey.intendedIsFavorite: true,
+                LibrarySyncFailureUserInfoKey.supersededByNewerIntent: false
             ]
         )
         wait(for: [reverted], timeout: 10)

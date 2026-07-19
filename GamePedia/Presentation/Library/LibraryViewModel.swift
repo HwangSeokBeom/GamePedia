@@ -2300,8 +2300,8 @@ final class LibraryViewModel {
         // (permanent failure — cleared in observeLibrarySyncSignals()).
         if let librarySync {
             Task {
-                let accepted = await librarySync.enqueueLibraryStatusUpdate(request)
-                if !accepted {
+                let result = await librarySync.enqueueLibraryStatusUpdate(request)
+                if result != .accepted {
                     await self.performDirectStatusUpdate(request: request, identifier: identifier)
                 }
             }
@@ -2346,11 +2346,11 @@ final class LibraryViewModel {
         // and `.librarySyncOperationDidFail` on permanent failure.
         if let librarySync {
             Task {
-                let accepted = await librarySync.enqueueFavoriteChange(
+                let result = await librarySync.enqueueFavoriteChange(
                     gameID: String(gameID),
                     isFavorite: false
                 )
-                if !accepted {
+                if result != .accepted {
                     await self.performDirectRemoveFavorite(gameID: gameID)
                 }
             }
@@ -2415,6 +2415,11 @@ final class LibraryViewModel {
                     }
                     self.apply(.setError(L10n.tr("Localizable", "library.error.addToPlayingSaveFailed")))
                 } else if kind == LibrarySyncEntityKind.favorite.rawValue {
+                    // A newer queued intent still governs; reloading now
+                    // would show server state that predates that intent.
+                    let superseded = notification
+                        .userInfo?[LibrarySyncFailureUserInfoKey.supersededByNewerIntent] as? Bool ?? false
+                    guard superseded == false else { return }
                     self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
                     self.loadLibrary(trigger: .refresh)
                 }

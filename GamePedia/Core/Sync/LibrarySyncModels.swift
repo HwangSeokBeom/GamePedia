@@ -73,6 +73,26 @@ struct LibraryStatusSyncPayload: Codable, Equatable {
     }
 }
 
+/// Durable settlement state of a queued operation.
+///
+/// - `queued`: the intent is durably recorded and its remote outcome is
+///   unknown; it is eligible for (re)submission.
+/// - `remotelyConfirmed`: the remote outcome is known (server success or a
+///   deterministic permanent rejection); the operation must NEVER be
+///   submitted again. A confirmed record only remains on disk while its
+///   cleanup write is pending — the terminal "locally cleaned" state is the
+///   record's removal from the file.
+///
+/// The transient "submitted" state is in-memory only
+/// (`inFlightOperationIDs`): after a crash mid-request the outcome is
+/// unknown, so the record correctly collapses back to `queued` and the
+/// replayed mutations converge server-side (absolute-state semantics, see
+/// header note above).
+enum LibrarySyncDurableState: String, Codable {
+    case queued
+    case remotelyConfirmed
+}
+
 struct LibrarySyncOperation: Codable, Equatable, Identifiable {
     /// Stable client-side idempotency key. Assigned once when the user intent
     /// is accepted and reused for every retry; never regenerated.
@@ -85,6 +105,38 @@ struct LibrarySyncOperation: Codable, Equatable, Identifiable {
     let accountID: String
     let kind: LibrarySyncOperationKind
     let createdAt: Date
+    /// Durable settlement state. Missing in files written before this field
+    /// existed, which decodes as `queued` — the safe default (re-submission
+    /// converges). Older readers ignore the extra key and also treat the
+    /// record as queued, which is equally convergent on rollback.
+    var state: LibrarySyncDurableState
+
+    init(
+        id: UUID,
+        accountID: String,
+        kind: LibrarySyncOperationKind,
+        createdAt: Date,
+        state: LibrarySyncDurableState = .queued
+    ) {
+        self.id = id
+        self.accountID = accountID
+        self.kind = kind
+        self.createdAt = createdAt
+        self.state = state
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, accountID, kind, createdAt, state
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        accountID = try container.decode(String.self, forKey: .accountID)
+        kind = try container.decode(LibrarySyncOperationKind.self, forKey: .kind)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        state = try container.decodeIfPresent(LibrarySyncDurableState.self, forKey: .state) ?? .queued
+    }
 
     /// Serialization key: operations sharing an entity key execute strictly
     /// FIFO; distinct entity keys may sync in parallel.
@@ -119,6 +171,22 @@ struct LibrarySyncOperation: Codable, Equatable, Identifiable {
 enum LibrarySyncEntityKind: String, Codable {
     case favorite
     case libraryStatus
+}
+
+/// Acknowledgement for an enqueue request. The optimistic UI may only treat
+/// an intent as "queued offline" on `.accepted`, which is returned strictly
+/// after the queue file was durably written.
+enum LibrarySyncEnqueueResult: Equatable {
+    /// Durably persisted; the engine owns delivery from here.
+    case accepted
+    /// No authenticated account owns the intent (guest, or the session was
+    /// superseded while the intent was being accepted). Callers fall back to
+    /// the direct (legacy) mutation path.
+    case unavailable
+    /// Durable persistence failed; the intent was NOT queued and must not be
+    /// presented as saved. Callers fall back to the direct mutation path so
+    /// the user gets a real success or a real error.
+    case storageBlocked
 }
 
 /// Server-authoritative result of a successfully replayed operation.
@@ -168,6 +236,16 @@ enum LibrarySyncFailureUserInfoKey {
     static let entityKind = "entityKind"
     static let gameID = "gameID"
     static let errorCode = "errorCode"
+    /// UUID string of the failed operation (client idempotency key).
+    static let operationID = "operationID"
+    /// For favorite operations: the Bool state the failed operation intended
+    /// to set. Failure observers reconcile against this — never against
+    /// whatever state currently happens to be on screen.
+    static let intendedIsFavorite = "intendedIsFavorite"
+    /// True when a newer queued intent exists for the same entity. Observers
+    /// must ignore the failure for optimistic-state purposes: the newest
+    /// intent still governs the UI and will post its own outcome.
+    static let supersededByNewerIntent = "supersededByNewerIntent"
 }
 
 // MARK: - Diagnostics

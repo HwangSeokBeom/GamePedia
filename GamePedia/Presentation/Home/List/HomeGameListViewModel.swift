@@ -81,11 +81,11 @@ final class HomeGameListViewModel {
         // `.librarySyncOperationDidFail` on permanent failure.
         if let librarySync {
             Task {
-                let accepted = await librarySync.enqueueFavoriteChange(
+                let result = await librarySync.enqueueFavoriteChange(
                     gameID: String(gameId),
                     isFavorite: !isCurrentlyFavorite
                 )
-                if !accepted {
+                if result != .accepted {
                     await self.performDirectFavoriteToggle(
                         gameId: gameId,
                         isCurrentlyFavorite: isCurrentlyFavorite
@@ -129,7 +129,7 @@ final class HomeGameListViewModel {
     }
 
     /// A queued favorite change permanently failed after the optimistic
-    /// update: revert that game's local entry.
+    /// update: revert that game's local entry to the pre-intent state.
     private func observeLibrarySyncFailures() {
         NotificationCenter.default.publisher(for: .librarySyncOperationDidFail)
             .receive(on: DispatchQueue.main)
@@ -138,11 +138,17 @@ final class HomeGameListViewModel {
                       let kind = notification.userInfo?[LibrarySyncFailureUserInfoKey.entityKind] as? String,
                       kind == LibrarySyncEntityKind.favorite.rawValue,
                       let failedGameID = notification.userInfo?[LibrarySyncFailureUserInfoKey.gameID] as? String,
-                      let gameId = Int(failedGameID) else {
+                      let gameId = Int(failedGameID),
+                      let intended = notification
+                        .userInfo?[LibrarySyncFailureUserInfoKey.intendedIsFavorite] as? Bool else {
                     return
                 }
-                let isCurrentlyMarked = self.state.wishlistedGameIDs.contains(gameId)
-                self.applyFavoriteChange(gameId: gameId, isFavorite: !isCurrentlyMarked)
+                // A newer queued intent for this game still governs the UI;
+                // an old failure must not invert the newest state.
+                let superseded = notification
+                    .userInfo?[LibrarySyncFailureUserInfoKey.supersededByNewerIntent] as? Bool ?? false
+                guard superseded == false else { return }
+                self.applyFavoriteChange(gameId: gameId, isFavorite: !intended)
             }
             .store(in: &cancellables)
     }

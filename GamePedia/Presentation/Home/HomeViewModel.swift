@@ -203,11 +203,11 @@ final class HomeViewModel {
             apply(.setWishlistedGameIDs(updatedIDs))
 
             Task {
-                let accepted = await librarySync.enqueueFavoriteChange(
+                let result = await librarySync.enqueueFavoriteChange(
                     gameID: String(gameId),
                     isFavorite: !isCurrentlyFavorite
                 )
-                if !accepted {
+                if result != .accepted {
                     await self.performDirectFavoriteToggle(
                         gameId: gameId,
                         isCurrentlyFavorite: isCurrentlyFavorite
@@ -263,13 +263,23 @@ final class HomeViewModel {
                       let gameId = Int(failedGameID) else {
                     return
                 }
-                var updatedIDs = self.state.wishlistedGameIDs
-                if updatedIDs.contains(gameId) {
-                    updatedIDs.remove(gameId)
-                } else {
-                    updatedIDs.insert(gameId)
+                // A newer queued intent for this game still governs the UI;
+                // this failure is history and must not touch state.
+                let superseded = notification
+                    .userInfo?[LibrarySyncFailureUserInfoKey.supersededByNewerIntent] as? Bool ?? false
+                guard superseded == false else { return }
+                // Reconcile against the failed operation's intended state —
+                // never by inverting whatever is currently on screen.
+                if let intended = notification
+                    .userInfo?[LibrarySyncFailureUserInfoKey.intendedIsFavorite] as? Bool {
+                    var updatedIDs = self.state.wishlistedGameIDs
+                    if intended {
+                        updatedIDs.remove(gameId)
+                    } else {
+                        updatedIDs.insert(gameId)
+                    }
+                    self.apply(.setWishlistedGameIDs(updatedIDs))
                 }
-                self.apply(.setWishlistedGameIDs(updatedIDs))
                 self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
             }
             .store(in: &cancellables)

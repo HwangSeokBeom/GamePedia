@@ -107,10 +107,24 @@ final class MockLibrarySyncTransport: LibrarySyncTransporting, @unchecked Sendab
 
 // MARK: - In-memory store double
 
+struct MockStoreWriteError: Error, Equatable {}
+
 final class InMemorySyncOperationStore: SyncOperationStoring, @unchecked Sendable {
     private let lock = NSLock()
     private var storage: [String: [LibrarySyncOperation]] = [:]
     private(set) var persistCallCount = 0
+    private var loadCallCount = 0
+    private var heldLoads: [Int: CheckedContinuation<Void, Never>] = [:]
+
+    /// Scripted persist failure per 0-based persist call index. Called under
+    /// the lock — keep it pure. Return an error to make that write fail.
+    var persistBehavior: @Sendable (_ index: Int, _ operations: [LibrarySyncOperation], _ accountID: String) -> Error? =
+        { _, _, _ in nil }
+    /// When true, every `load` parks on a continuation until the test calls
+    /// `resolveHeldLoad(index:)` — the deterministic account-switch window.
+    var holdLoads = false
+    /// Fired after a load is recorded (parked or not); receives its index.
+    var onLoad: ((Int) -> Void)?
 
     func seed(_ operations: [LibrarySyncOperation], accountID: String) {
         lock.lock()
@@ -124,7 +138,38 @@ final class InMemorySyncOperationStore: SyncOperationStoring, @unchecked Sendabl
         return storage[accountID] ?? []
     }
 
+    var heldLoadIndices: [Int] {
+        lock.lock()
+        defer { lock.unlock() }
+        return heldLoads.keys.sorted()
+    }
+
+    func resolveHeldLoad(index: Int) {
+        lock.lock()
+        let continuation = heldLoads.removeValue(forKey: index)
+        lock.unlock()
+        continuation?.resume()
+    }
+
     func load(accountID: String) async -> SyncStoreLoadResult {
+        lock.lock()
+        let index = loadCallCount
+        loadCallCount += 1
+        let shouldHold = holdLoads
+        let callback = onLoad
+        lock.unlock()
+
+        if shouldHold {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                lock.lock()
+                heldLoads[index] = continuation
+                lock.unlock()
+                callback?(index)
+            }
+        } else {
+            callback?(index)
+        }
+
         lock.lock()
         defer { lock.unlock() }
         return SyncStoreLoadResult(
@@ -133,11 +178,18 @@ final class InMemorySyncOperationStore: SyncOperationStoring, @unchecked Sendabl
         )
     }
 
-    func persist(_ operations: [LibrarySyncOperation], accountID: String) async {
+    func persist(_ operations: [LibrarySyncOperation], accountID: String) async throws {
         lock.lock()
-        storage[accountID] = operations
+        let index = persistCallCount
         persistCallCount += 1
+        let error = persistBehavior(index, operations, accountID)
+        if error == nil {
+            storage[accountID] = operations
+        }
         lock.unlock()
+        if let error {
+            throw error
+        }
     }
 
     func purge(accountID: String) async {
@@ -154,31 +206,33 @@ final class MockLibraryMutationRouter: LibraryMutationSyncing, @unchecked Sendab
     private(set) var favoriteChanges: [(gameID: String, isFavorite: Bool)] = []
     private(set) var statusUpdates: [LibraryGameStatusUpdateRequest] = []
     private(set) var retryNowCallCount = 0
-    var acceptsEnqueues = true
+    /// Result every enqueue reports; `.unavailable`/`.storageBlocked` route
+    /// the caller to the direct path.
+    var enqueueResult: LibrarySyncEnqueueResult = .accepted
     var pendingFavoriteIntentValue: Bool?
     /// Fired after an enqueue is recorded (safe place to fulfill expectations).
     var onEnqueue: (() -> Void)?
     /// Fired after retryNow is recorded.
     var onRetryNow: (() -> Void)?
 
-    func enqueueFavoriteChange(gameID: String, isFavorite: Bool) async -> Bool {
+    func enqueueFavoriteChange(gameID: String, isFavorite: Bool) async -> LibrarySyncEnqueueResult {
         lock.lock()
         favoriteChanges.append((gameID, isFavorite))
-        let accepted = acceptsEnqueues
+        let result = enqueueResult
         let callback = onEnqueue
         lock.unlock()
         callback?()
-        return accepted
+        return result
     }
 
-    func enqueueLibraryStatusUpdate(_ request: LibraryGameStatusUpdateRequest) async -> Bool {
+    func enqueueLibraryStatusUpdate(_ request: LibraryGameStatusUpdateRequest) async -> LibrarySyncEnqueueResult {
         lock.lock()
         statusUpdates.append(request)
-        let accepted = acceptsEnqueues
+        let result = enqueueResult
         let callback = onEnqueue
         lock.unlock()
         callback?()
-        return accepted
+        return result
     }
 
     func pendingFavoriteIntent(gameID: String) async -> Bool? {

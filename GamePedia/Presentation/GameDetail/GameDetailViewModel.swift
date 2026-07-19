@@ -113,6 +113,11 @@ final class GameDetailViewModel {
                       failedGameID == String(gameID) else {
                     return
                 }
+                // A newer queued intent still governs this game's state; a
+                // server refetch now would race the pending intent.
+                let superseded = notification
+                    .userInfo?[LibrarySyncFailureUserInfoKey.supersededByNewerIntent] as? Bool ?? false
+                guard superseded == false else { return }
                 self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
                 Task { await self.fetchFavoriteStatus(gameId: gameID) }
             }
@@ -444,13 +449,15 @@ final class GameDetailViewModel {
         // this view model already observes.
         if let librarySync {
             Task {
-                let accepted = await librarySync.enqueueFavoriteChange(
+                let result = await librarySync.enqueueFavoriteChange(
                     gameID: String(gameID),
                     isFavorite: !previousFavoriteState
                 )
-                if !accepted {
-                    // No authenticated account: fall back to the direct call
-                    // so the existing unauthorized error surfaces unchanged.
+                if result != .accepted {
+                    // No authenticated account, or the queue could not be
+                    // durably written: fall back to the direct call so the
+                    // user gets a real success or a real error instead of a
+                    // false "queued" acknowledgement.
                     await self.performDirectFavoriteToggle(
                         gameID: gameID,
                         previousFavoriteState: previousFavoriteState
