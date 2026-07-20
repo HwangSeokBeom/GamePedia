@@ -1,8 +1,14 @@
 import Foundation
 
 protocol FavoriteRemoteDataSource {
-    func addFavorite(requestDTO: AddFavoriteRequestDTO) async throws -> FavoriteMutationResponseDataDTO
-    func removeFavorite(gameId: String) async throws -> FavoriteMutationResponseDataDTO
+    func addFavorite(
+        requestDTO: AddFavoriteRequestDTO,
+        authorization: RequestAuthorization
+    ) async throws -> FavoriteMutationResponseDataDTO
+    func removeFavorite(
+        gameId: String,
+        authorization: RequestAuthorization
+    ) async throws -> FavoriteMutationResponseDataDTO
     func fetchMyFavorites(sort: FavoriteSortOption?) async throws -> FavoriteListResponseDataDTO
     func fetchFavoriteStatus(gameId: String) async throws -> FavoriteStatusResponseDataDTO
 }
@@ -14,18 +20,26 @@ final class DefaultFavoriteRemoteDataSource: FavoriteRemoteDataSource {
         self.apiClient = apiClient
     }
 
-    func addFavorite(requestDTO: AddFavoriteRequestDTO) async throws -> FavoriteMutationResponseDataDTO {
+    func addFavorite(
+        requestDTO: AddFavoriteRequestDTO,
+        authorization: RequestAuthorization
+    ) async throws -> FavoriteMutationResponseDataDTO {
         let response = try await apiClient.request(
             .addFavorite(body: requestDTO),
-            as: FavoriteResponseEnvelopeDTO<FavoriteMutationResponseDataDTO>.self
+            as: FavoriteResponseEnvelopeDTO<FavoriteMutationResponseDataDTO>.self,
+            authorization: authorization
         )
         return response.data
     }
 
-    func removeFavorite(gameId: String) async throws -> FavoriteMutationResponseDataDTO {
+    func removeFavorite(
+        gameId: String,
+        authorization: RequestAuthorization
+    ) async throws -> FavoriteMutationResponseDataDTO {
         let response = try await apiClient.request(
             .removeFavorite(gameId: gameId),
-            as: FavoriteResponseEnvelopeDTO<FavoriteMutationResponseDataDTO>.self
+            as: FavoriteResponseEnvelopeDTO<FavoriteMutationResponseDataDTO>.self,
+            authorization: authorization
         )
         return response.data
     }

@@ -113,6 +113,11 @@ final class GameDetailViewModel {
                       failedGameID == String(gameID) else {
                     return
                 }
+                // A newer queued intent still governs this game's state; a
+                // server refetch now would race the pending intent.
+                let superseded = notification
+                    .userInfo?[LibrarySyncFailureUserInfoKey.supersededByNewerIntent] as? Bool ?? false
+                guard superseded == false else { return }
                 self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
                 Task { await self.fetchFavoriteStatus(gameId: gameID) }
             }
@@ -435,46 +440,83 @@ final class GameDetailViewModel {
 
         let previousFavoriteState = state.isFavorite
 
-        apply(.setFavorite(!previousFavoriteState))
-
-        // Offline-first path: accept the intent locally (stable idempotency
-        // key, durable queue) and return immediately. The engine posts the
-        // server-authoritative `.favoriteDidChange` on success and
+        // Offline-first path: ownership (account scope + gesture sequence)
+        // is captured synchronously HERE, before the optimistic flip and the
+        // submission Task, so a later account switch can never re-bind the
+        // intent and rapid gestures keep their true order. The engine posts
+        // the server-authoritative `.favoriteDidChange` on success and
         // `.librarySyncOperationDidFail` on permanent failure, both of which
         // this view model already observes.
         if let librarySync {
+            let ownership = librarySync.captureFavoriteIntent(
+                gameID: String(gameID),
+                isFavorite: !previousFavoriteState
+            )
+            apply(.setFavorite(!previousFavoriteState))
             Task {
-                let accepted = await librarySync.enqueueFavoriteChange(
-                    gameID: String(gameID),
-                    isFavorite: !previousFavoriteState
-                )
-                if !accepted {
-                    // No authenticated account: fall back to the direct call
-                    // so the existing unauthorized error surfaces unchanged.
+                guard let ownership else {
+                    // No authenticated account owned the gesture: the
+                    // pre-2.2 direct path applies unchanged.
                     await self.performDirectFavoriteToggle(
                         gameID: gameID,
                         previousFavoriteState: previousFavoriteState
                     )
+                    return
+                }
+                let result = await librarySync.enqueueFavoriteChange(
+                    gameID: String(gameID),
+                    isFavorite: !previousFavoriteState,
+                    ownership: ownership
+                )
+                switch result {
+                case .accepted, .staleOwnership, .supersededByNewerIntent:
+                    // accepted: the engine owns delivery. stale/superseded:
+                    // the owning scope ended or a newer gesture governs —
+                    // this intent is terminal and must never touch the
+                    // network or newer UI state.
+                    break
+                case .storageBlocked, .serviceUnavailable:
+                    // The engine could not durably own the intent. No second
+                    // transport path: restore the last acknowledged favorite
+                    // state and surface a retryable failure. Guarded so a
+                    // stale scope never touches the current account's UI and
+                    // an old gesture never overwrites a newer one.
+                    await MainActor.run {
+                        guard librarySync.isNewestOwnedIntent(ownership) else { return }
+                        self.apply(.setFavorite(previousFavoriteState))
+                        self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
+                    }
                 }
             }
             return
         }
 
+        apply(.setFavorite(!previousFavoriteState))
         apply(.setFavoriteLoading(true))
 
         Task {
             await performDirectFavoriteToggle(
                 gameID: gameID,
-                previousFavoriteState: previousFavoriteState
+                previousFavoriteState: previousFavoriteState,
+                authorization: .currentSession
             )
         }
     }
 
-    private func performDirectFavoriteToggle(gameID: Int, previousFavoriteState: Bool) async {
+    /// Direct path for gestures the engine does not own. `.guestOnly` for
+    /// guest gestures (can never attach a bearer token, so a login racing
+    /// the gesture cannot be mutated); `.currentSession` only for the
+    /// explicit offline-sync kill-switch (librarySync == nil).
+    private func performDirectFavoriteToggle(
+        gameID: Int,
+        previousFavoriteState: Bool,
+        authorization: RequestAuthorization = .guestOnly
+    ) async {
         do {
                 let result = try await toggleFavoriteUseCase.execute(
                     gameId: String(gameID),
-                    isCurrentlyFavorite: previousFavoriteState
+                    isCurrentlyFavorite: previousFavoriteState,
+                    authorization: authorization
                 )
 
                 await MainActor.run {

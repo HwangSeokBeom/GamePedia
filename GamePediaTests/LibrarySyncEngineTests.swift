@@ -54,7 +54,7 @@ final class LibrarySyncEngineTests: XCTestCase {
         transport.onCall = { _ in transportCalled.fulfill() }
 
         let accepted = await engine.enqueueFavoriteChange(gameID: "42", isFavorite: true)
-        XCTAssertTrue(accepted)
+        XCTAssertEqual(accepted, .accepted)
 
         // Accepted, in the queue, and durable before the server has answered.
         let pending = await engine.pendingOperationCount
@@ -87,7 +87,7 @@ final class LibrarySyncEngineTests: XCTestCase {
         transport.onCall = { _ in transportCalled.fulfill() }
 
         let accepted = await engine.enqueueFavoriteChange(gameID: "7", isFavorite: false)
-        XCTAssertTrue(accepted)
+        XCTAssertEqual(accepted, .accepted)
         let pending = await engine.pendingOperationCount
         XCTAssertEqual(pending, 1)
 
@@ -238,7 +238,7 @@ final class LibrarySyncEngineTests: XCTestCase {
 
         // Enqueue attempts while unauthenticated are rejected.
         let rejected = await engine.enqueueFavoriteChange(gameID: "10", isFavorite: true)
-        XCTAssertFalse(rejected)
+        XCTAssertEqual(rejected, .serviceUnavailable)
 
         // Same account signs back in: the preserved operation replays once.
         let replayed = notificationExpectation(.favoriteDidChange, center: center)

@@ -14,17 +14,20 @@ final class LibraryOfflineMutationViewModelTests: XCTestCase {
         private let lock = NSLock()
         private(set) var addedGameIDs: [String] = []
         private(set) var removedGameIDs: [String] = []
+        private(set) var authorizations: [RequestAuthorization] = []
 
-        func addFavorite(gameId: String) async throws -> FavoriteMutationResult {
+        func addFavorite(gameId: String, authorization: RequestAuthorization) async throws -> FavoriteMutationResult {
             lock.lock()
             addedGameIDs.append(gameId)
+            authorizations.append(authorization)
             lock.unlock()
             return FavoriteMutationResult(gameId: Int(gameId) ?? -1, isFavorite: true)
         }
 
-        func removeFavorite(gameId: String) async throws -> FavoriteMutationResult {
+        func removeFavorite(gameId: String, authorization: RequestAuthorization) async throws -> FavoriteMutationResult {
             lock.lock()
             removedGameIDs.append(gameId)
+            authorizations.append(authorization)
             lock.unlock()
             return FavoriteMutationResult(gameId: Int(gameId) ?? -1, isFavorite: false)
         }
@@ -88,7 +91,10 @@ final class LibraryOfflineMutationViewModelTests: XCTestCase {
             userInfo: [
                 LibrarySyncFailureUserInfoKey.entityKind: LibrarySyncEntityKind.favorite.rawValue,
                 LibrarySyncFailureUserInfoKey.gameID: "55",
-                LibrarySyncFailureUserInfoKey.errorCode: "INVALID_GAME_ID"
+                LibrarySyncFailureUserInfoKey.errorCode: "INVALID_GAME_ID",
+                LibrarySyncFailureUserInfoKey.operationID: UUID().uuidString,
+                LibrarySyncFailureUserInfoKey.intendedIsFavorite: true,
+                LibrarySyncFailureUserInfoKey.supersededByNewerIntent: false
             ]
         )
         wait(for: [reverted], timeout: 10)
@@ -120,10 +126,10 @@ final class LibraryOfflineMutationViewModelTests: XCTestCase {
         XCTAssertEqual(repository.addedGameIDs, ["77"])
     }
 
-    func testHomeGameListFallsBackToDirectPathWhenEnqueueIsRejected() {
+    func testHomeGameListRejectedEnqueueNeverFallsBackAndReconcilesOptimisticState() {
         let repository = MockFavoriteRepository()
         let router = MockLibraryMutationRouter()
-        router.acceptsEnqueues = false
+        router.enqueueResult = .serviceUnavailable
         let viewModel = HomeGameListViewModel(
             section: .popular,
             games: [],
@@ -132,19 +138,22 @@ final class LibraryOfflineMutationViewModelTests: XCTestCase {
             librarySync: router
         )
 
-        let posted = XCTNSNotificationExpectation(
-            name: .favoriteDidChange,
-            object: nil,
-            notificationCenter: .default
-        )
-        posted.handler = { notification in
-            notification.userInfo?[FavoriteChangeUserInfoKey.gameId] as? Int == 88
+        let reconciled = expectation(description: "optimistic state reconciled")
+        viewModel.onStateChanged = { state in
+            if !state.wishlistedGameIDs.contains(88) {
+                reconciled.fulfill()
+            }
         }
         viewModel.send(.didTapFavorite(gameId: 88))
-        wait(for: [posted], timeout: 10)
+        // Optimistic flip applies immediately…
+        XCTAssertTrue(viewModel.state.wishlistedGameIDs.contains(88))
+        // …and the local refusal reconciles it back without ANY second
+        // transport path: the repository must never be called.
+        wait(for: [reconciled], timeout: 10)
 
         XCTAssertEqual(router.favoriteChanges.count, 1)
-        XCTAssertEqual(repository.addedGameIDs, ["88"], "a rejected enqueue must fall back to the direct call")
+        XCTAssertTrue(repository.addedGameIDs.isEmpty, "a refused enqueue must never reach the repository")
+        XCTAssertTrue(repository.removedGameIDs.isEmpty)
     }
 
     // MARK: HomeViewModel — optimistic accept and failure revert
@@ -174,7 +183,10 @@ final class LibraryOfflineMutationViewModelTests: XCTestCase {
             userInfo: [
                 LibrarySyncFailureUserInfoKey.entityKind: LibrarySyncEntityKind.favorite.rawValue,
                 LibrarySyncFailureUserInfoKey.gameID: "900001",
-                LibrarySyncFailureUserInfoKey.errorCode: "INVALID_GAME_ID"
+                LibrarySyncFailureUserInfoKey.errorCode: "INVALID_GAME_ID",
+                LibrarySyncFailureUserInfoKey.operationID: UUID().uuidString,
+                LibrarySyncFailureUserInfoKey.intendedIsFavorite: true,
+                LibrarySyncFailureUserInfoKey.supersededByNewerIntent: false
             ]
         )
         wait(for: [reverted], timeout: 10)

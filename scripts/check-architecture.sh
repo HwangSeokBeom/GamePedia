@@ -86,6 +86,41 @@ if [ -n "$LIVESERVICE_DOMAIN" ]; then
     fail "Core/LiveService references Domain types" "$LIVESERVICE_DOMAIN"
 fi
 
+# Rule 8: authenticated favorite/library mutations are engine-only. The
+# removed authenticated direct-fallback machinery must never reappear in
+# production code.
+DIRECT_FALLBACK=$(grep -rn "runAuthenticatedDirectFallback\|LibraryDirectMutationCoordinator\|LibraryDirectFallbackOutcome" \
+    GamePedia 2>/dev/null)
+if [ -n "$DIRECT_FALLBACK" ]; then
+    fail "Authenticated direct-fallback machinery reappeared" "$DIRECT_FALLBACK"
+fi
+
+# Rule 9: `.boundAccount` authorization is the sync engine's remote
+# execution credential. Only the sync transport (Core/Sync) may construct
+# it; Presentation/Application/Domain code binding accounts directly would
+# bypass the engine's ownership authority.
+BOUND_ACCOUNT=$(grep -rn "\.boundAccount(" GamePedia --include="*.swift" 2>/dev/null \
+    | grep -v "GamePedia/Core/Sync/" \
+    | grep -v "GamePedia/Shared/Auth/" \
+    | grep -v "GamePedia/Data/Network/APIClient.swift" \
+    | grep -v "\.swift:.*//")
+if [ -n "$BOUND_ACCOUNT" ]; then
+    fail "boundAccount authorization constructed outside the sync transport" "$BOUND_ACCOUNT"
+fi
+
+# Rule 10: the direct mutation use cases default to the guest-only
+# boundary. A default drifting back to `.currentSession` would let a guest
+# gesture pick up a token adopted after the gesture.
+for USE_CASE in \
+    GamePedia/Domain/Favorite/ToggleFavoriteUseCase.swift \
+    GamePedia/Domain/Favorite/AddFavoriteUseCase.swift \
+    GamePedia/Domain/Favorite/RemoveFavoriteUseCase.swift \
+    GamePedia/Domain/Library/UpdateLibraryGameStatusUseCase.swift; do
+    if ! grep -q "authorization: RequestAuthorization = .guestOnly" "$USE_CASE" 2>/dev/null; then
+        fail "Mutation use case lost its guest-only default authorization" "$USE_CASE"
+    fi
+done
+
 # Rule 6: no raw print of URLs with query values in Core request
 # coordination (privacy: keys must stay identifier-based).
 COORD_URL_LOG=$(grep -rn "print(.*url" GamePedia/Core/RequestCoordination GamePedia/Core/Pagination 2>/dev/null)

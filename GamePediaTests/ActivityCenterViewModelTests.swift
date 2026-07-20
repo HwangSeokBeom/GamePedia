@@ -135,7 +135,7 @@ final class ActivityCenterViewModelTests: XCTestCase {
                 readStateStore: readStateStore,
                 breadcrumbs: OperationBreadcrumbRecorder()
             ),
-            accountIDProvider: { accountID }
+            sessionProvider: { LiveServiceSession(accountID: accountID, generation: 1) }
         )
     }
 

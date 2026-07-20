@@ -1,0 +1,5 @@
+// Single source of truth for app + widget-extension versions.
+// App Store requires CFBundleVersion of an embedded appex to match its
+// containing app, so both targets must resolve these from this one file.
+MARKETING_VERSION = 2.0.0
+CURRENT_PROJECT_VERSION = 1

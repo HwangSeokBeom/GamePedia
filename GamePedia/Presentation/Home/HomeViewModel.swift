@@ -188,12 +188,18 @@ final class HomeViewModel {
     private func toggleFavorite(gameId: Int) {
         let isCurrentlyFavorite = state.wishlistedGameIDs.contains(gameId)
 
-        // Offline-first path: accept locally and update the wishlist set
-        // optimistically. The engine posts server-authoritative
-        // `.favoriteDidChange` on success (already observed) and
-        // `.librarySyncOperationDidFail` on permanent failure (observed
-        // below), which re-syncs this screen.
+        // Offline-first path: ownership (account scope + gesture sequence)
+        // is captured synchronously HERE, before the submission Task exists,
+        // so a later account switch can never re-bind the intent and a later
+        // gesture can never be reordered behind this one. The engine posts
+        // server-authoritative `.favoriteDidChange` on success (already
+        // observed) and `.librarySyncOperationDidFail` on permanent failure
+        // (observed below), which re-syncs this screen.
         if let librarySync {
+            let ownership = librarySync.captureFavoriteIntent(
+                gameID: String(gameId),
+                isFavorite: !isCurrentlyFavorite
+            )
             var updatedIDs = state.wishlistedGameIDs
             if isCurrentlyFavorite {
                 updatedIDs.remove(gameId)
@@ -203,30 +209,75 @@ final class HomeViewModel {
             apply(.setWishlistedGameIDs(updatedIDs))
 
             Task {
-                let accepted = await librarySync.enqueueFavoriteChange(
-                    gameID: String(gameId),
-                    isFavorite: !isCurrentlyFavorite
-                )
-                if !accepted {
+                guard let ownership else {
+                    // No authenticated account owned the gesture: the
+                    // pre-2.2 direct path applies unchanged.
                     await self.performDirectFavoriteToggle(
                         gameId: gameId,
                         isCurrentlyFavorite: isCurrentlyFavorite
                     )
+                    return
+                }
+                let result = await librarySync.enqueueFavoriteChange(
+                    gameID: String(gameId),
+                    isFavorite: !isCurrentlyFavorite,
+                    ownership: ownership
+                )
+                switch result {
+                case .accepted, .staleOwnership, .supersededByNewerIntent:
+                    // accepted: the engine owns delivery. stale/superseded:
+                    // the owning scope ended or a newer gesture governs —
+                    // this intent is terminal and must never touch the
+                    // network or newer UI state.
+                    break
+                case .storageBlocked, .serviceUnavailable:
+                    // The engine could not durably own the intent. There is
+                    // no second transport path: reconcile the optimistic
+                    // flip back to the last acknowledged state and surface a
+                    // retryable failure. Guarded so a stale scope never
+                    // touches the current account's UI and an old gesture
+                    // never overwrites a newer one.
+                    await MainActor.run {
+                        guard librarySync.isNewestOwnedIntent(ownership) else { return }
+                        var updatedIDs = self.state.wishlistedGameIDs
+                        if isCurrentlyFavorite {
+                            updatedIDs.insert(gameId)
+                        } else {
+                            updatedIDs.remove(gameId)
+                        }
+                        self.apply(.setWishlistedGameIDs(updatedIDs))
+                        self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
+                    }
                 }
             }
             return
         }
 
         Task {
-            await performDirectFavoriteToggle(gameId: gameId, isCurrentlyFavorite: isCurrentlyFavorite)
+            await performDirectFavoriteToggle(
+                gameId: gameId,
+                isCurrentlyFavorite: isCurrentlyFavorite,
+                authorization: .currentSession
+            )
         }
     }
 
-    private func performDirectFavoriteToggle(gameId: Int, isCurrentlyFavorite: Bool) async {
+    /// Direct path for gestures the engine does not own. `authorization`
+    /// is `.guestOnly` for guest gestures (no authenticated account at
+    /// gesture time — the request can never attach a bearer token, so a
+    /// login racing the gesture cannot be mutated) and `.currentSession`
+    /// only for the explicit offline-sync kill-switch (librarySync == nil,
+    /// compile-time unreachable while the feature flag is on).
+    private func performDirectFavoriteToggle(
+        gameId: Int,
+        isCurrentlyFavorite: Bool,
+        authorization: RequestAuthorization = .guestOnly
+    ) async {
             do {
                 let result = try await toggleFavoriteUseCase.execute(
                     gameId: String(gameId),
-                    isCurrentlyFavorite: isCurrentlyFavorite
+                    isCurrentlyFavorite: isCurrentlyFavorite,
+                    authorization: authorization
                 )
 
                 await MainActor.run {
@@ -263,13 +314,23 @@ final class HomeViewModel {
                       let gameId = Int(failedGameID) else {
                     return
                 }
-                var updatedIDs = self.state.wishlistedGameIDs
-                if updatedIDs.contains(gameId) {
-                    updatedIDs.remove(gameId)
-                } else {
-                    updatedIDs.insert(gameId)
+                // A newer queued intent for this game still governs the UI;
+                // this failure is history and must not touch state.
+                let superseded = notification
+                    .userInfo?[LibrarySyncFailureUserInfoKey.supersededByNewerIntent] as? Bool ?? false
+                guard superseded == false else { return }
+                // Reconcile against the failed operation's intended state —
+                // never by inverting whatever is currently on screen.
+                if let intended = notification
+                    .userInfo?[LibrarySyncFailureUserInfoKey.intendedIsFavorite] as? Bool {
+                    var updatedIDs = self.state.wishlistedGameIDs
+                    if intended {
+                        updatedIDs.remove(gameId)
+                    } else {
+                        updatedIDs.insert(gameId)
+                    }
+                    self.apply(.setWishlistedGameIDs(updatedIDs))
                 }
-                self.apply(.setWishlistedGameIDs(updatedIDs))
                 self.apply(.setError(L10n.tr("Localizable", "favorite.error.updateFailed")))
             }
             .store(in: &cancellables)

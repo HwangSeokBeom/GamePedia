@@ -32,9 +32,21 @@ final class APIClient {
     private let baseURL: URL
     private let session: URLSession
 
-    // MARK: User auth token (separate from Twitch token)
-    // TODO: Set this after user login, e.g. from Keychain
-    var userAuthToken: String? = nil
+    // MARK: User auth credential (separate from Twitch token)
+    // The atomic account→credential binding authority. Session adoption
+    // (login/refresh) and invalidation (logout/deletion) flow through it,
+    // so an account-bound request can validate ownership and snapshot the
+    // matching token under one lock. See `SessionCredentialAuthority`.
+    let credentialAuthority = SessionCredentialAuthority()
+
+    /// Legacy accessor over the authority: the mutable current-session
+    /// token. Reads are unchanged; the setter is the account-less legacy
+    /// seam (tests/diagnostics) — production session changes go through
+    /// `credentialAuthority` with account identity.
+    var userAuthToken: String? {
+        get { credentialAuthority.currentAccessToken }
+        set { credentialAuthority.adoptLegacyAccessToken(newValue) }
+    }
 
     // MARK: Init
     init(
@@ -55,8 +67,15 @@ final class APIClient {
     // MARK: - Public Interface
 
     /// Executes an endpoint and decodes the JSON response into type T.
-    func request<T: Decodable>(_ endpoint: Endpoint, as type: T.Type) async throws -> T {
-        let urlRequest = try await buildRequest(from: endpoint)
+    /// `authorization` decides how the Authorization credential is
+    /// resolved; account-critical mutations pass `.boundAccount`/`.guestOnly`
+    /// so a stale session fails before transmission.
+    func request<T: Decodable>(
+        _ endpoint: Endpoint,
+        as type: T.Type,
+        authorization: RequestAuthorization = .currentSession
+    ) async throws -> T {
+        let urlRequest = try await buildRequest(from: endpoint, authorization: authorization)
         let isGameRequest = endpoint.path.hasPrefix("/games")
         let homeEndpointName = homeEndpointName(for: endpoint.path)
         let homeLogPrefix = "[HomeAPI][\(AppConfig.apiEnvironment.rawValue)]"
@@ -235,8 +254,11 @@ final class APIClient {
         }
     }
 
-    func requestVoid(_ endpoint: Endpoint) async throws {
-        let urlRequest = try await buildRequest(from: endpoint)
+    func requestVoid(
+        _ endpoint: Endpoint,
+        authorization: RequestAuthorization = .currentSession
+    ) async throws {
+        let urlRequest = try await buildRequest(from: endpoint, authorization: authorization)
         if endpoint.path.contains("/reviews") {
             let bodyString = requestBodyPreview(from: urlRequest.httpBody)
             print("[ReviewSubmit] APIClient.requestVoid url=\(urlRequest.url?.absoluteString ?? "nil") method=\(urlRequest.httpMethod ?? "nil") headers=\(redactedHeaders(urlRequest.allHTTPHeaderFields)) bodyPrefix=\(bodyString)")
@@ -250,7 +272,10 @@ final class APIClient {
 
     // MARK: - Private: Request Builder
 
-    private func buildRequest(from endpoint: Endpoint) async throws -> URLRequest {
+    private func buildRequest(
+        from endpoint: Endpoint,
+        authorization: RequestAuthorization
+    ) async throws -> URLRequest {
         var components = URLComponents(
             url: baseURL.appendingPathComponent(endpoint.path),
             resolvingAgainstBaseURL: true
@@ -277,9 +302,31 @@ final class APIClient {
             request.httpBody = try JSONEncoder().encode(encodable)
         }
 
-        // Optional user JWT for custom backend endpoints
+        // Optional user JWT for custom backend endpoints. The credential is
+        // resolved according to the request's authorization mode; a failed
+        // resolution throws BEFORE any request is transmitted.
         if endpoint.requiresUserAuth {
-            guard let userToken = userAuthToken else {
+            let userToken: String
+            switch authorization {
+            case .currentSession:
+                // Legacy behavior: the mutable current-session token.
+                guard let current = credentialAuthority.currentAccessToken else {
+                    throw NetworkError.unauthorized
+                }
+                userToken = current
+            case .boundAccount(let expectation):
+                // Atomic bind: ownership validation and credential snapshot
+                // happen under one lock. A stale expectation (account
+                // replaced, logged out, deleted, or A → B → A since capture)
+                // fails here — the mutable current token is never read.
+                guard let snapshot = credentialAuthority.bindCredential(expectation: expectation) else {
+                    throw NetworkError.unauthorized
+                }
+                userToken = snapshot.accessToken
+            case .guestOnly:
+                // A guest-owned mutation can never attach a bearer token —
+                // not even one that appeared after the gesture. Deterministic
+                // unauthorized, no networking.
                 throw NetworkError.unauthorized
             }
             request.setValue("Bearer \(userToken)", forHTTPHeaderField: "Authorization")

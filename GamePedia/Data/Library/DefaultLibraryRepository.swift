@@ -189,7 +189,10 @@ final class DefaultLibraryRepository: LibraryRepository {
         }
     }
 
-    func updateGameStatus(request: LibraryGameStatusUpdateRequest) async throws -> LibraryGameStatusMutationResult {
+    func updateGameStatus(
+        request: LibraryGameStatusUpdateRequest,
+        authorization: RequestAuthorization
+    ) async throws -> LibraryGameStatusMutationResult {
         do {
             let data = try await libraryRemoteDataSource.updateGameStatus(
                 requestDTO: UpdateLibraryStatusRequestDTO(
@@ -198,7 +201,8 @@ final class DefaultLibraryRepository: LibraryRepository {
                     title: request.title,
                     coverUrl: request.coverImageURL?.absoluteString,
                     status: request.status.rawValue
-                )
+                ),
+                authorization: authorization
             )
             return try LibraryMapper.toStatusMutationResult(data)
         } catch {

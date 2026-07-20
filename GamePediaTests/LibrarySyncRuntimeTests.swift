@@ -64,7 +64,7 @@ final class LibrarySyncRuntimeTests: XCTestCase {
 
         // Before any session event, enqueues are rejected (no account).
         let rejected = await engine.enqueueFavoriteChange(gameID: "1", isFavorite: true)
-        XCTAssertFalse(rejected)
+        XCTAssertEqual(rejected, .serviceUnavailable)
 
         // The bridged authenticated notification activates the account.
         let activated = notificationExpectation(.librarySyncQueueDidChange, center: center)
@@ -80,7 +80,7 @@ final class LibrarySyncRuntimeTests: XCTestCase {
 
         let success = notificationExpectation(.favoriteDidChange, center: center)
         let accepted = await engine.enqueueFavoriteChange(gameID: "1", isFavorite: true)
-        XCTAssertTrue(accepted)
+        XCTAssertEqual(accepted, .accepted)
         await fulfillment(of: [success], timeout: 10)
     }
 

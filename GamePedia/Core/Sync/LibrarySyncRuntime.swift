@@ -109,6 +109,15 @@ final class LibrarySyncRuntime {
                     .userInfo?[AuthSessionChangeUserInfoKey.isAuthenticated] as? Bool ?? false
                 let userID = notification
                     .userInfo?[AuthSessionChangeUserInfoKey.userId] as? String
+                // Gesture-time ownership adopts the new scope synchronously,
+                // inside the notification delivery: a gesture performed after
+                // this event can only capture the new account, and captures
+                // from the old scope are already stale — even though the
+                // engine's own adoption below is asynchronous.
+                engine.ownershipContext.adoptSession(
+                    isAuthenticated: isAuthenticated,
+                    userID: userID
+                )
                 Task {
                     await engine.sessionDidChange(isAuthenticated: isAuthenticated, userID: userID)
                 }
@@ -123,6 +132,10 @@ final class LibrarySyncRuntime {
             ) { notification in
                 guard let userID = notification
                     .userInfo?[AuthSessionChangeUserInfoKey.userId] as? String else { return }
+                // Same synchronous ownership invalidation as the session
+                // bridge: no gesture may capture the deleted account's scope
+                // after this notification.
+                engine.ownershipContext.invalidateAccount(userID)
                 Task { await engine.accountDidDelete(userID: userID) }
             }
         )

@@ -36,18 +36,18 @@ final class LibrarySyncStoreTests: XCTestCase {
         )
     }
 
-    func testPersistAndLoadRoundTripPreservesOperations() async {
+    func testPersistAndLoadRoundTripPreservesOperations() async throws {
         let operations = [makeOperation(), makeOperation(gameID: "7")]
-        await store.persist(operations, accountID: "user-a")
+        try await store.persist(operations, accountID: "user-a")
 
         let result = await store.load(accountID: "user-a")
         XCTAssertEqual(result.operations, operations)
         XCTAssertFalse(result.recoveredFromCorruption)
     }
 
-    func testAccountsAreIsolatedOnDisk() async {
-        await store.persist([makeOperation(accountID: "user-a")], accountID: "user-a")
-        await store.persist([makeOperation(accountID: "user-b", gameID: "9")], accountID: "user-b")
+    func testAccountsAreIsolatedOnDisk() async throws {
+        try await store.persist([makeOperation(accountID: "user-a")], accountID: "user-a")
+        try await store.persist([makeOperation(accountID: "user-b", gameID: "9")], accountID: "user-b")
 
         let loadedA = await store.load(accountID: "user-a")
         let loadedB = await store.load(accountID: "user-b")
@@ -100,7 +100,7 @@ final class LibrarySyncStoreTests: XCTestCase {
         let loaded = await store.load(accountID: "user-a")
         XCTAssertTrue(loaded.operations.isEmpty)
 
-        await store.persist([makeOperation()], accountID: "user-a")
+        try await store.persist([makeOperation()], accountID: "user-a")
         let untouched = try Data(contentsOf: futureURL)
         XCTAssertEqual(untouched, futureContents, "a rollback must never corrupt newer-schema data")
     }
@@ -123,7 +123,7 @@ final class LibrarySyncStoreTests: XCTestCase {
 
         // The store keeps working after recovery.
         let operations = [makeOperation()]
-        await store.persist(operations, accountID: "user-a")
+        try await store.persist(operations, accountID: "user-a")
         let reloaded = await store.load(accountID: "user-a")
         XCTAssertEqual(reloaded.operations, operations)
         XCTAssertFalse(reloaded.recoveredFromCorruption)
@@ -145,8 +145,8 @@ final class LibrarySyncStoreTests: XCTestCase {
     // MARK: 8-support. Purge
 
     func testPurgeRemovesQueueAndQuarantineFilesForTheAccountOnly() async throws {
-        await store.persist([makeOperation()], accountID: "user-a")
-        await store.persist([makeOperation(accountID: "user-b", gameID: "9")], accountID: "user-b")
+        try await store.persist([makeOperation()], accountID: "user-a")
+        try await store.persist([makeOperation(accountID: "user-b", gameID: "9")], accountID: "user-b")
 
         // Also leave a quarantined artifact for user-a.
         let corruptURL = currentFileURL(accountID: "user-a").appendingPathExtension("corrupt")
@@ -162,11 +162,11 @@ final class LibrarySyncStoreTests: XCTestCase {
         XCTAssertEqual(loadedB.operations.count, 1)
     }
 
-    func testPersistingEmptyQueueRemovesTheFile() async {
-        await store.persist([makeOperation()], accountID: "user-a")
+    func testPersistingEmptyQueueRemovesTheFile() async throws {
+        try await store.persist([makeOperation()], accountID: "user-a")
         XCTAssertTrue(FileManager.default.fileExists(atPath: currentFileURL(accountID: "user-a").path))
 
-        await store.persist([], accountID: "user-a")
+        try await store.persist([], accountID: "user-a")
         XCTAssertFalse(FileManager.default.fileExists(atPath: currentFileURL(accountID: "user-a").path))
     }
 }

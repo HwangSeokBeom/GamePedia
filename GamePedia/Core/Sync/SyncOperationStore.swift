@@ -30,7 +30,9 @@ struct SyncStoreLoadResult {
 
 protocol SyncOperationStoring: Sendable {
     func load(accountID: String) async -> SyncStoreLoadResult
-    func persist(_ operations: [LibrarySyncOperation], accountID: String) async
+    /// Durably writes the queue, or throws. Callers must not acknowledge an
+    /// enqueue (or consider a cleanup applied) unless this returns.
+    func persist(_ operations: [LibrarySyncOperation], accountID: String) async throws
     /// Removes every schema version of the account's queue. Used for account
     /// deletion cleanup.
     func purge(accountID: String) async
@@ -94,7 +96,7 @@ actor FileSyncOperationStore: SyncOperationStoring {
         }
     }
 
-    func persist(_ operations: [LibrarySyncOperation], accountID: String) async {
+    func persist(_ operations: [LibrarySyncOperation], accountID: String) async throws {
         let url = fileURL(accountID: accountID, schemaVersion: Self.currentSchemaVersion)
         do {
             try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
@@ -109,12 +111,16 @@ actor FileSyncOperationStore: SyncOperationStoring {
                 operations: operations
             )
             let data = try encoder.encode(envelope)
-            try data.write(to: url, options: .atomic)
+            // File protection: readable after the first unlock so a
+            // background drain can still reach the queue. The OS enforces
+            // this on device hardware only; nothing beyond the write
+            // succeeding is claimed here.
+            try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         } catch {
-            // Persistence failure must never crash the app or drop the
-            // in-memory queue; the queue simply loses restart durability
-            // until the next successful write.
+            // The caller owns the acknowledgement decision; never report a
+            // write that did not happen as durable.
             print("[Sync] store persist failed code=STORE_WRITE_FAILED")
+            throw error
         }
     }
 
