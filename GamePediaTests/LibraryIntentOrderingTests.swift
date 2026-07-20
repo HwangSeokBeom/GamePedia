@@ -144,7 +144,8 @@ final class LibraryIntentOrderingTests: XCTestCase {
         let secondResult = await engine.enqueueFavoriteChange(gameID: "42", isFavorite: false, ownership: second)
         XCTAssertEqual(secondResult, .supersededByNewerIntent)
 
-        transport.resolveHeldWithDefaultSuccess(index: 0)
+        // Observers first, trigger last: the engine may post the applied
+        // notification as soon as the held outcome is released.
         let applied = notificationExpectation(.favoriteDidChange, center: center) { notification in
             notification.userInfo?[FavoriteChangeUserInfoKey.isFavorite] as? Bool == true
         }
@@ -152,6 +153,7 @@ final class LibraryIntentOrderingTests: XCTestCase {
         transport.onCall = { [transport] call in
             if call.index == 1 { transport?.resolveHeldWithDefaultSuccess(index: 1) }
         }
+        transport.resolveHeldWithDefaultSuccess(index: 0)
         await fulfillment(of: [applied], timeout: 10)
         // Only sequences 1 and 3 were ever submitted, in FIFO order.
         XCTAssertEqual(transport.calls.map { $0.operation.sequence }, [1, 3])
@@ -181,8 +183,10 @@ final class LibraryIntentOrderingTests: XCTestCase {
         let firstResult = await engine.enqueueFavoriteChange(gameID: "42", isFavorite: true, ownership: first)
         XCTAssertEqual(firstResult, .supersededByNewerIntent)
 
-        transport.resolveHeldWithDefaultSuccess(index: 0)
+        // Observers first, trigger last: the engine may post the applied
+        // notification as soon as the held outcome is released.
         let applied = notificationExpectation(.favoriteDidChange, center: center)
+        transport.resolveHeldWithDefaultSuccess(index: 0)
         await fulfillment(of: [applied], timeout: 10)
         XCTAssertEqual(transport.calls.count, 1)
         XCTAssertEqual(transport.calls[0].operation.sequence, 2)

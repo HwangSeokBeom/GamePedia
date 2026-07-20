@@ -45,6 +45,9 @@ final class RequestCoordinationTests: XCTestCase {
         }
     }
 
+    /// Must be installed BEFORE the task that runs the operation is spawned:
+    /// `onStarted` only fires going forward, so an observer installed after
+    /// the start was already counted can never fulfill.
     private func expectStarted(_ operation: GatedOperation, count: Int) -> XCTestExpectation {
         let started = expectation(description: "operation start #\(count)")
         operation.onStarted = { current in
@@ -108,24 +111,24 @@ final class RequestCoordinationTests: XCTestCase {
         let counter = GatedOperation()
 
         counter.onStarted = nil
+        let started = expectStarted(counter, count: 1)
         let first = Task {
             try await coordinator.value(for: "k") {
                 await counter.run()
                 return 1
             }
         }
-        let started = expectStarted(counter, count: 1)
         await fulfillment(of: [started], timeout: 2)
         counter.release()
         _ = try await first.value
 
+        let startedAgain = expectStarted(counter, count: 2)
         let second = Task {
             try await coordinator.value(for: "k") {
                 await counter.run()
                 return 2
             }
         }
-        let startedAgain = expectStarted(counter, count: 2)
         await fulfillment(of: [startedAgain], timeout: 2)
         counter.release()
         let secondValue = try await second.value
@@ -203,8 +206,8 @@ final class RequestCoordinationTests: XCTestCase {
             }
         }
 
-        let first = Task { try await fetch() }
         let started = expectStarted(counter, count: 1)
+        let first = Task { try await fetch() }
         await fulfillment(of: [started], timeout: 2)
         counter.release()
         let firstValue = try await first.value
@@ -218,8 +221,8 @@ final class RequestCoordinationTests: XCTestCase {
 
         // Past TTL: re-executes.
         clock.advance(2)
-        let second = Task { try await fetch() }
         let startedAgain = expectStarted(counter, count: 2)
+        let second = Task { try await fetch() }
         await fulfillment(of: [startedAgain], timeout: 2)
         counter.release()
         let secondValue = try await second.value
@@ -232,13 +235,13 @@ final class RequestCoordinationTests: XCTestCase {
         let coordinator = RequestCoordinator<String, Int>(successTTL: 30)
         let counter = GatedOperation()
 
+        let started = expectStarted(counter, count: 1)
         let failing = Task {
             try await coordinator.value(for: "k") { () -> Int in
                 await counter.run()
                 throw TestFailure()
             }
         }
-        let started = expectStarted(counter, count: 1)
         await fulfillment(of: [started], timeout: 2)
         counter.release()
         do {
@@ -246,13 +249,13 @@ final class RequestCoordinationTests: XCTestCase {
             XCTFail("expected failure")
         } catch {}
 
+        let startedAgain = expectStarted(counter, count: 2)
         let retry = Task {
             try await coordinator.value(for: "k") { () -> Int in
                 await counter.run()
                 return 5
             }
         }
-        let startedAgain = expectStarted(counter, count: 2)
         await fulfillment(of: [startedAgain], timeout: 2)
         counter.release()
         let value = try await retry.value
