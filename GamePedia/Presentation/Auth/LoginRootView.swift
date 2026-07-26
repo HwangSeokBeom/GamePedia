@@ -1,4 +1,5 @@
 import AuthenticationServices
+import GoogleSignIn
 import UIKit
 
 final class LoginRootView: UIView {
@@ -24,7 +25,13 @@ final class LoginRootView: UIView {
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
-    let googleButton = UIButton(type: .system)
+    let googleButton: GIDSignInButton = {
+        let button = GIDSignInButton()
+        button.style = .wide
+        button.colorScheme = .dark
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
     let signUpButton = UIButton(type: .system)
     let forgotPasswordButton = UIButton(type: .system)
 
@@ -184,7 +191,7 @@ final class LoginRootView: UIView {
 
             loginButton.heightAnchor.constraint(equalToConstant: 52),
             appleButton.heightAnchor.constraint(equalToConstant: 52),
-            googleButton.heightAnchor.constraint(equalToConstant: 52),
+            googleButton.heightAnchor.constraint(equalToConstant: 48),
 
             footerStack.topAnchor.constraint(equalTo: formCardView.bottomAnchor, constant: 18),
             footerStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
@@ -241,8 +248,6 @@ final class LoginRootView: UIView {
 
     private func configureControls() {
         loginButton.configuration = makePrimaryButton(title: L10n.tr("Localizable", "auth.login.button"))
-        googleButton.configuration = makeSecondaryButton(title: L10n.tr("Localizable", "auth.login.google"), systemImageName: "globe")
-        googleButton.contentHorizontalAlignment = .center
 
         signUpButton.configuration = makeFooterButton(title: L10n.tr("Localizable", "auth.login.signUp"), tintColor: .gpPrimary)
         forgotPasswordButton.configuration = makeFooterButton(title: L10n.tr("Localizable", "auth.login.forgotPassword"), tintColor: .gpTextSecondary)
