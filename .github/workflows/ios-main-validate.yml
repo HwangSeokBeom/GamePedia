@@ -82,8 +82,8 @@ jobs:
           echo "APP_STORE_PROVISIONING_PROFILE_NAME=$APP_PROFILE_NAME" >> "$GITHUB_ENV"
           echo "APP_STORE_WIDGET_PROVISIONING_PROFILE_NAME=$WIDGET_PROFILE_NAME" >> "$GITHUB_ENV"
 
-      - name: Validate production archive path
-        # main push validates the release archive only; uploads stay explicit.
+      - name: Validate production pre-archive path
+        # main push stops before archive creation; archive/upload stay explicit.
         env:
           CI: "true"
-        run: bundle exec fastlane ios release_archive
+        run: bundle exec fastlane ios release_preflight

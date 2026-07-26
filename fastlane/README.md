@@ -37,7 +37,31 @@ Build the staging app and upload it to TestFlight
 [bundle exec] fastlane ios release_archive
 ```
 
-Build a production archive without uploading it
+Validate the production archive path on main without uploading
+
+### ios release_preflight
+
+```sh
+[bundle exec] fastlane ios release_preflight
+```
+
+Validate the production Release build without creating an archive
+
+### ios release
+
+```sh
+[bundle exec] fastlane ios release
+```
+
+Build the production app and upload it to App Store Connect only when explicitly triggered
+
+### ios release_upload
+
+```sh
+[bundle exec] fastlane ios release_upload
+```
+
+Compatibility alias for the production upload lane
 
 ----
 
