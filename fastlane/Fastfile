@@ -124,10 +124,32 @@ platform :ios do
     project = Xcodeproj::Project.open(project_path)
     target = target_named!(project, target_name)
     configuration = configuration_named!(target, configuration_name)
+    marketing_version = configuration.build_settings["MARKETING_VERSION"].to_s.strip
+    build_number = configuration.build_settings["CURRENT_PROJECT_VERSION"].to_s.strip
+
+    return {
+      marketing_version: marketing_version,
+      build_number: build_number
+    } unless marketing_version.empty? || build_number.empty?
+
+    output = sh(
+      [
+        "xcodebuild",
+        xcodebuild_container_arguments,
+        "-target #{Shellwords.escape(target_name)}",
+        "-configuration #{Shellwords.escape(configuration_name)}",
+        "-showBuildSettings"
+      ].join(" "),
+      log: false
+    )
+    effective_settings = output.each_line.each_with_object({}) do |line, settings|
+      match = line.match(/^\s*(MARKETING_VERSION|CURRENT_PROJECT_VERSION) = (.+?)\s*$/)
+      settings[match[1]] = match[2] if match
+    end
 
     {
-      marketing_version: configuration.build_settings["MARKETING_VERSION"].to_s.strip,
-      build_number: configuration.build_settings["CURRENT_PROJECT_VERSION"].to_s.strip
+      marketing_version: marketing_version.empty? ? effective_settings["MARKETING_VERSION"].to_s.strip : marketing_version,
+      build_number: build_number.empty? ? effective_settings["CURRENT_PROJECT_VERSION"].to_s.strip : build_number
     }
   end
 
@@ -538,6 +560,42 @@ platform :ios do
       archive_path: "build/archives/GamePedia.xcarchive",
       skip_package_ipa: true,
       skip_package_pkg: true
+    )
+  end
+
+  desc "Validate the production Release build without creating an archive"
+  lane :release_preflight do |_options|
+    release_marketing_version = current_marketing_version(configuration_name: "Release")
+    release_build_number = current_build_number(configuration_name: "Release")
+
+    log_project_versioning!(
+      label: "Release preflight using committed project versioning",
+      configuration_name: "Release"
+    )
+    log_effective_xcodebuild_versioning!(configuration_name: "Release")
+    log_distribution_context!(
+      build_type: "production-preflight",
+      scheme: "GamePedia-Prod",
+      configuration: "Release",
+      api_environment: "production",
+      upload_destination: "None (no archive, no upload)",
+      marketing_version: release_marketing_version,
+      build_number: release_build_number
+    )
+
+    sh(
+      [
+        "xcodebuild",
+        xcodebuild_container_arguments,
+        "-scheme GamePedia-Prod",
+        "-configuration Release",
+        "-destination 'generic/platform=iOS'",
+        "-derivedDataPath build/prearchive-derived",
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGNING_REQUIRED=NO",
+        "CODE_SIGN_IDENTITY=''",
+        "clean build"
+      ].join(" ")
     )
   end
 
