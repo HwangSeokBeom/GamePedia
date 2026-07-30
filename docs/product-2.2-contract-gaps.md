@@ -69,7 +69,9 @@ contents are untyped even though the surrounding response is typed.
 | `searchCatalogGames` → `data.meta` | Holds the pagination cursor. Unreadable without guessing a key, so catalog search asks for one page at the contract maximum (`limit=50`) and does not paginate. |
 | `listPlaySessions` → `data.meta` | Same; Playlog lists one page at `limit=50`. |
 | `ProductConfig.limits` | Not read. |
-| `ProductConfig.allowlists` | Read *defensively* by `ProductConfigMapper`: if a `productEventCodes` array of strings is present it narrows what the app sends, and if it is absent or shaped differently the app falls back to the contract's own `eventCode` enum. Nothing depends on the key existing, and the value can only ever restrict — an event's validity is already guaranteed by the generated enum, which cannot express an undeclared code. |
+| `PublicArticle.heroImage` | Declared `{"type": ["object","null"]}` inline instead of `$ref: ArticleHeroImage`, so the article **detail** cannot type its hero. The reader takes the hero from the typed `ArticleSummary` card it was opened from; an article reached without a card shows no hero rather than an unreviewed one. |
+| `PublicArticle.relatedGames` | Declared `{"items": {"type": "object"}}` instead of `$ref: ArticleRelatedGame`. Same treatment: related games come from the typed card, and are otherwise omitted. Note `ArticleSummary` gets both of these right — only the detail schema is untyped. |
+| `ProductConfig.limits` | Read *defensively* by `ProductConfigMapper`: if a `productEventCodes` array of strings is present it narrows what the app sends, and if it is absent or shaped differently the app falls back to the contract's own `eventCode` enum. Nothing depends on the key existing, and the value can only ever restrict — an event's validity is already guaranteed by the generated enum, which cannot express an undeclared code. |
 
 ## Blocked — reported, not faked
 
