@@ -49,6 +49,13 @@ public enum Product22JSON {
         container.value as? Bool
     }
 
+    /// The keys actually present in an untyped object. Lets a caller assert
+    /// that a field it never confirmed was not sent, without reaching for the
+    /// runtime's container API.
+    public static func keys(_ container: Product22JSONObject) -> Set<String> {
+        Set(container.value.keys)
+    }
+
     /// An array of strings at `key`, or nil if it is absent or shaped
     /// differently. Never throws and never partially succeeds: a mixed array
     /// yields nil rather than a silently filtered subset.
