@@ -1,0 +1,319 @@
+{
+  "success": true,
+  "data": {
+    "generatedAt": "2026-07-30T09:00:00.000Z",
+    "timezone": "Asia/Seoul",
+    "locale": "ko",
+    "sections": [
+      {
+        "key": "playCompass",
+        "status": "ok",
+        "reasonCode": null,
+        "data": {
+          "recommendations": [
+            {
+              "catalogGameId": "7a1f2b3c-4d5e-4f60-8a91-2b3c4d5e6f70",
+              "title": "Hollow Knight",
+              "rank": 1,
+              "score": 0.8125,
+              "scoreComponents": {
+                "platform": 1,
+                "timeFit": 0.9,
+                "continuity": 0.75,
+                "social": 0,
+                "energy": 0.5,
+                "mood": 0.6,
+                "recency": 0.4,
+                "snooze": 0,
+                "friendOverlap": 0
+              },
+              "reasonCodes": [
+                "fits_available_time",
+                "already_in_progress",
+                "platform_available",
+                "owned_on_steam"
+              ],
+              "estimatedSessionMinutes": 55,
+              "estimatedSessionBasis": "playlog_median",
+              "ownershipEvidence": {
+                "source": "STEAM",
+                "externalGameId": "367520",
+                "libraryStatus": "PLAYING",
+                "provenance": "PROVIDER_VERIFIED",
+                "playtimeMinutes": 1840,
+                "lastPlayedAt": "2026-07-27T13:20:00.000Z",
+                "installEvidence": {
+                  "known": false,
+                  "reason": "install_state_not_tracked"
+                },
+                "ownershipVerified": true
+              }
+            },
+            {
+              "catalogGameId": "8b2f3c4d-5e6f-4071-9ba2-3c4d5e6f7081",
+              "title": "Slay the Spire",
+              "rank": 2,
+              "score": 0.7040,
+              "scoreComponents": {
+                "platform": 1,
+                "timeFit": 1,
+                "continuity": 0.2,
+                "social": 0,
+                "energy": 0.8,
+                "mood": 0.4,
+                "recency": 0.1,
+                "snooze": 0
+              },
+              "reasonCodes": [
+                "shorter_than_available_time",
+                "backlog_oldest_untouched",
+                "low_energy_friendly"
+              ],
+              "estimatedSessionMinutes": 25,
+              "estimatedSessionBasis": "genre_short_session",
+              "ownershipEvidence": {
+                "source": "STEAM",
+                "externalGameId": "646570",
+                "libraryStatus": "BACKLOG",
+                "provenance": "USER_CONFIRMED",
+                "playtimeMinutes": null,
+                "lastPlayedAt": null,
+                "installEvidence": {
+                  "known": false,
+                  "reason": "install_state_not_tracked"
+                },
+                "ownershipVerified": false
+              }
+            }
+          ],
+          "confidence": "MEDIUM",
+          "dataFreshness": {
+            "candidatePoolSize": 42,
+            "freshestLibraryUpdateAt": "2026-07-30T06:10:00.000Z",
+            "playlogSampleSize": 31,
+            "stale": false
+          },
+          "emptyReason": null,
+          "ownedOnly": true
+        }
+      },
+      {
+        "key": "gameDNA",
+        "status": "ok",
+        "reasonCode": null,
+        "data": {
+          "signalCount": 68,
+          "confidence": "HIGH",
+          "generatedAt": "2026-07-30T08:55:00.000Z",
+          "topGenres": [
+            { "genre": "Metroidvania", "weight": 21, "share": 0.34 },
+            { "genre": "Roguelike", "weight": 14, "share": 0.23 },
+            { "genre": "RPG", "weight": 9, "share": 0.15 }
+          ],
+          "sessionLengthLabel": "MIXED",
+          "socialLabel": "SINGLEPLAYER",
+          "toneLabel": "CHALLENGE",
+          "missingSignals": ["mood_tags", "completion_outcomes"],
+          "reasonCodes": ["playlog_sample_sufficient", "library_breadth_narrow"]
+        }
+      },
+      {
+        "key": "gameBriefing",
+        "status": "ok",
+        "reasonCode": null,
+        "data": {
+          "items": [
+            {
+              "catalogGameId": "9c3f4d5e-6f70-4182-8cb3-4d5e6f708192",
+              "title": "블루 아카이브",
+              "updatedAt": "2026-07-29T22:00:00.000Z",
+              "noteworthyReleases": [
+                {
+                  "countryCode": "JP",
+                  "platform": "iOS",
+                  "serviceStatus": "LIVE",
+                  "shutdownDate": null,
+                  "provenance": "OFFICIAL_SOURCE"
+                },
+                {
+                  "countryCode": "KR",
+                  "platform": "Android",
+                  "serviceStatus": "SUNSET_ANNOUNCED",
+                  "shutdownDate": "2026-11-30",
+                  "provenance": "OFFICIAL_SOURCE"
+                }
+              ]
+            }
+          ],
+          "emptyReason": null,
+          "generatedAt": "2026-07-30T08:58:00.000Z"
+        }
+      },
+      {
+        "key": "backlogRescue",
+        "status": "ok",
+        "reasonCode": null,
+        "data": {
+          "items": [
+            {
+              "catalogGameId": "ad4f5e6f-7081-4293-9dc4-5e6f70819203",
+              "title": "Outer Wilds",
+              "addedAt": "2025-12-02T11:00:00.000Z",
+              "reasonCode": "backlog_never_logged",
+              "ownershipProvenance": "PROVIDER_VERIFIED"
+            }
+          ],
+          "emptyReason": null
+        }
+      },
+      {
+        "key": "spoilerFreeStartGuide",
+        "status": "ok",
+        "reasonCode": null,
+        "data": {
+          "items": [
+            {
+              "catalogGameId": "be5f6f70-8192-43a4-8ed5-6f7081920314",
+              "title": "Disco Elysium",
+              "libraryStatus": "BACKLOG",
+              "genres": ["RPG", "Adventure"],
+              "platforms": ["PC", "Nintendo Switch"],
+              "estimatedFirstSessionMinutes": 90,
+              "soloFriendly": true,
+              "partyFriendly": false,
+              "spoilerFree": true
+            }
+          ],
+          "emptyReason": null
+        }
+      },
+      {
+        "key": "editorialCuration",
+        "status": "ok",
+        "reasonCode": null,
+        "data": {
+          "articles": [
+            {
+              "slug": "korean-mobile-mmo-shutdown-wave-2026",
+              "status": "PUBLISHED",
+              "locale": "ko",
+              "headline": "2026년 국내 모바일 MMO 서비스 종료 흐름 정리",
+              "excerpt": "올해 상반기 국내에서 서비스를 종료했거나 종료를 예고한 모바일 MMO를 한자리에 모았습니다.",
+              "publishedAt": "2026-07-28T02:00:00.000Z",
+              "correctedAt": null,
+              "heroImage": {
+                "url": "https://cdn.gamepedia.example/press/mmo-wave-2026.jpg",
+                "rightsStatus": "OFFICIAL_PRESS_KIT",
+                "attribution": "제공: 각 배급사 공식 프레스킷"
+              },
+              "heroImageWithheldReason": null,
+              "relatedGames": [
+                {
+                  "catalogGameId": "9c3f4d5e-6f70-4182-8cb3-4d5e6f708192",
+                  "relation": "SUBJECT"
+                }
+              ],
+              "sourceCount": 4
+            },
+            {
+              "slug": "steam-deck-verified-korean-indies",
+              "status": "CORRECTED",
+              "locale": "ko",
+              "headline": "스팀덱에서 잘 도는 한국 인디 게임 12선",
+              "excerpt": "실제 검증 등급과 커뮤니티 리포트를 함께 확인했습니다.",
+              "publishedAt": "2026-07-20T05:30:00.000Z",
+              "correctedAt": "2026-07-26T09:15:00.000Z",
+              "heroImage": null,
+              "heroImageWithheldReason": "rights_status_unresolved",
+              "relatedGames": [],
+              "sourceCount": 2
+            }
+          ],
+          "emptyReason": null
+        }
+      },
+      {
+        "key": "monthlyReplay",
+        "status": "ok",
+        "reasonCode": null,
+        "data": {
+          "monthKey": "2026-07",
+          "timezone": "Asia/Seoul",
+          "isEmpty": false,
+          "playedDayCount": 18,
+          "totalMinutes": 1265,
+          "mostPlayedGame": {
+            "catalogGameId": "7a1f2b3c-4d5e-4f60-8a91-2b3c4d5e6f70",
+            "title": "Hollow Knight",
+            "totalMinutes": 620,
+            "sessionCount": 11,
+            "minutesKnown": true
+          },
+          "surpriseGame": {
+            "catalogGameId": "be5f6f70-8192-43a4-8ed5-6f7081920314",
+            "title": "Disco Elysium",
+            "totalMinutes": 180,
+            "sessionCount": 2,
+            "reasonCode": "first_played_this_month"
+          },
+          "missingData": [
+            {
+              "code": "duration_missing",
+              "affectedSessionCount": 3,
+              "effect": "총 플레이 시간에서 제외됨"
+            }
+          ]
+        }
+      },
+      {
+        "key": "friendActivity",
+        "status": "ok",
+        "reasonCode": null,
+        "data": {
+          "items": [
+            {
+              "activityId": "cf607081-9203-44b5-9fe6-708192031425",
+              "actorUserId": "d0718192-0314-46c6-8007-819203142536",
+              "activityType": "REVIEW_CREATED",
+              "catalogGameId": "7a1f2b3c-4d5e-4f60-8a91-2b3c4d5e6f70",
+              "legacyIdentity": {
+                "gameSource": "STEAM",
+                "externalGameId": "367520",
+                "igdbGameId": "2680"
+              },
+              "createdAt": "2026-07-30T01:05:00.000Z"
+            },
+            {
+              "activityId": "e1829203-1425-47d7-9118-920314253647",
+              "actorUserId": "f2930314-2536-48e8-8229-031425364758",
+              "activityType": "STEAM_RECENTLY_PLAYED_SYNC",
+              "catalogGameId": null,
+              "legacyIdentity": {
+                "gameSource": null,
+                "externalGameId": null,
+                "igdbGameId": null
+              },
+              "createdAt": "2026-07-29T18:40:00.000Z"
+            }
+          ],
+          "emptyReason": null
+        }
+      }
+    ],
+    "meta": {
+      "sectionOrder": [
+        "playCompass",
+        "gameDNA",
+        "gameBriefing",
+        "backlogRescue",
+        "spoilerFreeStartGuide",
+        "editorialCuration",
+        "monthlyReplay",
+        "friendActivity"
+      ],
+      "limit": 8,
+      "nextCursor": null,
+      "partialFailure": false
+    }
+  }
+}

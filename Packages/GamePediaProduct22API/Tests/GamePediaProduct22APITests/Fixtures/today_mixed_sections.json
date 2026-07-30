@@ -1,0 +1,68 @@
+{
+  "success": true,
+  "data": {
+    "generatedAt": "2026-07-30T09:10:00.000Z",
+    "timezone": "Asia/Seoul",
+    "locale": "ko",
+    "sections": [
+      {
+        "key": "playCompass",
+        "status": "ok",
+        "reasonCode": null,
+        "data": {
+          "recommendations": [],
+          "confidence": "LOW",
+          "dataFreshness": {
+            "candidatePoolSize": 0,
+            "freshestLibraryUpdateAt": null,
+            "playlogSampleSize": 0,
+            "stale": true
+          },
+          "emptyReason": "no_owned_playing_or_backlog_games",
+          "ownedOnly": true
+        }
+      },
+      {
+        "key": "gameDNA",
+        "status": "unavailable",
+        "reasonCode": "SECTION_TIMEOUT",
+        "data": null
+      },
+      {
+        "key": "editorialCuration",
+        "status": "ok",
+        "reasonCode": null,
+        "data": {
+          "articles": [],
+          "emptyReason": "no_published_articles"
+        }
+      },
+      {
+        "key": "monthlyReplay",
+        "status": "ok",
+        "reasonCode": null,
+        "data": {
+          "monthKey": "2026-07",
+          "timezone": "Asia/Seoul",
+          "isEmpty": true,
+          "playedDayCount": 0,
+          "totalMinutes": 0,
+          "mostPlayedGame": null,
+          "surpriseGame": null,
+          "missingData": []
+        }
+      }
+    ],
+    "meta": {
+      "sectionOrder": [
+        "playCompass",
+        "gameDNA",
+        "editorialCuration",
+        "monthlyReplay"
+      ],
+      "limit": 8,
+      "nextCursor": null,
+      "partialFailure": true
+    }
+  }
+}
