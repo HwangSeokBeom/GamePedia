@@ -1,7 +1,5 @@
 import Foundation
 import GamePediaProduct22API
-import HTTPTypes
-import OpenAPIRuntime
 
 // MARK: - Product22Authorization
 //
@@ -15,17 +13,16 @@ enum Product22Authorization: Equatable, Sendable {
 
     /// Anonymous. No Authorization header is attached, ever.
     ///
-    /// The Product 2.2 contract currently declares `bearerAuth` globally and
-    /// the server puts `authenticateAccessToken` on every route, so no
-    /// operation is anonymous today. The case exists so that a future public
-    /// operation is expressed rather than accidentally authenticated, and so
-    /// tests can assert that nothing forces a header on.
+    /// The Product 2.2 contract declares `bearerAuth` globally and the server
+    /// puts `authenticateAccessToken` on every route, so no operation is
+    /// anonymous today. The case exists so that a future public operation is
+    /// expressed rather than accidentally authenticated, and so tests can
+    /// assert that nothing forces a header on.
     case anonymous
 
     /// Reads the current session credential when the request is built. For
-    /// reads, which are not account-critical: the worst case is that a read
-    /// issued across a session change returns the new account's data, and the
-    /// caller discards it anyway (see `Product22RequestGuard`).
+    /// reads, which are not account-critical: a read issued across a session
+    /// change is discarded by the repository rather than displayed.
     case currentSession
 
     /// Atomic bind against a gesture-time account expectation. Every mutation
@@ -59,9 +56,13 @@ enum Product22AuthorizationContext {
     }
 }
 
-// MARK: - Product22AuthorizationMiddleware
+// MARK: - Product22AuthorizationPolicy
 //
-// Attaches the Authorization header, or refuses to.
+// The credential rules, as a plain function of (authorization, authority).
+//
+// The `ClientMiddleware` conformance itself lives in the API package so the
+// app never links OpenAPIRuntime or HTTPTypes; this type supplies the policy
+// the package's middleware calls into.
 //
 // What it deliberately does NOT do:
 //   - refresh a token (the existing auth layer owns refresh; a second refresh
@@ -69,53 +70,45 @@ enum Product22AuthorizationContext {
 //   - retry anything
 //   - read the mutable current token for an account-bound request
 
-struct Product22AuthorizationMiddleware: ClientMiddleware {
+enum Product22AuthorizationPolicy {
 
-    private let authority: SessionCredentialAuthority
-
-    init(authority: SessionCredentialAuthority) {
-        self.authority = authority
-    }
-
-    // The isolation annotations are explicit because the app target builds
-    // with SWIFT_APPROACHABLE_CONCURRENCY while OpenAPIRuntime does not: the
-    // app's default would infer `nonisolated(nonsending)` for the `next`
-    // closure, which no longer matches the protocol's `@concurrent` one.
-    @concurrent
-    func intercept(
-        _ request: HTTPRequest,
-        body: HTTPBody?,
-        baseURL: URL,
-        operationID: String,
-        next: @Sendable @concurrent (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)
-    ) async throws -> (HTTPResponse, HTTPBody?) {
-        var request = request
-
-        switch Product22AuthorizationContext.current {
+    static func decide(
+        _ authorization: Product22Authorization,
+        authority: SessionCredentialAuthority
+    ) -> BearerAuthorizationMiddleware.Decision {
+        switch authorization {
         case .anonymous:
             // Nothing attached. Not even if a session exists.
-            break
+            return .omit
 
         case .currentSession:
             guard let token = authority.currentAccessToken else {
-                throw Product22Error.unauthorized
+                return .refuse(Product22Error.unauthorized)
             }
-            request.headerFields[.authorization] = "Bearer \(token)"
+            return .attach(token: token)
 
         case .boundAccount(let expectation):
             // Ownership validation and credential snapshot happen under one
             // lock inside the authority, so nothing can slip between them.
             guard let snapshot = authority.bindCredential(expectation: expectation) else {
-                throw Product22Error.accountChanged
+                return .refuse(Product22Error.accountChanged)
             }
-            request.headerFields[.authorization] = "Bearer \(snapshot.accessToken)"
+            return .attach(token: snapshot.accessToken)
 
         case .guestOnly:
             // Deterministic refusal, no networking. A guest gesture can never
             // mutate an account that logged in after the gesture.
-            throw Product22Error.unauthorized
+            return .refuse(Product22Error.unauthorized)
         }
+    }
 
-        return try await next(request, body, baseURL)
+    /// The middleware the client is built with. It reads the task local at
+    /// intercept time, so one client serves every authorization mode.
+    static func makeMiddleware(
+        authority: SessionCredentialAuthority
+    ) -> BearerAuthorizationMiddleware {
+        BearerAuthorizationMiddleware { _ in
+            decide(Product22AuthorizationContext.current, authority: authority)
+        }
     }
 }

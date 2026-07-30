@@ -1,6 +1,5 @@
 import Foundation
 import GamePediaProduct22API
-import OpenAPIRuntime
 
 // MARK: - QuickAddMapper
 
@@ -49,13 +48,13 @@ enum QuickAddMapper {
 
     private static func confirmedFields(
         _ fields: QuickAddConfirmedFields
-    ) throws -> OpenAPIObjectContainer {
-        var raw: [String: (any Sendable)?] = [:]
+    ) throws -> Product22JSONObject {
+        var raw: [String: any Sendable] = [:]
         if let title = fields.originalTitle { raw["originalTitle"] = title }
         if let developer = fields.developerName { raw["developerName"] = developer }
         if let publisher = fields.publisherName { raw["publisherName"] = publisher }
         if !fields.platforms.isEmpty { raw["platforms"] = fields.platforms }
-        return try OpenAPIObjectContainer(unvalidatedValue: raw)
+        return try Product22JSON.object(raw)
     }
 
     // MARK: Response → domain

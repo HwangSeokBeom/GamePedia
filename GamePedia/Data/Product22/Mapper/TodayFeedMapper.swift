@@ -1,6 +1,5 @@
 import Foundation
 import GamePediaProduct22API
-import OpenAPIRuntime
 
 // MARK: - TodayFeedMapper
 //
@@ -190,7 +189,7 @@ enum TodayFeedMapper {
             confidence: Product22CommonMapper.confidence(data.confidence.rawValue),
             freshness: PlayCompassMapper.freshness(data.dataFreshness),
             emptyReason: data.emptyReason.flatMap { PlayCompassEmptyReason(rawValue: $0.rawValue) },
-            ownedOnly: (data.ownedOnly.value as? Bool) ?? true
+            ownedOnly: Product22JSON.bool(data.ownedOnly) ?? true
         )
     }
 

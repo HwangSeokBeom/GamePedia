@@ -1,6 +1,5 @@
 import Foundation
 import GamePediaProduct22API
-import OpenAPIRuntime
 
 // MARK: - Product22CommonMapper
 //
@@ -42,8 +41,8 @@ enum Product22CommonMapper {
     /// Reads a `const` the generator typed as an opaque container. Four Today
     /// sections declare `status` as a single-value const rather than an enum,
     /// so their status arrives this way.
-    static func constString(_ container: OpenAPIValueContainer) -> String? {
-        container.value as? String
+    static func constString(_ container: Product22JSONValue) -> String? {
+        Product22JSON.string(container)
     }
 
     /// Only an absolute https URL is accepted. A source link, a hero image or

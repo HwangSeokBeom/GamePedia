@@ -1,6 +1,5 @@
 import Foundation
 import GamePediaProduct22API
-import OpenAPIRuntime
 
 // MARK: - ProductEventCode
 //
@@ -130,8 +129,8 @@ struct ProductEventProperties: Equatable, Sendable {
 
     var isEmpty: Bool { storage.isEmpty }
 
-    func asJSONObject() throws -> OpenAPIObjectContainer {
-        var raw: [String: (any Sendable)?] = [:]
+    func asJSONObject() throws -> Product22JSONObject {
+        var raw: [String: any Sendable] = [:]
         for (key, value) in storage {
             switch value {
             case .code(let string): raw[key] = string
@@ -139,7 +138,7 @@ struct ProductEventProperties: Equatable, Sendable {
             case .flag(let bool): raw[key] = bool
             }
         }
-        return try OpenAPIObjectContainer(unvalidatedValue: raw)
+        return try Product22JSON.object(raw)
     }
 }
 

@@ -1,6 +1,5 @@
 import Foundation
 import GamePediaProduct22API
-import OpenAPIRuntime
 
 // MARK: - ProductConfigStore
 //
@@ -190,11 +189,13 @@ enum ProductConfigMapper {
     /// to the contract's own `eventCode` enum. The value can therefore only
     /// ever restrict, never widen — nothing depends on this key existing, and
     /// an event's validity is guaranteed by the generated enum regardless.
-    private static func eventCodes(from allowlists: OpenAPIObjectContainer) -> Set<String>? {
-        guard let raw = allowlists.value["productEventCodes"] else { return nil }
-        guard let codes = raw as? [Any] else { return nil }
-        let strings = codes.compactMap { $0 as? String }
-        guard strings.count == codes.count, !strings.isEmpty else { return nil }
-        return Set(strings)
+    private static func eventCodes(
+        from allowlists: Product22JSONObject
+    ) -> Set<String>? {
+        guard let codes = Product22JSON.stringArray(allowlists, key: "productEventCodes"),
+              !codes.isEmpty else {
+            return nil
+        }
+        return Set(codes)
     }
 }

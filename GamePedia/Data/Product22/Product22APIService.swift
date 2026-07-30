@@ -1,6 +1,5 @@
 import Foundation
 import GamePediaProduct22API
-import OpenAPIRuntime
 
 // MARK: - Product22APIServicing
 //
@@ -139,7 +138,11 @@ enum PlaySessionVisibility: String, Sendable, CaseIterable {
 /// middleware; the per-call credential rule travels through a task local.
 final class DefaultProduct22APIService: Product22APIServicing {
 
-    private let client: Client
+    // Stored as the generated protocol rather than the concrete `Client`
+    // struct. Holding the struct by value would drag OpenAPIRuntime's internal
+    // `UniversalClient` metadata into this module's link, which is exactly the
+    // transport dependency the API package exists to contain.
+    private let client: any APIProtocol
 
     init(
         baseURL: URL = AppConfig.coreBaseURL,
@@ -148,13 +151,13 @@ final class DefaultProduct22APIService: Product22APIServicing {
     ) {
         self.client = Product22ClientFactory.makeClient(
             baseURL: baseURL,
-            middlewares: [Product22AuthorizationMiddleware(authority: authority)],
+            middlewares: [Product22AuthorizationPolicy.makeMiddleware(authority: authority)],
             session: session
         )
     }
 
     /// Test seam: inject a fully deterministic transport.
-    init(client: Client) {
+    init(client: any APIProtocol) {
         self.client = client
     }
 
@@ -339,7 +342,7 @@ final class DefaultProduct22APIService: Product22APIServicing {
                     body: .json(.init(corrections: corrections.map {
                         .init(
                             fieldPath: $0.fieldPath,
-                            proposedValue: try OpenAPIValueContainer(unvalidatedValue: $0.proposedValue),
+                            proposedValue: try Product22JSON.value($0.proposedValue),
                             sourceUrl: $0.sourceURL
                         )
                     }))

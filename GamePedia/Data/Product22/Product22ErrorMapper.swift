@@ -1,6 +1,5 @@
 import Foundation
 import GamePediaProduct22API
-import OpenAPIRuntime
 
 // MARK: - Product22ErrorMapper
 //
@@ -58,8 +57,8 @@ enum Product22ErrorMapper {
     static func map(_ error: any Error) -> Product22Error {
         if let mapped = error as? Product22Error { return mapped }
 
-        if let clientError = error as? ClientError {
-            return map(clientError.underlyingError)
+        if let underlying = Product22ClientErrors.underlyingError(of: error) {
+            return map(underlying)
         }
 
         if error is CancellationError { return .cancelled }

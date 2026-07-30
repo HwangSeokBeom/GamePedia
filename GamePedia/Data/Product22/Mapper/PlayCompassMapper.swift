@@ -1,6 +1,5 @@
 import Foundation
 import GamePediaProduct22API
-import OpenAPIRuntime
 
 // MARK: - PlayCompassMapper
 
@@ -17,7 +16,7 @@ enum PlayCompassMapper {
             generatedAt: dto.generatedAt,
             freshness: freshness(dto.dataFreshness),
             emptyReason: dto.emptyReason.flatMap { PlayCompassEmptyReason(rawValue: $0.rawValue) },
-            ownedOnly: (dto.ownedOnly.value as? Bool) ?? true,
+            ownedOnly: Product22JSON.bool(dto.ownedOnly) ?? true,
             requestHash: dto.requestHash
         )
     }

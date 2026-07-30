@@ -28,14 +28,23 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.11.1"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.12.0"),
-        .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.3.0")
+        .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.3.0"),
+        // The generated Client.swift imports HTTPTypes directly, so the target
+        // genuinely depends on it. Declaring it is not optional: SwiftPM's
+        // static build happens to resolve it transitively, but Xcode links this
+        // product as a dynamic framework and fails with undefined HTTPTypes
+        // symbols unless it is an explicit dependency. Pinned to the version
+        // the swift-openapi packages already resolve to, so Package.resolved
+        // does not move.
+        .package(url: "https://github.com/apple/swift-http-types", exact: "1.6.0")
     ],
     targets: [
         .target(
             name: "GamePediaProduct22API",
             dependencies: [
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
-                .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession")
+                .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession"),
+                .product(name: "HTTPTypes", package: "swift-http-types")
             ],
             swiftSettings: [.swiftLanguageMode(.v5)],
             plugins: [

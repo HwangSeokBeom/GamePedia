@@ -1,6 +1,5 @@
 import Foundation
 import GamePediaProduct22API
-import OpenAPIRuntime
 
 // MARK: - GameDNA (full profile)
 
@@ -60,7 +59,7 @@ enum PlayIntelligenceMapper {
             generatedAt: dto.generatedAt,
             missingSignals: dto.missingSignals,
             reasonCodes: dto.reasonCodes,
-            isDeterministic: (dto.computation.deterministic.value as? Bool) ?? true,
+            isDeterministic: Product22JSON.bool(dto.computation.deterministic) ?? true,
             includesAINarration: dto.computation.aiNarrationIncluded ?? false
         )
     }

@@ -11,6 +11,7 @@
 		24110B74C9636D692EAE21EB /* GamePediaWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F02B35BA4E08F03BD4CF5073 /* GamePediaWidgetExtension.appex */; };
 		31BC588E854BF5FB780D8B14 /* GameWidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78FA82D8737F7E97902E8F93 /* GameWidgetSnapshotStore.swift */; };
 		3826C6F41AEB7A1B299B1352 /* GamePediaProduct22API in Frameworks */ = {isa = PBXBuildFile; productRef = 62FA699CCE2CDB94B142FAA8 /* GamePediaProduct22API */; };
+		3D6FC1EF5BFB082EF11B1C85 /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 9E659E4E5A247B2A925B83C8 /* OpenAPIRuntime */; };
 		5D4AC81B011067B6F883DD1D /* GamePediaWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7485FCF17BB0BB1B52670E0 /* GamePediaWidgetBundle.swift */; };
 		5DDB1DDD93263FF0C7D22874 /* GamePediaProduct22API in Frameworks */ = {isa = PBXBuildFile; productRef = 1CC8E1900D4F98EBACA07AA8 /* GamePediaProduct22API */; };
 		73676A9C1E2D4A5B6C7D8E90 /* RecentViewedWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98A7B6C5D4E3F20123456789 /* RecentViewedWidget.swift */; };
@@ -18,6 +19,7 @@
 		8561337B80828FF847F24F9E /* WidgetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E57E52BE1A067EF91366F0B6 /* WidgetTheme.swift */; };
 		8B9A887F2F6EDD1B00D5F380 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 8B9A887E2F6EDD1B00D5F380 /* Kingfisher */; };
 		8C3B650A2F6F000100D5F380 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 8C3B65092F6F000100D5F380 /* GoogleSignIn */; };
+		8E8B9609CBAB8B3D524192B4 /* OpenAPIRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = A07332BF1E0C1C968D6996EA /* OpenAPIRuntime */; };
 		A3D01D2461455C12FCD1B027 /* TrendingGamesWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A791AC4D288906DD8C646A48 /* TrendingGamesWidget.swift */; };
 		AA1000012F80000100D5F380 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA1000042F80000100D5F380 /* FirebaseCore */; };
 		AA1000022F80000100D5F380 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = AA1000052F80000100D5F380 /* FirebaseMessaging */; };
@@ -140,6 +142,7 @@
 				8C3B650A2F6F000100D5F380 /* GoogleSignIn in Frameworks */,
 				8B9A887F2F6EDD1B00D5F380 /* Kingfisher in Frameworks */,
 				5DDB1DDD93263FF0C7D22874 /* GamePediaProduct22API in Frameworks */,
+				8E8B9609CBAB8B3D524192B4 /* OpenAPIRuntime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -148,6 +151,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3826C6F41AEB7A1B299B1352 /* GamePediaProduct22API in Frameworks */,
+				3D6FC1EF5BFB082EF11B1C85 /* OpenAPIRuntime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -250,6 +254,7 @@
 				8C3B65092F6F000100D5F380 /* GoogleSignIn */,
 				8B9A887E2F6EDD1B00D5F380 /* Kingfisher */,
 				1CC8E1900D4F98EBACA07AA8 /* GamePediaProduct22API */,
+				A07332BF1E0C1C968D6996EA /* OpenAPIRuntime */,
 			);
 			productName = GamePedia;
 			productReference = 8B9A88492F6EDC9A00D5F380 /* GamePedia.app */;
@@ -274,6 +279,7 @@
 			name = GamePediaTests;
 			packageProductDependencies = (
 				62FA699CCE2CDB94B142FAA8 /* GamePediaProduct22API */,
+				9E659E4E5A247B2A925B83C8 /* OpenAPIRuntime */,
 			);
 			productName = GamePediaTests;
 			productReference = 8B9A885F2F6EDC9B00D5F380 /* GamePediaTests.xctest */;
@@ -1312,6 +1318,14 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 8C3B65082F6F000100D5F380 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignIn;
+		};
+		9E659E4E5A247B2A925B83C8 /* OpenAPIRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = OpenAPIRuntime;
+		};
+		A07332BF1E0C1C968D6996EA /* OpenAPIRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = OpenAPIRuntime;
 		};
 		AA1000042F80000100D5F380 /* FirebaseCore */ = {
 			isa = XCSwiftPackageProductDependency;
