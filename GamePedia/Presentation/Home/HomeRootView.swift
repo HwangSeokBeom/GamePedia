@@ -6,11 +6,42 @@ final class HomeRootView: UIView {
 
     // MARK: - Section Layout
 
-    enum Section: Int, CaseIterable {
-        case todayRecommendation = 0
+    /// Home's section identity.
+    ///
+    /// This used to be an `Int`-raw enum, with the layout and the header
+    /// provider both switching on the *position* of a section. That cannot
+    /// express Product 2.2's Today feed, whose section count and order are
+    /// decided by the server (`meta.sectionOrder`) and change per response —
+    /// a fixed position would silently give one section another's layout the
+    /// moment the server reordered or omitted one.
+    ///
+    /// So identity is now the key itself, and both the layout and the header
+    /// provider resolve it through the diffable data source.
+    enum Section: Hashable {
+        /// Feed-level notices: staleness, partial failure. Never an error.
+        case todayNotice
+        /// One Product 2.2 Today section, named by its server key.
+        case today(TodaySectionKey)
+        /// Legacy discovery, kept below Today.
+        case todayRecommendation
         case popular
         case trending
+
+        /// The pre-existing discovery sections, in their original order.
+        static let legacyDiscovery: [Section] = [.todayRecommendation, .popular, .trending]
+
+        var todayKey: TodaySectionKey? {
+            if case .today(let key) = self { return key }
+            return nil
+        }
     }
+
+    /// Resolves the section identifier at a given index.
+    ///
+    /// The view controller points this at its diffable data source, which is
+    /// the only thing that knows what is actually on screen. Without it the
+    /// layout would be back to guessing from position.
+    var sectionIdentifierProvider: ((Int) -> Section?)?
 
     // MARK: Subviews
 
@@ -106,6 +137,9 @@ final class HomeRootView: UIView {
         collectionView.register(TodayRecommendationSkeletonCell.self, forCellWithReuseIdentifier: TodayRecommendationSkeletonCell.reuseId)
         collectionView.register(GameHorizontalSkeletonCell.self, forCellWithReuseIdentifier: GameHorizontalSkeletonCell.reuseId)
         collectionView.register(GameRowSkeletonCell.self, forCellWithReuseIdentifier: GameRowSkeletonCell.reuseId)
+        collectionView.register(TodayItemCell.self, forCellWithReuseIdentifier: TodayItemCell.reuseId)
+        collectionView.register(TodayStatusCell.self, forCellWithReuseIdentifier: TodayStatusCell.reuseId)
+        collectionView.register(TodayNoticeCell.self, forCellWithReuseIdentifier: TodayNoticeCell.reuseId)
         collectionView.register(
             HomeSectionHeaderView.self,
             forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
@@ -150,14 +184,65 @@ final class HomeRootView: UIView {
     // MARK: - Compositional Layout
 
     private func makeLayout() -> UICollectionViewCompositionalLayout {
-        UICollectionViewCompositionalLayout { sectionIndex, _ in
-            switch Section(rawValue: sectionIndex) {
+        UICollectionViewCompositionalLayout { [weak self] sectionIndex, _ in
+            guard let self else { return nil }
+            // Keyed by identity, not by position — see `Section`.
+            switch self.sectionIdentifierProvider?(sectionIndex) {
+            case .todayNotice:         return self.noticeSection()
+            case .today:               return self.todayFeedSection()
             case .todayRecommendation: return self.todayRecommendationSection()
-            case .popular:     return self.horizontalSection()
-            case .trending:    return self.verticalSection()
-            case .none:        return self.horizontalSection()
+            case .popular:             return self.horizontalSection()
+            case .trending:            return self.verticalSection()
+            case nil:                  return self.horizontalSection()
             }
         }
+    }
+
+    /// Notices sit above everything with no header of their own.
+    private func noticeSection() -> NSCollectionLayoutSection {
+        let item = NSCollectionLayoutItem(layoutSize: .init(
+            widthDimension: .fractionalWidth(1.0),
+            heightDimension: .estimated(36)
+        ))
+        let group = NSCollectionLayoutGroup.vertical(
+            layoutSize: .init(
+                widthDimension: .fractionalWidth(1.0),
+                heightDimension: .estimated(36)
+            ),
+            subitems: [item]
+        )
+        let section = NSCollectionLayoutSection(group: group)
+        section.interGroupSpacing = 8
+        section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 20, bottom: 12, trailing: 20)
+        return section
+    }
+
+    /// A Today section is a vertical list with an estimated height, so a long
+    /// localized string or a large Dynamic Type setting grows the row instead
+    /// of clipping it.
+    private func todayFeedSection() -> NSCollectionLayoutSection {
+        let item = NSCollectionLayoutItem(layoutSize: .init(
+            widthDimension: .fractionalWidth(1.0),
+            heightDimension: .estimated(96)
+        ))
+        let group = NSCollectionLayoutGroup.vertical(
+            layoutSize: .init(
+                widthDimension: .fractionalWidth(1.0),
+                heightDimension: .estimated(96)
+            ),
+            subitems: [item]
+        )
+        let section = NSCollectionLayoutSection(group: group)
+        section.interGroupSpacing = 10
+        section.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 20, bottom: 24, trailing: 20)
+
+        let header = NSCollectionLayoutBoundarySupplementaryItem(
+            layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .estimated(44)),
+            elementKind: UICollectionView.elementKindSectionHeader,
+            alignment: .top
+        )
+        section.boundarySupplementaryItems = [header]
+        return section
     }
 
     private func todayRecommendationSection() -> NSCollectionLayoutSection {

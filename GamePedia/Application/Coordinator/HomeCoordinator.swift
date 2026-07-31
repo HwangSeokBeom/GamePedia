@@ -138,7 +138,86 @@ final class HomeCoordinator {
             showNotifications()
         case .presentHomeFilterSheet:
             break
+
+        // Product 2.2. Each destination is built here so a screen never has to
+        // know how the Product 2.2 stack is assembled.
+        case .showCatalogGame(let catalogGameID):
+            showCatalogGame(catalogGameID)
+        case .showArticle(let slug):
+            showArticle(slug: slug, card: nil)
+        case .showMonthlyReplay(let monthKey):
+            showMonthlyReplay(monthKey: monthKey)
+        case .showGameDNA:
+            showGameDNA()
+        case .showPlayCompass:
+            showPlayCompass()
         }
+    }
+
+    // MARK: - Product 2.2 destinations
+
+    private func product22Service() -> DefaultProduct22APIService {
+        DefaultProduct22APIService()
+    }
+
+    private func showCatalogGame(_ catalogGameID: CatalogGameID) {
+        let service = product22Service()
+        let viewController = CatalogGameViewController(
+            catalogGameID: catalogGameID,
+            repository: CatalogRepository(service: service),
+            configStore: Product22Runtime.shared.configStore(service: service)
+        )
+        push(viewController)
+    }
+
+    private func showArticle(slug: String, card: ArticleCard?) {
+        let service = product22Service()
+        let viewController = ArticleReaderViewController(
+            slug: slug,
+            card: card,
+            repository: MagazineRepository(service: service),
+            onOpenCatalogGame: { [weak self] id in self?.showCatalogGame(id) }
+        )
+        push(viewController)
+    }
+
+    private func showMonthlyReplay(monthKey: String) {
+        let service = product22Service()
+        let viewController = MonthlyReplayViewController(
+            monthKey: monthKey,
+            repository: PlayIntelligenceRepository(service: service),
+            configStore: Product22Runtime.shared.configStore(service: service)
+        )
+        push(viewController)
+    }
+
+    private func showGameDNA() {
+        let service = product22Service()
+        let viewController = GameDNAViewController(
+            repository: PlayIntelligenceRepository(service: service),
+            configStore: Product22Runtime.shared.configStore(service: service)
+        )
+        push(viewController)
+    }
+
+    private func showPlayCompass() {
+        let service = product22Service()
+        let viewController = PlayCompassViewController(
+            repository: PlayIntelligenceRepository(service: service),
+            configStore: Product22Runtime.shared.configStore(service: service),
+            onOpenCatalogGame: { [weak self] id in self?.showCatalogGame(id) }
+        )
+        push(viewController)
+    }
+
+    /// Appearance is applied before the push so the correct style is present
+    /// from the first transition frame, matching the rest of this coordinator.
+    private func push(_ viewController: UIViewController) {
+        NavigationBarStyler.apply(
+            .opaque, to: viewController.navigationItem, buttonTintColor: .gpTextSecondary
+        )
+        viewController.hidesBottomBarWhenPushed = true
+        navigationController.pushViewController(viewController, animated: true)
     }
 
     private func showGameList(

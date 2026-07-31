@@ -115,6 +115,13 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
             guard let self else { return nil }
             return self.headerProvider(collectionView: collectionView, kind: kind, indexPath: indexPath)
         }
+
+        // Both the layout and the header provider resolve a section by its
+        // identifier rather than its position, so the server can decide how
+        // many Today sections there are and in what order.
+        rootView.sectionIdentifierProvider = { [weak self] index in
+            self?.dataSource.sectionIdentifier(for: index)
+        }
     }
 
     private func cellProvider(
@@ -123,6 +130,42 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
         item: HomeCollectionItem
     ) -> UICollectionViewCell {
         switch item {
+        case .todayNotice(let message):
+            let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: TodayNoticeCell.reuseId, for: indexPath
+            ) as! TodayNoticeCell
+            cell.configure(message: message)
+            return cell
+
+        case .todayItem(_, let todayItem):
+            let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: TodayItemCell.reuseId, for: indexPath
+            ) as! TodayItemCell
+            cell.configure(with: todayItem)
+            return cell
+
+        case .todayStatus(let key, let message, let retryTitle):
+            let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: TodayStatusCell.reuseId, for: indexPath
+            ) as! TodayStatusCell
+            // A disabled section has no retry title and therefore no action —
+            // a kill switch cannot be retried.
+            cell.configure(
+                message: message,
+                retryTitle: retryTitle,
+                onRetry: retryTitle == nil ? nil : { [weak self] in
+                    self?.viewModel.send(.retryTodaySection(key))
+                }
+            )
+            return cell
+
+        case .todaySkeleton:
+            let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: TodayStatusCell.reuseId, for: indexPath
+            ) as! TodayStatusCell
+            cell.configure(message: L10n.Common.State.loading, retryTitle: nil, onRetry: nil)
+            return cell
+
         case .todayRecommendation(let recommendation):
             let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: TodayRecommendationCardCell.reuseId, for: indexPath
@@ -188,7 +231,7 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
         ) as! HomeSectionHeaderView
         header.sectionHeader.seeMoreButton.removeTarget(nil, action: nil, for: .touchUpInside)
 
-        guard let section = HomeRootView.Section(rawValue: indexPath.section) else {
+        guard let section = dataSource.sectionIdentifier(for: indexPath.section) else {
             header.configure(title: "", systemImageName: nil, tintColor: .gpTextPrimary, showSeeMore: false)
             return header
         }
@@ -208,6 +251,20 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
         }
 
         switch section {
+        case .todayNotice:
+            // Notices carry their own copy in the cell and need no header.
+            header.configure(title: "", systemImageName: nil, tintColor: .gpTextPrimary, showSeeMore: false)
+
+        case .today(let key):
+            // The title comes from the Today display model, which is the one
+            // place that maps a server section key to localized copy.
+            header.configure(
+                title: TodayDisplayModel.title(for: key),
+                systemImageName: nil,
+                tintColor: .gpPrimary,
+                showSeeMore: false
+            )
+
         case .todayRecommendation:
             header.configure(
                 title: HomeSection.todayRecommendation.headerTitle,
@@ -290,7 +347,11 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
         switch route {
         case .presentHomeFilterSheet(let filter):
             presentHomeFilterSheet(filter: filter)
-        case .showGameList, .showNotifications:
+        case .showGameList, .showNotifications,
+             .showCatalogGame, .showArticle, .showMonthlyReplay,
+             .showGameDNA, .showPlayCompass:
+            // Product 2.2 destinations are owned by HomeCoordinator, which is
+            // the only place that knows how to build them.
             onRoute?(route)
         }
     }
@@ -305,7 +366,8 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
 
     private func applySnapshot(state: HomeState) {
         var snapshot = NSDiffableDataSourceSnapshot<HomeRootView.Section, HomeCollectionItem>()
-        snapshot.appendSections(HomeRootView.Section.allCases)
+        appendTodaySections(state: state, snapshot: &snapshot)
+        snapshot.appendSections(HomeRootView.Section.legacyDiscovery)
         let isFavoriteStateOnlyUpdate = !state.showsSkeleton
             && dataSource.snapshot().numberOfItems > 0
             && lastRenderedWishlistedGameIDs != state.wishlistedGameIDs
@@ -344,6 +406,72 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
         lastRenderedWishlistedGameIDs = state.wishlistedGameIDs
     }
 
+    /// Appends the Product 2.2 Today sections above the legacy discovery
+    /// sections, in the order the server chose.
+    ///
+    /// Nothing is appended when Today is absent — the feature is off, nobody
+    /// is signed in, or it has not loaded — so Home falls back to exactly the
+    /// experience it had before Product 2.2 existed.
+    private func appendTodaySections(
+        state: HomeState,
+        snapshot: inout NSDiffableDataSourceSnapshot<HomeRootView.Section, HomeCollectionItem>
+    ) {
+        if state.showsTodaySkeleton {
+            snapshot.appendSections([.today(.playCompass)])
+            snapshot.appendItems(
+                [.todaySkeleton(key: .playCompass, index: 0)],
+                toSection: .today(.playCompass)
+            )
+            return
+        }
+
+        guard let today = state.today else { return }
+
+        var notices: [HomeCollectionItem] = []
+        if today.isStale { notices.append(.todayNotice(message: L10n.Product22.Today.stale)) }
+        if today.showsPartialFailureNotice {
+            notices.append(.todayNotice(message: L10n.Product22.Today.partialNotice))
+        }
+        if !notices.isEmpty {
+            snapshot.appendSections([.todayNotice])
+            snapshot.appendItems(notices, toSection: .todayNotice)
+        }
+
+        for section in today.sections {
+            let identifier = HomeRootView.Section.today(section.key)
+            snapshot.appendSections([identifier])
+
+            switch section.state {
+            case .items(let items):
+                snapshot.appendItems(
+                    items.map { .todayItem(key: section.key, item: $0) },
+                    toSection: identifier
+                )
+            case .empty(let message):
+                snapshot.appendItems(
+                    [.todayStatus(key: section.key, message: message, retryTitle: nil)],
+                    toSection: identifier
+                )
+            case .disabled(let message):
+                // No retry title: a kill switch cannot be retried.
+                snapshot.appendItems(
+                    [.todayStatus(key: section.key, message: message, retryTitle: nil)],
+                    toSection: identifier
+                )
+            case .unavailable(let message, let retryTitle):
+                let isRetrying = state.retryingTodaySections.contains(section.key)
+                snapshot.appendItems(
+                    [.todayStatus(
+                        key: section.key,
+                        message: isRetrying ? L10n.Common.State.loading : message,
+                        retryTitle: isRetrying ? nil : retryTitle
+                    )],
+                    toSection: identifier
+                )
+            }
+        }
+    }
+
     private func reconfigureTrendingItemsIfNeeded(
         state: HomeState,
         snapshot: inout NSDiffableDataSourceSnapshot<HomeRootView.Section, HomeCollectionItem>
@@ -368,8 +496,10 @@ final class HomeViewController: BaseViewController<HomeRootView, HomeState> {
     }
 
     private func refreshVisibleSectionHeaders(showsSkeleton: Bool) {
-        for section in HomeRootView.Section.allCases {
-            let indexPath = IndexPath(item: 0, section: section.rawValue)
+        // Driven by what is actually on screen, because the section list is no
+        // longer a fixed set known at compile time.
+        for (index, section) in dataSource.snapshot().sectionIdentifiers.enumerated() {
+            let indexPath = IndexPath(item: 0, section: index)
             guard let header = rootView.collectionView.supplementaryView(
                 forElementKind: UICollectionView.elementKindSectionHeader,
                 at: indexPath

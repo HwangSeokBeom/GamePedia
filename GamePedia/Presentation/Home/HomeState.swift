@@ -16,6 +16,22 @@ struct HomeState {
     var selectedGameModeFilter: HomeGameModeFilter = .all
     var unreadNotificationCount: Int = 0
 
+    /// The Product 2.2 Today feed, when it is available to this user. Nil
+    /// means Today is not being shown at all — the feature is off, the user is
+    /// signed out, or it has not loaded yet — and Home falls back to the
+    /// legacy discovery experience on its own.
+    var today: TodayDisplayModel? = nil
+    /// True while the first Today load for this account is in flight.
+    var isTodayLoading: Bool = false
+
+    /// Sections the user asked to retry individually; used to show progress on
+    /// exactly the one they tapped rather than the whole feed.
+    var retryingTodaySections: Set<TodaySectionKey> = []
+
+    var showsTodaySkeleton: Bool {
+        isTodayLoading && today == nil
+    }
+
     var showsSkeleton: Bool {
         isLoading
             && highlights.isEmpty

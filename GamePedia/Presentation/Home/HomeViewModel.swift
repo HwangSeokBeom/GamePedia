@@ -26,7 +26,13 @@ final class HomeViewModel {
     private let translateTextUseCase: TranslateTextUseCase
     private let fetchUnreadNotificationCountUseCase: FetchUnreadNotificationCountUseCase
     private let librarySync: (any LibraryMutationSyncing)?
+    /// Nil in tests that do not care about Today. Home renders its legacy
+    /// experience unchanged when Today is absent, so nil is a valid state.
+    private let todayFeedLoader: (any TodayFeedLoading)?
     private var cancellables = Set<AnyCancellable>()
+    /// The in-flight Today load. Cancelled and replaced on refresh so a slow
+    /// earlier response can never overwrite a newer one.
+    private var todayTask: Task<Void, Never>?
 
     // MARK: Init
     init(
@@ -42,9 +48,11 @@ final class HomeViewModel {
         fetchUnreadNotificationCountUseCase: FetchUnreadNotificationCountUseCase = FetchUnreadNotificationCountUseCase(
             notificationRepository: DefaultNotificationRepository()
         ),
-        librarySync: (any LibraryMutationSyncing)? = LibrarySyncRuntime.shared.mutationRouter
+        librarySync: (any LibraryMutationSyncing)? = LibrarySyncRuntime.shared.mutationRouter,
+        todayFeedLoader: (any TodayFeedLoading)? = LoadTodayFeedUseCase.live()
     ) {
         self.librarySync = librarySync
+        self.todayFeedLoader = todayFeedLoader
         let resolvedActivityRepository = userActivityRepository ?? LocalUserActivityRepository.shared
         self.userActivityRepository = resolvedActivityRepository
         self.loadHomeFeedUseCase = loadHomeFeedUseCase ?? LoadHomeFeedUseCase.live(
@@ -68,6 +76,7 @@ final class HomeViewModel {
         switch intent {
         case .viewDidLoad:
             loadHomeData()
+            loadToday(forceRefresh: false)
         case .didTapGame(let game):
             Task {
                 await userActivityRepository.recordViewed(game: game)
@@ -83,6 +92,61 @@ final class HomeViewModel {
             routeToSectionList(section)
         case .didTapNotification:
             onRoute?(.showNotifications)
+
+        case .refreshToday:
+            loadToday(forceRefresh: true)
+
+        case .retryTodaySection(let key):
+            // The contract has no per-section retry endpoint, so retrying one
+            // section refetches the feed. The UI still scopes the affected
+            // state to the section the user tapped rather than showing the
+            // whole feed as loading.
+            apply(.setTodaySectionRetrying(key, true))
+            loadToday(forceRefresh: true)
+
+        case .didTapTodayItem(let item):
+            routeToTodayItem(item)
+        }
+    }
+
+    // MARK: - Product 2.2 Today
+
+    private func loadToday(forceRefresh: Bool) {
+        guard let todayFeedLoader else { return }
+        todayTask?.cancel()
+        if state.today == nil { apply(.setTodayLoading(true)) }
+
+        todayTask = Task { [weak self] in
+            guard let self else { return }
+            let result = await todayFeedLoader.load(forceRefresh: forceRefresh)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                switch result {
+                case .feed(let feed, let isStale):
+                    self.apply(.setToday(TodayDisplayModel(feed: feed, isStale: isStale)))
+                case .unavailable:
+                    // Today simply does not appear. Home's pre-existing
+                    // discovery experience is untouched and shows no error.
+                    self.apply(.setToday(nil))
+                }
+            }
+        }
+    }
+
+    private func routeToTodayItem(_ item: TodayDisplayModel.Item) {
+        switch item.action {
+        case .openCatalogGame(let id):
+            onRoute?(.showCatalogGame(id))
+        case .openArticle(let slug):
+            onRoute?(.showArticle(slug: slug))
+        case .openMonthlyReplay(let monthKey):
+            onRoute?(.showMonthlyReplay(monthKey: monthKey))
+        case .openGameDNA:
+            onRoute?(.showGameDNA)
+        case .openPlayCompass:
+            onRoute?(.showPlayCompass)
+        case nil:
+            break
         }
     }
 
