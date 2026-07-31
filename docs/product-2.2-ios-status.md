@@ -3,8 +3,12 @@
 Branch `feat/product-2.2-2.3-ios-20260730-223307`, based on
 `6a0e7f558f8338b4ad161defa4e798041aa7c985`.
 
-**This branch is not shippable.** Everything below the view layer is built and
-tested; no Product 2.2 screen exists yet. Read "What is left" before planning.
+Today is integrated into Home above the legacy discovery sections, and the
+magazine reader, canonical catalog detail, Play Compass, Game DNA and Monthly
+Replay screens are built. All 25 required test areas are covered.
+
+Playlog's own screens and the Quick Add flow are the remaining product surface;
+their data layer, repositories and mappers are complete. See "What is left".
 
 ## What is done
 
@@ -47,49 +51,45 @@ account-isolated Today cache with stale-response suppression.
   `scripts/generate-product22-l10n.py`.
 
 ### Tests
-87 new: 72 in `GamePediaTests/Product22` plus 15 in the package. 591 unit tests
+98 new: 83 in `GamePediaTests/Product22` plus 15 in the package. 602 unit tests
 pass in total against a 519-test baseline, 0 failures, 0 skipped, 0 new
-warnings.
+warnings. All 25 required areas are covered.
 
 ## What is left
 
-### 1. Today's placement in Home — the one structural task
-`HomeRootView.Section` is an `Int`-raw enum, and both `makeLayout()` and
-`headerProvider(...)` switch on `Section(rawValue: sectionIndex)`. Today needs
-eight sections in server-supplied order, which that shape cannot express.
+### 1. Playlog screens
+The session list, the month calendar and the create/edit form. Everything
+underneath is done and tested: `PlaylogRepository` (create/update/delete with
+idempotent mutation keys), `PlayCalendarDeriver` (month grid derived from typed
+sessions, because the calendar endpoint's body is untyped) and the
+`PlaySessionDraft` model whose `clientMutationId` is created once per draft so a
+retry reuses it.
 
-The change:
+Entry points still to add: "플레이 기록" from Library and from canonical catalog
+detail.
 
-1. Make the section identifier `Hashable` rather than `Int`-raw, e.g.
-   `case today(TodaySectionKey)`, `case todayNotice`, plus the three existing
-   legacy cases.
-2. Re-key `makeLayout()` off `dataSource.sectionIdentifier(for: sectionIndex)`
-   instead of `rawValue`, and do the same in `headerProvider`.
-3. Append Today sections ahead of the legacy discovery sections in
-   `applySnapshot(state:)`; `TodayDisplayModel.sections` is already in the
-   server's `meta.sectionOrder`.
-4. Extend `HomeState` with the display model, `HomeIntent` with
-   `loadToday` / `retryTodaySection(TodaySectionKey)` / `refreshToday`, and
-   handle them in `HomeReducer`.
+Note the note-storage rule before building the form: if a draft with a note is
+ever persisted across launches it needs the same encryption, file protection and
+account-deletion cleanup as the existing protected stores. If that cannot be
+done, keep note-bearing mutations online-only — never plaintext UserDefaults.
 
-This was deliberately not started rather than half-finished: a partial refactor
-breaks the existing Home screen, which is worse than not having Today yet.
+### 2. AI Quick Add flow
+Preview → candidate selection or explicit field confirmation → confirm.
+`QuickAddRepository`, `QuickAddMapper` and the `QuickAddInput`/`QuickAddPreview`
+/`QuickAddConfirmation` models are complete and tested, including the
+redaction rule (`QuickAddInput` redacts itself in every string conversion) and
+the mutual exclusivity of link-existing versus confirm-new.
 
-### 2. Remaining screens
-Play Compass input and results, Game DNA, Playlog list/calendar/form, Monthly
-Replay, the magazine reader screen (the renderer is ready), canonical catalog
-search/detail, and the Quick Add flow. Each has its domain layer, repository
-and mappers already in place.
+Two scenarios in this flow are blocked by the contract, not by the app — see
+`docs/product-2.2-contract-gaps.md` before designing the confirmation screen.
 
-### 3. Remaining test areas
-Two of the 25 required areas are still open, both because they need UI:
-
-* **23** — follow/unfollow optimistic UI with exact rollback on failure.
-  `CatalogRepository.setFollowing` exists; the view model does not.
-* **25** — coordinator routes and back-navigation state restoration.
+### 3. Catalog search screen
+`CatalogRepository.search` exists; the canonical detail screen and follow are
+built. Search is one page at the contract maximum because the pagination cursor
+sits in an untyped `meta`.
 
 ### 4. Strings for the unbuilt screens
-Catalog and Quick Add chrome is not localized yet. Add keys to all four
+Playlog and Quick Add chrome is not localized yet. Add keys to all four
 `Localizable.strings` files under the `product22.` prefix and re-run
 `scripts/generate-product22-l10n.py`; it fails if the languages disagree.
 
