@@ -45,7 +45,7 @@ enum CatalogProvenance: String, CaseIterable, Equatable, Sendable {
 
 // MARK: - CatalogPublicationStatus
 
-enum CatalogPublicationStatus: String, Equatable, Sendable {
+enum CatalogPublicationStatus: String, CaseIterable, Equatable, Sendable {
     /// Visible only to the submitter.
     case privateEntry = "PRIVATE"
     /// Submitted for review. Not public, and not approved.
@@ -56,7 +56,7 @@ enum CatalogPublicationStatus: String, Equatable, Sendable {
 
 // MARK: - CatalogServiceStatus
 
-enum CatalogServiceStatus: String, Equatable, Sendable {
+enum CatalogServiceStatus: String, CaseIterable, Equatable, Sendable {
     case announced = "ANNOUNCED"
     case preRegistration = "PRE_REGISTRATION"
     case live = "LIVE"

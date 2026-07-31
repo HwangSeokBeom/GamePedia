@@ -13,6 +13,8 @@ final class CatalogGameViewController: Product22ListViewController {
     private let catalogGameID: CatalogGameID
     private let repository: any CatalogRepositing
     private let configStore: ProductConfigStore
+    private let onOpenPlaylog: ((CatalogGameID, String?) -> Void)?
+    private let onSuggestCorrection: ((CatalogGameID) -> Void)?
 
     private var detail: CatalogGameDetail?
     /// What the follow button currently claims. Diverges from `detail` only
@@ -31,11 +33,15 @@ final class CatalogGameViewController: Product22ListViewController {
     init(
         catalogGameID: CatalogGameID,
         repository: any CatalogRepositing,
-        configStore: ProductConfigStore
+        configStore: ProductConfigStore,
+        onOpenPlaylog: ((CatalogGameID, String?) -> Void)? = nil,
+        onSuggestCorrection: ((CatalogGameID) -> Void)? = nil
     ) {
         self.catalogGameID = catalogGameID
         self.repository = repository
         self.configStore = configStore
+        self.onOpenPlaylog = onOpenPlaylog
+        self.onSuggestCorrection = onSuggestCorrection
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -108,6 +114,20 @@ final class CatalogGameViewController: Product22ListViewController {
     /// Test seam: the optimistic value the button is currently showing.
     var followButtonReflectsFollowing: Bool { isFollowing }
 
+    // MARK: Row actions
+
+    override func didSelectRow(_ row: Product22ListRow, in section: Product22ListSection) {
+        guard section.id == "actions" else { return }
+        switch row.id {
+        case "playlog":
+            onOpenPlaylog?(catalogGameID, detail?.summary.originalTitle)
+        case "correction":
+            onSuggestCorrection?(catalogGameID)
+        default:
+            break
+        }
+    }
+
     // MARK: Sections
 
     private func sections(for detail: CatalogGameDetail) -> [Product22ListSection] {
@@ -118,8 +138,8 @@ final class CatalogGameViewController: Product22ListViewController {
         var identityDetails: [String] = []
         if let developer = detail.summary.developerName { identityDetails.append(developer) }
         if let publisher = detail.summary.publisherName { identityDetails.append(publisher) }
-        identityDetails.append(detail.summary.titleProvenance.rawValue)
-        identityDetails.append(detail.summary.publicationStatus.rawValue)
+        identityDetails.append(Product22Vocabulary.text(for: detail.summary.titleProvenance))
+        identityDetails.append(Product22Vocabulary.text(for: detail.summary.publicationStatus))
         if detail.resolvedFromMerge {
             // The id asked for was merged into this one; say so rather than
             // silently showing a different game.
@@ -153,7 +173,7 @@ final class CatalogGameViewController: Product22ListViewController {
                             details: [
                                 localization.languageCode,
                                 localization.regionCode,
-                                localization.provenance.rawValue
+                                Product22Vocabulary.text(for: localization.provenance)
                             ].compactMap { $0 }
                         )
                     }
@@ -169,10 +189,10 @@ final class CatalogGameViewController: Product22ListViewController {
                     id: "regions",
                     title: nil,
                     rows: detail.regionalReleases.map { release in
-                        var details = [release.serviceStatus.rawValue, release.platform]
+                        var details = [Product22Vocabulary.text(for: release.serviceStatus), release.platform]
                         if let operatorName = release.operatorName { details.append(operatorName) }
                         if let shutdown = release.shutdownDate { details.append(shutdown) }
-                        details.append(release.provenance.rawValue)
+                        details.append(Product22Vocabulary.text(for: release.provenance))
                         return Product22ListRow(
                             id: release.id.wireValue,
                             title: release.countryCode,
@@ -181,6 +201,31 @@ final class CatalogGameViewController: Product22ListViewController {
                     }
                 )
             )
+        }
+
+        // Actions. "플레이 기록" is one of the two entry points the Playlog
+        // feature is reachable from.
+        var actions: [Product22ListRow] = []
+        if onOpenPlaylog != nil {
+            actions.append(
+                Product22ListRow(
+                    id: "playlog",
+                    title: L10n.Product22.Catalog.playlogEntry,
+                    actionTitle: L10n.Product22.Catalog.playlogEntry
+                )
+            )
+        }
+        if onSuggestCorrection != nil {
+            actions.append(
+                Product22ListRow(
+                    id: "correction",
+                    title: L10n.Product22.Catalog.correction,
+                    actionTitle: L10n.Product22.Catalog.correction
+                )
+            )
+        }
+        if !actions.isEmpty {
+            sections.append(Product22ListSection(id: "actions", title: nil, rows: actions))
         }
 
         // Per-field evidence, so an inferred value never looks confirmed.
@@ -193,7 +238,7 @@ final class CatalogGameViewController: Product22ListViewController {
                         Product22ListRow(
                             id: evidence.fieldPath,
                             title: evidence.fieldPath,
-                            details: [evidence.provenance.rawValue, evidence.sourceType]
+                            details: [Product22Vocabulary.text(for: evidence.provenance), evidence.sourceType]
                         )
                     }
                 )

@@ -26,8 +26,19 @@ final class LibraryCoordinator {
 
     // MARK: Start
 
+    /// Shared with Home and Search so the three cannot drift apart.
+    private lazy var product22 = Product22SceneFactory(navigationController: navigationController)
+
     func start() {
         let libraryVC = LibraryViewController()
+        // "플레이 기록" from Library — the account-wide view, with no game
+        // preselected. The per-game entry point lives on catalog detail.
+        libraryVC.navigationItem.rightBarButtonItem = UIBarButtonItem(
+            title: L10n.Product22.Playlog.title,
+            primaryAction: UIAction { [weak self] _ in
+                self?.product22.showPlaylog(catalogGameID: nil, gameTitle: nil)
+            }
+        )
         libraryVC.onGameSelected = { [weak self] gameId in
             self?.showDetail(gameId: gameId)
         }

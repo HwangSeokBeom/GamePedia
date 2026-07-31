@@ -74,6 +74,28 @@ def lower_first(text: str) -> str:
     return text[:1].lower() + text[1:]
 
 
+# Swift keywords that are legal as members only when escaped. A key like
+# `product22.visibility.private` is perfectly reasonable, so the generator
+# escapes rather than forcing the key to be renamed.
+SWIFT_KEYWORDS = {
+    "associatedtype", "class", "deinit", "enum", "extension", "fileprivate",
+    "func", "import", "init", "inout", "internal", "let", "open", "operator",
+    "private", "protocol", "public", "rethrows", "static", "struct",
+    "subscript", "typealias", "var", "break", "case", "continue", "default",
+    "defer", "do", "else", "fallthrough", "for", "guard", "if", "in", "repeat",
+    "return", "switch", "where", "while", "as", "catch", "false", "is", "nil",
+    "super", "self", "Self", "throw", "throws", "true", "try", "Any", "Type",
+    "Protocol", "associativity", "convenience", "dynamic", "didSet", "final",
+    "get", "infix", "indirect", "lazy", "left", "mutating", "none",
+    "nonmutating", "optional", "override", "postfix", "precedence", "prefix",
+    "required", "right", "set", "unowned", "weak", "willSet",
+}
+
+
+def escaped(identifier: str) -> str:
+    return f"`{identifier}`" if identifier in SWIFT_KEYWORDS else identifier
+
+
 class Node:
     def __init__(self) -> None:
         self.children: dict[str, "Node"] = {}
@@ -89,7 +111,7 @@ def build_tree(entries: list[tuple[str, str]]) -> Node:
         node = root
         for part in parts[:-1]:
             node = node.children.setdefault(upper_first(part), Node())
-        node.leaves.append((lower_first(parts[-1]), key, value))
+        node.leaves.append((escaped(lower_first(parts[-1])), key, value))
     return root
 
 
@@ -101,7 +123,7 @@ def render(node: Node, indent: int, out: list[str]) -> None:
     for index, (name, child) in enumerate(node.children.items()):
         if node.leaves or index > 0:
             out.append("")
-        out.append(f"{pad}enum {name} {{")
+        out.append(f"{pad}enum {escaped(name)} {{")
         render(child, indent + 1, out)
         out.append(f"{pad}}}")
 

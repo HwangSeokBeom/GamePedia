@@ -166,6 +166,213 @@ extension L10n {
       /// 기사 읽기
       static let readMore = L10n.tr("Localizable", "product22.article.readMore")
     }
+
+    enum Catalog {
+      /// 게임 카탈로그
+      static let searchTitle = L10n.tr("Localizable", "product22.catalog.searchTitle")
+      /// 게임 이름을 입력하세요
+      static let searchPlaceholder = L10n.tr("Localizable", "product22.catalog.searchPlaceholder")
+      /// 찾고 싶은 게임을 검색해 보세요
+      static let searchPrompt = L10n.tr("Localizable", "product22.catalog.searchPrompt")
+      /// 검색 결과가 없어요
+      static let noResults = L10n.tr("Localizable", "product22.catalog.noResults")
+      /// 찾는 게임이 없나요? 빠르게 등록
+      static let quickAddPrompt = L10n.tr("Localizable", "product22.catalog.quickAddPrompt")
+      /// 소식 받기
+      static let follow = L10n.tr("Localizable", "product22.catalog.follow")
+      /// 소식 그만 받기
+      static let unfollow = L10n.tr("Localizable", "product22.catalog.unfollow")
+      /// 정보 수정 제안
+      static let correction = L10n.tr("Localizable", "product22.catalog.correction")
+      /// 제안이 접수됐어요. 검토 후 반영됩니다.
+      static let correctionPending = L10n.tr("Localizable", "product22.catalog.correctionPending")
+      /// 수정할 항목
+      static let correctionFieldPath = L10n.tr("Localizable", "product22.catalog.correctionFieldPath")
+      /// 올바른 값
+      static let correctionValue = L10n.tr("Localizable", "product22.catalog.correctionValue")
+      /// 출처 링크 (선택)
+      static let correctionSource = L10n.tr("Localizable", "product22.catalog.correctionSource")
+      /// 원제
+      static let originalTitle = L10n.tr("Localizable", "product22.catalog.originalTitle")
+      /// 다른 이름
+      static let aliases = L10n.tr("Localizable", "product22.catalog.aliases")
+      /// 국가별 서비스
+      static let regionalReleases = L10n.tr("Localizable", "product22.catalog.regionalReleases")
+      /// 정보 출처
+      static let evidence = L10n.tr("Localizable", "product22.catalog.evidence")
+      /// 플레이 기록
+      static let playlogEntry = L10n.tr("Localizable", "product22.catalog.playlogEntry")
+    }
+
+    enum Provenance {
+      /// 확인된 정보
+      static let verified = L10n.tr("Localizable", "product22.provenance.verified")
+      /// 사용자가 입력한 정보
+      static let asserted = L10n.tr("Localizable", "product22.provenance.asserted")
+      /// 아직 확인되지 않음
+      static let unconfirmed = L10n.tr("Localizable", "product22.provenance.unconfirmed")
+    }
+
+    enum Service {
+      /// 출시 예정
+      static let announced = L10n.tr("Localizable", "product22.service.announced")
+      /// 사전 등록
+      static let preRegistration = L10n.tr("Localizable", "product22.service.preRegistration")
+      /// 서비스 중
+      static let live = L10n.tr("Localizable", "product22.service.live")
+      /// 점검 중
+      static let maintenance = L10n.tr("Localizable", "product22.service.maintenance")
+      /// 서비스 종료 예정
+      static let sunsetAnnounced = L10n.tr("Localizable", "product22.service.sunsetAnnounced")
+      /// 서비스 종료
+      static let shutdown = L10n.tr("Localizable", "product22.service.shutdown")
+    }
+
+    enum Publication {
+      /// 나만 보는 등록
+      static let `private` = L10n.tr("Localizable", "product22.publication.private")
+      /// 공개 검토 대기 중
+      static let pendingReview = L10n.tr("Localizable", "product22.publication.pendingReview")
+      /// 공개됨
+      static let published = L10n.tr("Localizable", "product22.publication.published")
+      /// 반려됨
+      static let rejected = L10n.tr("Localizable", "product22.publication.rejected")
+    }
+
+    enum QuickAdd {
+      /// 게임 빠르게 등록
+      static let title = L10n.tr("Localizable", "product22.quickAdd.title")
+      /// 게임 이름, 공식 사이트, App Store 또는 Google Play 주소를 입력하세요
+      static let inputPrompt = L10n.tr("Localizable", "product22.quickAdd.inputPrompt")
+      /// 예: 게임 이름 또는 스토어 주소
+      static let inputPlaceholder = L10n.tr("Localizable", "product22.quickAdd.inputPlaceholder")
+      /// 입력한 문장은 저장하지 않아요
+      static let inputNotStored = L10n.tr("Localizable", "product22.quickAdd.inputNotStored")
+      /// 국가
+      static let region = L10n.tr("Localizable", "product22.quickAdd.region")
+      /// 플랫폼 (선택)
+      static let platformHint = L10n.tr("Localizable", "product22.quickAdd.platformHint")
+      /// 확인해 보기
+      static let preview = L10n.tr("Localizable", "product22.quickAdd.preview")
+      /// 이미 등록된 게임
+      static let existingCandidates = L10n.tr("Localizable", "product22.quickAdd.existingCandidates")
+      /// 새로 등록하기
+      static let newDraft = L10n.tr("Localizable", "product22.quickAdd.newDraft")
+      /// 이 게임으로 연결
+      static let linkExisting = L10n.tr("Localizable", "product22.quickAdd.linkExisting")
+      /// 게임 이름을 직접 확인해 주세요
+      static let titleRequired = L10n.tr("Localizable", "product22.quickAdd.titleRequired")
+      /// 아래 내용을 확인한 뒤 등록해 주세요
+      static let confirmFields = L10n.tr("Localizable", "product22.quickAdd.confirmFields")
+      /// 확인이 필요해요
+      static let needsConfirmation = L10n.tr("Localizable", "product22.quickAdd.needsConfirmation")
+      /// 자동으로 추정한 값이에요. 맞는지 확인해 주세요.
+      static let aiInferred = L10n.tr("Localizable", "product22.quickAdd.aiInferred")
+      /// 자동 확인에 실패해서 직접 입력이 필요해요
+      static let aiFallback = L10n.tr("Localizable", "product22.quickAdd.aiFallback")
+      /// 나만 보는 목록에 등록
+      static let registerPrivate = L10n.tr("Localizable", "product22.quickAdd.registerPrivate")
+      /// 공개 목록 등재 요청하기
+      static let requestPublicReview = L10n.tr("Localizable", "product22.quickAdd.requestPublicReview")
+      /// 공개 등재는 검토를 거쳐요. 요청해도 바로 공개되지 않아요.
+      static let publicReviewNote = L10n.tr("Localizable", "product22.quickAdd.publicReviewNote")
+      /// 나만 보는 목록에 등록했어요
+      static let doneRegistered = L10n.tr("Localizable", "product22.quickAdd.doneRegistered")
+      /// 이미 있던 게임에 연결했어요
+      static let doneLinked = L10n.tr("Localizable", "product22.quickAdd.doneLinked")
+      /// 공개 등재를 요청했어요. 검토 결과를 기다려 주세요.
+      static let donePendingReview = L10n.tr("Localizable", "product22.quickAdd.donePendingReview")
+      /// 카탈로그에서 찾아보기
+      static let findInCatalog = L10n.tr("Localizable", "product22.quickAdd.findInCatalog")
+      /// 확인 결과가 만료됐어요. 다시 확인해 주세요.
+      static let expired = L10n.tr("Localizable", "product22.quickAdd.expired")
+      /// 오늘 등록 요청을 너무 많이 했어요. 잠시 후 다시 시도해 주세요.
+      static let quotaExceeded = L10n.tr("Localizable", "product22.quickAdd.quotaExceeded")
+      /// 이미 등록된 게임과 정보가 겹쳐요. 위 목록에서 골라 주세요.
+      static let identityConflict = L10n.tr("Localizable", "product22.quickAdd.identityConflict")
+      /// 입력한 내용을 확인해 주세요
+      static let invalidInput = L10n.tr("Localizable", "product22.quickAdd.invalidInput")
+      /// 스토어에서 확인된 같은 게임
+      static let matchExact = L10n.tr("Localizable", "product22.quickAdd.matchExact")
+      /// 비슷하지만 아직 확인되지 않았어요
+      static let matchUnverified = L10n.tr("Localizable", "product22.quickAdd.matchUnverified")
+    }
+
+    enum Playlog {
+      /// 플레이 기록
+      static let title = L10n.tr("Localizable", "product22.playlog.title")
+      /// 아직 기록이 없어요
+      static let empty = L10n.tr("Localizable", "product22.playlog.empty")
+      /// 기록 추가
+      static let add = L10n.tr("Localizable", "product22.playlog.add")
+      /// 기록 수정
+      static let edit = L10n.tr("Localizable", "product22.playlog.edit")
+      /// 기록 삭제
+      static let delete = L10n.tr("Localizable", "product22.playlog.delete")
+      /// 달력
+      static let calendar = L10n.tr("Localizable", "product22.playlog.calendar")
+      /// 언제 했나요
+      static let playedAt = L10n.tr("Localizable", "product22.playlog.playedAt")
+      /// 얼마나 했나요 (분)
+      static let duration = L10n.tr("Localizable", "product22.playlog.duration")
+      /// 진행도 (%)
+      static let progress = L10n.tr("Localizable", "product22.playlog.progress")
+      /// 기분
+      static let mood = L10n.tr("Localizable", "product22.playlog.mood")
+      /// 어떻게 끝냈나요
+      static let outcome = L10n.tr("Localizable", "product22.playlog.outcome")
+      /// 공개 범위
+      static let visibility = L10n.tr("Localizable", "product22.playlog.visibility")
+      /// 메모
+      static let note = L10n.tr("Localizable", "product22.playlog.note")
+      /// 메모와 기분은 나만 볼 수 있어요
+      static let notePrivate = L10n.tr("Localizable", "product22.playlog.notePrivate")
+      /// 저장
+      static let save = L10n.tr("Localizable", "product22.playlog.save")
+      /// 저장하지 못했어요. 다시 시도하면 중복 없이 저장돼요.
+      static let saveFailed = L10n.tr("Localizable", "product22.playlog.saveFailed")
+      /// 이 기록을 삭제할까요?
+      static let deleteConfirm = L10n.tr("Localizable", "product22.playlog.deleteConfirm")
+      /// 시간 미기록
+      static let durationUnknown = L10n.tr("Localizable", "product22.playlog.durationUnknown")
+      /// 이 날의 기록
+      static let sessionsOnDay = L10n.tr("Localizable", "product22.playlog.sessionsOnDay")
+    }
+
+    enum Outcome {
+      /// 계속 진행 중
+      static let `continue` = L10n.tr("Localizable", "product22.outcome.continue")
+      /// 잠시 멈춤
+      static let paused = L10n.tr("Localizable", "product22.outcome.paused")
+      /// 그만둠
+      static let dropped = L10n.tr("Localizable", "product22.outcome.dropped")
+      /// 끝까지 함
+      static let completed = L10n.tr("Localizable", "product22.outcome.completed")
+    }
+
+    enum Mood {
+      /// 느긋함
+      static let relaxed = L10n.tr("Localizable", "product22.mood.relaxed")
+      /// 몰입함
+      static let focused = L10n.tr("Localizable", "product22.mood.focused")
+      /// 신남
+      static let excited = L10n.tr("Localizable", "product22.mood.excited")
+      /// 지루함
+      static let bored = L10n.tr("Localizable", "product22.mood.bored")
+      /// 답답함
+      static let frustrated = L10n.tr("Localizable", "product22.mood.frustrated")
+      /// 추억에 잠김
+      static let nostalgic = L10n.tr("Localizable", "product22.mood.nostalgic")
+    }
+
+    enum Visibility {
+      /// 나만 보기
+      static let `private` = L10n.tr("Localizable", "product22.visibility.private")
+      /// 친구에게 공개
+      static let friends = L10n.tr("Localizable", "product22.visibility.friends")
+      /// 전체 공개
+      static let `public` = L10n.tr("Localizable", "product22.visibility.public")
+    }
   }
 }
 

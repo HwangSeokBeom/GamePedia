@@ -41,8 +41,20 @@ final class SearchCoordinator {
             let presenter = searchVC ?? self.navigationController.topViewController ?? self.navigationController
             self.onAuthenticationRequested?(presenter, context, action)
         }
+        // Product 2.2 entry point. Added to the navigation item rather than
+        // to SearchViewController itself, so the existing search screen is
+        // untouched: canonical catalog search sits alongside the existing
+        // results, and Quick Add hangs off it for "the game isn't here".
+        searchVC.navigationItem.rightBarButtonItem = UIBarButtonItem(
+            title: L10n.Product22.Catalog.searchTitle,
+            primaryAction: UIAction { [weak self] _ in self?.product22.showCatalogSearch() }
+        )
+
         navigationController.setViewControllers([searchVC], animated: false)
     }
+
+    /// Shared with Home and Library so the three cannot drift apart.
+    private lazy var product22 = Product22SceneFactory(navigationController: navigationController)
 
     // MARK: - Navigation
 

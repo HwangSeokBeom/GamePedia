@@ -80,6 +80,21 @@ contents are untyped even though the surrounding response is typed.
 | `confirmCatalogSubmission` | `POST /api/v1/catalog/submissions/{submissionId}/confirm` | After a successful Quick Add confirmation the app cannot learn the `catalogGameId` that was created or linked, so it cannot navigate the user straight to "the game you just registered". The confirmation screen reports the outcome it *does* know — PRIVATE registration versus PENDING_REVIEW public review, which is determined by the `requestPublicReview` flag the user themselves set — and offers a catalog search instead of a direct link. It never claims a specific game was linked. |
 | `getCatalogSubmission` | `GET /api/v1/catalog/submissions/{submissionId}` | A "my submission status" screen cannot be built: status, resolution and the resulting game are all inside the untyped `data`. The operation is exposed on the API service and left uncalled by the UI. |
 
+### Status in the shipped UI
+
+Both are now live blockers against built screens, not hypotheticals:
+
+* **`confirmCatalogSubmission`** — `QuickAddViewController.showCompletion` reports
+  the outcome it can actually derive: PRIVATE registration versus a
+  PENDING_REVIEW request, which follows from the `requestPublicReview` flag the
+  user themselves set, plus created-versus-linked from the 201/200 status. It
+  offers "카탈로그에서 찾아보기" (a normal catalog search) instead of a direct
+  link, and never claims a specific game was created or linked. **No DTO is
+  invented to fill the gap.**
+* **`getCatalogSubmission`** — no submission-status screen exists. The operation
+  stays on `Product22APIServicing` so the surface is complete, and no UI calls
+  it. **No DTO is invented to fill the gap.**
+
 ### What the contract would need
 
 For the two blocked operations, `SuccessEnvelope` should be replaced by a
