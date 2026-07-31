@@ -80,6 +80,10 @@ class Product22ListViewController: UIViewController {
 
     private var sections: [Product22ListSection] = []
     private var loadTask: Task<Void, Never>?
+    /// The cursor for the next page, when the last load reported one. Opaque:
+    /// stored and passed back verbatim, never parsed.
+    private var nextCursor: String?
+    private var isLoadingNextPage = false
     /// Monotonic; a response whose token is no longer the newest is discarded
     /// rather than rendered, so a slow earlier load cannot replace a faster
     /// later one.
@@ -166,6 +170,15 @@ class Product22ListViewController: UIViewController {
         .empty(message: L10n.Common.State.empty)
     }
 
+    /// Fetch the page after `cursor` and return its rows plus the cursor after
+    /// it. Override in screens that paginate; the default reports no more.
+    ///
+    /// Rows are appended to the last section, which is where every paginating
+    /// screen keeps its results.
+    func loadNextPage(after cursor: String) async -> (rows: [Product22ListRow], nextCursor: String?)? {
+        nil
+    }
+
     /// Called when a row with an `actionTitle` is selected.
     func didSelectRow(_ row: Product22ListRow, in section: Product22ListSection) {}
 
@@ -175,6 +188,9 @@ class Product22ListViewController: UIViewController {
         loadTask?.cancel()
         loadToken &+= 1
         let token = loadToken
+        // A reload starts a new list; any cursor from the old one is stale.
+        nextCursor = nil
+        isLoadingNextPage = false
 
         if sections.isEmpty && !refreshControl.isRefreshing {
             activityIndicator.startAnimating()
@@ -235,6 +251,48 @@ class Product22ListViewController: UIViewController {
 
     @objc private func pulledToRefresh() { reload() }
     @objc private func retryTapped() { reload() }
+
+    // MARK: Pagination
+
+    /// Records the cursor the current page ended on. A screen calls this from
+    /// `loadContent()` so the scaffold knows whether more exists.
+    final func setNextCursor(_ cursor: String?) {
+        nextCursor = cursor
+    }
+
+    /// Test seam.
+    var pendingNextCursor: String? { nextCursor }
+
+    @MainActor
+    private func loadNextPageIfNeeded() {
+        guard let cursor = nextCursor, !isLoadingNextPage, !sections.isEmpty else { return }
+        isLoadingNextPage = true
+        let token = loadToken
+
+        Task { [weak self] in
+            guard let self else { return }
+            let page = await self.loadNextPage(after: cursor)
+            await MainActor.run {
+                self.isLoadingNextPage = false
+                // A page that arrives after a reload belongs to a list that no
+                // longer exists, so it is dropped rather than appended.
+                guard token == self.loadToken else { return }
+                guard let page, !page.rows.isEmpty else {
+                    // No more, or the request failed. Either way stop asking,
+                    // so a failing cursor cannot spin.
+                    self.nextCursor = nil
+                    return
+                }
+                self.nextCursor = page.nextCursor
+                let last = self.sections.count - 1
+                let existing = self.sections[last]
+                self.sections[last] = Product22ListSection(
+                    id: existing.id, title: existing.title, rows: existing.rows + page.rows
+                )
+                self.tableView.reloadData()
+            }
+        }
+    }
 }
 
 // MARK: - UITableViewDataSource / Delegate
@@ -257,6 +315,16 @@ extension Product22ListViewController: UITableViewDataSource, UITableViewDelegat
         ) as! Product22ListCell
         cell.configure(with: sections[indexPath.section].rows[indexPath.row])
         return cell
+    }
+
+    func tableView(
+        _ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath
+    ) {
+        // Paged in as the user reaches the end, rather than behind a button —
+        // and only from the last section, which is where results live.
+        guard indexPath.section == sections.count - 1,
+              indexPath.row >= sections[indexPath.section].rows.count - 3 else { return }
+        loadNextPageIfNeeded()
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {

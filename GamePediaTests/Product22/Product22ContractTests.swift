@@ -32,11 +32,11 @@ final class Product22ContractTests: XCTestCase {
     func testShippedContractMatchesTheServerHeadAndHashTheAppClaims() throws {
         XCTAssertEqual(
             Product22ClientFactory.Contract.serverHead,
-            "a42ef7d0510c39811844293cc4dbebbf55a5da39"
+            "ce083aa9d873c4f9338c0f926cc2cea647c455bf"
         )
         XCTAssertEqual(
             Product22ClientFactory.Contract.openAPISHA256,
-            "c7bb0f485969d7d76375beb0c5e962ac1009dbe1c24a46612787a9b06632de55"
+            "c0c5c0287879b4139306d59ef4951afc2d81d409ba34f24bdc7233e3c0612e27"
         )
         XCTAssertEqual(Product22ClientFactory.Contract.operationIDs.count, 26)
         XCTAssertEqual(Product22ClientFactory.Contract.productVersion, "2.2.0")

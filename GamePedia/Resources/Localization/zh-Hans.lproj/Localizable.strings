@@ -973,3 +973,28 @@
 "product22.visibility.private" = "仅自己";
 "product22.visibility.friends" = "好友可见";
 "product22.visibility.public" = "所有人可见";
+
+/* Product 2.2 — quick add deep link, submission status and pagination. */
+"product22.quickAdd.openRegisteredGame" = "查看已注册的游戏";
+"product22.quickAdd.openConflictingGame" = "查看已有的游戏";
+"product22.quickAdd.replayed" = "该申请此前已处理，结果不变。";
+"product22.quickAdd.conflictExistingGame" = "已有游戏持有相同的商店标识，请先查看它。";
+"product22.submission.title" = "提交状态";
+"product22.submission.status" = "状态";
+"product22.submission.statusPreview" = "尚未确认";
+"product22.submission.statusPersonalConfirmed" = "已加入你的列表";
+"product22.submission.statusPendingReview" = "等待审核";
+"product22.submission.statusApproved" = "已批准公开";
+"product22.submission.statusRejected" = "公开申请被驳回";
+"product22.submission.statusExpired" = "已过期";
+"product22.submission.resultingGame" = "生成的游戏";
+"product22.submission.draft" = "提交内容";
+"product22.submission.draftUnreadable" = "已保存的内容无法读取，请重新开始。";
+"product22.submission.candidates" = "找到的候选";
+"product22.submission.candidatesUnknown" = "未记录候选信息";
+"product22.submission.claimedIdentities" = "从输入中读取的商店标识（未核实）";
+"product22.submission.expiresAt" = "过期时间";
+"product22.submission.notFound" = "找不到该提交";
+"product22.list.loadMore" = "加载更多";
+"product22.list.loadingMore" = "加载中…";
+"product22.catalog.emptyQuery" = "无法识别该搜索词，请输入游戏名称。";

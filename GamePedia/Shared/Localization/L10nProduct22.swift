@@ -202,6 +202,8 @@ extension L10n {
       static let evidence = L10n.tr("Localizable", "product22.catalog.evidence")
       /// 플레이 기록
       static let playlogEntry = L10n.tr("Localizable", "product22.catalog.playlogEntry")
+      /// 검색어를 알아볼 수 없어요. 게임 이름을 입력해 주세요.
+      static let emptyQuery = L10n.tr("Localizable", "product22.catalog.emptyQuery")
     }
 
     enum Provenance {
@@ -296,6 +298,14 @@ extension L10n {
       static let matchExact = L10n.tr("Localizable", "product22.quickAdd.matchExact")
       /// 비슷하지만 아직 확인되지 않았어요
       static let matchUnverified = L10n.tr("Localizable", "product22.quickAdd.matchUnverified")
+      /// 등록한 게임 보기
+      static let openRegisteredGame = L10n.tr("Localizable", "product22.quickAdd.openRegisteredGame")
+      /// 이미 등록된 게임 보기
+      static let openConflictingGame = L10n.tr("Localizable", "product22.quickAdd.openConflictingGame")
+      /// 이미 처리된 요청이에요. 결과는 그대로예요.
+      static let replayed = L10n.tr("Localizable", "product22.quickAdd.replayed")
+      /// 같은 스토어 정보를 가진 게임이 이미 있어요. 그 게임을 확인해 주세요.
+      static let conflictExistingGame = L10n.tr("Localizable", "product22.quickAdd.conflictExistingGame")
     }
 
     enum Playlog {
@@ -372,6 +382,48 @@ extension L10n {
       static let friends = L10n.tr("Localizable", "product22.visibility.friends")
       /// 전체 공개
       static let `public` = L10n.tr("Localizable", "product22.visibility.public")
+    }
+
+    enum Submission {
+      /// 등록 요청 상태
+      static let title = L10n.tr("Localizable", "product22.submission.title")
+      /// 상태
+      static let status = L10n.tr("Localizable", "product22.submission.status")
+      /// 확인 대기 중
+      static let statusPreview = L10n.tr("Localizable", "product22.submission.statusPreview")
+      /// 나만 보는 목록에 등록됨
+      static let statusPersonalConfirmed = L10n.tr("Localizable", "product22.submission.statusPersonalConfirmed")
+      /// 공개 검토 대기 중
+      static let statusPendingReview = L10n.tr("Localizable", "product22.submission.statusPendingReview")
+      /// 공개 승인됨
+      static let statusApproved = L10n.tr("Localizable", "product22.submission.statusApproved")
+      /// 공개 반려됨
+      static let statusRejected = L10n.tr("Localizable", "product22.submission.statusRejected")
+      /// 기간이 지나 만료됨
+      static let statusExpired = L10n.tr("Localizable", "product22.submission.statusExpired")
+      /// 등록된 게임
+      static let resultingGame = L10n.tr("Localizable", "product22.submission.resultingGame")
+      /// 등록 내용
+      static let draft = L10n.tr("Localizable", "product22.submission.draft")
+      /// 저장된 내용을 다시 읽을 수 없어요. 처음부터 다시 등록해 주세요.
+      static let draftUnreadable = L10n.tr("Localizable", "product22.submission.draftUnreadable")
+      /// 찾은 후보
+      static let candidates = L10n.tr("Localizable", "product22.submission.candidates")
+      /// 후보 정보가 기록되지 않았어요
+      static let candidatesUnknown = L10n.tr("Localizable", "product22.submission.candidatesUnknown")
+      /// 입력에서 읽은 스토어 정보 (미확인)
+      static let claimedIdentities = L10n.tr("Localizable", "product22.submission.claimedIdentities")
+      /// 만료 시각
+      static let expiresAt = L10n.tr("Localizable", "product22.submission.expiresAt")
+      /// 등록 요청을 찾을 수 없어요
+      static let notFound = L10n.tr("Localizable", "product22.submission.notFound")
+    }
+
+    enum List {
+      /// 더 불러오기
+      static let loadMore = L10n.tr("Localizable", "product22.list.loadMore")
+      /// 불러오는 중…
+      static let loadingMore = L10n.tr("Localizable", "product22.list.loadingMore")
     }
   }
 }

@@ -33,6 +33,8 @@ final class Product22MutationTests: XCTestCase {
     // MARK: 13 — a retry reuses the key; a new action does not
 
     func testRetryingTheSameSubmissionReusesItsMutationKey() async throws {
+        // The create re-reads through the typed list endpoint.
+        service.playSessionsResult = .success(try Product22SubmissionFixture.playSessionListDTO())
         let repository = PlaylogRepository(service: service)
         let draft = PlaySessionDraft(
             catalogGameID: CatalogGameID(uuidString: Product22Fixture.gameA)!,
@@ -63,6 +65,7 @@ final class Product22MutationTests: XCTestCase {
     }
 
     func testADifferentUserActionGetsADifferentMutationKey() async throws {
+        service.playSessionsResult = .success(try Product22SubmissionFixture.playSessionListDTO())
         let repository = PlaylogRepository(service: service)
         let gameID = CatalogGameID(uuidString: Product22Fixture.gameA)!
 
@@ -98,9 +101,9 @@ final class Product22MutationTests: XCTestCase {
     func testCreateUpdateDeleteIssueTheirRequestsInOrderWithDistinctKeys() async throws {
         let gameID = CatalogGameID(uuidString: Product22Fixture.gameA)!
         let sessionJSON = Product22Fixture.playSession(mutationID: "create-key-0001")
-        service.playSessionsResult = .success([
-            try Product22Decode.decode(Components.Schemas.PlaySession.self, from: sessionJSON)
-        ])
+        service.playSessionsResult = .success(
+            try Product22SubmissionFixture.playSessionListDTO(sessions: "[\(sessionJSON)]")
+        )
 
         let repository = PlaylogRepository(service: service)
 
@@ -212,11 +215,12 @@ final class Product22MutationTests: XCTestCase {
         let repository = QuickAddRepository(service: service)
         let gameID = CatalogGameID(uuidString: Product22Fixture.gameA)!
 
-        let outcome = try await repository.confirm(
+        service.confirmResult = .success(try Product22SubmissionFixture.confirmDTO())
+        let result = try await repository.confirm(
             submissionID: CatalogSubmissionID(uuid: UUID()),
             selection: .linkExisting(gameID, requestPublicReview: false)
         )
-        XCTAssertEqual(outcome, .created)
+        XCTAssertEqual(result.catalogGameID?.wireValue, Product22Fixture.gameA)
 
         let request = try XCTUnwrap(service.lastConfirmRequest)
         XCTAssertEqual(request.selectedCatalogGameId, gameID.wireValue)
@@ -236,6 +240,9 @@ final class Product22MutationTests: XCTestCase {
             platforms: ["iOS", "Android"]
         )
 
+        service.confirmResult = .success(
+            try Product22SubmissionFixture.confirmDTO(publicReviewStatus: "PENDING_REVIEW")
+        )
         _ = try await repository.confirm(
             submissionID: CatalogSubmissionID(uuid: UUID()),
             selection: .confirmNewGame(fields: fields, requestPublicReview: true)

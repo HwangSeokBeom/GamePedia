@@ -973,3 +973,28 @@
 "product22.visibility.private" = "Only me";
 "product22.visibility.friends" = "Friends";
 "product22.visibility.public" = "Everyone";
+
+/* Product 2.2 — quick add deep link, submission status and pagination. */
+"product22.quickAdd.openRegisteredGame" = "Open the game you registered";
+"product22.quickAdd.openConflictingGame" = "Open the existing game";
+"product22.quickAdd.replayed" = "This was already processed. The outcome is unchanged.";
+"product22.quickAdd.conflictExistingGame" = "A game already holds this store identity. Take a look at it.";
+"product22.submission.title" = "Submission status";
+"product22.submission.status" = "Status";
+"product22.submission.statusPreview" = "Not confirmed yet";
+"product22.submission.statusPersonalConfirmed" = "In your own list";
+"product22.submission.statusPendingReview" = "Awaiting review";
+"product22.submission.statusApproved" = "Approved for public listing";
+"product22.submission.statusRejected" = "Public listing declined";
+"product22.submission.statusExpired" = "Expired";
+"product22.submission.resultingGame" = "Resulting game";
+"product22.submission.draft" = "Submitted details";
+"product22.submission.draftUnreadable" = "The stored details can no longer be read. Please start over.";
+"product22.submission.candidates" = "Candidates found";
+"product22.submission.candidatesUnknown" = "No candidate information was recorded";
+"product22.submission.claimedIdentities" = "Store identifiers read from your input (unverified)";
+"product22.submission.expiresAt" = "Expires";
+"product22.submission.notFound" = "Submission not found";
+"product22.list.loadMore" = "Load more";
+"product22.list.loadingMore" = "Loading…";
+"product22.catalog.emptyQuery" = "That query couldn't be read. Try a game name.";

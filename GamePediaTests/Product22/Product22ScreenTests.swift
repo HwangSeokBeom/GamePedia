@@ -92,7 +92,10 @@ final class Product22QuickAddScreenTests: XCTestCase {
     private final class StubQuickAddRepository: QuickAddRepositing, @unchecked Sendable {
         var previewResult: Result<QuickAddPreview, any Error> =
             .failure(Product22Error.transport(message: "not stubbed"))
-        var confirmResult: Result<SubmissionConfirmOutcome, any Error> = .success(.created)
+        var confirmResult: Result<SubmissionConfirmResult, any Error> =
+            .success(Product22SubmissionFixture.confirmResult())
+        var stateResult: Result<CatalogSubmissionState, any Error> =
+            .failure(Product22Error.notFound)
         private(set) var confirmations: [QuickAddConfirmation] = []
 
         func preview(_ input: QuickAddInput) async throws -> QuickAddPreview {
@@ -101,9 +104,13 @@ final class Product22QuickAddScreenTests: XCTestCase {
 
         func confirm(
             submissionID: CatalogSubmissionID, selection: QuickAddConfirmation
-        ) async throws -> SubmissionConfirmOutcome {
+        ) async throws -> SubmissionConfirmResult {
             confirmations.append(selection)
             return try confirmResult.get()
+        }
+
+        func state(submissionID: CatalogSubmissionID) async throws -> CatalogSubmissionState {
+            try stateResult.get()
         }
     }
 
@@ -243,13 +250,20 @@ final class Product22PlaylogScreenTests: XCTestCase {
 
     private final class StubPlaylogRepository: PlaylogRepositing, @unchecked Sendable {
         var sessions: [PlaySession] = []
+        var nextCursor: String?
         var createResult: Result<PlaySession?, any Error> = .success(nil)
         private(set) var createdDrafts: [PlaySessionDraft] = []
         private(set) var deleted: [PlaySession] = []
+        private(set) var requestedCursors: [String?] = []
 
         func sessions(
-            for gameID: CatalogGameID?, from: Date?, to: Date?
-        ) async throws -> [PlaySession] { sessions }
+            for gameID: CatalogGameID?, from: Date?, to: Date?, cursor: String?
+        ) async throws -> PlaySessionPageResult {
+            requestedCursors.append(cursor)
+            return PlaySessionPageResult(
+                sessions: sessions, nextCursor: cursor == nil ? nextCursor : nil, limit: 50
+            )
+        }
 
         func calendar(monthKey: String, timeZone: TimeZone) async throws -> PlayCalendarMonth {
             PlayCalendarDeriver.month(monthKey: monthKey, timeZone: timeZone, sessions: sessions)

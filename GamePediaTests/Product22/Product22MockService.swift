@@ -25,6 +25,7 @@ final class Product22MockService: Product22APIServicing, @unchecked Sendable {
         case corrections(id: String, count: Int)
         case previewSubmission
         case confirmSubmission(id: String)
+        case fetchSubmission(id: String)
         case listPlaySessions(gameID: String?)
         case createPlaySession(clientMutationID: String)
         case updatePlaySession(id: String, clientMutationID: String)
@@ -59,11 +60,17 @@ final class Product22MockService: Product22APIServicing, @unchecked Sendable {
         .failure(Product22Error.transport(message: "not stubbed"))
     var todayResult: Result<Components.Schemas.TodayFeed, any Error> =
         .failure(Product22Error.transport(message: "not stubbed"))
-    var playSessionsResult: Result<[Components.Schemas.PlaySession], any Error> = .success([])
+    var playSessionsResult: Result<Components.Schemas.PlaySessionListResult, any Error> =
+        .failure(Product22Error.transport(message: "not stubbed"))
     var productEventsResult: Result<Void, any Error> = .success(())
     var previewResult: Result<Components.Schemas.SubmissionPreviewResponse, any Error> =
         .failure(Product22Error.transport(message: "not stubbed"))
-    var confirmResult: Result<SubmissionConfirmOutcome, any Error> = .success(.created)
+    var confirmResult: Result<Components.Schemas.SubmissionConfirmResult, any Error> =
+        .failure(Product22Error.transport(message: "not stubbed"))
+    var submissionStateResult: Result<Components.Schemas.SubmissionState, any Error> =
+        .failure(Product22Error.transport(message: "not stubbed"))
+    var searchResult: Result<Components.Schemas.CatalogSearchResult, any Error> =
+        .failure(Product22Error.transport(message: "not stubbed"))
     var mutationResult: Result<Void, any Error> = .success(())
 
     /// Delays every Today response, so a test can change the account or fire a
@@ -99,12 +106,15 @@ final class Product22MockService: Product22APIServicing, @unchecked Sendable {
 
     // MARK: Catalog
 
+    private(set) var searchCursors: [String?] = []
+
     func searchCatalogGames(
         query: String, locale: String?, regionCode: String?,
         platform: String?, limit: Int?, cursor: String?
-    ) async throws -> CatalogSearchPage {
+    ) async throws -> Components.Schemas.CatalogSearchResult {
         record(.catalogSearch(query: query))
-        return CatalogSearchPage(games: [])
+        searchCursors.append(cursor)
+        return try searchResult.get()
     }
 
     func fetchCatalogGame(id: CatalogGameID) async throws -> Components.Schemas.CatalogGameDetail {
@@ -146,20 +156,28 @@ final class Product22MockService: Product22APIServicing, @unchecked Sendable {
         id: CatalogSubmissionID,
         request: Components.Schemas.SubmissionConfirmRequest,
         authorization: Product22Authorization
-    ) async throws -> SubmissionConfirmOutcome {
+    ) async throws -> Components.Schemas.SubmissionConfirmResult {
         lastConfirmRequest = request
         record(.confirmSubmission(id: id.wireValue))
         return try confirmResult.get()
     }
 
+    func fetchSubmission(id: CatalogSubmissionID) async throws -> Components.Schemas.SubmissionState {
+        record(.fetchSubmission(id: id.wireValue))
+        return try submissionStateResult.get()
+    }
+
     // MARK: Playlog
+
+    private(set) var playSessionCursors: [String?] = []
 
     func listPlaySessions(
         catalogGameID: CatalogGameID?, from: Date?, to: Date?,
         outcome: Components.Schemas.PlaySessionOutcome?, limit: Int?, cursor: String?
-    ) async throws -> PlaySessionPage {
+    ) async throws -> Components.Schemas.PlaySessionListResult {
         record(.listPlaySessions(gameID: catalogGameID?.wireValue))
-        return PlaySessionPage(sessions: try playSessionsResult.get())
+        playSessionCursors.append(cursor)
+        return try playSessionsResult.get()
     }
 
     func createPlaySession(

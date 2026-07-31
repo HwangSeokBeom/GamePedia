@@ -62,7 +62,11 @@ actor MagazineRepository: MagazineRepositing {
 // MARK: - CatalogRepositing
 
 protocol CatalogRepositing: Sendable {
-    func search(query: String, locale: String?, regionCode: String?, platform: String?) async throws -> [CatalogGameSummary]
+    /// One page. Pass the previous page's `nextCursor` back verbatim to
+    /// continue; nil starts at the beginning.
+    func search(
+        query: String, locale: String?, regionCode: String?, platform: String?, cursor: String?
+    ) async throws -> CatalogSearchPageResult
     func detail(id: CatalogGameID) async throws -> CatalogGameDetail
     func setFollowing(_ following: Bool, id: CatalogGameID, regionalReleaseID: RegionalReleaseID?) async throws
     func submitCorrections(_ corrections: [CatalogCorrection], for id: CatalogGameID) async throws
@@ -70,8 +74,8 @@ protocol CatalogRepositing: Sendable {
 
 actor CatalogRepository: CatalogRepositing {
 
-    /// The contract's maximum. Pagination is not available because the cursor
-    /// lives in an untyped `meta`; see docs/product-2.2-contract-gaps.md.
+    /// The contract's maximum page size. The cursor is typed, so the app
+    /// paginates properly rather than truncating at one page.
     private static let pageLimit = 50
 
     private let service: any Product22APIServicing
@@ -84,17 +88,20 @@ actor CatalogRepository: CatalogRepositing {
         query: String,
         locale: String?,
         regionCode: String?,
-        platform: String?
-    ) async throws -> [CatalogGameSummary] {
-        let page = try await service.searchCatalogGames(
-            query: query,
-            locale: locale,
-            regionCode: regionCode,
-            platform: platform,
-            limit: Self.pageLimit,
-            cursor: nil
+        platform: String?,
+        cursor: String?
+    ) async throws -> CatalogSearchPageResult {
+        CatalogSubmissionMapper.searchPage(
+            from: try await service.searchCatalogGames(
+                query: query,
+                locale: locale,
+                regionCode: regionCode,
+                platform: platform,
+                limit: Self.pageLimit,
+                // Opaque continuation token, passed back exactly as received.
+                cursor: cursor
+            )
         )
-        return page.games.compactMap(CatalogMapper.summary(from:))
     }
 
     func detail(id: CatalogGameID) async throws -> CatalogGameDetail {
@@ -146,7 +153,11 @@ actor CatalogRepository: CatalogRepositing {
 // MARK: - PlaylogRepositing
 
 protocol PlaylogRepositing: Sendable {
-    func sessions(for gameID: CatalogGameID?, from: Date?, to: Date?) async throws -> [PlaySession]
+    /// One page of sessions, newest first. Pass the previous page's
+    /// `nextCursor` back verbatim to continue.
+    func sessions(
+        for gameID: CatalogGameID?, from: Date?, to: Date?, cursor: String?
+    ) async throws -> PlaySessionPageResult
     func calendar(monthKey: String, timeZone: TimeZone) async throws -> PlayCalendarMonth
     func create(_ draft: PlaySessionDraft) async throws -> PlaySession?
     func update(_ draft: PlaySessionDraft, existing: PlaySession) async throws -> PlaySession?
@@ -166,18 +177,44 @@ actor PlaylogRepository: PlaylogRepositing {
     func sessions(
         for gameID: CatalogGameID?,
         from: Date?,
-        to: Date?
-    ) async throws -> [PlaySession] {
-        let page = try await service.listPlaySessions(
-            catalogGameID: gameID,
-            from: from,
-            to: to,
-            outcome: nil,
-            limit: Self.pageLimit,
-            cursor: nil
+        to: Date?,
+        cursor: String?
+    ) async throws -> PlaySessionPageResult {
+        CatalogSubmissionMapper.playSessionPage(
+            from: try await service.listPlaySessions(
+                catalogGameID: gameID,
+                from: from,
+                to: to,
+                outcome: nil,
+                limit: Self.pageLimit,
+                cursor: cursor
+            )
         )
-        return page.sessions.compactMap(PlaylogMapper.session(from:))
     }
+
+    /// Every session in a window, following the cursor to the end.
+    ///
+    /// The month grid has to aggregate a whole month, so it cannot stop at the
+    /// first page. The page cap bounds it: a month with more sessions than
+    /// this is beyond what the grid can meaningfully display anyway.
+    private func allSessions(
+        for gameID: CatalogGameID?, from: Date?, to: Date?
+    ) async throws -> [PlaySession] {
+        var collected: [PlaySession] = []
+        var cursor: String?
+        var pages = 0
+        repeat {
+            let page = try await sessions(for: gameID, from: from, to: to, cursor: cursor)
+            collected.append(contentsOf: page.sessions)
+            cursor = page.nextCursor
+            pages += 1
+        } while cursor != nil && pages < Self.maximumCalendarPages
+        return collected
+    }
+
+    /// Bounds the calendar's cursor walk. 20 pages at the contract's maximum
+    /// page size is 1000 sessions in one month.
+    private static let maximumCalendarPages = 20
 
     /// Derived from the typed session list; the dedicated calendar endpoint's
     /// body is untyped. See docs/product-2.2-contract-gaps.md.
@@ -187,7 +224,7 @@ actor PlaylogRepository: PlaylogRepositing {
                 ValidationFailure(code: "INVALID_MONTH", fieldErrors: [])
             )
         }
-        let sessions = try await sessions(for: nil, from: window.start, to: window.end)
+        let sessions = try await allSessions(for: nil, from: window.start, to: window.end)
         return PlayCalendarDeriver.month(
             monthKey: monthKey, timeZone: timeZone, sessions: sessions
         )
@@ -211,8 +248,8 @@ actor PlaylogRepository: PlaylogRepositing {
             patch: PlaylogMapper.patch(from: draft, against: existing),
             authorization: Product22MutationAuthorizer.captureExpectation()
         )
-        let refreshed = try await sessions(for: existing.catalogGameID, from: nil, to: nil)
-        return refreshed.first { $0.id == existing.id }
+        let refreshed = try await sessions(for: existing.catalogGameID, from: nil, to: nil, cursor: nil)
+        return refreshed.sessions.first { $0.id == existing.id }
     }
 
     /// Delete gets its own mutation key derived from the record's own key, so
@@ -230,8 +267,8 @@ actor PlaylogRepository: PlaylogRepositing {
         _ mutationID: String,
         gameID: CatalogGameID
     ) async throws -> PlaySession? {
-        let refreshed = try await sessions(for: gameID, from: nil, to: nil)
-        return refreshed.first { $0.clientMutationID == mutationID }
+        let refreshed = try await sessions(for: gameID, from: nil, to: nil, cursor: nil)
+        return refreshed.sessions.first { $0.clientMutationID == mutationID }
     }
 }
 
@@ -287,7 +324,9 @@ protocol QuickAddRepositing: Sendable {
     func confirm(
         submissionID: CatalogSubmissionID,
         selection: QuickAddConfirmation
-    ) async throws -> SubmissionConfirmOutcome
+    ) async throws -> SubmissionConfirmResult
+    /// The caller's own submission state, for the status screen.
+    func state(submissionID: CatalogSubmissionID) async throws -> CatalogSubmissionState
 }
 
 actor QuickAddRepository: QuickAddRepositing {
@@ -309,11 +348,19 @@ actor QuickAddRepository: QuickAddRepositing {
     func confirm(
         submissionID: CatalogSubmissionID,
         selection: QuickAddConfirmation
-    ) async throws -> SubmissionConfirmOutcome {
-        try await service.confirmSubmission(
-            id: submissionID,
-            request: QuickAddMapper.confirmRequest(from: selection),
-            authorization: Product22MutationAuthorizer.captureExpectation()
+    ) async throws -> SubmissionConfirmResult {
+        try CatalogSubmissionMapper.confirmResult(
+            from: try await service.confirmSubmission(
+                id: submissionID,
+                request: QuickAddMapper.confirmRequest(from: selection),
+                authorization: Product22MutationAuthorizer.captureExpectation()
+            )
+        )
+    }
+
+    func state(submissionID: CatalogSubmissionID) async throws -> CatalogSubmissionState {
+        try CatalogSubmissionMapper.state(
+            from: try await service.fetchSubmission(id: submissionID)
         )
     }
 }

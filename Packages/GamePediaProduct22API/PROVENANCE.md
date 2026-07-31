@@ -7,17 +7,31 @@ the file wholesale and update every field below in the same commit.
 
 | Field | Value |
 | --- | --- |
-| Source server HEAD | `a42ef7d0510c39811844293cc4dbebbf55a5da39` |
+| Source server HEAD | `ce083aa9d873c4f9338c0f926cc2cea647c455bf` |
 | Source path | `openapi/product-2.2.openapi.json` |
 | Source checkout | `/Users/hwangseokbeom/.codex/worktrees/1c7d/GamePediaCoreServer` |
-| SHA-256 | `c7bb0f485969d7d76375beb0c5e962ac1009dbe1c24a46612787a9b06632de55` |
-| Synced at (UTC) | 2026-07-30T13:41:44Z |
+| SHA-256 | `c0c5c0287879b4139306d59ef4951afc2d81d409ba34f24bdc7233e3c0612e27` |
+| Synced at (UTC) | 2026-07-31T08:16:26Z |
 | Contract `info.version` | 2.2.0 |
 | Operations declared | 26 |
 | iOS base commit | `6a0e7f558f8338b4ad161defa4e798041aa7c985` |
+| Contract implementation commit | `6fbcf094ef45d971ce43e2ea7f5236dc525f199e` |
 
 Verified at sync time: the server checkout was at exactly that HEAD with a clean
 working tree, and `shasum -a 256` of the source file matched the value above.
+
+### Revision history
+
+The first sync was server HEAD `a42ef7d0510c39811844293cc4dbebbf55a5da39`
+(SHA-256 `c7bb0f48…32de55`). That revision left four operations' 2xx bodies as
+a bare `SuccessEnvelope`, which cost the app catalog-search and Playlog
+pagination, the Quick Add deep link, and any submission-status screen —
+recorded at the time in `docs/product-2.2-contract-gaps.md` rather than worked
+around with hand-written DTOs.
+
+Commit `6fbcf094` types all four. The change is purely additive: 19 new
+schemas, none removed, no existing schema altered, and the operation set is
+unchanged at 26.
 
 ## Generator and runtime versions
 

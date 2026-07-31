@@ -973,3 +973,28 @@
 "product22.visibility.private" = "自分のみ";
 "product22.visibility.friends" = "フレンドに公開";
 "product22.visibility.public" = "全体に公開";
+
+/* Product 2.2 — quick add deep link, submission status and pagination. */
+"product22.quickAdd.openRegisteredGame" = "登録したゲームを見る";
+"product22.quickAdd.openConflictingGame" = "既存のゲームを見る";
+"product22.quickAdd.replayed" = "すでに処理済みの申請です。結果は変わりません。";
+"product22.quickAdd.conflictExistingGame" = "同じストア情報を持つゲームがすでにあります。そちらをご確認ください。";
+"product22.submission.title" = "登録申請の状態";
+"product22.submission.status" = "状態";
+"product22.submission.statusPreview" = "確認待ち";
+"product22.submission.statusPersonalConfirmed" = "自分だけのリストに登録済み";
+"product22.submission.statusPendingReview" = "公開審査待ち";
+"product22.submission.statusApproved" = "公開が承認されました";
+"product22.submission.statusRejected" = "公開が却下されました";
+"product22.submission.statusExpired" = "期限切れ";
+"product22.submission.resultingGame" = "登録されたゲーム";
+"product22.submission.draft" = "登録内容";
+"product22.submission.draftUnreadable" = "保存内容を読み取れません。最初からやり直してください。";
+"product22.submission.candidates" = "見つかった候補";
+"product22.submission.candidatesUnknown" = "候補の情報は記録されていません";
+"product22.submission.claimedIdentities" = "入力から読み取ったストア情報（未確認）";
+"product22.submission.expiresAt" = "有効期限";
+"product22.submission.notFound" = "登録申請が見つかりません";
+"product22.list.loadMore" = "さらに読み込む";
+"product22.list.loadingMore" = "読み込み中…";
+"product22.catalog.emptyQuery" = "検索語を読み取れません。ゲーム名を入力してください。";

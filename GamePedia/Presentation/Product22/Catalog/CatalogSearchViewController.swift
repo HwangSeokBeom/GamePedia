@@ -8,9 +8,8 @@ import UIKit
 // result state and from the navigation bar, so a user who finds nothing does
 // not have to back out to register what they were looking for.
 //
-// One page at the contract maximum: the pagination cursor lives in an untyped
-// `meta`, so paging would mean guessing a key name. See
-// docs/product-2.2-contract-gaps.md.
+// Results page in as the user scrolls, following the contract's typed
+// `meta.nextCursor`. The cursor is opaque and is passed back verbatim.
 
 final class CatalogSearchViewController: Product22ListViewController {
 
@@ -80,45 +79,67 @@ final class CatalogSearchViewController: Product22ListViewController {
         }
 
         do {
-            let games = try await repository.search(
+            let page = try await repository.search(
                 query: trimmed,
                 locale: Locale.current.language.languageCode?.identifier,
                 regionCode: Locale.current.region?.identifier,
-                platform: nil
+                platform: nil,
+                cursor: nil
             )
-            results = games
-            guard !games.isEmpty else {
+            results = page.games
+            setNextCursor(page.nextCursor)
+
+            guard !page.games.isEmpty else {
+                // `emptyQuery` and `noMatch` are different facts and the copy
+                // distinguishes them: one means "we couldn't read that", the
+                // other "nothing scored well enough".
+                let reason = page.matchedBy == .emptyQuery
+                    ? L10n.Product22.Catalog.emptyQuery
+                    : L10n.Product22.Catalog.noResults
                 // The empty state is where Quick Add matters most, so it names
                 // the action rather than just reporting nothing found.
-                return .empty(
-                    message: "\(L10n.Product22.Catalog.noResults)\n\(L10n.Product22.Catalog.quickAddPrompt)"
-                )
+                return .empty(message: "\(reason)\n\(L10n.Product22.Catalog.quickAddPrompt)")
             }
             return .loaded([
-                Product22ListSection(
-                    id: "results",
-                    title: nil,
-                    rows: games.map { game in
-                        var details: [String] = []
-                        if let developer = game.developerName { details.append(developer) }
-                        // Provenance and publication status are shown, so a
-                        // private or unconfirmed entry never reads like a
-                        // verified public one.
-                        details.append(Product22Vocabulary.text(for: game.titleProvenance))
-                        details.append(Product22Vocabulary.text(for: game.publicationStatus))
-                        return Product22ListRow(
-                            id: game.id.wireValue,
-                            title: game.originalTitle,     // server content
-                            subtitle: game.platforms.joined(separator: " · "),
-                            details: details,
-                            actionTitle: L10n.Common.Button.seeAll
-                        )
-                    }
-                )
+                Product22ListSection(id: "results", title: nil, rows: page.games.map(Self.row(for:)))
             ])
         } catch {
             return Product22ScreenState.failure(from: error, configStore: configStore)
         }
+    }
+
+    override func loadNextPage(
+        after cursor: String
+    ) async -> (rows: [Product22ListRow], nextCursor: String?)? {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard let page = try? await repository.search(
+            query: trimmed,
+            locale: Locale.current.language.languageCode?.identifier,
+            regionCode: Locale.current.region?.identifier,
+            platform: nil,
+            cursor: cursor
+        ) else {
+            return nil
+        }
+        results.append(contentsOf: page.games)
+        return (page.games.map(Self.row(for:)), page.nextCursor)
+    }
+
+    static func row(for game: CatalogGameSummary) -> Product22ListRow {
+        var details: [String] = []
+        if let developer = game.developerName { details.append(developer) }
+        // Provenance and publication status are shown, so a private or
+        // unconfirmed entry never reads like a verified public one.
+        details.append(Product22Vocabulary.text(for: game.titleProvenance))
+        details.append(Product22Vocabulary.text(for: game.publicationStatus))
+        return Product22ListRow(
+            id: game.id.wireValue,
+            title: game.originalTitle,     // server content
+            subtitle: game.platforms.joined(separator: " · "),
+            details: details,
+            actionTitle: L10n.Common.Button.seeAll
+        )
     }
 
     override func didSelectRow(_ row: Product22ListRow, in section: Product22ListSection) {

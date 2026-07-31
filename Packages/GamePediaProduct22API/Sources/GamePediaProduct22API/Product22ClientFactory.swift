@@ -26,9 +26,9 @@ public enum Product22ClientFactory {
     public enum Contract {
         /// SHA-256 of `Sources/GamePediaProduct22API/openapi.json`.
         public static let openAPISHA256 =
-            "c7bb0f485969d7d76375beb0c5e962ac1009dbe1c24a46612787a9b06632de55"
+            "c0c5c0287879b4139306d59ef4951afc2d81d409ba34f24bdc7233e3c0612e27"
         /// Exact GamePediaCoreServer commit the document was taken from.
-        public static let serverHead = "a42ef7d0510c39811844293cc4dbebbf55a5da39"
+        public static let serverHead = "ce083aa9d873c4f9338c0f926cc2cea647c455bf"
         /// Path of the document inside that server checkout.
         public static let serverPath = "openapi/product-2.2.openapi.json"
         /// `info.version` of the contract document.

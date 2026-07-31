@@ -139,9 +139,19 @@ final class Product22FollowRollbackTests: XCTestCase {
         var detail: CatalogGameDetail?
         private(set) var followCalls: [(Bool, CatalogGameID)] = []
 
+        var searchPages: [CatalogSearchPageResult] = []
+        private(set) var searchCursors: [String?] = []
+
         func search(
-            query: String, locale: String?, regionCode: String?, platform: String?
-        ) async throws -> [CatalogGameSummary] { [] }
+            query: String, locale: String?, regionCode: String?, platform: String?, cursor: String?
+        ) async throws -> CatalogSearchPageResult {
+            searchCursors.append(cursor)
+            guard let page = searchPages.first(where: { _ in true }) else {
+                return CatalogSearchPageResult(games: [], nextCursor: nil, matchedBy: .ranked, limit: 50)
+            }
+            if !searchPages.isEmpty { searchPages.removeFirst() }
+            return page
+        }
 
         func detail(id: CatalogGameID) async throws -> CatalogGameDetail {
             guard let detail else { throw Product22Error.notFound }

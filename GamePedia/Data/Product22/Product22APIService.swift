@@ -24,7 +24,7 @@ protocol Product22APIServicing: Sendable {
     func searchCatalogGames(
         query: String, locale: String?, regionCode: String?,
         platform: String?, limit: Int?, cursor: String?
-    ) async throws -> CatalogSearchPage
+    ) async throws -> Components.Schemas.CatalogSearchResult
     func fetchCatalogGame(id: CatalogGameID) async throws -> Components.Schemas.CatalogGameDetail
     func followCatalogGame(
         id: CatalogGameID, regionalReleaseID: RegionalReleaseID?, authorization: Product22Authorization
@@ -38,21 +38,24 @@ protocol Product22APIServicing: Sendable {
     func previewSubmission(
         _ request: Components.Schemas.SubmissionPreviewRequest, authorization: Product22Authorization
     ) async throws -> Components.Schemas.SubmissionPreviewResponse
-    /// Returns whether the server created a new canonical game (201) or linked
-    /// an existing one / replayed an earlier confirmation (200). The response
-    /// body is untyped in the contract and is deliberately not read; see
-    /// docs/product-2.2-contract-gaps.md.
+    /// The typed confirmation result: which canonical game it resolved to,
+    /// whether this request created it, whether it was an idempotent replay,
+    /// and any identity conflict the server refused to auto-merge.
     func confirmSubmission(
         id: CatalogSubmissionID,
         request: Components.Schemas.SubmissionConfirmRequest,
         authorization: Product22Authorization
-    ) async throws -> SubmissionConfirmOutcome
+    ) async throws -> Components.Schemas.SubmissionConfirmResult
+
+    /// The caller's own submission. Another account's is a 404, so a
+    /// submission id is not enumerable.
+    func fetchSubmission(id: CatalogSubmissionID) async throws -> Components.Schemas.SubmissionState
 
     // Playlog
     func listPlaySessions(
         catalogGameID: CatalogGameID?, from: Date?, to: Date?,
         outcome: Components.Schemas.PlaySessionOutcome?, limit: Int?, cursor: String?
-    ) async throws -> PlaySessionPage
+    ) async throws -> Components.Schemas.PlaySessionListResult
     func createPlaySession(
         _ request: Components.Schemas.CreatePlaySessionRequest, authorization: Product22Authorization
     ) async throws
@@ -78,30 +81,10 @@ protocol Product22APIServicing: Sendable {
 
 typealias ProductEventPayload = Components.Schemas.ProductEventBatchRequest.eventsPayloadPayload
 
-/// Both list endpoints declare their `meta` as an untyped object, so the
-/// pagination cursor inside it cannot be read without guessing a key name.
-/// The app therefore asks for a single page at the contract's maximum `limit`
-/// and does not paginate. See docs/product-2.2-contract-gaps.md.
-struct CatalogSearchPage: Sendable {
-    let games: [Components.Schemas.CatalogGameSummary]
-}
-
-struct PlaySessionPage: Sendable {
-    let sessions: [Components.Schemas.PlaySession]
-}
-
 struct CatalogCorrectionInput: Sendable, Equatable {
     let fieldPath: String
     let proposedValue: String
     let sourceURL: String?
-}
-
-enum SubmissionConfirmOutcome: Sendable, Equatable {
-    /// 201 — a new PRIVATE canonical game was created.
-    case created
-    /// 200 — an existing candidate was linked, or an earlier confirmation was
-    /// replayed idempotently.
-    case linkedOrReplayed
 }
 
 /// Only the fields the app edits. A member left nil is omitted from the
@@ -241,7 +224,7 @@ final class DefaultProduct22APIService: Product22APIServicing {
     func searchCatalogGames(
         query: String, locale: String?, regionCode: String?,
         platform: String?, limit: Int?, cursor: String?
-    ) async throws -> CatalogSearchPage {
+    ) async throws -> Components.Schemas.CatalogSearchResult {
         try await perform(.currentSession) {
             switch try await client.searchCatalogGames(
                 .init(query: .init(
@@ -250,8 +233,7 @@ final class DefaultProduct22APIService: Product22APIServicing {
                 ))
             ) {
             case .ok(let ok):
-                let data = try require(try ok.body.json.value2.data, "catalog search")
-                return CatalogSearchPage(games: data.games)
+                return try ok.body.json.data
             case .badRequest(let response):
                 throw Product22ErrorMapper.validation(try response.body.json)
             case .unauthorized:
@@ -391,15 +373,15 @@ final class DefaultProduct22APIService: Product22APIServicing {
         id: CatalogSubmissionID,
         request: Components.Schemas.SubmissionConfirmRequest,
         authorization: Product22Authorization
-    ) async throws -> SubmissionConfirmOutcome {
+    ) async throws -> Components.Schemas.SubmissionConfirmResult {
         try await perform(authorization) {
             switch try await client.confirmCatalogSubmission(
                 .init(path: .init(submissionId: id.wireValue), body: .json(request))
             ) {
-            case .created:
-                return .created
-            case .ok:
-                return .linkedOrReplayed
+            case .created(let created):
+                return try created.body.json.data
+            case .ok(let ok):
+                return try ok.body.json.data
             case .badRequest(let response):
                 throw Product22ErrorMapper.validation(try response.body.json)
             case .unauthorized:
@@ -416,12 +398,35 @@ final class DefaultProduct22APIService: Product22APIServicing {
         }
     }
 
+    func fetchSubmission(id: CatalogSubmissionID) async throws -> Components.Schemas.SubmissionState {
+        try await perform(.currentSession) {
+            switch try await client.getCatalogSubmission(
+                .init(path: .init(submissionId: id.wireValue))
+            ) {
+            case .ok(let ok):
+                return try ok.body.json.data
+            case .badRequest(let response):
+                throw Product22ErrorMapper.validation(try response.body.json)
+            case .unauthorized:
+                throw Product22Error.unauthorized
+            case .notFound:
+                // Another account's submission is reported as 404 too, so ids
+                // are not enumerable.
+                throw Product22Error.notFound
+            case .serviceUnavailable(let response):
+                throw Product22ErrorMapper.featureUnavailable(try response.body.json)
+            case .undocumented(let statusCode, _):
+                throw Product22ErrorMapper.undocumented(statusCode: statusCode)
+            }
+        }
+    }
+
     // MARK: Playlog
 
     func listPlaySessions(
         catalogGameID: CatalogGameID?, from: Date?, to: Date?,
         outcome: Components.Schemas.PlaySessionOutcome?, limit: Int?, cursor: String?
-    ) async throws -> PlaySessionPage {
+    ) async throws -> Components.Schemas.PlaySessionListResult {
         try await perform(.currentSession) {
             switch try await client.listPlaySessions(
                 .init(query: .init(
@@ -430,8 +435,7 @@ final class DefaultProduct22APIService: Product22APIServicing {
                 ))
             ) {
             case .ok(let ok):
-                let data = try require(try ok.body.json.value2.data, "play sessions")
-                return PlaySessionPage(sessions: data.playSessions)
+                return try ok.body.json.data
             case .badRequest(let response):
                 throw Product22ErrorMapper.validation(try response.body.json)
             case .unauthorized:

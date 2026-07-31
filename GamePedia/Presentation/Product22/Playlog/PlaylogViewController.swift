@@ -5,9 +5,12 @@ import UIKit
 // The play-session list and month grid for one canonical game, or for the
 // whole account when `catalogGameID` is nil.
 //
-// The month grid is derived from typed sessions rather than fetched: the
-// calendar endpoint's response body is untyped in the contract, so reading it
-// would mean guessing key names. See docs/product-2.2-contract-gaps.md.
+// Sessions page in as the user scrolls, following the contract's typed
+// `meta.nextCursor` over (playedAt desc, id desc).
+//
+// The month grid is still derived from typed sessions rather than fetched:
+// `getPlayCalendar` remains untyped in the contract. The deriver now walks the
+// cursor to the end of the month so the grid aggregates the whole window.
 
 final class PlaylogViewController: Product22ListViewController {
 
@@ -72,10 +75,14 @@ final class PlaylogViewController: Product22ListViewController {
             // The month window bounds the fetch so the grid and the list are
             // built from the same typed rows.
             let window = PlayCalendarDeriver.window(monthKey: monthKey, timeZone: timeZone)
-            let fetched = try await repository.sessions(
-                for: catalogGameID, from: window?.start, to: window?.end
+            let page = try await repository.sessions(
+                for: catalogGameID, from: window?.start, to: window?.end, cursor: nil
             )
-            sessions = fetched.sorted { $0.playedAt > $1.playedAt }
+            // The server already orders by (playedAt desc, id desc), and those
+            // two are unique together, so a page boundary can neither skip nor
+            // repeat a session. Re-sorting locally would fight the cursor.
+            sessions = page.sessions
+            setNextCursor(page.nextCursor)
 
             guard !sessions.isEmpty else {
                 return .empty(message: L10n.Product22.Playlog.empty)
@@ -84,6 +91,19 @@ final class PlaylogViewController: Product22ListViewController {
         } catch {
             return Product22ScreenState.failure(from: error, configStore: configStore)
         }
+    }
+
+    override func loadNextPage(
+        after cursor: String
+    ) async -> (rows: [Product22ListRow], nextCursor: String?)? {
+        let window = PlayCalendarDeriver.window(monthKey: monthKey, timeZone: timeZone)
+        guard let page = try? await repository.sessions(
+            for: catalogGameID, from: window?.start, to: window?.end, cursor: cursor
+        ) else {
+            return nil
+        }
+        sessions.append(contentsOf: page.sessions)
+        return (page.sessions.map(row(for:)), page.nextCursor)
     }
 
     private func buildSections() -> [Product22ListSection] {
@@ -117,29 +137,34 @@ final class PlaylogViewController: Product22ListViewController {
             Product22ListSection(
                 id: "sessions",
                 title: L10n.Product22.Playlog.title,
-                rows: sessions.map { session in
-                    var details: [String] = [Product22Vocabulary.text(for: session.outcome)]
-                    if let minutes = session.durationMinutes {
-                        details.append("\(minutes)")
-                    } else {
-                        details.append(L10n.Product22.Playlog.durationUnknown)
-                    }
-                    if let progress = session.progressPercent { details.append("\(progress)%") }
-                    if let mood = session.mood { details.append(Product22Vocabulary.text(for: mood)) }
-                    details.append(Product22Vocabulary.text(for: session.visibility))
-
-                    return Product22ListRow(
-                        id: session.id.wireValue,
-                        title: gameTitle ?? session.catalogGameID.wireValue,
-                        subtitle: session.note,
-                        details: details,
-                        actionTitle: L10n.Product22.Playlog.edit
-                    )
-                }
+                rows: sessions.map(row(for:))
             )
         )
 
         return sections
+    }
+
+    /// Every optional field is treated as genuinely optional: a session with
+    /// no duration, no progress and no mood still renders, and says which
+    /// facts are missing rather than showing a zero.
+    private func row(for session: PlaySession) -> Product22ListRow {
+        var details: [String] = [Product22Vocabulary.text(for: session.outcome)]
+        if let minutes = session.durationMinutes {
+            details.append("\(minutes)")
+        } else {
+            details.append(L10n.Product22.Playlog.durationUnknown)
+        }
+        if let progress = session.progressPercent { details.append("\(progress)%") }
+        if let mood = session.mood { details.append(Product22Vocabulary.text(for: mood)) }
+        details.append(Product22Vocabulary.text(for: session.visibility))
+
+        return Product22ListRow(
+            id: session.id.wireValue,
+            title: gameTitle ?? session.catalogGameID.wireValue,
+            subtitle: session.note,
+            details: details,
+            actionTitle: L10n.Product22.Playlog.edit
+        )
     }
 
     // MARK: Selection

@@ -120,10 +120,25 @@ final class Product22SceneFactory {
             initialQuery: initialQuery,
             repository: QuickAddRepository(service: service),
             configStore: configStore(service),
-            onFindInCatalog: { [weak self] query in self?.showCatalogSearch(initialQuery: query) }
+            onFindInCatalog: { [weak self] query in self?.showCatalogSearch(initialQuery: query) },
+            // Deep link straight to the game the confirmation resolved to.
+            onOpenCatalogGame: { [weak self] id in self?.showCatalogGame(id) },
+            onOpenSubmissionState: { [weak self] id in self?.showSubmissionState(id) }
         )
         navigationController.present(
             UINavigationController(rootViewController: viewController), animated: true
+        )
+    }
+
+    func showSubmissionState(_ submissionID: CatalogSubmissionID) {
+        let service = service()
+        push(
+            SubmissionStateViewController(
+                submissionID: submissionID,
+                repository: QuickAddRepository(service: service),
+                configStore: configStore(service),
+                onOpenCatalogGame: { [weak self] id in self?.showCatalogGame(id) }
+            )
         )
     }
 

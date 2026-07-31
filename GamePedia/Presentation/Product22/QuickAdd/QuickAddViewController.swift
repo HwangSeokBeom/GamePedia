@@ -26,6 +26,10 @@ final class QuickAddViewController: UIViewController {
     private let repository: any QuickAddRepositing
     private let configStore: ProductConfigStore
     private let onFindInCatalog: (String?) -> Void
+    /// Deep link to the game the confirmation resolved to. Available now that
+    /// `confirmCatalogSubmission` returns a typed `catalogGameId`.
+    private let onOpenCatalogGame: (CatalogGameID) -> Void
+    private let onOpenSubmissionState: (CatalogSubmissionID) -> Void
 
     // MARK: State
 
@@ -56,12 +60,16 @@ final class QuickAddViewController: UIViewController {
         initialQuery: String?,
         repository: any QuickAddRepositing,
         configStore: ProductConfigStore,
-        onFindInCatalog: @escaping (String?) -> Void
+        onFindInCatalog: @escaping (String?) -> Void,
+        onOpenCatalogGame: @escaping (CatalogGameID) -> Void = { _ in },
+        onOpenSubmissionState: @escaping (CatalogSubmissionID) -> Void = { _ in }
     ) {
         self.rawInput = initialQuery ?? ""
         self.repository = repository
         self.configStore = configStore
         self.onFindInCatalog = onFindInCatalog
+        self.onOpenCatalogGame = onOpenCatalogGame
+        self.onOpenSubmissionState = onOpenSubmissionState
         // Suggested from the device region, and editable — the user may be
         // registering a game for a different market than they live in.
         self.regionCode = (Locale.current.region?.identifier ?? "US").uppercased()
@@ -474,13 +482,13 @@ final class QuickAddViewController: UIViewController {
         task = Task { [weak self] in
             guard let self else { return }
             do {
-                let outcome = try await repository.confirm(
+                let result = try await repository.confirm(
                     submissionID: preview.submissionID, selection: confirmation
                 )
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     self.activityIndicator.stopAnimating()
-                    self.showCompletion(outcome: outcome, confirmation: confirmation)
+                    self.showCompletion(result: result)
                 }
             } catch {
                 guard !Task.isCancelled else { return }
@@ -492,33 +500,51 @@ final class QuickAddViewController: UIViewController {
         }
     }
 
-    /// Reports the outcome the app actually knows.
+    /// Reports the outcome and offers the game it resolved to.
     ///
-    /// The confirm response body is untyped in the contract, so the created or
-    /// linked `catalogGameId` cannot be read and this screen cannot navigate
-    /// to "the game you just registered". It offers a catalog search instead
-    /// and never claims a specific game was linked. See
-    /// docs/product-2.2-contract-gaps.md.
-    private func showCompletion(
-        outcome: SubmissionConfirmOutcome,
-        confirmation: QuickAddConfirmation
-    ) {
-        let message: String
-        switch (confirmation.outcome, outcome) {
-        case (.pendingPublicReview, _):
+    /// `confirmCatalogSubmission` now returns a typed `catalogGameId`, so the
+    /// flow deep-links to the game that was created or linked instead of
+    /// falling back to a catalog search. All three paths return the same
+    /// fields, so this reads `createdNewGame` and `isIdempotentReplay` rather
+    /// than branching on the status code.
+    ///
+    /// An identity conflict takes priority over the resolved game: if a
+    /// verified identity already exists elsewhere, that existing game is the
+    /// honest destination, and nothing was merged to get there.
+    private func showCompletion(result: SubmissionConfirmResult) {
+        var message: String
+        switch result.publicationStatus {
+        case .pendingReview:
             message = L10n.Product22.QuickAdd.donePendingReview
-        case (.privateRegistration, .linkedOrReplayed):
-            message = L10n.Product22.QuickAdd.doneLinked
-        case (.privateRegistration, .created):
-            message = L10n.Product22.QuickAdd.doneRegistered
+        case .privateEntry, .published, .rejected:
+            message = result.createdNewGame
+                ? L10n.Product22.QuickAdd.doneRegistered
+                : L10n.Product22.QuickAdd.doneLinked
+        }
+        if result.isIdempotentReplay {
+            message += "\n\n" + L10n.Product22.QuickAdd.replayed
+        }
+        if result.identityConflict != nil {
+            message += "\n\n" + L10n.Product22.QuickAdd.conflictExistingGame
         }
 
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        alert.addAction(
-            UIAlertAction(title: L10n.Product22.QuickAdd.findInCatalog, style: .default) { [weak self] _ in
-                let title = self?.confirmedTitle
+
+        if let target = result.deepLinkTarget {
+            let title = result.identityConflict != nil
+                ? L10n.Product22.QuickAdd.openConflictingGame
+                : L10n.Product22.QuickAdd.openRegisteredGame
+            alert.addAction(UIAlertAction(title: title, style: .default) { [weak self] _ in
                 self?.discardUnfinishedInput()
-                self?.dismiss(animated: true) { self?.onFindInCatalog(title) }
+                self?.dismiss(animated: true) { self?.onOpenCatalogGame(target) }
+            })
+        }
+
+        alert.addAction(
+            UIAlertAction(title: L10n.Product22.Submission.title, style: .default) { [weak self] _ in
+                let id = result.submissionID
+                self?.discardUnfinishedInput()
+                self?.dismiss(animated: true) { self?.onOpenSubmissionState(id) }
             }
         )
         alert.addAction(UIAlertAction(title: L10n.Common.Button.confirm, style: .cancel) { [weak self] _ in

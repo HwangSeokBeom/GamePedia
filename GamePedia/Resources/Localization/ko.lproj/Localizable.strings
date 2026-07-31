@@ -973,3 +973,28 @@
 "product22.visibility.private" = "나만 보기";
 "product22.visibility.friends" = "친구에게 공개";
 "product22.visibility.public" = "전체 공개";
+
+/* Product 2.2 — quick add deep link, submission status and pagination. */
+"product22.quickAdd.openRegisteredGame" = "등록한 게임 보기";
+"product22.quickAdd.openConflictingGame" = "이미 등록된 게임 보기";
+"product22.quickAdd.replayed" = "이미 처리된 요청이에요. 결과는 그대로예요.";
+"product22.quickAdd.conflictExistingGame" = "같은 스토어 정보를 가진 게임이 이미 있어요. 그 게임을 확인해 주세요.";
+"product22.submission.title" = "등록 요청 상태";
+"product22.submission.status" = "상태";
+"product22.submission.statusPreview" = "확인 대기 중";
+"product22.submission.statusPersonalConfirmed" = "나만 보는 목록에 등록됨";
+"product22.submission.statusPendingReview" = "공개 검토 대기 중";
+"product22.submission.statusApproved" = "공개 승인됨";
+"product22.submission.statusRejected" = "공개 반려됨";
+"product22.submission.statusExpired" = "기간이 지나 만료됨";
+"product22.submission.resultingGame" = "등록된 게임";
+"product22.submission.draft" = "등록 내용";
+"product22.submission.draftUnreadable" = "저장된 내용을 다시 읽을 수 없어요. 처음부터 다시 등록해 주세요.";
+"product22.submission.candidates" = "찾은 후보";
+"product22.submission.candidatesUnknown" = "후보 정보가 기록되지 않았어요";
+"product22.submission.claimedIdentities" = "입력에서 읽은 스토어 정보 (미확인)";
+"product22.submission.expiresAt" = "만료 시각";
+"product22.submission.notFound" = "등록 요청을 찾을 수 없어요";
+"product22.list.loadMore" = "더 불러오기";
+"product22.list.loadingMore" = "불러오는 중…";
+"product22.catalog.emptyQuery" = "검색어를 알아볼 수 없어요. 게임 이름을 입력해 주세요.";
