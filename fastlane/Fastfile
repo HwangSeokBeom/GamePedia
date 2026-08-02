@@ -351,12 +351,13 @@ platform :ios do
     )
   end
 
-  def distribution_xcargs(widget_profile_name)
+  def distribution_xcargs(app_profile_name, widget_profile_name)
     [
       '-skipPackagePluginValidation',
       'CODE_SIGN_STYLE=Manual',
       "DEVELOPMENT_TEAM=#{distribution_team_id}",
       'CODE_SIGN_IDENTITY="Apple Distribution"',
+      "APP_PROVISIONING_PROFILE_SPECIFIER=#{Shellwords.escape(app_profile_name)}",
       "WIDGET_PROVISIONING_PROFILE_SPECIFIER=#{Shellwords.escape(widget_profile_name)}"
     ].join(" ")
   end
@@ -517,7 +518,7 @@ platform :ios do
       configuration: "Staging",
       clean: true,
       export_method: "app-store",
-      xcargs: distribution_xcargs(widget_provisioning_profile_name),
+      xcargs: distribution_xcargs(app_provisioning_profile_name, widget_provisioning_profile_name),
       export_options: distribution_export_options(
         app_identifier,
         app_provisioning_profile_name,
@@ -541,6 +542,7 @@ platform :ios do
 
   desc "Validate the production archive path on main without uploading"
   lane :release_archive do |_options|
+    app_provisioning_profile_name = resolve_app_provisioning_profile_name
     widget_provisioning_profile_name = resolve_widget_provisioning_profile_name
     release_marketing_version = current_marketing_version(configuration_name: "Release")
     release_build_number = current_build_number(configuration_name: "Release")
@@ -566,7 +568,7 @@ platform :ios do
       configuration: "Release",
       clean: true,
       export_method: "app-store",
-      xcargs: distribution_xcargs(widget_provisioning_profile_name),
+      xcargs: distribution_xcargs(app_provisioning_profile_name, widget_provisioning_profile_name),
       archive_path: "build/archives/GamePedia.xcarchive",
       skip_package_ipa: true,
       skip_package_pkg: true
@@ -649,7 +651,7 @@ platform :ios do
       configuration: "Release",
       clean: true,
       export_method: "app-store",
-      xcargs: distribution_xcargs(widget_provisioning_profile_name),
+      xcargs: distribution_xcargs(app_provisioning_profile_name, widget_provisioning_profile_name),
       export_options: distribution_export_options(
         app_identifier,
         app_provisioning_profile_name,
