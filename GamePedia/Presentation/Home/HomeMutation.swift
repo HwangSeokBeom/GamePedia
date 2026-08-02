@@ -11,4 +11,8 @@ enum HomeMutation {
     case setError(String)
     case clearError
     case setTranslatedTitles([Int: String])
+    // Product 2.2 Today
+    case setToday(TodayDisplayModel?)
+    case setTodayLoading(Bool)
+    case setTodaySectionRetrying(TodaySectionKey, Bool)
 }

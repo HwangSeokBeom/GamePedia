@@ -353,10 +353,20 @@ platform :ios do
 
   def distribution_xcargs(widget_profile_name)
     [
+      '-skipPackagePluginValidation',
       'CODE_SIGN_STYLE=Manual',
       "DEVELOPMENT_TEAM=#{distribution_team_id}",
       'CODE_SIGN_IDENTITY="Apple Distribution"',
       "WIDGET_PROVISIONING_PROFILE_SPECIFIER=#{Shellwords.escape(widget_profile_name)}"
+    ].join(" ")
+  end
+
+  def unsigned_ci_xcargs
+    [
+      '-skipPackagePluginValidation',
+      'CODE_SIGNING_ALLOWED=NO',
+      'CODE_SIGNING_REQUIRED=NO',
+      'CODE_SIGN_IDENTITY=""'
     ].join(" ")
   end
 
@@ -465,7 +475,7 @@ platform :ios do
       result_bundle_path: "fastlane/test_output/GamePediaTests.xcresult",
       include_simulator_logs: true,
       fail_build: true,
-      xcargs: 'CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""'
+      xcargs: unsigned_ci_xcargs
     )
   end
 
@@ -591,6 +601,7 @@ platform :ios do
         "-configuration Release",
         "-destination 'generic/platform=iOS'",
         "-derivedDataPath build/prearchive-derived",
+        "-skipPackagePluginValidation",
         "CODE_SIGNING_ALLOWED=NO",
         "CODE_SIGNING_REQUIRED=NO",
         "CODE_SIGN_IDENTITY=''",

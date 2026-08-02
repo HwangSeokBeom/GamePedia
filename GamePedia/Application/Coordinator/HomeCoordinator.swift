@@ -138,8 +138,44 @@ final class HomeCoordinator {
             showNotifications()
         case .presentHomeFilterSheet:
             break
+
+        // Product 2.2. Each destination is built here so a screen never has to
+        // know how the Product 2.2 stack is assembled.
+        case .showCatalogGame(let catalogGameID):
+            showCatalogGame(catalogGameID)
+        case .showArticle(let slug):
+            showArticle(slug: slug, card: nil)
+        case .showMonthlyReplay(let monthKey):
+            showMonthlyReplay(monthKey: monthKey)
+        case .showGameDNA:
+            showGameDNA()
+        case .showPlayCompass:
+            showPlayCompass()
         }
     }
+
+    // MARK: - Product 2.2 destinations
+    //
+    // Built by the shared scene factory, so Home, Search and Library reach the
+    // same screens through the same wiring.
+
+    private lazy var product22 = Product22SceneFactory(navigationController: navigationController)
+
+    private func showCatalogGame(_ catalogGameID: CatalogGameID) {
+        product22.showCatalogGame(catalogGameID)
+    }
+
+    private func showArticle(slug: String, card: ArticleCard?) {
+        product22.showArticle(slug: slug, card: card)
+    }
+
+    private func showMonthlyReplay(monthKey: String) {
+        product22.showMonthlyReplay(monthKey: monthKey)
+    }
+
+    private func showGameDNA() { product22.showGameDNA() }
+
+    private func showPlayCompass() { product22.showPlayCompass() }
 
     private func showGameList(
         section: HomeSection,

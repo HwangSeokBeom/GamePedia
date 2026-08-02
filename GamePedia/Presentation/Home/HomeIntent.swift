@@ -10,6 +10,10 @@ enum HomeIntent {
     case didTapApplyHomeFilters(HomeContentFilter)
     case didTapSeeMore(section: HomeSection)
     case didTapNotification
+    // Product 2.2 Today
+    case refreshToday
+    case retryTodaySection(TodaySectionKey)
+    case didTapTodayItem(TodayDisplayModel.Item)
 }
 
 enum HomeSection: Equatable {
@@ -66,4 +70,12 @@ enum HomeRoute {
     case presentHomeFilterSheet(HomeContentFilter)
     case showGameList(section: HomeSection, games: [Game], wishlistedGameIDs: Set<Int>)
     case showNotifications
+    // Product 2.2. Catalog games are addressed by canonical UUID and never by
+    // the legacy IGDB integer id, so these are separate routes rather than a
+    // reuse of `showGameList`.
+    case showCatalogGame(CatalogGameID)
+    case showArticle(slug: String)
+    case showMonthlyReplay(monthKey: String)
+    case showGameDNA
+    case showPlayCompass
 }

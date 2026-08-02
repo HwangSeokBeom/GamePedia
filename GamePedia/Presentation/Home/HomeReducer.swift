@@ -21,6 +21,18 @@ enum HomeReducer {
             state.selectedPlatformFilter = filter.platform
             state.selectedCategoryFilter = filter.category
             state.selectedGameModeFilter = filter.gameMode
+        case .setToday(let today):
+            state.today = today
+            state.isTodayLoading = false
+            state.retryingTodaySections = []
+        case .setTodayLoading(let isLoading):
+            state.isTodayLoading = isLoading
+        case .setTodaySectionRetrying(let key, let isRetrying):
+            if isRetrying {
+                state.retryingTodaySections.insert(key)
+            } else {
+                state.retryingTodaySections.remove(key)
+            }
         case .setUnreadNotificationCount(let unreadCount):
             state.unreadNotificationCount = max(unreadCount, 0)
         case .setError(let message):

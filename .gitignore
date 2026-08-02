@@ -19,3 +19,7 @@ DerivedData/
 build/
 *.ipa
 *.xcarchive
+
+# Swift Package Manager (local packages)
+.build/
+.swiftpm/

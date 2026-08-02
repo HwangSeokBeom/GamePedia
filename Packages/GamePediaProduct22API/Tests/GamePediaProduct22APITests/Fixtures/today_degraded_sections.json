@@ -1,0 +1,73 @@
+{
+  "success": true,
+  "data": {
+    "generatedAt": "2026-07-30T09:05:00.000Z",
+    "timezone": "UTC",
+    "locale": null,
+    "sections": [
+      {
+        "key": "playCompass",
+        "status": "disabled",
+        "reasonCode": "FEATURE_DISABLED",
+        "data": null
+      },
+      {
+        "key": "gameDNA",
+        "status": "disabled",
+        "reasonCode": "FEATURE_DISABLED",
+        "data": null
+      },
+      {
+        "key": "gameBriefing",
+        "status": "unavailable",
+        "reasonCode": "SECTION_TIMEOUT",
+        "data": null
+      },
+      {
+        "key": "backlogRescue",
+        "status": "unavailable",
+        "reasonCode": "SECTION_FAILED",
+        "data": null
+      },
+      {
+        "key": "spoilerFreeStartGuide",
+        "status": "unavailable",
+        "reasonCode": "SECTION_FAILED",
+        "data": null
+      },
+      {
+        "key": "editorialCuration",
+        "status": "disabled",
+        "reasonCode": "FEATURE_DISABLED",
+        "data": null
+      },
+      {
+        "key": "monthlyReplay",
+        "status": "unavailable",
+        "reasonCode": "SECTION_TIMEOUT",
+        "data": null
+      },
+      {
+        "key": "friendActivity",
+        "status": "unavailable",
+        "reasonCode": "SECTION_FAILED",
+        "data": null
+      }
+    ],
+    "meta": {
+      "sectionOrder": [
+        "playCompass",
+        "gameDNA",
+        "gameBriefing",
+        "backlogRescue",
+        "spoilerFreeStartGuide",
+        "editorialCuration",
+        "monthlyReplay",
+        "friendActivity"
+      ],
+      "limit": 8,
+      "nextCursor": null,
+      "partialFailure": true
+    }
+  }
+}
