@@ -23,7 +23,7 @@ enum Product22MutationAuthorizer {
               let expectation = authority.expectation(accountID: accountID) else {
             return .guestOnly
         }
-        return .boundAccount(expectation)
+        return .accountBound(expectation)
     }
 }
 

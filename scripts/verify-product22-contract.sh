@@ -61,10 +61,10 @@ fi
 # ------------------------------------- 4. pinned generator + runtime versions
 if grep -q 'swift-openapi-generator", exact: "1.11.1"' "$PACKAGE_DIR/Package.swift" \
   && grep -q 'swift-openapi-runtime", exact: "1.12.0"' "$PACKAGE_DIR/Package.swift" \
-  && grep -q 'swift-openapi-urlsession", exact: "1.3.0"' "$PACKAGE_DIR/Package.swift"; then
-  pass "generator/runtime/urlsession pinned exactly (1.11.1 / 1.12.0 / 1.3.0)"
+  && grep -q 'swift-openapi-urlsession", exact: "1.3.1"' "$PACKAGE_DIR/Package.swift"; then
+  pass "generator/runtime/urlsession pinned exactly (1.11.1 / 1.12.0 / 1.3.1)"
 else
-  fail "swift-openapi package pins drifted from 1.11.1 / 1.12.0 / 1.3.0"
+  fail "swift-openapi package pins drifted from 1.11.1 / 1.12.0 / 1.3.1"
 fi
 
 # --------------------------------------------- 5. contract structural content

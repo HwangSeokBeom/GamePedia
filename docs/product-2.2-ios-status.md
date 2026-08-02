@@ -17,7 +17,7 @@ work around them.
 `Packages/GamePediaProduct22API` isolates the server contract. The OpenAPI
 document is a byte-exact copy of GamePediaCoreServer
 `a42ef7d0510c39811844293cc4dbebbf55a5da39`; generator 1.11.1, runtime 1.12.0
-and urlsession 1.3.0 are pinned with `exact:`. Generated sources are produced
+and urlsession 1.3.1 are pinned with `exact:`. Generated sources are produced
 by the build plugin and are **not** committed, so checked-in Swift cannot drift
 from the contract. See `PROVENANCE.md` in that package and
 `scripts/verify-product22-contract.sh`.

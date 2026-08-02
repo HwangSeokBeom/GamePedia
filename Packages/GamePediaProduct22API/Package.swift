@@ -28,7 +28,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-openapi-generator", exact: "1.11.1"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.12.0"),
-        .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.3.0"),
+        .package(url: "https://github.com/apple/swift-openapi-urlsession", exact: "1.3.1"),
         // The generated Client.swift imports HTTPTypes directly, so the target
         // genuinely depends on it. Declaring it is not optional: SwiftPM's
         // static build happens to resolve it transitively, but Xcode links this

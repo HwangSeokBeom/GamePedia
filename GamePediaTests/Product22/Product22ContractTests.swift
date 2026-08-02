@@ -261,7 +261,7 @@ final class Product22ContractTests: XCTestCase {
 
     func testAccountBoundMutationFailsWhenTheAccountChangedAfterTheGesture() async throws {
         let expectation = Product22MutationAuthorizer.captureExpectation(authority: authority)
-        guard case .boundAccount = expectation else {
+        guard case .accountBound = expectation else {
             return XCTFail("a signed-in gesture must bind its account")
         }
 

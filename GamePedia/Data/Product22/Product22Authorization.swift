@@ -29,7 +29,11 @@ enum Product22Authorization: Equatable, Sendable {
     /// started by a user gesture uses this: if the account was replaced,
     /// logged out or deleted since the gesture, the request fails before
     /// transmission instead of being sent with somebody else's token.
-    case boundAccount(AuthorizationExpectation)
+    // This is deliberately named separately from
+    // `RequestAuthorization.boundAccount`: that credential is reserved for
+    // the durable library sync transport, while Product 2.2 mutations are
+    // online-only calls that bind their own gesture-time expectation.
+    case accountBound(AuthorizationExpectation)
 
     /// A gesture that a guest started. It must never acquire a bearer token,
     /// not even one that appeared after the gesture, so it fails closed.
@@ -87,7 +91,7 @@ enum Product22AuthorizationPolicy {
             }
             return .attach(token: token)
 
-        case .boundAccount(let expectation):
+        case .accountBound(let expectation):
             // Ownership validation and credential snapshot happen under one
             // lock inside the authority, so nothing can slip between them.
             guard let snapshot = authority.bindCredential(expectation: expectation) else {

@@ -42,7 +42,11 @@ decoding behaviour on a patch bump is not a contract client.
 | --- | --- | --- |
 | swift-openapi-generator | 1.11.1 | `73997cc62c2193d5046e431c9d546119dda14502` |
 | swift-openapi-runtime | 1.12.0 | `3d3a8457661daf7fb260ceeb9f0e24e5204ba5fb` |
-| swift-openapi-urlsession | 1.3.0 | `576a65b4ffb8c12ddad4950dc21eea2ef071bec2` |
+| swift-openapi-urlsession | 1.3.1 | `08796d36c99ad2318929bfa1d1e40f82194b65cc` |
+
+Version 1.3.1 includes the upstream terminal-event race fix that prevents a
+request-body stream from crashing when URLSession delivers overlapping close
+events.
 
 Transitive pins are recorded in `Package.resolved`, which is version
 controlled. `swift package resolve` must not modify it.
