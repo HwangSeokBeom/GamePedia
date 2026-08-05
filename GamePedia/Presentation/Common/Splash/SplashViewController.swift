@@ -3,10 +3,10 @@ import UIKit
 final class SplashViewController: UIViewController {
 
     private enum Metrics {
-        static let glowSide: CGFloat = 148
-        static let logoContainerSide: CGFloat = 88
-        static let logoWidth: CGFloat = 30
-        static let logoHeight: CGFloat = 22
+        static let glowSide: CGFloat = 164
+        static let logoContainerSide: CGFloat = 104
+        static let logoWidth: CGFloat = 64
+        static let logoHeight: CGFloat = 47
         static let titleTopSpacing: CGFloat = 32
         static let subtitleTopSpacing: CGFloat = 6
     }

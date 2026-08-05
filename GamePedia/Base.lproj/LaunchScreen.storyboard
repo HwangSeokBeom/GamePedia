@@ -13,7 +13,20 @@
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <color key="backgroundColor" red="0.043137254900000002" green="0.043137254900000002" blue="0.054901960780000003" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="logoIcon" translatesAutoresizingMaskIntoConstraints="NO" id="m9n-LG-0iP">
+                                <rect key="frame" x="155.5" y="310" width="64" height="47"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="64" id="FdK-bH-VLi"/>
+                                    <constraint firstAttribute="height" constant="47" id="pGJ-Nf-hD7"/>
+                                </constraints>
+                            </imageView>
+                        </subviews>
+                        <color key="backgroundColor" name="SplashBackground"/>
+                        <constraints>
+                            <constraint firstItem="m9n-LG-0iP" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="QqJ-hG-RcM"/>
+                            <constraint firstItem="m9n-LG-0iP" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="ktL-M2-HxE"/>
+                        </constraints>
                         <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
                     </view>
                 </viewController>
@@ -22,4 +35,10 @@
             <point key="canvasLocation" x="53" y="375"/>
         </scene>
     </scenes>
+    <resources>
+        <image name="logoIcon" width="54.666666666666664" height="40"/>
+        <namedColor name="SplashBackground">
+            <color red="0.97254901960784312" green="0.97254901960784312" blue="0.98039215686274506" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+    </resources>
 </document>
