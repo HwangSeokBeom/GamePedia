@@ -1,12 +1,15 @@
 {
   "images" : [
     {
-      "filename" : "logoIcon-다음에서-변환-png.pdf",
+      "filename" : "logoIcon.pdf",
       "idiom" : "universal"
     }
   ],
   "info" : {
     "author" : "xcode",
     "version" : 1
+  },
+  "properties" : {
+    "preserves-vector-representation" : true
   }
 }
